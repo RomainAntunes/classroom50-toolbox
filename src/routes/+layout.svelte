@@ -6,12 +6,23 @@
 
   let { children } = $props();
 
+  // The webview's own menu (Reload, Back, Inspect Element) makes no sense in a tray app.
+  // Text fields keep theirs for copy and paste.
+  function onContextMenu(event: MouseEvent) {
+    const target = event.target as HTMLElement | null;
+    if (!target?.closest("input, textarea, [contenteditable]")) {
+      event.preventDefault();
+    }
+  }
+
   onMount(async () => {
     setLocale(navigator.language);
     const info = await api.appInfo();
     document.documentElement.dataset.os = info.os;
   });
 </script>
+
+<svelte:document oncontextmenu={onContextMenu} />
 
 <div class="popover">
   {@render children()}

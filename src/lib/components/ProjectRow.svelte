@@ -57,6 +57,11 @@
     align-items: center;
     gap: calc(var(--space) / 2);
     padding: 8px 12px;
+    transition: background-color 0.12s;
+  }
+
+  .row:hover {
+    background: var(--bg-control);
   }
 
   .text {
