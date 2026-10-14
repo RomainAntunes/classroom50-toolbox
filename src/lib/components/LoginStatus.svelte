@@ -179,7 +179,6 @@
     border-radius: 13px;
     background: transparent;
     color: inherit;
-    line-height: 1;
   }
 
   .account img,
@@ -195,6 +194,12 @@
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
+    /* Trim the line box to cap height and baseline, so centering it centers the letters
+       on the avatar instead of leaving descender space below them. */
+    text-box: trim-both cap alphabetic;
+    /* Equal room above and below, so descenders (g, p, y) aren't clipped by the
+       ellipsis overflow while the center stays put. */
+    padding: 4px 0;
   }
 
   .account svg {
