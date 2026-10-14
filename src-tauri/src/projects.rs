@@ -1,6 +1,8 @@
-//! The merged project list: GitHub repos holding `.classroom50.yaml`, clones found in the
-//! watched folders, and each classroom's published assignment manifest, joined by
-//! `owner/repo`. A sync runs on a timer, when the popover opens and on demand; the result
+//! The merged project list. Classrooms come from the user's classroom teams and from
+//! `.classroom50.yaml` files; a repo (on GitHub or cloned in a watched folder) belongs to
+//! a classroom through that file or, for assignments without an autograder, which commit
+//! no file, through the `<classroom>-<assignment>-...` naming rule checked against the
+//! classroom's published manifest. Everything is joined by `owner/repo`. A sync runs on a timer, when the popover opens and on demand; the result
 //! is pushed to the UI as the `projects-updated` event.
 
 use std::collections::{BTreeMap, HashMap, HashSet};
@@ -15,7 +17,9 @@ use serde_json::{Map, Value, json};
 use tauri::{AppHandle, Emitter, Manager};
 use tokio::task::JoinSet;
 
-use crate::classroom50::{self, Assignment, RepoConfig, SUBMIT_TAG_PREFIX, SubmissionMode};
+use crate::classroom50::{
+    self, Assignment, Classroom, RepoConfig, SUBMIT_TAG_PREFIX, SubmissionMode,
+};
 use crate::discovery::{self, LocalProject};
 use crate::error::{Error, Result};
 use crate::github::{self, Http, HttpCache};
@@ -25,7 +29,8 @@ use crate::tools;
 
 pub const UPDATED_EVENT: &str = "projects-updated";
 
-const CACHE_FILE: &str = "repos.json";
+/// v2 keeps every inspected repo, not only those with a marker file.
+const CACHE_FILE: &str = "repos-v2.json";
 const SYNC_INTERVAL: Duration = Duration::from_secs(15 * 60);
 /// Opening the popover refreshes at most this often.
 const MIN_AUTO_INTERVAL: chrono::TimeDelta = chrono::TimeDelta::minutes(2);
@@ -65,7 +70,8 @@ pub struct RemoteRepo {
     pub default_branch: Option<String>,
     pub head: Option<Commit>,
     pub last_submission: Option<Submission>,
-    pub config: RepoConfig,
+    /// The repo's `.classroom50.yaml`, when it has a valid one.
+    pub config: Option<RepoConfig>,
 }
 
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize)]
@@ -96,10 +102,12 @@ pub struct Project {
     pub id: String,
     pub owner: Option<String>,
     pub repo: Option<String>,
+    /// From `.classroom50.yaml`, or derived from the repo name.
     pub config: RepoConfig,
     pub path: Option<PathBuf>,
     pub local: Option<LocalState>,
     pub remote: Option<RemoteRepo>,
+    pub classroom: Option<Classroom>,
     pub assignment: Option<Assignment>,
     pub pending: Option<Pending>,
 }
@@ -144,8 +152,10 @@ struct RemoteCache {
     /// `pushedAt` of every listed repo at the time it was last inspected, by lowercase
     /// `owner/repo`. Pushing a commit or tag changes it.
     checked: HashMap<String, Option<DateTime<Utc>>>,
-    /// The Classroom 50 repos among them.
+    /// Details of every inspected repo; which are assignments is decided per sync.
     repos: BTreeMap<String, RemoteRepo>,
+    /// From the user's classroom teams.
+    classrooms: Vec<Classroom>,
 }
 
 pub struct ProjectsState {
@@ -281,7 +291,16 @@ async fn sync(
             .into_iter()
             .filter_map(|p| p.remote)
             .collect();
-        let projects = build(remote_repos, scan_local(folders).await, state, http, now).await;
+        let classrooms = state.remote().classrooms;
+        let projects = build(
+            remote_repos,
+            classrooms,
+            scan_local(folders).await,
+            state,
+            http,
+            now,
+        )
+        .await;
         return Snapshot {
             projects,
             synced_at: previous.synced_at,
@@ -290,44 +309,160 @@ async fn sync(
     }
 
     let (remote, locals) = tokio::join!(sync_remote(state, http), scan_local(folders));
-    let (remote_repos, issue) = match remote {
-        Ok(repos) => (repos, None),
+    let (repos, classrooms, issue) = match remote {
+        Ok(()) => {
+            let cache = state.remote();
+            (cache.repos.into_values().collect(), cache.classrooms, None)
+        }
         // Without a usable login the cached repos may belong to another account.
         Err(err @ (Error::NotSignedIn | Error::NotInstalled { .. })) => {
-            (Vec::new(), Some(SyncIssue::from(&err)))
+            (Vec::new(), Vec::new(), Some(SyncIssue::from(&err)))
         }
         // Offline or rate limited: keep showing what was last seen.
         Err(err) => {
             log::warn!("GitHub sync failed: {err}");
+            let cache = state.remote();
             (
-                state.remote().repos.into_values().collect(),
+                cache.repos.into_values().collect(),
+                cache.classrooms,
                 Some(SyncIssue::from(&err)),
             )
         }
     };
 
     Snapshot {
-        projects: build(remote_repos, locals, state, http, now).await,
+        projects: build(repos, classrooms, locals, state, http, now).await,
         synced_at: Some(now),
         issue,
     }
 }
 
+type ClassroomKey = (String, String);
+
+/// Resolves which repos are assignments, then merges, annotates and sorts them.
 async fn build(
     remote: Vec<RemoteRepo>,
-    locals: Vec<(LocalProject, Option<LocalState>)>,
+    team_classrooms: Vec<Classroom>,
+    locals: Vec<LocalProject>,
     state: &ProjectsState,
     http: &reqwest::Client,
     now: DateTime<Utc>,
 ) -> Vec<Project> {
-    let mut projects = merge(remote, locals);
-    attach_assignments(&mut projects, &state.http_cache, http).await;
+    // Teams carry the display name and secret, so they win over marker files.
+    let mut classrooms: BTreeMap<ClassroomKey, Classroom> =
+        team_classrooms.into_iter().map(|c| (c.key(), c)).collect();
+    let configs = remote
+        .iter()
+        .filter_map(|r| Some((r.owner.as_str(), r.config.as_ref()?)))
+        .chain(
+            locals
+                .iter()
+                .filter_map(|l| Some((l.owner.as_deref()?, l.config.as_ref()?))),
+        );
+    for (owner, config) in configs {
+        let classroom = Classroom::from_config(owner, config);
+        classrooms.entry(classroom.key()).or_insert(classroom);
+    }
+    let manifests = fetch_manifests(&classrooms, &state.http_cache, http).await;
     state.http_cache.save();
+
+    let identify = |owner: Option<&str>, name: Option<&str>, config: Option<&RepoConfig>| {
+        identify(owner, name, config, &classrooms, &manifests)
+    };
+    let remote: Vec<(RemoteRepo, RepoConfig)> = remote
+        .into_iter()
+        .filter_map(|repo| {
+            let config = identify(Some(&repo.owner), Some(&repo.name), repo.config.as_ref())?;
+            Some((repo, config))
+        })
+        .collect();
+    let locals: Vec<(LocalProject, RepoConfig)> = locals
+        .into_iter()
+        .filter_map(|clone| {
+            let config = identify(
+                clone.owner.as_deref(),
+                clone.repo.as_deref(),
+                clone.config.as_ref(),
+            )?;
+            Some((clone, config))
+        })
+        .collect();
+    let states = local_states(locals.iter().map(|(clone, _)| clone.path.clone())).await;
+
+    let mut projects = merge(
+        remote,
+        locals
+            .into_iter()
+            .zip(states)
+            .map(|((c, cfg), s)| (c, cfg, s))
+            .collect(),
+    );
     for project in &mut projects {
+        let key = project.owner.as_deref().map(|owner| {
+            (
+                owner.to_ascii_lowercase(),
+                project.config.classroom.to_ascii_lowercase(),
+            )
+        });
+        project.classroom = key.as_ref().and_then(|k| classrooms.get(k)).cloned();
+        project.assignment = key
+            .as_ref()
+            .and_then(|k| manifests.get(k))
+            .and_then(|list| list.iter().find(|a| a.slug == project.config.assignment))
+            .cloned();
         project.pending = pending(project);
     }
     projects.sort_by_cached_key(|p| sort_key(p, now));
     projects
+}
+
+/// The assignment identity of a repo: its marker file, else its name matched against the
+/// manifests of the owner's classrooms. `None` means it isn't an assignment repo.
+fn identify(
+    owner: Option<&str>,
+    name: Option<&str>,
+    config: Option<&RepoConfig>,
+    classrooms: &BTreeMap<ClassroomKey, Classroom>,
+    manifests: &HashMap<ClassroomKey, Vec<Assignment>>,
+) -> Option<RepoConfig> {
+    if let Some(config) = config {
+        return Some(config.clone());
+    }
+    let (owner, name) = (owner?.to_ascii_lowercase(), name?);
+    classrooms
+        .iter()
+        .filter(|((org, _), _)| *org == owner)
+        .find_map(|(key, classroom)| {
+            let slugs = manifests.get(key)?.iter().map(|a| a.slug.as_str());
+            let slug = classroom50::assignment_for_repo(name, &classroom.slug, slugs)?;
+            Some(RepoConfig {
+                classroom: classroom.slug.clone(),
+                assignment: slug.to_owned(),
+                secret: classroom.secret.clone(),
+            })
+        })
+}
+
+/// Fetches each classroom's manifest once (conditional GET).
+async fn fetch_manifests(
+    classrooms: &BTreeMap<ClassroomKey, Classroom>,
+    cache: &HttpCache,
+    http: &reqwest::Client,
+) -> HashMap<ClassroomKey, Vec<Assignment>> {
+    let fetches = classrooms.iter().map(|(key, classroom)| async move {
+        let url = classroom.assignments_url();
+        let manifest = match cache.get_text(http, &url).await {
+            Ok(body) => classroom50::parse_assignments(&url, &body)
+                .inspect_err(|err| log::warn!("{err}"))
+                .ok(),
+            Err(err) => {
+                log::warn!("could not fetch {url}: {err}");
+                None
+            }
+        };
+        manifest.map(|m| (key.clone(), m))
+    });
+    join_all(fetches).await.into_iter().flatten().collect()
 }
 
 // ---- Remote discovery ----------------------------------------------------------------
@@ -443,9 +578,11 @@ struct RefNode {
 }
 
 impl RepoNode {
-    /// `None` when the repo isn't a Classroom 50 assignment (no or invalid config).
-    fn into_remote(self) -> Option<RemoteRepo> {
-        let config = RepoConfig::parse(self.config?.text.as_deref()?).ok()?;
+    fn into_remote(self) -> RemoteRepo {
+        let config = self
+            .config
+            .and_then(|blob| blob.text)
+            .and_then(|text| RepoConfig::parse(&text).ok());
         let last_submission = self
             .submissions
             .and_then(|refs| refs.nodes.into_iter().next())
@@ -468,7 +605,7 @@ impl RepoNode {
             ),
             None => (None, None),
         };
-        Some(RemoteRepo {
+        RemoteRepo {
             owner: self.owner.login,
             name: self.name,
             url: self.url,
@@ -481,7 +618,7 @@ impl RepoNode {
             head,
             last_submission,
             config,
-        })
+        }
     }
 }
 
@@ -493,11 +630,13 @@ fn parse_submit_time(name: &str) -> Option<DateTime<Utc>> {
         .map(|t| t.and_utc())
 }
 
-/// Lists every repo the user can see, then inspects only those pushed since the last
-/// sync. Progress is kept even when a later request fails.
-async fn sync_remote(state: &ProjectsState, http: &reqwest::Client) -> Result<Vec<RemoteRepo>> {
+/// Lists every repo the user can see, inspects only those pushed since the last sync, and
+/// reads the user's classroom teams. Results land in the persisted cache; progress is kept
+/// even when a later request fails.
+async fn sync_remote(state: &ProjectsState, http: &reqwest::Client) -> Result<()> {
     let token = tools::gh_token().await?;
     let (login, listed) = list_repos(http, &token).await?;
+    let classrooms = list_classrooms(http, &token, &login).await;
 
     let mut cache = state.remote();
     if cache.login.as_deref() != Some(login.as_str()) {
@@ -538,16 +677,87 @@ async fn sync_remote(state: &ProjectsState, http: &reqwest::Client) -> Result<Ve
                 };
                 let k = key(&listed.name_with_owner);
                 cache.checked.insert(k.clone(), listed.pushed_at);
-                match node.and_then(RepoNode::into_remote) {
-                    Some(repo) => cache.repos.insert(k, repo),
+                match node {
+                    Some(node) => cache.repos.insert(k, node.into_remote()),
                     None => cache.repos.remove(&k),
                 };
             }
         }
     }
-    let repos = cache.repos.values().cloned().collect();
+    match classrooms {
+        Ok(classrooms) => cache.classrooms = classrooms,
+        // Teams are a bonus over marker files; keep the last known list.
+        Err(err) => log::warn!("could not read classroom teams: {err}"),
+    }
     state.store_remote(cache);
-    result.map(|()| repos)
+    result
+}
+
+const TEAMS_QUERY: &str = r#"
+query($login: String!, $cursor: String) {
+  viewer {
+    organizations(first: 100, after: $cursor) {
+      pageInfo { hasNextPage endCursor }
+      nodes {
+        login
+        teams(first: 100, userLogins: [$login], query: "classroom50-") {
+          nodes { slug description }
+        }
+      }
+    }
+  }
+}"#;
+
+#[derive(Deserialize)]
+struct TeamsData {
+    viewer: TeamsViewer,
+}
+
+#[derive(Deserialize)]
+struct TeamsViewer {
+    organizations: Connection<OrgNode>,
+}
+
+#[derive(Deserialize)]
+struct OrgNode {
+    login: String,
+    teams: TeamConnection,
+}
+
+#[derive(Deserialize)]
+struct TeamConnection {
+    nodes: Vec<Option<TeamNode>>,
+}
+
+#[derive(Deserialize)]
+struct TeamNode {
+    slug: String,
+    description: Option<String>,
+}
+
+/// The classrooms the user is enrolled in, from their `classroom50-<classroom>` teams.
+async fn list_classrooms(
+    http: &reqwest::Client,
+    token: &str,
+    login: &str,
+) -> Result<Vec<Classroom>> {
+    let mut classrooms = Vec::new();
+    let mut cursor: Option<String> = None;
+    for _ in 0..MAX_LIST_PAGES {
+        let variables = json!({ "login": login, "cursor": cursor });
+        let data: TeamsData = github::graphql(http, token, TEAMS_QUERY, variables).await?;
+        let page = data.viewer.organizations;
+        for org in page.nodes.into_iter().flatten() {
+            classrooms.extend(org.teams.nodes.into_iter().flatten().filter_map(|team| {
+                Classroom::from_team(&org.login, &team.slug, team.description.as_deref())
+            }));
+        }
+        match page.page_info.end_cursor {
+            Some(next) if page.page_info.has_next_page => cursor = Some(next),
+            _ => break,
+        }
+    }
+    Ok(classrooms)
 }
 
 async fn list_repos(http: &reqwest::Client, token: &str) -> Result<(String, Vec<ListedRepo>)> {
@@ -602,26 +812,30 @@ fn key(name_with_owner: &str) -> String {
 
 // ---- Local clones ----------------------------------------------------------------------
 
-async fn scan_local(folders: Vec<PathBuf>) -> Vec<(LocalProject, Option<LocalState>)> {
-    let found = tauri::async_runtime::spawn_blocking(move || {
+async fn scan_local(folders: Vec<PathBuf>) -> Vec<LocalProject> {
+    tauri::async_runtime::spawn_blocking(move || {
         folders
             .iter()
             .flat_map(|root| discovery::scan(root, discovery::DEFAULT_MAX_DEPTH))
-            .collect::<Vec<_>>()
+            .collect()
     })
     .await
-    .unwrap_or_default();
+    .unwrap_or_default()
+}
 
+/// `git status` of each clone, concurrently, in input order.
+async fn local_states(paths: impl Iterator<Item = PathBuf>) -> Vec<Option<LocalState>> {
     let mut tasks = JoinSet::new();
-    for (i, project) in found.iter().enumerate() {
-        let path = project.path.clone();
+    let mut count = 0;
+    for (i, path) in paths.enumerate() {
         tasks.spawn(async move { (i, local_state(&path).await) });
+        count += 1;
     }
-    let mut states = vec![None; found.len()];
+    let mut states = vec![None; count];
     while let Some(Ok((i, state))) = tasks.join_next().await {
         states[i] = state;
     }
-    found.into_iter().zip(states).collect()
+    states
 }
 
 /// `git status` without taking the index lock, so it never races the student's own git.
@@ -667,19 +881,23 @@ fn parse_status(porcelain: &str) -> LocalState {
 
 // ---- Merge -----------------------------------------------------------------------------
 
-fn merge(remote: Vec<RemoteRepo>, locals: Vec<(LocalProject, Option<LocalState>)>) -> Vec<Project> {
+fn merge(
+    remote: Vec<(RemoteRepo, RepoConfig)>,
+    locals: Vec<(LocalProject, RepoConfig, Option<LocalState>)>,
+) -> Vec<Project> {
     let mut by_id: BTreeMap<String, Project> = remote
         .into_iter()
-        .map(|repo| {
+        .map(|(repo, config)| {
             let id = key(&format!("{}/{}", repo.owner, repo.name));
             let project = Project {
                 id: id.clone(),
                 owner: Some(repo.owner.clone()),
                 repo: Some(repo.name.clone()),
-                config: repo.config.clone(),
+                config,
                 path: None,
                 local: None,
                 remote: Some(repo),
+                classroom: None,
                 assignment: None,
                 pending: None,
             };
@@ -687,7 +905,7 @@ fn merge(remote: Vec<RemoteRepo>, locals: Vec<(LocalProject, Option<LocalState>)
         })
         .collect();
 
-    for (clone, state) in locals {
+    for (clone, config, state) in locals {
         let id = match (&clone.owner, &clone.repo) {
             (Some(owner), Some(repo)) => key(&format!("{owner}/{repo}")),
             _ => clone.path.to_string_lossy().into_owned(),
@@ -706,10 +924,11 @@ fn merge(remote: Vec<RemoteRepo>, locals: Vec<(LocalProject, Option<LocalState>)
                         id,
                         owner: clone.owner,
                         repo: clone.repo,
-                        config: clone.config,
+                        config,
                         path: Some(clone.path),
                         local: state,
                         remote: None,
+                        classroom: None,
                         assignment: None,
                         pending: None,
                     },
@@ -718,52 +937,6 @@ fn merge(remote: Vec<RemoteRepo>, locals: Vec<(LocalProject, Option<LocalState>)
         }
     }
     by_id.into_values().collect()
-}
-
-/// Fetches each classroom's manifest once and attaches the matching entry to each project.
-async fn attach_assignments(projects: &mut [Project], cache: &HttpCache, http: &reqwest::Client) {
-    let mut manifests: HashMap<String, Option<Vec<Assignment>>> = HashMap::new();
-    for project in projects.iter() {
-        let Some(owner) = &project.owner else {
-            continue;
-        };
-        let url = classroom50::assignments_url(
-            owner,
-            &project.config.classroom,
-            project.config.secret.as_deref(),
-        );
-        manifests.entry(url).or_default();
-    }
-    let fetches = manifests.keys().map(|url| async move {
-        let manifest = match cache.get_text(http, url).await {
-            Ok(body) => classroom50::parse_assignments(url, &body)
-                .inspect_err(|err| log::warn!("{err}"))
-                .ok(),
-            Err(err) => {
-                log::warn!("could not fetch {url}: {err}");
-                None
-            }
-        };
-        (url.clone(), manifest)
-    });
-    let fetched: Vec<_> = join_all(fetches).await;
-    manifests.extend(fetched);
-
-    for project in projects {
-        let Some(owner) = &project.owner else {
-            continue;
-        };
-        let url = classroom50::assignments_url(
-            owner,
-            &project.config.classroom,
-            project.config.secret.as_deref(),
-        );
-        project.assignment = manifests
-            .get(&url)
-            .and_then(Option::as_ref)
-            .and_then(|list| list.iter().find(|a| a.slug == project.config.assignment))
-            .cloned();
-    }
 }
 
 fn pending(project: &Project) -> Option<Pending> {
@@ -797,8 +970,9 @@ fn sort_key(project: &Project, now: DateTime<Utc>) -> (u8, i64, String) {
         .map_or(&project.config.assignment, |a| &a.name)
         .to_lowercase();
     let assignment = project.assignment.as_ref();
-    let closed =
-        assignment.is_some_and(|a| a.closed) || project.remote.as_ref().is_some_and(|r| r.archived);
+    let closed = assignment.is_some_and(|a| a.closed)
+        || project.remote.as_ref().is_some_and(|r| r.archived)
+        || project.classroom.as_ref().is_some_and(|c| !c.active);
     match assignment
         .and_then(|a| a.due)
         .map(|d| d.with_timezone(&Utc))
@@ -839,7 +1013,7 @@ mod tests {
                 commit: commit.into(),
                 at: None,
             }),
-            config: config("hello"),
+            config: Some(config("hello")),
         }
     }
 
@@ -876,8 +1050,8 @@ mod tests {
         }"#;
         let repo = serde_json::from_str::<RepoNode>(json)
             .unwrap()
-            .into_remote()
-            .unwrap();
+            .into_remote();
+        assert_eq!(repo.config.unwrap().assignment, "hello");
         assert!(repo.can_push);
         assert_eq!(repo.head.unwrap().oid, "aaa");
         let submission = repo.last_submission.unwrap();
@@ -889,7 +1063,7 @@ mod tests {
                 "viewerPermission": "ADMIN", "defaultBranchRef": null, "config": null, "submissions": {"nodes": []}}"#,
         )
         .unwrap();
-        assert!(plain.into_remote().is_none());
+        assert!(plain.into_remote().config.is_none());
     }
 
     #[test]
@@ -898,17 +1072,20 @@ mod tests {
             path: "/code/hello".into(),
             owner: Some("cs50".into()),
             repo: Some("Fall-Hello-Alice".into()),
-            config: config("hello"),
+            config: Some(config("hello")),
         };
         let orphan = LocalProject {
             path: "/code/scratch".into(),
             owner: None,
             repo: None,
-            config: config("scratch"),
+            config: Some(config("scratch")),
         };
         let projects = merge(
-            vec![remote("fall-hello-alice", "aaa", None)],
-            vec![(clone, Some(LocalState::default())), (orphan, None)],
+            vec![(remote("fall-hello-alice", "aaa", None), config("hello"))],
+            vec![
+                (clone, config("hello"), Some(LocalState::default())),
+                (orphan, config("scratch"), None),
+            ],
         );
         assert_eq!(projects.len(), 2);
         let hello = projects
@@ -921,6 +1098,42 @@ mod tests {
             projects
                 .iter()
                 .any(|p| p.id == "/code/scratch" && p.remote.is_none())
+        );
+    }
+
+    #[test]
+    fn identifies_repos_by_marker_or_name() {
+        let poo = Classroom::from_team("HEIGVD-POO", "classroom50-26-poo-c", None).unwrap();
+        let classrooms = BTreeMap::from([(poo.key(), poo)]);
+        let manifest: Vec<Assignment> = serde_json::from_value(json!([
+            {"slug": "lab02", "name": "Labo 2", "mode": "team"},
+            {"slug": "labo-3-hogwarts", "name": "Labo 3", "mode": "team"}
+        ]))
+        .unwrap();
+        let manifests =
+            HashMap::from([(("heigvd-poo".to_owned(), "26-poo-c".to_owned()), manifest)]);
+        let find = |owner, name, config| identify(owner, name, config, &classrooms, &manifests);
+
+        let lab3 = find(
+            Some("HEIGVD-POO"),
+            Some("26-poo-c-labo-3-hogwarts-group-5"),
+            None,
+        )
+        .unwrap();
+        assert_eq!(
+            (lab3.classroom.as_str(), lab3.assignment.as_str()),
+            ("26-poo-c", "labo-3-hogwarts")
+        );
+        // A marker file wins; unrelated repos and other orgs don't match.
+        let marked = config("hello");
+        assert_eq!(
+            find(Some("x"), Some("y"), Some(&marked)),
+            Some(marked.clone())
+        );
+        assert_eq!(find(Some("HEIGVD-POO"), Some("hogwarts"), None), None);
+        assert_eq!(
+            find(Some("other-org"), Some("26-poo-c-lab02-group-1"), None),
+            None
         );
     }
 
@@ -938,6 +1151,7 @@ mod tests {
             path: None,
             local,
             remote: Some(remote),
+            classroom: None,
             assignment: Some(assignment.clone()),
             pending: None,
         };
@@ -955,3 +1169,4 @@ mod tests {
         assert_eq!(pending(&edited), Some(Pending::Uncommitted));
     }
 }
+

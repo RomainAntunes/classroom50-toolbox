@@ -14,7 +14,7 @@
   } from "$lib/api";
   import { t } from "$lib/i18n";
   import { session } from "$lib/session.svelte";
-  import { loadSettings, pickWatchedFolder } from "$lib/settings.svelte";
+  import { loadSettings } from "$lib/settings.svelte";
   import Section from "$lib/components/Section.svelte";
   import ToolRow from "$lib/components/ToolRow.svelte";
   import ProjectRow from "$lib/components/ProjectRow.svelte";
@@ -58,7 +58,7 @@
       const key = `${project.owner ?? ""}/${project.config.classroom}`.toLowerCase();
       let group = groups.get(key);
       if (!group) {
-        group = { key, title: project.config.classroom, projects: [] };
+        group = { key, title: project.classroom?.name ?? project.config.classroom, projects: [] };
         groups.set(key, group);
       }
       group.projects.push(project);
@@ -147,20 +147,6 @@
   <div class="tools">
     <button
       class="icon"
-      onclick={pickWatchedFolder}
-      title={t("projects.addFolder")}
-      aria-label={t("projects.addFolder")}
-    >
-      <svg viewBox="0 0 24 24" aria-hidden="true">
-        <path d="M12 10v6" />
-        <path d="M9 13h6" />
-        <path
-          d="M20 20a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z"
-        />
-      </svg>
-    </button>
-    <button
-      class="icon"
       class:spinning={syncing}
       disabled={loading}
       onclick={refresh}
@@ -224,7 +210,7 @@
         {t("projects.loading")}
       {:else}
         {t("projects.empty")}
-        <button onclick={pickWatchedFolder}>{t("projects.addFolder")}</button>
+        <button onclick={() => goto("/settings")}>{t("app.settings")}</button>
       {/if}
     </p>
   {/each}
@@ -245,10 +231,12 @@
   .search {
     flex: 1;
     min-width: 0;
+    box-sizing: border-box;
+    height: 26px;
     font: inherit;
     font-size: 0.9em;
     color: inherit;
-    padding: 4px 8px;
+    padding: 0 8px;
     border: 1px solid var(--border);
     border-radius: var(--radius-control);
     background: var(--bg-control);

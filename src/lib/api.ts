@@ -52,7 +52,17 @@ export interface RemoteRepo {
   defaultBranch: string | null;
   head: Commit | null;
   lastSubmission: Submission | null;
-  config: RepoConfig;
+  config: RepoConfig | null;
+}
+
+export interface Classroom {
+  org: string;
+  slug: string;
+  name: string | null;
+  term: string | null;
+  active: boolean;
+  secret: string | null;
+  pagesBaseUrl: string | null;
 }
 
 export interface LocalState {
@@ -88,6 +98,7 @@ export interface Project {
   path: string | null;
   local: LocalState | null;
   remote: RemoteRepo | null;
+  classroom: Classroom | null;
   assignment: Assignment | null;
   pending: Pending | null;
 }

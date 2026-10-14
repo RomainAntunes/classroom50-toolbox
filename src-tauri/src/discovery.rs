@@ -1,4 +1,6 @@
-//! Finds Classroom 50 clones on disk: any directory holding a `.classroom50.yaml`.
+//! Finds candidate clones on disk: directories holding a `.classroom50.yaml`, and git
+//! repos with a GitHub origin (assignments without an autograder have no marker file).
+//! `projects` decides which of them belong to a classroom.
 
 use std::path::{Path, PathBuf};
 
@@ -18,11 +20,11 @@ pub struct LocalProject {
     pub path: PathBuf,
     pub owner: Option<String>,
     pub repo: Option<String>,
-    pub config: RepoConfig,
+    pub config: Option<RepoConfig>,
 }
 
-/// Walks `root` and returns every Classroom 50 repo found. A repo's own subtree isn't
-/// descended into. Blocking: call from `spawn_blocking`.
+/// Walks `root` and returns every candidate repo. A repo's own subtree isn't descended
+/// into. Blocking: call from `spawn_blocking`.
 pub fn scan(root: &Path, max_depth: usize) -> Vec<LocalProject> {
     let mut projects = Vec::new();
     let mut walker = WalkDir::new(root)
@@ -33,19 +35,22 @@ pub fn scan(root: &Path, max_depth: usize) -> Vec<LocalProject> {
 
     while let Some(entry) = walker.next() {
         let Ok(entry) = entry else { continue };
-        if !entry.file_type().is_dir() || !entry.path().join(REPO_CONFIG_FILE).is_file() {
+        let dir = entry.path();
+        let has_config = dir.join(REPO_CONFIG_FILE).is_file();
+        if !entry.file_type().is_dir() || !(has_config || dir.join(".git").exists()) {
             continue;
         }
-        if let Ok(Some(config)) = RepoConfig::read(entry.path()) {
-            let (owner, repo) = origin_of(entry.path()).unzip();
+        walker.skip_current_dir();
+        let config = RepoConfig::read(dir).ok().flatten();
+        let (owner, repo) = origin_of(dir).unzip();
+        if config.is_some() || owner.is_some() {
             projects.push(LocalProject {
-                path: entry.path().to_path_buf(),
+                path: dir.to_path_buf(),
                 owner,
                 repo,
                 config,
             });
         }
-        walker.skip_current_dir();
     }
     projects
 }
@@ -111,31 +116,51 @@ mod tests {
     }
 
     #[test]
-    fn scans_for_marker_files() {
+    fn scans_for_marker_files_and_github_clones() {
         let root = std::env::temp_dir().join(format!("c50tb-scan-{}", std::process::id()));
         let repo = root.join("course").join("hello");
         let nested = repo.join("sub");
         let hidden = root.join(".cache").join("ignored");
-        for dir in [&nested, &hidden, &repo.join(".git")] {
+        let bare_clone = root.join("course").join("lab3");
+        let local_only = root.join("scratch");
+        for dir in [
+            &nested,
+            &hidden,
+            &repo.join(".git"),
+            &bare_clone.join(".git"),
+            &local_only.join(".git"),
+        ] {
             std::fs::create_dir_all(dir).unwrap();
         }
         let yaml = "classroom: fall\nassignment: hello\n";
         std::fs::write(repo.join(REPO_CONFIG_FILE), yaml).unwrap();
         std::fs::write(nested.join(REPO_CONFIG_FILE), yaml).unwrap();
         std::fs::write(hidden.join(REPO_CONFIG_FILE), yaml).unwrap();
+        let origin =
+            |url: &str| format!("[core]\n\tbare = false\n[remote \"origin\"]\n\turl = {url}\n");
         std::fs::write(
             repo.join(".git").join("config"),
-            "[core]\n\tbare = false\n[remote \"origin\"]\n\turl = git@github.com:cs50/fall-hello-alice.git\n",
+            origin("git@github.com:cs50/fall-hello-alice.git"),
         )
         .unwrap();
+        std::fs::write(
+            bare_clone.join(".git").join("config"),
+            origin("https://github.com/cs50/fall-lab3-group-5"),
+        )
+        .unwrap();
+        std::fs::write(local_only.join(".git").join("config"), "[core]\n").unwrap();
 
-        let projects = scan(&root, DEFAULT_MAX_DEPTH);
+        let mut projects = scan(&root, DEFAULT_MAX_DEPTH);
         std::fs::remove_dir_all(&root).unwrap();
+        projects.sort_by(|a, b| a.path.cmp(&b.path));
 
-        assert_eq!(projects.len(), 1);
+        assert_eq!(projects.len(), 2);
         assert_eq!(projects[0].path, repo);
         assert_eq!(projects[0].owner.as_deref(), Some("cs50"));
         assert_eq!(projects[0].repo.as_deref(), Some("fall-hello-alice"));
-        assert_eq!(projects[0].config.assignment, "hello");
+        assert_eq!(projects[0].config.as_ref().unwrap().assignment, "hello");
+        assert_eq!(projects[1].path, bare_clone);
+        assert_eq!(projects[1].repo.as_deref(), Some("fall-lab3-group-5"));
+        assert!(projects[1].config.is_none());
     }
 }
