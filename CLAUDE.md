@@ -13,7 +13,7 @@ A tray app for [Classroom 50](https://github.com/foundation50/classroom50) stude
 The first release is for students only. Keep the domain layer role-agnostic so a teacher mode (`gh teacher`) can be added later without a rewrite.
 
 - Repo: `github.com/RomainAntunes/classroom50-toolbox`. License: GPL-3.0, the same as Classroom 50.
-- Status: base scaffold. Tray, popover, tool detection and install, local scan and the Pages manifest fetch are done. Not yet built: the GitHub API client, deadline tracking and notifications, grades, accept and submit, settings persistence, and the login flow.
+- Status: tray, popover, tool detection and install, local scan, Pages manifest fetch, persisted settings and in-app sign-in are done. Not yet built: the GitHub API client, deadline tracking and notifications, grades, and accept and submit.
 
 ## Stack and decisions (settled, don't re-litigate)
 
@@ -70,9 +70,13 @@ The dev build is tray-only (no Dock icon, starts hidden). Open it from the tray 
 - `process.rs` is the only place that spawns programs. It adds the usual install dirs to PATH, because a Finder-launched app has no `/opt/homebrew/bin`. It also sets `GH_PROMPT_DISABLED` and hides console windows on Windows.
 - `platform/{macos,windows,linux}.rs` implement the same functions (install command, extra PATH dirs, open terminal) and are selected with `cfg(target_os)`.
 - `tools.rs` detects and installs git, gh and gh-student, and reads gh's auth.
+- `login.rs` runs `gh auth login --web` with no TTY. gh prints the one-time code and the device URL on stderr, which are parsed and emitted as `login-device-code`. The browser takes focus and hides the popover, so the UI reports success through a system notification.
+- `settings.rs` stores `settings.json` in the app config dir, written atomically. A corrupt file is moved to `.bak`. On first run (no file) the login item is registered. `apply_launch_at_login` skips this in debug builds, and `get_settings` reports the OS's real login-item state.
 - `classroom50.rs` holds the typed upstream contracts and Pages URLs. `discovery.rs` is the local scanner.
-- `tray.rs`, `popover.rs` and `updater.rs` handle the tray icon and menu, the anchored window (hide on blur, vibrancy or Mica) and self-update.
+- `tray.rs`, `popover.rs` and `updater.rs` handle the tray icon and menu, the anchored window (hide on blur, vibrancy or Mica) and self-update. A native dialog steals focus and would hide the popover, so every dialog-plugin call in the UI is wrapped in `withDialog()` (`src/lib/api.ts`), which pins the popover while the dialog is open.
+- `src/lib/settings.svelte.ts` holds the shared settings state. Rust is the source of truth: write through `saveSettings`, never mutate locally. It also migrates the v0.1.0 `localStorage` folder list.
 - `src/lib/theme/theme.css` holds the semantic tokens plus a skin per `data-os`. Components use tokens only.
+- Icons: `assets/icon.svg`, `assets/icon-small.svg` (heavier strokes, used at 44px and below) and `assets/tray.svg` are the sources. Never edit `src-tauri/icons/` by hand; run `scripts/build-icons.sh` (macOS only, needs `rsvg-convert` and ImageMagick).
 - `src/lib/i18n` is a flat `en.json` read through `t(key, params)`. New strings go there.
 - The updater public key is in `tauri.conf.json`. The private key and its password are in `~/.tauri/classroom50-toolbox.key{,.password}` locally and in the CI secrets `TAURI_SIGNING_PRIVATE_KEY` and `TAURI_SIGNING_PRIVATE_KEY_PASSWORD`. Losing them strands existing installs on their current version.
 - Release: run `pnpm bump X.Y.Z` in the PR, which updates `package.json` (read by `tauri.conf.json`) and `Cargo.toml`. On merge, `release.yml` sees that `vX.Y.Z` has no release yet, builds every platform and creates a draft release with `latest.json`, tagging the merge commit. Merges without a bump build nothing. Publishing the draft ships the update. Don't push tags by hand.
@@ -81,6 +85,6 @@ The dev build is tray-only (no Dock icon, starts hidden). Open it from the tray 
 
 - Keep platform-specific code (package managers, tray behavior, autostart, opening editors) in `platform/`, one file per OS exposing the same functions. The UI never branches on OS for behavior, only for theming.
 - Every call to `gh` or `git` goes through one Rust process wrapper that captures stderr and exit codes and returns typed errors. Never build shell strings; pass arguments as a vector.
-- Rust owns all state and I/O. Svelte only renders and invokes typed Tauri commands, and receives events for progress and refreshes. (The watched-folder list is in `localStorage` for now and should move to Rust with the settings work.)
+- Rust owns all state and I/O. Svelte only renders and invokes typed Tauri commands, and receives events for progress and refreshes.
 - Tauri permissions are allow-listed in `src-tauri/capabilities/default.json`. A plugin API called from JS needs its permission added there.
 - Don't use em-dashes in code, comments or UI strings.

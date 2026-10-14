@@ -61,6 +61,28 @@ where
     Ok(Output { stdout, stderr })
 }
 
+/// Starts `program` with stdout/stderr piped, for long-running commands whose output is
+/// streamed (e.g. `gh auth login`). The child is killed if the handle is dropped.
+pub fn spawn_piped<I, S>(program: &str, args: I) -> Result<tokio::process::Child>
+where
+    I: IntoIterator<Item = S>,
+    S: AsRef<OsStr>,
+{
+    let mut cmd = command(program);
+    cmd.args(args)
+        .stdin(Stdio::null())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .kill_on_drop(true);
+    match cmd.spawn() {
+        Ok(child) => Ok(child),
+        Err(err) if err.kind() == ErrorKind::NotFound => Err(Error::NotInstalled {
+            program: program.to_owned(),
+        }),
+        Err(err) => Err(err.into()),
+    }
+}
+
 /// Starts `program` without waiting for it (terminals, editors).
 pub fn spawn_detached<I, S>(program: &str, args: I, cwd: Option<&Path>) -> Result<()>
 where

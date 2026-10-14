@@ -2,9 +2,11 @@ pub mod classroom50;
 mod commands;
 pub mod discovery;
 pub mod error;
+mod login;
 pub mod platform;
 mod popover;
 pub mod process;
+pub mod settings;
 pub mod tools;
 mod tray;
 mod updater;
@@ -37,6 +39,7 @@ pub fn run() {
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_opener::init())
         .manage(popover::PopoverState::default())
+        .manage(login::LoginState::default())
         .manage(commands::Http(
             reqwest::Client::builder()
                 .user_agent(USER_AGENT)
@@ -49,6 +52,18 @@ pub fn run() {
             app.set_activation_policy(tauri::ActivationPolicy::Accessory);
 
             let handle = app.handle();
+            let (settings, first_run) =
+                settings::SettingsStore::load(&app.path().app_config_dir()?);
+            if first_run {
+                let defaults = settings.get();
+                if let Err(err) = commands::apply_launch_at_login(handle, defaults.launch_at_login)
+                    .and_then(|()| settings.set(defaults).map(drop))
+                {
+                    log::warn!("first-run setup failed: {err}");
+                }
+            }
+            app.manage(settings);
+
             popover::setup(handle)?;
             tray::setup(handle)?;
             if !cfg!(debug_assertions) {
@@ -58,11 +73,16 @@ pub fn run() {
         })
         .invoke_handler(tauri::generate_handler![
             commands::app_info,
+            commands::set_popover_pinned,
             commands::tool_statuses,
             commands::install_command,
             commands::install_tool,
             commands::auth_status,
-            commands::scan_folders,
+            commands::scan_projects,
+            commands::get_settings,
+            commands::update_settings,
+            commands::login,
+            commands::cancel_login,
             commands::fetch_assignments,
             commands::open_terminal,
             commands::check_update,

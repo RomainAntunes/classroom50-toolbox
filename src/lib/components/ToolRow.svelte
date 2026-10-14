@@ -1,6 +1,6 @@
 <script lang="ts">
   import { ask, message } from "@tauri-apps/plugin-dialog";
-  import { api, errorMessage, type ToolStatus } from "$lib/api";
+  import { api, errorMessage, withDialog, type ToolStatus } from "$lib/api";
   import { t } from "$lib/i18n";
 
   let { status, onchange }: { status: ToolStatus; onchange: (s: ToolStatus) => void } = $props();
@@ -11,11 +11,14 @@
     try {
       const spec = await api.installCommand(status.tool);
       const command = [spec.program, ...spec.args].join(" ");
-      if (!(await ask(t("setup.installConfirm", { command }), { kind: "info" }))) return;
+      const confirmed = await withDialog(() =>
+        ask(t("setup.installConfirm", { command }), { kind: "info" }),
+      );
+      if (!confirmed) return;
       installing = true;
       onchange(await api.installTool(status.tool));
     } catch (err) {
-      await message(errorMessage(err), { kind: "error" });
+      await withDialog(() => message(errorMessage(err), { kind: "error" }));
     } finally {
       installing = false;
     }
