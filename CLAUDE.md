@@ -90,3 +90,4 @@ The dev build is tray-only (no Dock icon, starts hidden). Open it from the tray 
 - Rust owns all state and I/O. Svelte only renders and invokes typed Tauri commands, and receives events for progress and refreshes.
 - Tauri permissions are allow-listed in `src-tauri/capabilities/default.json`. A plugin API called from JS needs its permission added there.
 - Don't use em-dashes in code, comments or UI strings.
+- **Dev builds never write to GitHub.** The owner develops against their real classes, so `process::checked_args` refuses `gh student submit|accept|invite|team add` and `git push` under `debug_assertions`. Never weaken or bypass this, and never run those commands by hand while testing. Test the write paths with unit tests or a throwaway repo the owner sets up.

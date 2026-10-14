@@ -17,6 +17,9 @@ pub enum Error {
     #[error("{0}")]
     Unsupported(String),
 
+    #[error("`{0}` is disabled in development builds")]
+    BlockedInDev(String),
+
     #[error("cancelled")]
     Cancelled,
 
@@ -63,6 +66,7 @@ impl Error {
             Error::NotInstalled { .. } => "notInstalled",
             Error::CommandFailed { .. } => "commandFailed",
             Error::Unsupported(_) => "unsupported",
+            Error::BlockedInDev(_) => "blockedInDev",
             Error::Cancelled => "cancelled",
             Error::SchemaMismatch { .. } => "schemaMismatch",
             Error::NotSignedIn => "notSignedIn",
