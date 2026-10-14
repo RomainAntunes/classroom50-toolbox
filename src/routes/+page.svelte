@@ -162,8 +162,12 @@
   onMount(() => {
     load();
     const unlisteners = [
-      listen<UpdateInfo>(UPDATE_AVAILABLE_EVENT, (event) => (session.update = event.payload)),
-      listen<SyncProgress>(SYNC_PROGRESS_EVENT, (event) => (session.progress = event.payload)),
+      listen<UpdateInfo>(UPDATE_AVAILABLE_EVENT, (event) => {
+        session.update = event.payload;
+      }),
+      listen<SyncProgress>(SYNC_PROGRESS_EVENT, (event) => {
+        session.progress = event.payload;
+      }),
       listen<Snapshot>(PROJECTS_UPDATED_EVENT, (event) => {
         session.snapshot = event.payload;
         now = new Date();
