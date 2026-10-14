@@ -1,0 +1,6 @@
+# Check out with LF everywhere (Windows included) so Prettier and rustfmt agree across OSes.
+* text=auto eol=lf
+
+*.png binary
+*.ico binary
+*.icns binary

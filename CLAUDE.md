@@ -22,7 +22,7 @@ The first release is for students only. Keep the domain layer role-agnostic so a
 - **Auth reuses gh.** Run `gh student login` (which requests `admin:org read:org repo workflow`), then read the token with `gh auth token`. There is no separate OAuth app, and the app never stores its own token copy.
 - **Installs go through the OS package manager.** That means Homebrew (macOS), winget (Windows) and apt/dnf/pacman (Linux), followed by `gh extension install foundation50/gh-student`. Upgrades use `gh extension upgrade gh-student`. Elevation (sudo/UAC) must be explicit and user-initiated.
 - **Alerts:** native OS notifications (approaching due dates, a new grade), a tray icon state or badge (something due soon or failing tests), and autostart at login (launch hidden).
-- **Release:** a GitHub Actions matrix builds dmg, msi/nsis, AppImage, deb and rpm on a version tag and publishes them to GitHub Releases. The Tauri updater reads `https://github.com/RomainAntunes/classroom50-toolbox/releases/latest/download/latest.json`. Updater artifacts are signed with the Tauri key (kept in CI secrets). OS code signing (Apple notarization, Authenticode) is deferred.
+- **Release:** a GitHub Actions matrix builds dmg, msi/nsis, AppImage, deb and rpm when a PR merges into `main` with a new version, and attaches them to a draft GitHub Release. The owner publishes the draft by hand. The Tauri updater reads `https://github.com/RomainAntunes/classroom50-toolbox/releases/latest/download/latest.json`. Updater artifacts are signed with the Tauri key (kept in CI secrets). OS code signing (Apple notarization, Authenticode) is deferred.
 - **i18n:** English only, but every user-facing string goes through the i18n layer from the start.
 
 ## Classroom 50 contracts the app depends on
@@ -75,7 +75,7 @@ The dev build is tray-only (no Dock icon, starts hidden). Open it from the tray 
 - `src/lib/theme/theme.css` holds the semantic tokens plus a skin per `data-os`. Components use tokens only.
 - `src/lib/i18n` is a flat `en.json` read through `t(key, params)`. New strings go there.
 - The updater public key is in `tauri.conf.json`. The private key and its password are in `~/.tauri/classroom50-toolbox.key{,.password}` locally and in the CI secrets `TAURI_SIGNING_PRIVATE_KEY` and `TAURI_SIGNING_PRIVATE_KEY_PASSWORD`. Losing them strands existing installs on their current version.
-- Release: bump `version` in `package.json` (`tauri.conf.json` and the updater read it from there; also bump `Cargo.toml`), then push a `vX.Y.Z` tag. CI creates a draft release with `latest.json`, and publishing the draft ships the update.
+- Release: run `pnpm bump X.Y.Z` in the PR, which updates `package.json` (read by `tauri.conf.json`) and `Cargo.toml`. On merge, `release.yml` sees that `vX.Y.Z` has no release yet, builds every platform and creates a draft release with `latest.json`, tagging the merge commit. Merges without a bump build nothing. Publishing the draft ships the update. Don't push tags by hand.
 
 ## Conventions
 
