@@ -1,17 +1,43 @@
 <script lang="ts">
   import "$lib/theme/theme.css";
   import { onMount } from "svelte";
-  import { api } from "$lib/api";
+  import { listen } from "@tauri-apps/api/event";
+  import { api, NOTIFY_EVENT, UNSEEN_EVENT, type Notice } from "$lib/api";
   import { setLocale } from "$lib/i18n";
+  import { showNotice } from "$lib/notices";
+  import { session } from "$lib/session.svelte";
 
   let { children } = $props();
 
-  onMount(async () => {
+  // The webview's own menu (Reload, Back, Inspect Element) makes no sense in a tray app.
+  // Text fields keep theirs for copy and paste.
+  function onContextMenu(event: MouseEvent) {
+    const target = event.target as HTMLElement | null;
+    if (!target?.closest("input, textarea, [contenteditable]")) {
+      event.preventDefault();
+    }
+  }
+
+  // Lives in the layout so notices arrive whichever page is shown, and while hidden.
+  onMount(() => {
     setLocale(navigator.language);
-    const info = await api.appInfo();
-    document.documentElement.dataset.os = info.os;
+    void api.appInfo().then((info) => (document.documentElement.dataset.os = info.os));
+    void api.unseen().then((ids) => {
+      session.unseen = ids;
+    });
+    const unlisteners = [
+      listen<Notice>(NOTIFY_EVENT, (event) => void showNotice(event.payload)),
+      listen<string[]>(UNSEEN_EVENT, (event) => {
+        session.unseen = event.payload;
+      }),
+    ];
+    return () => {
+      for (const unlisten of unlisteners) void unlisten.then((stop) => stop());
+    };
   });
 </script>
+
+<svelte:document oncontextmenu={onContextMenu} />
 
 <div class="popover">
   {@render children()}

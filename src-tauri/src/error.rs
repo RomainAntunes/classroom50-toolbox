@@ -17,6 +17,9 @@ pub enum Error {
     #[error("{0}")]
     Unsupported(String),
 
+    #[error("`{0}` is disabled in development builds")]
+    BlockedInDev(String),
+
     #[error("cancelled")]
     Cancelled,
 
@@ -26,6 +29,20 @@ pub enum Error {
         found: String,
         expected: &'static str,
     },
+
+    #[error("not signed in to GitHub")]
+    NotSignedIn,
+
+    #[error("GitHub rate limit reached, retrying after {reset_at:?}")]
+    RateLimited {
+        reset_at: Option<chrono::DateTime<chrono::Utc>>,
+    },
+
+    #[error("GitHub API: {0}")]
+    GitHub(String),
+
+    #[error("can't reach GitHub")]
+    Offline,
 
     #[error("invalid .classroom50.yaml: {0}")]
     RepoConfig(#[from] serde_norway::Error),
@@ -47,13 +64,28 @@ pub enum Error {
 }
 
 impl Error {
-    fn kind(&self) -> &'static str {
+    /// A request that never got an answer (no network, DNS, timeout) means offline; other
+    /// HTTP errors stay as they are.
+    pub fn network(err: reqwest::Error) -> Self {
+        if err.is_connect() || err.is_timeout() {
+            Error::Offline
+        } else {
+            Error::Http(err)
+        }
+    }
+
+    pub fn kind(&self) -> &'static str {
         match self {
             Error::NotInstalled { .. } => "notInstalled",
             Error::CommandFailed { .. } => "commandFailed",
             Error::Unsupported(_) => "unsupported",
+            Error::BlockedInDev(_) => "blockedInDev",
             Error::Cancelled => "cancelled",
             Error::SchemaMismatch { .. } => "schemaMismatch",
+            Error::NotSignedIn => "notSignedIn",
+            Error::RateLimited { .. } => "rateLimited",
+            Error::GitHub(_) => "github",
+            Error::Offline => "offline",
             Error::RepoConfig(_) => "repoConfig",
             Error::Io(_) => "io",
             Error::Http(_) => "http",

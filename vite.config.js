@@ -2,11 +2,28 @@ import { defineConfig } from "vite";
 import { sveltekit } from "@sveltejs/kit/vite";
 // @ts-expect-error type error without @types/node package
 import process from "node:process";
+// @ts-expect-error type error without @types/node package
+import { execSync } from "node:child_process";
 const host = process.env.TAURI_DEV_HOST;
+
+/** The commit being built, with `-dirty` when the tree has changes; null outside git. */
+function commit() {
+  try {
+    const git = (/** @type {string} */ args) =>
+      execSync(`git ${args}`, { encoding: "utf8" }).trim();
+    const dirty = git("status --porcelain --untracked-files=no") !== "";
+    return git("rev-parse --short HEAD") + (dirty ? "-dirty" : "");
+  } catch {
+    return null;
+  }
+}
 
 // https://vite.dev/config/
 export default defineConfig(() => ({
   plugins: [sveltekit()],
+  define: {
+    __COMMIT__: JSON.stringify(commit()),
+  },
 
   // Vite options tailored for Tauri development and only applied in `tauri dev` or `tauri build`
   //

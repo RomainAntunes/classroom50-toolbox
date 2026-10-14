@@ -79,11 +79,13 @@ pub fn show(app: &AppHandle) {
     }
     let _ = window.show();
     let _ = window.set_focus();
+    crate::projects::refresh_if_stale(app);
 }
 
 pub fn hide(app: &AppHandle) {
     if let Some(window) = app.get_webview_window(LABEL) {
         let _ = window.hide();
+        crate::alerts::mark_seen(app);
         if let Ok(mut at) = app.state::<PopoverState>().hidden_at.lock() {
             *at = Some(Instant::now());
         }

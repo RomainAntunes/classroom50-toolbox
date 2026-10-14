@@ -56,6 +56,21 @@ pub fn install_command(tool: Tool) -> Result<CommandSpec> {
 }
 
 /// Terminals open in the working directory they are spawned from.
+/// Where editors keep their settings: the XDG config dir, plus the Flatpak sandboxes of
+/// VS Code and VSCodium.
+pub fn editor_config_dirs() -> Vec<PathBuf> {
+    let home = home_dir();
+    let xdg = std::env::var_os("XDG_CONFIG_HOME")
+        .map(PathBuf::from)
+        .filter(|dir| dir.is_absolute())
+        .or_else(|| home.as_ref().map(|home| home.join(".config")));
+    let flatpaks = home.iter().flat_map(|home| {
+        ["com.visualstudio.code", "com.vscodium.codium"]
+            .map(|app| home.join(".var/app").join(app).join("config"))
+    });
+    xdg.into_iter().chain(flatpaks).collect()
+}
+
 pub fn open_terminal(dir: &Path) -> Result<()> {
     for terminal in [
         "x-terminal-emulator",

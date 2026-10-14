@@ -14,6 +14,11 @@ pub const REPO_CONFIG_FILE: &str = ".classroom50.yaml";
 /// The per-org config repo created by `gh teacher init`; also the GitHub Pages path.
 pub const CONFIG_REPO: &str = "classroom50";
 pub const ASSIGNMENTS_SCHEMA: &str = "classroom50/assignments/v1";
+pub const TEAM_SCHEMA: &str = "classroom50/team/v1";
+/// Student team `classroom50-<classroom>`; staff teams add `-<role>`.
+pub const TEAM_PREFIX: &str = "classroom50-";
+const GROUP_TEAM_PREFIX: &str = "classroom50-group-";
+const STAFF_ROLES: &[&str] = &["teacher", "hta", "ta"];
 pub const SUBMIT_TAG_PREFIX: &str = "submit/";
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -120,17 +125,168 @@ pub struct TestResult {
     pub max_score: u32,
 }
 
+/// A classroom the student belongs to. Read from the description of its secret student
+/// team (`classroom-team-v1`), which exists so members can enumerate their classrooms
+/// without access to the private config repo.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct Classroom {
+    pub org: String,
+    pub slug: String,
+    pub name: Option<String>,
+    pub term: Option<String>,
+    /// `false` once the teacher archived the classroom.
+    pub active: bool,
+    pub secret: Option<String>,
+    /// Custom Pages host for orgs off `github.io`.
+    pub pages_base_url: Option<String>,
+}
+
+#[derive(Deserialize)]
+struct TeamRecord {
+    schema: String,
+    #[serde(default)]
+    name: Option<String>,
+    #[serde(default)]
+    term: Option<String>,
+    #[serde(default)]
+    active: Option<bool>,
+    #[serde(default)]
+    secret: Option<String>,
+    #[serde(default)]
+    pages_base_url: Option<String>,
+}
+
+impl Classroom {
+    /// A classroom known only from a repo's `.classroom50.yaml`.
+    pub fn from_config(org: &str, config: &RepoConfig) -> Self {
+        Self {
+            org: org.to_owned(),
+            slug: config.classroom.clone(),
+            name: None,
+            term: None,
+            active: true,
+            secret: config.secret.clone(),
+            pages_base_url: None,
+        }
+    }
+
+    /// Reads a team the user belongs to. `None` for group, staff and unrelated teams.
+    /// Student teams created before the description record existed still count.
+    pub fn from_team(org: &str, slug: &str, description: Option<&str>) -> Option<Self> {
+        let short = slug.strip_prefix(TEAM_PREFIX)?;
+        if slug.starts_with(GROUP_TEAM_PREFIX) || short.is_empty() {
+            return None;
+        }
+        let record = description
+            .and_then(|d| serde_json::from_str::<TeamRecord>(d).ok())
+            .filter(|r| r.schema == TEAM_SCHEMA);
+        if record.is_none()
+            && STAFF_ROLES
+                .iter()
+                .any(|role| short.ends_with(&format!("-{role}")))
+        {
+            return None;
+        }
+        let record = record.unwrap_or(TeamRecord {
+            schema: TEAM_SCHEMA.to_owned(),
+            name: None,
+            term: None,
+            active: None,
+            secret: None,
+            pages_base_url: None,
+        });
+        Some(Self {
+            org: org.to_owned(),
+            slug: short.to_owned(),
+            name: record.name.filter(|n| !n.is_empty()),
+            term: record.term.filter(|t| !t.is_empty()),
+            active: record.active.unwrap_or(true),
+            secret: record.secret.filter(|s| !s.is_empty()),
+            pages_base_url: record.pages_base_url.filter(|u| u.starts_with("https://")),
+        })
+    }
+
+    /// Identity used to merge the same classroom seen through teams and repo configs.
+    pub fn key(&self) -> (String, String) {
+        (
+            self.org.to_ascii_lowercase(),
+            self.slug.to_ascii_lowercase(),
+        )
+    }
+
+    pub fn assignments_url(&self) -> String {
+        assignments_url(
+            &self.org,
+            &self.slug,
+            self.secret.as_deref(),
+            self.pages_base_url.as_deref(),
+        )
+    }
+}
+
 /// Public, token-less location of a classroom's assignment list, as built by gh-student:
-/// `https://<org>.github.io/classroom50/<classroom>[/<secret>]/assignments.json`.
-pub fn assignments_url(org: &str, classroom: &str, secret: Option<&str>) -> String {
+/// `<base>/<classroom>[/<secret>]/assignments.json`, where the base defaults to
+/// `https://<org>.github.io/classroom50`.
+pub fn assignments_url(
+    org: &str,
+    classroom: &str,
+    secret: Option<&str>,
+    pages_base_url: Option<&str>,
+) -> String {
     let segment = match secret.filter(|s| !s.is_empty()) {
         Some(secret) => format!("{classroom}/{secret}"),
         None => classroom.to_owned(),
     };
-    format!(
-        "https://{}.github.io/{CONFIG_REPO}/{segment}/assignments.json",
-        org.to_ascii_lowercase()
-    )
+    let base = match pages_base_url {
+        Some(base) => base.trim_end_matches('/').to_owned(),
+        None => format!(
+            "https://{}.github.io/{CONFIG_REPO}",
+            org.to_ascii_lowercase()
+        ),
+    };
+    format!("{base}/{segment}/assignments.json")
+}
+
+/// Where the Classroom 50 web app runs (`web/CNAME` upstream).
+pub const WEB_APP_URL: &str = "https://classroom50.org";
+
+/// The student's page for an assignment in the Classroom 50 web app: submissions, grades
+/// and feedback. Org and slugs are GitHub names, which need no escaping.
+pub fn submission_url(org: &str, classroom: &str, assignment: &str) -> String {
+    format!("{WEB_APP_URL}/{org}/{classroom}/assignments/{assignment}/submission")
+}
+
+/// The web app's accept page for an assignment; `k` carries an unlisted classroom's key.
+pub fn accept_url(org: &str, classroom: &str, assignment: &str, secret: Option<&str>) -> String {
+    let url = format!("{WEB_APP_URL}/{org}/{classroom}/assignments/{assignment}/accept");
+    match secret.filter(|s| !s.is_empty()) {
+        Some(secret) => format!("{url}?k={secret}"),
+        None => url,
+    }
+}
+
+/// The assignment a repo belongs to by the upstream naming rule
+/// `<classroom>-<assignment>-<username or group>` (all lowercase). Needed because
+/// `no_autograder` and `empty_repo` assignments commit no `.classroom50.yaml`. The longest
+/// slug wins so `lab1` doesn't claim `lab1-extra` repos.
+pub fn assignment_for_repo<'a>(
+    repo: &str,
+    classroom: &str,
+    slugs: impl IntoIterator<Item = &'a str>,
+) -> Option<&'a str> {
+    let repo = repo.to_ascii_lowercase();
+    slugs
+        .into_iter()
+        .filter(|slug| {
+            let prefix = format!(
+                "{}-{}-",
+                classroom.to_ascii_lowercase(),
+                slug.to_ascii_lowercase()
+            );
+            repo.len() > prefix.len() && repo.starts_with(&prefix)
+        })
+        .max_by_key(|slug| slug.len())
 }
 
 pub fn parse_assignments(url: &str, json: &str) -> Result<Vec<Assignment>> {
@@ -143,23 +299,6 @@ pub fn parse_assignments(url: &str, json: &str) -> Result<Vec<Assignment>> {
         });
     }
     Ok(file.assignments)
-}
-
-pub async fn fetch_assignments(
-    client: &reqwest::Client,
-    org: &str,
-    classroom: &str,
-    secret: Option<&str>,
-) -> Result<Vec<Assignment>> {
-    let url = assignments_url(org, classroom, secret);
-    let body = client
-        .get(&url)
-        .send()
-        .await?
-        .error_for_status()?
-        .text()
-        .await?;
-    parse_assignments(&url, &body)
 }
 
 #[cfg(test)]
@@ -183,13 +322,68 @@ mod tests {
     #[test]
     fn builds_pages_urls() {
         assert_eq!(
-            assignments_url("CS50", "fall-2026", None),
+            assignments_url("CS50", "fall-2026", None, None),
             "https://cs50.github.io/classroom50/fall-2026/assignments.json"
         );
         assert_eq!(
-            assignments_url("cs50", "fall-2026", Some("ab12")),
+            assignments_url("cs50", "fall-2026", Some("ab12"), None),
             "https://cs50.github.io/classroom50/fall-2026/ab12/assignments.json"
         );
+        assert_eq!(
+            assignments_url("cs50", "fall", None, Some("https://pages.cs50.edu/c50/")),
+            "https://pages.cs50.edu/c50/fall/assignments.json"
+        );
+    }
+
+    #[test]
+    fn builds_submission_urls() {
+        assert_eq!(
+            submission_url("HEIGVD-202609-BDR-A", "bdr-a", "lab2"),
+            "https://classroom50.org/HEIGVD-202609-BDR-A/bdr-a/assignments/lab2/submission"
+        );
+    }
+
+    #[test]
+    fn reads_classroom_teams() {
+        let poo = Classroom::from_team(
+            "HEIGVD-POO",
+            "classroom50-26-poo-c",
+            Some(r#"{"schema":"classroom50/team/v1","name":"2026-POO-C","term":"2026-2027-S1"}"#),
+        )
+        .unwrap();
+        assert_eq!(poo.slug, "26-poo-c");
+        assert_eq!(poo.name.as_deref(), Some("2026-POO-C"));
+        assert!(poo.active && poo.secret.is_none());
+
+        let unlisted = Classroom::from_team(
+            "o",
+            "classroom50-x",
+            Some(r#"{"schema":"classroom50/team/v1","active":false,"secret":"abcd1234"}"#),
+        )
+        .unwrap();
+        assert!(!unlisted.active);
+        assert_eq!(unlisted.secret.as_deref(), Some("abcd1234"));
+
+        // A pre-record student team still counts; group and staff teams don't.
+        assert!(Classroom::from_team("o", "classroom50-bdr-a", None).is_some());
+        assert!(Classroom::from_team("o", "classroom50-group-3eaa7f60afc3ad98-3", None).is_none());
+        assert!(Classroom::from_team("o", "classroom50-26-poo-c-ta", None).is_none());
+        assert!(Classroom::from_team("o", "developers", None).is_none());
+    }
+
+    #[test]
+    fn matches_repos_by_name() {
+        let slugs = ["lab01", "labo-3-hogwarts", "lab1", "lab1-extra"];
+        let find = |repo: &str, classroom: &str| assignment_for_repo(repo, classroom, slugs);
+        assert_eq!(
+            find("26-poo-c-labo-3-hogwarts-group-5", "26-poo-c"),
+            Some("labo-3-hogwarts")
+        );
+        assert_eq!(find("26-POO-C-lab01-alice", "26-poo-c"), Some("lab01"));
+        assert_eq!(find("fall-lab1-extra-bob", "fall"), Some("lab1-extra"));
+        assert_eq!(find("fall-lab1-bob", "fall"), Some("lab1"));
+        assert_eq!(find("26-poo-c-lab01-", "26-poo-c"), None);
+        assert_eq!(find("hogwarts", "26-poo-c"), None);
     }
 
     #[test]
@@ -228,7 +422,7 @@ mod tests {
         let json = r#"{
             "schema": "classroom50/result/v1", "classroom": "fall-2026", "assignment": "hello",
             "assignment_type": "individual", "owner": "alice",
-            "submission": "submit/20261014T120000Z-abc1234",
+            "submission": "submit/2026-10-14T12-00-00Z-abc1234",
             "commit": "https://github.com/cs50/x/commit/abc", "release": "https://github.com/cs50/x/releases/tag/t",
             "review": "https://github.com/cs50/x/compare/a...b", "datetime": "2026-10-14T12:00:00Z",
             "score": 3, "max-score": 4,

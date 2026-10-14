@@ -53,6 +53,14 @@ pub fn install_command(tool: Tool) -> Result<CommandSpec> {
     ))
 }
 
+/// Where editors keep their settings (JetBrains, VS Code and its forks all use it).
+pub fn editor_config_dirs() -> Vec<PathBuf> {
+    std::env::var_os("APPDATA")
+        .map(PathBuf::from)
+        .into_iter()
+        .collect()
+}
+
 pub fn open_terminal(dir: &Path) -> Result<()> {
     if process::find_in_path("wt").is_some() {
         return process::spawn_detached("wt", ["-d".as_ref(), dir.as_os_str()], None);

@@ -25,6 +25,7 @@ where
     I: IntoIterator<Item = S>,
     S: AsRef<OsStr>,
 {
+    let args = checked_args(program, args)?;
     let mut cmd = command(program);
     cmd.args(args)
         .stdin(Stdio::null())
@@ -68,6 +69,7 @@ where
     I: IntoIterator<Item = S>,
     S: AsRef<OsStr>,
 {
+    let args = checked_args(program, args)?;
     let mut cmd = command(program);
     cmd.args(args)
         .stdin(Stdio::null())
@@ -89,6 +91,7 @@ where
     I: IntoIterator<Item = S>,
     S: AsRef<OsStr>,
 {
+    let args = checked_args(program, args)?;
     let mut cmd = std::process::Command::new(program);
     cmd.args(args)
         .env("PATH", search_path())
@@ -104,6 +107,42 @@ where
             program: program.to_owned(),
         }),
         Err(err) => Err(err.into()),
+    }
+}
+
+/// Development builds run against the developer's real classes, so they never write to
+/// GitHub: submitting, accepting, inviting, joining a team and `git push` are refused.
+fn checked_args<I, S>(program: &str, args: I) -> Result<Vec<OsString>>
+where
+    I: IntoIterator<Item = S>,
+    S: AsRef<OsStr>,
+{
+    let args: Vec<OsString> = args.into_iter().map(|a| a.as_ref().to_owned()).collect();
+    if cfg!(debug_assertions) && writes_to_github(program, &args) {
+        let line = std::iter::once(program.to_owned())
+            .chain(args.iter().map(|a| a.to_string_lossy().into_owned()))
+            .collect::<Vec<_>>()
+            .join(" ");
+        return Err(Error::BlockedInDev(line));
+    }
+    Ok(args)
+}
+
+fn writes_to_github(program: &str, args: &[OsString]) -> bool {
+    let words: Vec<String> = args
+        .iter()
+        .map(|a| a.to_string_lossy().to_ascii_lowercase())
+        .filter(|a| !a.starts_with('-'))
+        .collect();
+    let words: Vec<&str> = words.iter().map(String::as_str).collect();
+    let name = Path::new(program)
+        .file_stem()
+        .map(|s| s.to_string_lossy().to_ascii_lowercase());
+    match (name.as_deref(), words.as_slice()) {
+        (Some("gh"), ["student", "submit" | "accept" | "invite", ..]) => true,
+        (Some("gh"), ["student", "team", "add", ..]) => true,
+        (Some("git"), words) => words.contains(&"push"),
+        _ => false,
     }
 }
 
@@ -152,4 +191,41 @@ fn search_path() -> &'static OsString {
         }
         std::env::join_paths(dirs).unwrap_or_default()
     })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn writes(program: &str, args: &[&str]) -> bool {
+        let args: Vec<OsString> = args.iter().map(OsString::from).collect();
+        writes_to_github(program, &args)
+    }
+
+    #[test]
+    fn spots_commands_that_write_to_github() {
+        assert!(writes("gh", &["student", "submit"]));
+        assert!(writes(
+            "gh",
+            &["student", "accept", "cs50", "fall", "hello"]
+        ));
+        assert!(writes(
+            "/opt/homebrew/bin/gh",
+            &["student", "team", "add", "x"]
+        ));
+        assert!(writes("git", &["-C", "/x", "push", "origin", "main"]));
+        assert!(!writes("gh", &["student", "whoami"]));
+        assert!(!writes("gh", &["student", "team", "list"]));
+        assert!(!writes("git", &["--no-optional-locks", "status"]));
+        assert!(!writes("gh", &["auth", "token"]));
+    }
+
+    #[test]
+    fn dev_builds_refuse_submit() {
+        let result = checked_args("gh", ["student", "submit"]);
+        assert_eq!(
+            cfg!(debug_assertions),
+            matches!(result, Err(Error::BlockedInDev(_)))
+        );
+    }
 }
