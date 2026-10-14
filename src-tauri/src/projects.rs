@@ -12,6 +12,7 @@ use std::time::Duration;
 
 use chrono::{DateTime, NaiveDateTime, Utc};
 use futures_util::future::join_all;
+use serde::de::DeserializeOwned;
 use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value, json};
 use tauri::{AppHandle, Emitter, Manager};
@@ -26,6 +27,7 @@ use crate::error::{Error, Result};
 use crate::github::{self, Http, HttpCache};
 use crate::process;
 use crate::settings::{Settings, SettingsStore};
+use crate::status::{self, Branch, Feedback, Grade, StatusFields};
 use crate::tools;
 use crate::watch::{self, WatchTarget};
 
@@ -34,9 +36,13 @@ pub const PROGRESS_EVENT: &str = "sync-progress";
 
 /// v2 keeps every inspected repo, not only those with a marker file.
 const CACHE_FILE: &str = "repos-v2.json";
-const SYNC_INTERVAL: Duration = Duration::from_secs(15 * 60);
-/// Opening the popover refreshes at most this often.
-const MIN_AUTO_INTERVAL: chrono::TimeDelta = chrono::TimeDelta::minutes(2);
+/// How often the assignment repos' status (grades, feedback, branches) is re-read between
+/// full syncs. About one GraphQL point each time.
+const STATUS_INTERVAL: Duration = Duration::from_secs(2 * 60);
+/// A full sync (repo list, teams) is due after this long.
+const FULL_SYNC_AGE: chrono::TimeDelta = chrono::TimeDelta::minutes(15);
+/// Opening the popover re-reads the status at most this often.
+const MIN_STATUS_ON_OPEN: chrono::TimeDelta = chrono::TimeDelta::minutes(1);
 /// Repos per GraphQL request when reading `.classroom50.yaml`; larger batches time out.
 const DETAIL_BATCH: usize = 25;
 /// Batches in flight at once on a cold cache; GitHub discourages more concurrency.
@@ -75,6 +81,14 @@ pub struct RemoteRepo {
     pub last_submission: Option<Submission>,
     /// The repo's `.classroom50.yaml`, when it has a valid one.
     pub config: Option<RepoConfig>,
+    /// Branches with commits missing from the default branch. Like `grade` and `feedback`,
+    /// read by the status query, for assignment repos only.
+    #[serde(default)]
+    pub unmerged: Vec<Branch>,
+    #[serde(default)]
+    pub grade: Option<Grade>,
+    #[serde(default)]
+    pub feedback: Option<Feedback>,
 }
 
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize)]
@@ -86,6 +100,10 @@ pub struct LocalState {
     pub ahead: Option<u32>,
     pub behind: Option<u32>,
     pub changed_files: u32,
+    /// Local branches with commits missing from the local default branch.
+    pub unmerged: Vec<String>,
+    /// GitHub's default-branch head isn't in the clone: someone pushed since the last pull.
+    pub remote_ahead: bool,
 }
 
 /// The most pressing reason the graded state lags behind the student's work.
@@ -94,6 +112,9 @@ pub struct LocalState {
 pub enum Pending {
     Uncommitted,
     Unpushed,
+    /// A branch, local or pushed, holds commits that aren't on the default branch, which
+    /// is what gets graded.
+    Unmerged,
     /// Tag-mode assignment whose pushed head has no `submit/*` tag.
     Unsubmitted,
 }
@@ -146,8 +167,23 @@ impl From<&Error> for SyncIssue {
 #[serde(rename_all = "camelCase")]
 pub struct Snapshot {
     pub projects: Vec<Project>,
+    /// Assignments published in the user's classrooms that they haven't accepted yet.
+    pub unaccepted: Vec<Unaccepted>,
+    /// Last full sync (repo list and teams).
     pub synced_at: Option<DateTime<Utc>>,
+    /// Last time GitHub was read at all, full sync or status check.
+    pub checked_at: Option<DateTime<Utc>>,
     pub issue: Option<SyncIssue>,
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct Unaccepted {
+    /// `org/classroom/assignment`, lowercase.
+    pub id: String,
+    pub classroom: Classroom,
+    pub assignment: Assignment,
+    pub accept_url: String,
 }
 
 /// Discovery results persisted between runs, so a sync only re-reads repos pushed since.
@@ -245,10 +281,22 @@ pub async fn refresh_local(app: &AppHandle) -> Snapshot {
     publish(app, Mode::Local, guard).await
 }
 
+/// Re-reads the assignment repos' status and the disk, skipping repo discovery. Does
+/// nothing when a sync is already running.
+pub async fn refresh_status(app: &AppHandle) {
+    let state = app.state::<ProjectsState>();
+    let Ok(guard) = state.sync_lock.try_lock() else {
+        return;
+    };
+    publish(app, Mode::Status, guard).await;
+}
+
 #[derive(Clone, Copy, PartialEq, Eq)]
 enum Mode {
-    /// GitHub discovery, local scan and manifests.
+    /// GitHub discovery, assignment status, local scan and manifests.
     Full,
+    /// Assignment status and local scan, on top of the last discovery.
+    Status,
     /// Local scan only, on top of the previous snapshot's GitHub data.
     Local,
 }
@@ -268,6 +316,7 @@ async fn publish(app: &AppHandle, mode: Mode, _guard: tokio::sync::MutexGuard<'_
         log::warn!("could not emit {UPDATED_EVENT}: {err}");
     }
     watch::rewatch(app, targets);
+    crate::alerts::process(app, &snapshot);
     snapshot
 }
 
@@ -314,32 +363,44 @@ impl Progress {
     }
 }
 
-/// Refreshes in the background unless a sync ran recently or GitHub asked to back off.
-pub fn refresh_if_stale(app: &AppHandle) {
+/// Starts whatever is due in the background: a full sync when the last one is older than
+/// `FULL_SYNC_AGE`, else a status check when the last GitHub read is older than
+/// `min_status_age`. Nothing while GitHub asks to back off.
+fn refresh_due(app: &AppHandle, min_status_age: chrono::TimeDelta) {
     let snapshot = app.state::<ProjectsState>().snapshot();
     let now = Utc::now();
-    let recent = snapshot
-        .synced_at
-        .is_some_and(|at| now - at < MIN_AUTO_INTERVAL);
     let backing_off = snapshot
         .issue
         .and_then(|issue| issue.retry_after)
         .is_some_and(|until| now < until);
-    if recent || backing_off {
+    if backing_off {
         return;
     }
+    let older = |at: Option<DateTime<Utc>>, age| at.is_none_or(|at| now - at >= age);
     let app = app.clone();
-    tauri::async_runtime::spawn(async move {
-        refresh(&app).await;
-    });
+    if older(snapshot.synced_at, FULL_SYNC_AGE) {
+        tauri::async_runtime::spawn(async move {
+            refresh(&app).await;
+        });
+    } else if older(snapshot.checked_at, min_status_age) {
+        tauri::async_runtime::spawn(async move {
+            refresh_status(&app).await;
+        });
+    }
 }
 
-/// Syncs once at startup, then every `SYNC_INTERVAL`.
+/// When the popover opens.
+pub fn refresh_if_stale(app: &AppHandle) {
+    refresh_due(app, MIN_STATUS_ON_OPEN);
+}
+
+/// Syncs at startup, then checks every `STATUS_INTERVAL` what is due.
 pub fn start_background_sync(app: AppHandle) {
     tauri::async_runtime::spawn(async move {
         loop {
-            refresh_if_stale(&app);
-            tokio::time::sleep(SYNC_INTERVAL).await;
+            // A little slack so a tick isn't skipped for being a few seconds early.
+            refresh_due(&app, chrono::TimeDelta::seconds(100));
+            tokio::time::sleep(STATUS_INTERVAL).await;
         }
     });
 }
@@ -358,10 +419,11 @@ async fn sync(
         settings.scan_editor_projects,
         progress.clone(),
     );
-    let (snapshot, scan_targets) = if mode == Mode::Local {
+    let (snapshot, scan_targets) = if mode != Mode::Full {
         let (locals, targets) = scan.await;
+        let status = mode == Mode::Status;
         (
-            local_snapshot(state, http, locals, now, progress).await,
+            local_snapshot(state, http, locals, now, status, progress).await,
             targets,
         )
     } else {
@@ -403,6 +465,7 @@ async fn local_snapshot(
     http: &reqwest::Client,
     locals: Vec<LocalProject>,
     now: DateTime<Utc>,
+    status: bool,
     progress: &Progress,
 ) -> Snapshot {
     let previous = state.snapshot();
@@ -412,10 +475,27 @@ async fn local_snapshot(
         .filter_map(|p| p.remote)
         .collect();
     let classrooms = state.remote().classrooms;
-    let projects = build(remote_repos, classrooms, locals, state, http, now, progress).await;
+    let auth = if status {
+        status_auth(state).await
+    } else {
+        None
+    };
+    let checked_at = if auth.is_some() {
+        Some(now)
+    } else {
+        previous.checked_at
+    };
+    let sources = Sources {
+        remote: remote_repos,
+        classrooms,
+        locals,
+    };
+    let (projects, unaccepted) = build(sources, state, http, auth.as_ref(), now, progress).await;
     Snapshot {
         projects,
+        unaccepted,
         synced_at: previous.synced_at,
+        checked_at,
         issue: previous.issue,
     }
 }
@@ -449,9 +529,22 @@ async fn full_snapshot(
         }
     };
 
+    let auth = if issue.is_none() {
+        status_auth(state).await
+    } else {
+        None
+    };
+    let sources = Sources {
+        remote: repos,
+        classrooms,
+        locals,
+    };
+    let (projects, unaccepted) = build(sources, state, http, auth.as_ref(), now, progress).await;
     Snapshot {
-        projects: build(repos, classrooms, locals, state, http, now, progress).await,
+        projects,
+        unaccepted,
         synced_at: Some(now),
+        checked_at: Some(now),
         issue,
     }
 }
@@ -459,15 +552,26 @@ async fn full_snapshot(
 type ClassroomKey = (String, String);
 
 /// Resolves which repos are assignments, then merges, annotates and sorts them.
-async fn build(
+/// What a build merges: repos seen on GitHub, classrooms from teams, clones on disk.
+struct Sources {
     remote: Vec<RemoteRepo>,
-    team_classrooms: Vec<Classroom>,
+    classrooms: Vec<Classroom>,
     locals: Vec<LocalProject>,
+}
+
+async fn build(
+    sources: Sources,
     state: &ProjectsState,
     http: &reqwest::Client,
+    status: Option<&StatusAuth>,
     now: DateTime<Utc>,
     progress: &Progress,
-) -> Vec<Project> {
+) -> (Vec<Project>, Vec<Unaccepted>) {
+    let Sources {
+        remote,
+        classrooms: team_classrooms,
+        locals,
+    } = sources;
     // Teams carry the display name and secret, so they win over marker files.
     let mut classrooms: BTreeMap<ClassroomKey, Classroom> =
         team_classrooms.into_iter().map(|c| (c.key(), c)).collect();
@@ -496,6 +600,10 @@ async fn build(
             Some((repo, config))
         })
         .collect();
+    let remote = match status {
+        Some(auth) => refresh_statuses(state, http, auth, remote, progress).await,
+        None => remote,
+    };
     let locals: Vec<(LocalProject, RepoConfig)> = locals
         .into_iter()
         .filter_map(|clone| {
@@ -530,7 +638,6 @@ async fn build(
             .and_then(|k| manifests.get(k))
             .and_then(|list| list.iter().find(|a| a.slug == project.config.assignment))
             .cloned();
-        project.pending = pending(project);
         project.web_url = project.owner.as_deref().map(|owner| {
             classroom50::submission_url(
                 owner,
@@ -539,8 +646,56 @@ async fn build(
             )
         });
     }
+    check_clones(&mut projects).await;
+    for project in &mut projects {
+        project.pending = pending(project);
+    }
     projects.sort_by_cached_key(|p| sort_key(p, now));
-    projects
+    let unaccepted = unaccepted(&projects, &classrooms, &manifests, now);
+    (projects, unaccepted)
+}
+
+/// Published, open assignments of the user's classrooms with no repo yet, by due date.
+fn unaccepted(
+    projects: &[Project],
+    classrooms: &BTreeMap<ClassroomKey, Classroom>,
+    manifests: &HashMap<ClassroomKey, Vec<Assignment>>,
+    now: DateTime<Utc>,
+) -> Vec<Unaccepted> {
+    let accepted: HashSet<(ClassroomKey, &str)> = projects
+        .iter()
+        .filter_map(|p| {
+            let key = (
+                p.owner.as_deref()?.to_ascii_lowercase(),
+                p.config.classroom.to_ascii_lowercase(),
+            );
+            Some((key, p.config.assignment.as_str()))
+        })
+        .collect();
+    let mut list: Vec<Unaccepted> = manifests
+        .iter()
+        .filter_map(|(key, assignments)| Some((classrooms.get(key)?, key, assignments)))
+        .filter(|(classroom, _, _)| classroom.active)
+        .flat_map(|(classroom, key, assignments)| {
+            assignments
+                .iter()
+                .filter(|a| !a.closed && a.available_from.is_none_or(|from| from <= now))
+                .filter(|a| !accepted.contains(&(key.clone(), a.slug.as_str())))
+                .map(|a| Unaccepted {
+                    id: format!("{}/{}/{}", key.0, key.1, a.slug),
+                    classroom: classroom.clone(),
+                    assignment: a.clone(),
+                    accept_url: classroom50::accept_url(
+                        &classroom.org,
+                        &classroom.slug,
+                        &a.slug,
+                        classroom.secret.as_deref(),
+                    ),
+                })
+        })
+        .collect();
+    list.sort_by_key(|u| (u.assignment.due.is_none(), u.assignment.due));
+    list
 }
 
 /// The assignment identity of a repo: its marker file, else its name matched against the
@@ -748,6 +903,9 @@ impl RepoNode {
             head,
             last_submission,
             config,
+            unmerged: Vec::new(),
+            grade: None,
+            feedback: None,
         }
     }
 }
@@ -795,10 +953,14 @@ async fn sync_remote(
     let mut result = Ok(());
     'requests: for group in stale.chunks(DETAIL_BATCH * PARALLEL_BATCHES) {
         let batches: Vec<_> = group.chunks(DETAIL_BATCH).collect();
+        let names: Vec<Vec<&str>> = batches
+            .iter()
+            .map(|batch| batch.iter().map(|r| r.name_with_owner.as_str()).collect())
+            .collect();
         let responses = join_all(
-            batches
+            names
                 .iter()
-                .map(|batch| fetch_details(http, &token, batch)),
+                .map(|batch| fetch_nodes::<RepoNode>(http, &token, batch, "Repo", REPO_FRAGMENT)),
         )
         .await;
         for (batch, response) in batches.into_iter().zip(responses) {
@@ -818,7 +980,13 @@ async fn sync_remote(
                 let k = key(&listed.name_with_owner);
                 cache.checked.insert(k.clone(), listed.pushed_at);
                 match node {
-                    Some(node) => cache.repos.insert(k, node.into_remote()),
+                    Some(node) => {
+                        let mut repo = node.into_remote();
+                        if let Some(old) = cache.repos.get(&k) {
+                            keep_status(&mut repo, old);
+                        }
+                        cache.repos.insert(k, repo)
+                    }
                     None => cache.repos.remove(&k),
                 };
             }
@@ -918,32 +1086,140 @@ async fn list_repos(http: &reqwest::Client, token: &str) -> Result<(String, Vec<
     Ok((login, repos))
 }
 
-/// One aliased query (`r0`, `r1`, ...) for a batch of repos. Names travel as variables,
-/// never spliced into the query text.
-async fn fetch_details(
+/// One aliased query (`r0`, `r1`, ...) spreading `fragment` on each `owner/name`. Names
+/// travel as variables, never spliced into the query text.
+async fn fetch_nodes<T: DeserializeOwned>(
     http: &reqwest::Client,
     token: &str,
-    batch: &[&ListedRepo],
-) -> Result<HashMap<String, Option<RepoNode>>> {
+    names: &[&str],
+    fragment: &str,
+    fragments: &str,
+) -> Result<HashMap<String, Option<T>>> {
     let mut params = Vec::new();
     let mut fields = String::new();
     let mut variables = Map::new();
-    for (i, repo) in batch.iter().enumerate() {
-        let Some((owner, name)) = repo.name_with_owner.split_once('/') else {
+    for (i, name_with_owner) in names.iter().enumerate() {
+        let Some((owner, name)) = name_with_owner.split_once('/') else {
             continue;
         };
         params.push(format!("$o{i}: String!, $n{i}: String!"));
         fields.push_str(&format!(
-            "r{i}: repository(owner: $o{i}, name: $n{i}) {{ ...Repo }}\n"
+            "r{i}: repository(owner: $o{i}, name: $n{i}) {{ ...{fragment} }}\n"
         ));
         variables.insert(format!("o{i}"), owner.into());
         variables.insert(format!("n{i}"), name.into());
     }
-    let query = format!(
-        "query({}) {{\n{fields}}}\n{REPO_FRAGMENT}",
-        params.join(", ")
-    );
+    let query = format!("query({}) {{\n{fields}}}\n{fragments}", params.join(", "));
     github::graphql(http, token, &query, Value::Object(variables)).await
+}
+
+// ---- Assignment status ---------------------------------------------------------------
+
+pub(crate) struct StatusAuth {
+    token: String,
+    login: String,
+}
+
+/// The token and login for a status read, or `None` when signed out or never synced.
+async fn status_auth(state: &ProjectsState) -> Option<StatusAuth> {
+    let login = state.remote().login?;
+    let token = tools::gh_token().await.ok()?;
+    Some(StatusAuth { token, login })
+}
+
+#[derive(Deserialize)]
+struct StatusNode {
+    #[serde(flatten)]
+    repo: RepoNode,
+    #[serde(flatten)]
+    status: StatusFields,
+}
+
+/// Status fields survive a discovery re-read, which doesn't fetch them.
+fn keep_status(repo: &mut RemoteRepo, old: &RemoteRepo) {
+    repo.unmerged.clone_from(&old.unmerged);
+    repo.grade.clone_from(&old.grade);
+    repo.feedback.clone_from(&old.feedback);
+}
+
+/// Re-reads the assignment repos with the status fragment, downloads new grades and
+/// stores the result in the cache. A repo that can't be read keeps its last data.
+async fn refresh_statuses(
+    state: &ProjectsState,
+    http: &reqwest::Client,
+    auth: &StatusAuth,
+    repos: Vec<(RemoteRepo, RepoConfig)>,
+    progress: &Progress,
+) -> Vec<(RemoteRepo, RepoConfig)> {
+    let fragments = format!("{REPO_FRAGMENT}{}", status::FRAGMENT);
+    let names: Vec<String> = repos
+        .iter()
+        .map(|(r, _)| format!("{}/{}", r.owner, r.name))
+        .collect();
+    let batches: Vec<Vec<&str>> = names
+        .chunks(DETAIL_BATCH)
+        .map(|batch| batch.iter().map(String::as_str).collect())
+        .collect();
+    progress.add(batches.len());
+    let responses = join_all(batches.iter().map(|batch| async {
+        let response =
+            fetch_nodes::<StatusNode>(http, &auth.token, batch, "Status", &fragments).await;
+        progress.advance();
+        response
+    }))
+    .await;
+
+    let mut nodes: HashMap<usize, StatusNode> = HashMap::new();
+    for (b, response) in responses.into_iter().enumerate() {
+        match response {
+            Ok(batch) => {
+                for (alias, node) in batch {
+                    let Some(i) = alias
+                        .strip_prefix('r')
+                        .and_then(|i| i.parse::<usize>().ok())
+                    else {
+                        continue;
+                    };
+                    if let Some(node) = node {
+                        nodes.insert(b * DETAIL_BATCH + i, node);
+                    }
+                }
+            }
+            Err(err) => log::warn!("status check failed: {err}"),
+        }
+    }
+
+    let mut updated = Vec::with_capacity(repos.len());
+    for (i, (old, config)) in repos.into_iter().enumerate() {
+        let Some(StatusNode { repo, mut status }) = nodes.remove(&i) else {
+            updated.push((old, config));
+            continue;
+        };
+        let mut repo = repo.into_remote();
+        repo.unmerged = status.unmerged(repo.default_branch.as_deref());
+        repo.feedback = status.feedback(&auth.login);
+        repo.grade = match status.graded_release() {
+            Some(release) if old.grade.as_ref().is_some_and(|g| g.tag == release.tag) => old.grade,
+            Some(release) => match status::download_grade(http, &release).await {
+                Ok(grade) => Some(grade),
+                Err(err) => {
+                    log::warn!("{err}");
+                    old.grade
+                }
+            },
+            None => None,
+        };
+        updated.push((repo, config));
+    }
+
+    let mut cache = state.remote();
+    for (repo, _) in &updated {
+        cache
+            .repos
+            .insert(key(&format!("{}/{}", repo.owner, repo.name)), repo.clone());
+    }
+    state.store_remote(cache);
+    updated
 }
 
 fn key(name_with_owner: &str) -> String {
@@ -1076,6 +1352,69 @@ async fn local_state(path: &Path) -> Option<LocalState> {
     }
 }
 
+/// Compares each clone with GitHub's data: unmerged local branches, and whether the
+/// remote head is missing (needs a pull). No network: only the local object store.
+async fn check_clones(projects: &mut [Project]) {
+    let mut tasks = JoinSet::new();
+    for (i, project) in projects.iter().enumerate() {
+        let (Some(path), Some(local)) = (project.path.clone(), project.local.as_ref()) else {
+            continue;
+        };
+        let remote = project.remote.as_ref();
+        let default_branch = remote.and_then(|r| r.default_branch.clone());
+        let remote_head = remote
+            .and_then(|r| r.head.as_ref())
+            .map(|h| h.oid.clone())
+            .filter(|oid| local.head.as_deref() != Some(oid.as_str()));
+        tasks.spawn(async move {
+            let unmerged = match default_branch {
+                Some(branch) => unmerged_branches(&path, &branch).await,
+                None => Vec::new(),
+            };
+            let remote_ahead = match remote_head {
+                Some(oid) => !has_commit(&path, &oid).await,
+                None => false,
+            };
+            (i, unmerged, remote_ahead)
+        });
+    }
+    while let Some(Ok((i, unmerged, remote_ahead))) = tasks.join_next().await {
+        if let Some(local) = projects[i].local.as_mut() {
+            local.unmerged = unmerged;
+            local.remote_ahead = remote_ahead;
+        }
+    }
+}
+
+/// Local branches with commits not on `default` (the feedback branch never counts).
+async fn unmerged_branches(path: &Path, default: &str) -> Vec<String> {
+    let no_merged = format!("--no-merged=refs/heads/{default}");
+    let args = [
+        "for-each-ref",
+        no_merged.as_str(),
+        "--format=%(refname:short)",
+        "refs/heads",
+    ];
+    match process::run("git", args, Some(path)).await {
+        Ok(out) => out
+            .stdout
+            .lines()
+            .map(str::trim)
+            .filter(|b| !b.is_empty() && *b != default && *b != "feedback")
+            .map(str::to_owned)
+            .collect(),
+        // No local default branch yet: nothing to compare with.
+        Err(_) => Vec::new(),
+    }
+}
+
+async fn has_commit(path: &Path, oid: &str) -> bool {
+    let object = format!("{oid}^{{commit}}");
+    process::run("git", ["cat-file", "-e", object.as_str()], Some(path))
+        .await
+        .is_ok()
+}
+
 fn parse_status(porcelain: &str) -> LocalState {
     let mut state = LocalState::default();
     for line in porcelain.lines() {
@@ -1181,6 +1520,16 @@ fn pending(project: &Project) -> Option<Pending> {
         if local.ahead.is_some_and(|n| n > 0) {
             return Some(Pending::Unpushed);
         }
+        if !local.unmerged.is_empty() {
+            return Some(Pending::Unmerged);
+        }
+    }
+    if project
+        .remote
+        .as_ref()
+        .is_some_and(|r| !r.unmerged.is_empty())
+    {
+        return Some(Pending::Unmerged);
     }
     let tag_mode = project
         .assignment
@@ -1248,6 +1597,9 @@ mod tests {
                 at: None,
             }),
             config: Some(config("hello")),
+            unmerged: Vec::new(),
+            grade: None,
+            feedback: None,
         }
     }
 

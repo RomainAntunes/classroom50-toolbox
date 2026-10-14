@@ -8,5 +8,15 @@ export const session = $state<{
   snapshot: Snapshot | null;
   update: UpdateInfo | null;
   progress: SyncProgress | null;
+  /** Ids with news not seen yet (a dot in the list). */
+  unseen: string[];
   search: string;
-}>({ tools: [], auth: null, snapshot: null, update: null, progress: null, search: "" });
+}>({
+  tools: [],
+  auth: null,
+  snapshot: null,
+  update: null,
+  progress: null,
+  unseen: [],
+  search: "",
+});

@@ -12,6 +12,7 @@
     type Project,
     type Snapshot,
     type SyncProgress,
+    type Unaccepted,
     type ToolStatus,
     type UpdateInfo,
     withDialog,
@@ -22,12 +23,15 @@
   import Section from "$lib/components/Section.svelte";
   import ToolRow from "$lib/components/ToolRow.svelte";
   import ProjectRow from "$lib/components/ProjectRow.svelte";
+  import UnacceptedRow from "$lib/components/UnacceptedRow.svelte";
   import LoginStatus from "$lib/components/LoginStatus.svelte";
 
   interface ClassGroup {
     key: string;
     title: string;
+    owner: string;
     projects: Project[];
+    unaccepted: Unaccepted[];
   }
 
   let now = $state(new Date());
@@ -46,9 +50,11 @@
   const fraction = $derived(
     session.progress?.total ? session.progress.done / session.progress.total : null,
   );
-  const syncedAt = $derived(
-    session.snapshot?.syncedAt ? new Date(session.snapshot.syncedAt) : null,
-  );
+  // A status check also counts: it is the last time GitHub was read.
+  const syncedAt = $derived.by(() => {
+    const at = session.snapshot?.checkedAt ?? session.snapshot?.syncedAt;
+    return at ? new Date(at) : null;
+  });
   // `now` ticks every minute, so anything under a minute reads "just now".
   const syncedLabel = $derived(
     syncedAt === null
@@ -59,37 +65,68 @@
   );
   const allProjects = $derived(session.snapshot?.projects ?? []);
   const query = $derived(session.search.trim().toLowerCase());
-  const groups = $derived(groupByClass(allProjects.filter((p) => matches(p, query))));
+  const unseen = $derived(new Set(session.unseen));
+  const groups = $derived(
+    groupByClass(
+      allProjects.filter((p) => matches(q(p), query)),
+      (session.snapshot?.unaccepted ?? []).filter((u) =>
+        matches(
+          [
+            u.assignment.name,
+            u.assignment.slug,
+            u.classroom.slug,
+            u.classroom.name,
+            u.classroom.org,
+          ],
+          query,
+        ),
+      ),
+    ),
+  );
 
-  function matches(project: Project, q: string): boolean {
-    if (!q) return true;
+  function q(project: Project): (string | null | undefined)[] {
     return [
       project.assignment?.name,
       project.config.assignment,
       project.config.classroom,
+      project.classroom?.name,
       project.owner,
       project.repo,
-    ].some((field) => field?.toLowerCase().includes(q));
+    ];
+  }
+
+  function matches(fields: (string | null | undefined)[], search: string): boolean {
+    return !search || fields.some((field) => field?.toLowerCase().includes(search));
   }
 
   /** Keeps Rust's urgency order: a class appears where its most urgent assignment is. */
-  function groupByClass(projects: Project[]): ClassGroup[] {
+  function groupByClass(projects: Project[], unaccepted: Unaccepted[]): ClassGroup[] {
     const groups = new Map<string, ClassGroup>();
-    for (const project of projects) {
-      const key = `${project.owner ?? ""}/${project.config.classroom}`.toLowerCase();
-      let group = groups.get(key);
-      if (!group) {
-        group = { key, title: project.classroom?.name ?? project.config.classroom, projects: [] };
-        groups.set(key, group);
+    const group = (owner: string, slug: string, title: string) => {
+      const key = `${owner}/${slug}`.toLowerCase();
+      let found = groups.get(key);
+      if (!found) {
+        found = { key, title, owner, projects: [], unaccepted: [] };
+        groups.set(key, found);
       }
-      group.projects.push(project);
+      return found;
+    };
+    for (const project of projects) {
+      const { classroom } = project.config;
+      group(project.owner ?? "", classroom, project.classroom?.name ?? classroom).projects.push(
+        project,
+      );
+    }
+    for (const item of unaccepted) {
+      const { org, slug, name } = item.classroom;
+      group(org, slug, name ?? slug).unaccepted.push(item);
     }
     // Two orgs can use the same classroom slug; name the org only then.
     const list = [...groups.values()];
     for (const group of list) {
       const [owner] = group.key.split("/");
       if (owner && list.some((g) => g !== group && g.title === group.title)) {
-        group.title = `${group.title} (${group.projects[0].owner})`;
+        group.title = `${group.title} (${group.owner})`;
       }
     }
     return list;
@@ -262,12 +299,15 @@
   {#each groups as group (group.key)}
     <Section title={group.title}>
       {#each group.projects as project (project.id)}
-        <ProjectRow {project} {now} />
+        <ProjectRow {project} {now} unseen={unseen.has(project.id)} />
+      {/each}
+      {#each group.unaccepted as item (item.id)}
+        <UnacceptedRow {item} {now} unseen={unseen.has(item.id)} />
       {/each}
     </Section>
   {:else}
     <p class="empty">
-      {#if query && allProjects.length > 0}
+      {#if query && (allProjects.length > 0 || session.snapshot?.unaccepted.length)}
         {t("projects.noMatch")}
       {:else if syncing}
         {t("projects.loading")}

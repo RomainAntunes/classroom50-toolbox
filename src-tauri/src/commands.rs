@@ -78,6 +78,13 @@ pub async fn rescan_local(app: AppHandle) -> Snapshot {
     projects::refresh_local(&app).await
 }
 
+/// Ids of projects and unaccepted assignments with news not seen yet; `unseen-updated`
+/// follows.
+#[tauri::command]
+pub fn unseen(state: State<'_, crate::alerts::AlertsState>) -> Vec<String> {
+    state.unseen()
+}
+
 /// Whether a sync is running and how far it is; `sync-progress` follows.
 #[tauri::command]
 pub fn sync_progress(state: State<'_, ProjectsState>) -> SyncProgress {

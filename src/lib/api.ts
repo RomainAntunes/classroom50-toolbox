@@ -53,6 +53,33 @@ export interface RemoteRepo {
   head: Commit | null;
   lastSubmission: Submission | null;
   config: RepoConfig | null;
+  /** Branches with commits missing from the default branch. */
+  unmerged: Branch[];
+  grade: Grade | null;
+  feedback: Feedback | null;
+}
+
+export interface Branch {
+  name: string;
+  commits: number;
+}
+
+/** The newest autograder result (`result.json` on the `submit/*` release). */
+export interface Grade {
+  tag: string;
+  score: number;
+  maxScore: number;
+  testsPassed: number;
+  testsTotal: number;
+  publishedAt: string | null;
+  url: string;
+}
+
+/** Teacher comments and reviews on the Feedback PR. */
+export interface Feedback {
+  url: string;
+  comments: number;
+  latestAt: string | null;
 }
 
 export interface Classroom {
@@ -71,9 +98,13 @@ export interface LocalState {
   ahead: number | null;
   behind: number | null;
   changedFiles: number;
+  /** Local branches with commits missing from the local default branch. */
+  unmerged: string[];
+  /** GitHub has commits the clone doesn't (someone pushed since the last pull). */
+  remoteAhead: boolean;
 }
 
-export type Pending = "uncommitted" | "unpushed" | "unsubmitted";
+export type Pending = "uncommitted" | "unpushed" | "unmerged" | "unsubmitted";
 
 export interface Assignment {
   slug: string;
@@ -105,9 +136,21 @@ export interface Project {
   webUrl: string | null;
 }
 
+/** A published assignment the user hasn't accepted yet. */
+export interface Unaccepted {
+  id: string;
+  classroom: Classroom;
+  assignment: Assignment;
+  acceptUrl: string;
+}
+
 export interface Snapshot {
   projects: Project[];
+  unaccepted: Unaccepted[];
+  /** Last full sync. */
   syncedAt: string | null;
+  /** Last GitHub read, full sync or status check. */
+  checkedAt: string | null;
   /** Why the last sync was partial; same shape as `CommandError`. */
   issue: CommandError | null;
 }
@@ -129,6 +172,16 @@ export const DEVICE_CODE_EVENT = "login-device-code";
 export const UPDATE_AVAILABLE_EVENT = "update-available";
 export const PROJECTS_UPDATED_EVENT = "projects-updated";
 export const SYNC_PROGRESS_EVENT = "sync-progress";
+/** Payload: `Notice`. The UI words it and sends the system notification. */
+export const NOTIFY_EVENT = "notify";
+/** Payload: ids of projects and unaccepted assignments with unseen news. */
+export const UNSEEN_EVENT = "unseen-updated";
+
+export type Notice =
+  | { kind: "due"; assignment: string; due: string }
+  | { kind: "grade"; assignment: string; score: number; maxScore: number }
+  | { kind: "feedback"; assignment: string; count: number }
+  | { kind: "newAssignment"; assignment: string; classroom: string };
 
 /** Payload of `sync-progress`. `total` grows as work is found; 0 means not known yet. */
 export interface SyncProgress {
@@ -159,6 +212,7 @@ export const api = {
   refreshProjects: () => invoke<Snapshot>("refresh_projects"),
   syncProgress: () => invoke<SyncProgress>("sync_progress"),
   rescanLocal: () => invoke<Snapshot>("rescan_local"),
+  unseen: () => invoke<string[]>("unseen"),
   getSettings: () => invoke<Settings>("get_settings"),
   updateSettings: (next: Settings) => invoke<Settings>("update_settings", { next }),
   login: () => invoke<AuthStatus>("login"),

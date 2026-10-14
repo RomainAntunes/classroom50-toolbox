@@ -257,6 +257,15 @@ pub fn submission_url(org: &str, classroom: &str, assignment: &str) -> String {
     format!("{WEB_APP_URL}/{org}/{classroom}/assignments/{assignment}/submission")
 }
 
+/// The web app's accept page for an assignment; `k` carries an unlisted classroom's key.
+pub fn accept_url(org: &str, classroom: &str, assignment: &str, secret: Option<&str>) -> String {
+    let url = format!("{WEB_APP_URL}/{org}/{classroom}/assignments/{assignment}/accept");
+    match secret.filter(|s| !s.is_empty()) {
+        Some(secret) => format!("{url}?k={secret}"),
+        None => url,
+    }
+}
+
 /// The assignment a repo belongs to by the upstream naming rule
 /// `<classroom>-<assignment>-<username or group>` (all lowercase). Needed because
 /// `no_autograder` and `empty_repo` assignments commit no `.classroom50.yaml`. The longest

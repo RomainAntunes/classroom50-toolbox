@@ -1,0 +1,485 @@
+//! Turns snapshot changes into notifications and the tray badge: deadline reminders, new
+//! grades, new feedback and newly published assignments. What was already announced is
+//! remembered in `alerts.json` (app cache dir) so a restart doesn't repeat it, and the
+//! first snapshot only records a baseline. The UI formats and sends the notifications
+//! (`notify` event), so the text goes through i18n.
+
+use std::collections::{BTreeMap, BTreeSet};
+use std::path::{Path, PathBuf};
+use std::sync::Mutex;
+
+use chrono::{DateTime, TimeDelta, Utc};
+use serde::{Deserialize, Serialize};
+use tauri::{AppHandle, Emitter, Manager};
+
+use crate::classroom50::SubmissionMode;
+use crate::github;
+use crate::projects::{Project, Snapshot};
+use crate::settings::SettingsStore;
+use crate::tray;
+
+pub const NOTIFY_EVENT: &str = "notify";
+pub const UNSEEN_EVENT: &str = "unseen-updated";
+
+const FILE_NAME: &str = "alerts.json";
+/// Something due this soon and not done lights the badge.
+const DUE_SOON: TimeDelta = TimeDelta::hours(24);
+/// A grade or comment first seen for a repo is announced only if this recent; older ones
+/// predate the app.
+const FRESH: TimeDelta = TimeDelta::days(1);
+
+/// A notification for the UI to word.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[serde(
+    tag = "kind",
+    rename_all = "camelCase",
+    rename_all_fields = "camelCase"
+)]
+pub enum Notice {
+    Due {
+        assignment: String,
+        due: DateTime<Utc>,
+    },
+    Grade {
+        assignment: String,
+        score: u32,
+        max_score: u32,
+    },
+    Feedback {
+        assignment: String,
+        count: u32,
+    },
+    NewAssignment {
+        assignment: String,
+        classroom: String,
+    },
+}
+
+#[derive(Debug, Default, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", default)]
+struct Memory {
+    /// Assignment slugs seen per `org/classroom`.
+    assignments: BTreeMap<String, BTreeSet<String>>,
+    /// Graded `submit/*` tag per project.
+    grades: BTreeMap<String, String>,
+    /// Feedback PR comment count per project.
+    feedback: BTreeMap<String, u32>,
+    /// `<project>|<due>|<hours>` reminders already sent.
+    reminded: BTreeSet<String>,
+    /// Project and unaccepted-assignment ids with news the user hasn't opened the popover
+    /// on yet. They light the badge and get a dot in the list.
+    unseen: BTreeSet<String>,
+}
+
+pub struct AlertsState {
+    path: PathBuf,
+    memory: Mutex<Memory>,
+    badge: Mutex<Option<bool>>,
+}
+
+impl AlertsState {
+    pub fn load(cache_dir: &Path) -> Self {
+        let path = cache_dir.join(FILE_NAME);
+        let memory = std::fs::read_to_string(&path)
+            .ok()
+            .and_then(|json| serde_json::from_str(&json).ok())
+            .unwrap_or_default();
+        Self {
+            path,
+            memory: Mutex::new(memory),
+            badge: Mutex::new(None),
+        }
+    }
+
+    pub fn unseen(&self) -> Vec<String> {
+        self.memory
+            .lock()
+            .map(|m| m.unseen.iter().cloned().collect())
+            .unwrap_or_default()
+    }
+
+    fn save(&self, memory: &Memory) {
+        match serde_json::to_vec(memory) {
+            Ok(json) => {
+                if let Err(err) = github::write_atomic(&self.path, &json) {
+                    log::warn!("could not save {}: {err}", self.path.display());
+                }
+            }
+            Err(err) => log::warn!("could not encode alerts: {err}"),
+        }
+    }
+}
+
+/// Called after every sync with the new snapshot.
+pub fn process(app: &AppHandle, snapshot: &Snapshot) {
+    // Before the first GitHub read (or signed out) there's nothing to compare.
+    if snapshot.checked_at.is_none() {
+        return;
+    }
+    let hours = app.state::<SettingsStore>().get().notify_hours_before;
+    let state = app.state::<AlertsState>();
+    let Ok(mut memory) = state.memory.lock() else {
+        return;
+    };
+    let notices = diff(&mut memory, snapshot, &hours, Utc::now());
+    state.save(&memory);
+    let unseen: Vec<String> = memory.unseen.iter().cloned().collect();
+    let attention = !unseen.is_empty() || due_soon(snapshot, Utc::now());
+    drop(memory);
+
+    for notice in notices {
+        if let Err(err) = app.emit(NOTIFY_EVENT, &notice) {
+            log::warn!("could not emit {NOTIFY_EVENT}: {err}");
+        }
+    }
+    let _ = app.emit(UNSEEN_EVENT, &unseen);
+    set_badge(app, attention);
+}
+
+/// The popover was open, so its news has been seen.
+pub fn mark_seen(app: &AppHandle) {
+    let state = app.state::<AlertsState>();
+    let Ok(mut memory) = state.memory.lock() else {
+        return;
+    };
+    if memory.unseen.is_empty() {
+        return;
+    }
+    memory.unseen.clear();
+    state.save(&memory);
+    drop(memory);
+    let _ = app.emit(UNSEEN_EVENT, Vec::<String>::new());
+    let snapshot = app.state::<crate::projects::ProjectsState>().snapshot();
+    set_badge(app, due_soon(&snapshot, Utc::now()));
+}
+
+fn set_badge(app: &AppHandle, on: bool) {
+    let state = app.state::<AlertsState>();
+    let Ok(mut current) = state.badge.lock() else {
+        return;
+    };
+    if *current != Some(on) {
+        *current = Some(on);
+        tray::set_badge(app, on);
+    }
+}
+
+/// Updates `memory` and returns what to announce.
+fn diff(
+    memory: &mut Memory,
+    snapshot: &Snapshot,
+    hours_before: &[u32],
+    now: DateTime<Utc>,
+) -> Vec<Notice> {
+    let mut notices = Vec::new();
+    let fresh = |at: Option<DateTime<Utc>>| at.is_some_and(|at| now - at < FRESH);
+
+    // Newly published assignments, per classroom. A classroom seen for the first time
+    // only records its list.
+    let mut catalog: BTreeMap<String, Vec<(String, String, String, String)>> = BTreeMap::new();
+    for project in &snapshot.projects {
+        let Some(owner) = &project.owner else {
+            continue;
+        };
+        let classroom = classroom_key(owner, &project.config.classroom);
+        catalog.entry(classroom).or_default().push((
+            project.config.assignment.clone(),
+            assignment_name(project),
+            classroom_name(project),
+            project.id.clone(),
+        ));
+    }
+    for item in &snapshot.unaccepted {
+        let classroom = classroom_key(&item.classroom.org, &item.classroom.slug);
+        catalog.entry(classroom).or_default().push((
+            item.assignment.slug.clone(),
+            item.assignment.name.clone(),
+            item.classroom
+                .name
+                .clone()
+                .unwrap_or_else(|| item.classroom.slug.clone()),
+            item.id.clone(),
+        ));
+    }
+    for (classroom, assignments) in catalog {
+        let first_time = !memory.assignments.contains_key(&classroom);
+        let known = memory.assignments.entry(classroom).or_default();
+        for (slug, name, classroom_name, id) in assignments {
+            if known.insert(slug) && !first_time {
+                notices.push(Notice::NewAssignment {
+                    assignment: name,
+                    classroom: classroom_name,
+                });
+                memory.unseen.insert(id);
+            }
+        }
+    }
+
+    for project in &snapshot.projects {
+        let Some(remote) = &project.remote else {
+            continue;
+        };
+        let name = assignment_name(project);
+
+        if let Some(grade) = &remote.grade {
+            let previous = memory.grades.insert(project.id.clone(), grade.tag.clone());
+            let new = match previous {
+                Some(tag) => tag != grade.tag,
+                None => fresh(grade.published_at),
+            };
+            if new {
+                notices.push(Notice::Grade {
+                    assignment: name.clone(),
+                    score: grade.score,
+                    max_score: grade.max_score,
+                });
+                memory.unseen.insert(project.id.clone());
+            }
+        }
+
+        if let Some(feedback) = &remote.feedback {
+            let previous = memory
+                .feedback
+                .insert(project.id.clone(), feedback.comments);
+            let added = match previous {
+                Some(count) => feedback.comments.saturating_sub(count),
+                None if fresh(feedback.latest_at) => feedback.comments,
+                None => 0,
+            };
+            if added > 0 {
+                notices.push(Notice::Feedback {
+                    assignment: name.clone(),
+                    count: added,
+                });
+                memory.unseen.insert(project.id.clone());
+            }
+        }
+
+        if let Some(due) = open_due(project) {
+            // The tightest reminder already reached; the wider ones are skipped with it,
+            // so a late first sync sends one reminder, not one per setting.
+            let mut reached: Vec<u32> = hours_before
+                .iter()
+                .copied()
+                .filter(|h| due > now && due - now <= TimeDelta::hours(i64::from(*h)))
+                .collect();
+            reached.sort_unstable();
+            if let Some(&tightest) = reached.first() {
+                let key = |h: u32| format!("{}|{}|{h}", project.id, due.timestamp());
+                if needs_work(project) && !memory.reminded.contains(&key(tightest)) {
+                    notices.push(Notice::Due {
+                        assignment: name.clone(),
+                        due,
+                    });
+                }
+                memory.reminded.extend(reached.into_iter().map(key));
+            }
+        }
+    }
+
+    // Reminders for deadlines that have passed can go.
+    memory.reminded.retain(|key| {
+        key.split('|')
+            .nth(1)
+            .and_then(|t| t.parse::<i64>().ok())
+            .and_then(|t| DateTime::from_timestamp(t, 0))
+            .is_some_and(|due| due > now)
+    });
+    notices
+}
+
+/// Something open is due within `DUE_SOON` and not done.
+fn due_soon(snapshot: &Snapshot, now: DateTime<Utc>) -> bool {
+    snapshot
+        .projects
+        .iter()
+        .any(|p| open_due(p).is_some_and(|due| due > now && due - now <= DUE_SOON) && needs_work(p))
+}
+
+/// The due date of an assignment that can still take work.
+fn open_due(project: &Project) -> Option<DateTime<Utc>> {
+    let assignment = project.assignment.as_ref()?;
+    let archived = project.remote.as_ref().is_some_and(|r| r.archived);
+    if assignment.closed || archived {
+        return None;
+    }
+    assignment.due.map(|due| due.with_timezone(&Utc))
+}
+
+/// Whether the assignment may still need the student: anything pending, or no clone to
+/// tell (unless a tag-mode submission covers the remote head).
+fn needs_work(project: &Project) -> bool {
+    if project.pending.is_some() {
+        return true;
+    }
+    if project.path.is_some() {
+        return false;
+    }
+    let tag_mode = project
+        .assignment
+        .as_ref()
+        .is_some_and(|a| a.submission_mode == Some(SubmissionMode::Tag));
+    let submitted_head = project.remote.as_ref().is_some_and(|r| {
+        r.head.as_ref().is_some_and(|head| {
+            r.last_submission
+                .as_ref()
+                .is_some_and(|s| s.commit == head.oid)
+        })
+    });
+    !(tag_mode && submitted_head)
+}
+
+fn classroom_key(org: &str, classroom: &str) -> String {
+    format!("{org}/{classroom}").to_ascii_lowercase()
+}
+
+fn assignment_name(project: &Project) -> String {
+    project
+        .assignment
+        .as_ref()
+        .map_or_else(|| project.config.assignment.clone(), |a| a.name.clone())
+}
+
+fn classroom_name(project: &Project) -> String {
+    project
+        .classroom
+        .as_ref()
+        .and_then(|c| c.name.clone())
+        .unwrap_or_else(|| project.config.classroom.clone())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::classroom50::{Assignment, RepoConfig};
+    use crate::projects::RemoteRepo;
+    use crate::status::{Feedback, Grade};
+
+    fn assignment(slug: &str, due: Option<DateTime<Utc>>) -> Assignment {
+        let mut assignment: Assignment = serde_json::from_value(serde_json::json!({
+            "slug": slug, "name": slug.to_uppercase(), "mode": "individual"
+        }))
+        .unwrap();
+        assignment.due = due.map(|d| d.fixed_offset());
+        assignment
+    }
+
+    fn project(slug: &str, due: Option<DateTime<Utc>>) -> Project {
+        let remote: RemoteRepo = serde_json::from_value(serde_json::json!({
+            "owner": "org", "name": format!("c-{slug}-alice"), "url": "u",
+            "archived": false, "canPush": true, "defaultBranch": "main",
+            "head": null, "lastSubmission": null, "config": null
+        }))
+        .unwrap();
+        Project {
+            id: format!("org/c-{slug}-alice"),
+            owner: Some("org".into()),
+            repo: Some(remote.name.clone()),
+            config: RepoConfig {
+                classroom: "c".into(),
+                assignment: slug.into(),
+                secret: None,
+            },
+            path: None,
+            local: None,
+            remote: Some(remote),
+            classroom: None,
+            assignment: Some(assignment(slug, due)),
+            pending: None,
+            web_url: None,
+        }
+    }
+
+    fn snapshot(projects: Vec<Project>) -> Snapshot {
+        Snapshot {
+            projects,
+            checked_at: Some(Utc::now()),
+            ..Snapshot::default()
+        }
+    }
+
+    #[test]
+    fn first_snapshot_is_a_silent_baseline() {
+        let now = Utc::now();
+        let mut memory = Memory::default();
+        let mut graded = project("lab1", None);
+        graded.remote.as_mut().unwrap().grade = Some(Grade {
+            tag: "submit/old".into(),
+            score: 5,
+            max_score: 10,
+            tests_passed: 1,
+            tests_total: 2,
+            published_at: Some(now - TimeDelta::days(30)),
+            url: "u".into(),
+        });
+        let notices = diff(&mut memory, &snapshot(vec![graded]), &[24, 1], now);
+        assert!(notices.is_empty());
+        assert!(memory.unseen.is_empty());
+    }
+
+    #[test]
+    fn announces_new_grades_feedback_and_assignments() {
+        let now = Utc::now();
+        let mut memory = Memory::default();
+        diff(
+            &mut memory,
+            &snapshot(vec![project("lab1", None)]),
+            &[],
+            now,
+        );
+
+        let mut lab1 = project("lab1", None);
+        let remote = lab1.remote.as_mut().unwrap();
+        remote.grade = Some(Grade {
+            tag: "submit/new".into(),
+            score: 8,
+            max_score: 10,
+            tests_passed: 4,
+            tests_total: 5,
+            published_at: Some(now),
+            url: "u".into(),
+        });
+        remote.feedback = Some(Feedback {
+            url: "u".into(),
+            comments: 2,
+            latest_at: Some(now),
+        });
+        let notices = diff(
+            &mut memory,
+            &snapshot(vec![lab1, project("lab2", None)]),
+            &[],
+            now,
+        );
+        assert_eq!(
+            notices,
+            vec![
+                Notice::NewAssignment {
+                    assignment: "LAB2".into(),
+                    classroom: "c".into()
+                },
+                Notice::Grade {
+                    assignment: "LAB1".into(),
+                    score: 8,
+                    max_score: 10
+                },
+                Notice::Feedback {
+                    assignment: "LAB1".into(),
+                    count: 2
+                },
+            ]
+        );
+        assert!(memory.unseen.contains("org/c-lab1-alice"));
+    }
+
+    #[test]
+    fn reminds_once_per_deadline() {
+        let now = Utc::now();
+        let mut memory = Memory::default();
+        // Due in 30 min: past both thresholds, but only one reminder.
+        let snap = snapshot(vec![project("lab1", Some(now + TimeDelta::minutes(30)))]);
+        let notices = diff(&mut memory, &snap, &[24, 1], now);
+        assert_eq!(notices.len(), 1);
+        assert!(diff(&mut memory, &snap, &[24, 1], now).is_empty());
+        assert!(due_soon(&snap, now));
+    }
+}

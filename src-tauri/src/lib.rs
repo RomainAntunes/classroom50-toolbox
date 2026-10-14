@@ -1,3 +1,4 @@
+pub mod alerts;
 pub mod classroom50;
 mod commands;
 pub mod discovery;
@@ -10,6 +11,7 @@ mod popover;
 pub mod process;
 pub mod projects;
 pub mod settings;
+pub mod status;
 pub mod tools;
 mod tray;
 mod updater;
@@ -68,7 +70,9 @@ pub fn run() {
                 }
             }
             app.manage(settings);
-            app.manage(projects::ProjectsState::load(&app.path().app_cache_dir()?));
+            let cache_dir = app.path().app_cache_dir()?;
+            app.manage(projects::ProjectsState::load(&cache_dir));
+            app.manage(alerts::AlertsState::load(&cache_dir));
 
             popover::setup(handle)?;
             tray::setup(handle)?;
@@ -89,6 +93,7 @@ pub fn run() {
             commands::refresh_projects,
             commands::sync_progress,
             commands::rescan_local,
+            commands::unseen,
             commands::get_settings,
             commands::update_settings,
             commands::login,
