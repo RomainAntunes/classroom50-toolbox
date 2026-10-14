@@ -5,15 +5,19 @@
 //! and wait for gh to exit. The token stays in gh's own store (keychain where available).
 
 use serde::Serialize;
+use std::sync::Mutex;
 use tauri::{AppHandle, Emitter};
 use tokio::io::{AsyncBufReadExt, BufReader};
-use tokio::sync::Notify;
+
+use tokio::sync::oneshot;
 
 use crate::error::{Error, Result};
 use crate::process;
 use crate::tools::{self, AuthStatus};
 
 pub const DEVICE_CODE_EVENT: &str = "login-device-code";
+/// Sent however a sign-in ends (success, failure or cancel), so every view resets.
+pub const ENDED_EVENT: &str = "login-ended";
 
 /// The scopes `gh student login` requests; one sign-in covers gh-student too.
 const SCOPES: &str = "admin:org,read:org,repo,workflow";
@@ -26,18 +30,38 @@ pub struct DeviceCode {
     pub url: String,
 }
 
+/// The cancel switch of the sign-in in progress, if any. A channel, unlike a notification,
+/// can't miss a cancel that arrives between two polls.
 #[derive(Default)]
 pub struct LoginState {
-    cancel: Notify,
+    cancel: Mutex<Option<oneshot::Sender<()>>>,
 }
 
 impl LoginState {
     pub fn cancel(&self) {
-        self.cancel.notify_waiters();
+        if let Some(cancel) = self.cancel.lock().ok().and_then(|mut c| c.take()) {
+            let _ = cancel.send(());
+        }
     }
 }
 
 pub async fn login(app: &AppHandle, state: &LoginState) -> Result<AuthStatus> {
+    let result = run(app, state).await;
+    if let Ok(mut cancel) = state.cancel.lock() {
+        cancel.take();
+    }
+    let _ = app.emit(ENDED_EVENT, ());
+    result
+}
+
+async fn run(app: &AppHandle, state: &LoginState) -> Result<AuthStatus> {
+    let (cancel_tx, cancel_rx) = oneshot::channel();
+    if let Ok(mut cancel) = state.cancel.lock() {
+        // A sign-in still running from an earlier click is abandoned.
+        if let Some(previous) = cancel.replace(cancel_tx) {
+            let _ = previous.send(());
+        }
+    }
     let mut child = process::spawn_piped(
         "gh",
         [
@@ -80,7 +104,7 @@ pub async fn login(app: &AppHandle, state: &LoginState) -> Result<AuthStatus> {
 
     let status = tokio::select! {
         status = child.wait() => status?,
-        () = state.cancel.notified() => {
+        _ = cancel_rx => {
             let _ = child.kill().await;
             return Err(Error::Cancelled);
         }

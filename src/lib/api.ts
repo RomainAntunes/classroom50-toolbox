@@ -179,6 +179,8 @@ export interface DeviceCode {
 }
 
 export const DEVICE_CODE_EVENT = "login-device-code";
+/** However a sign-in ends (success, failure or cancel). */
+export const LOGIN_ENDED_EVENT = "login-ended";
 export const UPDATE_AVAILABLE_EVENT = "update-available";
 export const PROJECTS_UPDATED_EVENT = "projects-updated";
 export const SYNC_PROGRESS_EVENT = "sync-progress";

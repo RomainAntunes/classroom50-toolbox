@@ -11,6 +11,7 @@
   import {
     api,
     DEVICE_CODE_EVENT,
+    LOGIN_ENDED_EVENT,
     errorKind,
     errorMessage,
     withDialog,
@@ -114,9 +115,27 @@
     await openUrl(device.url);
   }
 
+  /** Hides the code at once; Rust kills gh and `login-ended` follows. */
+  function cancel() {
+    device = null;
+    pending = false;
+    void api.cancelLogin();
+  }
+
   onMount(() => {
-    const unlisten = listen<DeviceCode>(DEVICE_CODE_EVENT, (event) => (device = event.payload));
-    return () => void unlisten.then((stop) => stop());
+    const unlisteners = [
+      listen<DeviceCode>(DEVICE_CODE_EVENT, (event) => {
+        device = event.payload;
+      }),
+      // Also resets a view that didn't start the sign-in (e.g. after a reload).
+      listen(LOGIN_ENDED_EVENT, () => {
+        device = null;
+        pending = false;
+      }),
+    ];
+    return () => {
+      for (const unlisten of unlisteners) void unlisten.then((stop) => stop());
+    };
   });
 </script>
 
@@ -126,7 +145,7 @@
     <code>{device.code}</code>
     <div class="actions">
       <button class="primary" onclick={copyAndOpen}>{t("auth.copyAndOpen")}</button>
-      <button onclick={() => api.cancelLogin()}>{t("auth.cancel")}</button>
+      <button onclick={cancel}>{t("auth.cancel")}</button>
     </div>
   </div>
 {:else if auth?.loggedIn}
