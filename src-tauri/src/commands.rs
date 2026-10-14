@@ -88,10 +88,19 @@ pub fn update_settings(
     settings: State<'_, SettingsStore>,
     next: Settings,
 ) -> Result<Settings> {
-    if next.launch_at_login != settings.get().launch_at_login {
+    let previous = settings.get();
+    if next.launch_at_login != previous.launch_at_login {
         apply_launch_at_login(&app, next.launch_at_login)?;
     }
-    settings.set(next)
+    let saved = settings.set(next)?;
+    if saved.watched_folders != previous.watched_folders {
+        crate::watch::rewatch(&app);
+        let app = app.clone();
+        tauri::async_runtime::spawn(async move {
+            projects::refresh_local(&app).await;
+        });
+    }
+    Ok(saved)
 }
 
 /// Registers or removes the OS login item. Skipped in debug builds so `tauri dev` never

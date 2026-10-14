@@ -199,14 +199,35 @@ impl ProjectsState {
 /// flight and get its result instead of starting another.
 pub async fn refresh(app: &AppHandle) -> Snapshot {
     let state = app.state::<ProjectsState>();
-    let Ok(_guard) = state.sync_lock.try_lock() else {
+    let Ok(guard) = state.sync_lock.try_lock() else {
         drop(state.sync_lock.lock().await);
         return state.snapshot();
     };
+    publish(app, Mode::Full, guard).await
+}
+
+/// Re-reads only the watched folders (after a clone, commit or settings change) and keeps
+/// the last GitHub data, so it costs no API request.
+pub async fn refresh_local(app: &AppHandle) -> Snapshot {
+    let state = app.state::<ProjectsState>();
+    let guard = state.sync_lock.lock().await;
+    publish(app, Mode::Local, guard).await
+}
+
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum Mode {
+    /// GitHub discovery, local scan and manifests.
+    Full,
+    /// Local scan only, on top of the previous snapshot's GitHub data.
+    Local,
+}
+
+async fn publish(app: &AppHandle, mode: Mode, _guard: tokio::sync::MutexGuard<'_, ()>) -> Snapshot {
+    let state = app.state::<ProjectsState>();
     let http = &app.state::<Http>().0;
     let folders = app.state::<SettingsStore>().get().watched_folders;
 
-    let snapshot = sync(&state, http, folders).await;
+    let snapshot = sync(&state, http, folders, mode).await;
     if let Ok(mut current) = state.snapshot.lock() {
         *current = snapshot.clone();
     }
@@ -246,7 +267,28 @@ pub fn start_background_sync(app: AppHandle) {
     });
 }
 
-async fn sync(state: &ProjectsState, http: &reqwest::Client, folders: Vec<PathBuf>) -> Snapshot {
+async fn sync(
+    state: &ProjectsState,
+    http: &reqwest::Client,
+    folders: Vec<PathBuf>,
+    mode: Mode,
+) -> Snapshot {
+    let now = Utc::now();
+    if mode == Mode::Local {
+        let previous = state.snapshot();
+        let remote_repos = previous
+            .projects
+            .into_iter()
+            .filter_map(|p| p.remote)
+            .collect();
+        let projects = build(remote_repos, scan_local(folders).await, state, http, now).await;
+        return Snapshot {
+            projects,
+            synced_at: previous.synced_at,
+            issue: previous.issue,
+        };
+    }
+
     let (remote, locals) = tokio::join!(sync_remote(state, http), scan_local(folders));
     let (remote_repos, issue) = match remote {
         Ok(repos) => (repos, None),
@@ -264,20 +306,28 @@ async fn sync(state: &ProjectsState, http: &reqwest::Client, folders: Vec<PathBu
         }
     };
 
-    let mut projects = merge(remote_repos, locals);
+    Snapshot {
+        projects: build(remote_repos, locals, state, http, now).await,
+        synced_at: Some(now),
+        issue,
+    }
+}
+
+async fn build(
+    remote: Vec<RemoteRepo>,
+    locals: Vec<(LocalProject, Option<LocalState>)>,
+    state: &ProjectsState,
+    http: &reqwest::Client,
+    now: DateTime<Utc>,
+) -> Vec<Project> {
+    let mut projects = merge(remote, locals);
     attach_assignments(&mut projects, &state.http_cache, http).await;
     state.http_cache.save();
-    let now = Utc::now();
     for project in &mut projects {
         project.pending = pending(project);
     }
     projects.sort_by_cached_key(|p| sort_key(p, now));
-
-    Snapshot {
-        projects,
-        synced_at: Some(now),
-        issue,
-    }
+    projects
 }
 
 // ---- Remote discovery ----------------------------------------------------------------

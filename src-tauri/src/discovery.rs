@@ -10,7 +10,7 @@ use crate::classroom50::{REPO_CONFIG_FILE, RepoConfig};
 /// Deep enough for `~/code/<course>/<assignment>`, shallow enough to stay fast on a home dir.
 pub const DEFAULT_MAX_DEPTH: usize = 4;
 
-const SKIPPED_DIRS: &[&str] = &["node_modules", "target", "Library", "AppData", "venv"];
+pub const SKIPPED_DIRS: &[&str] = &["node_modules", "target", "Library", "AppData", "venv"];
 
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]

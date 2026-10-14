@@ -12,6 +12,7 @@ pub mod settings;
 pub mod tools;
 mod tray;
 mod updater;
+mod watch;
 
 use tauri::Manager;
 use tauri_plugin_autostart::MacosLauncher;
@@ -42,6 +43,7 @@ pub fn run() {
         .plugin(tauri_plugin_opener::init())
         .manage(popover::PopoverState::default())
         .manage(login::LoginState::default())
+        .manage(watch::FolderWatcher::default())
         .manage(github::Http(
             reqwest::Client::builder()
                 .user_agent(USER_AGENT)
@@ -70,6 +72,7 @@ pub fn run() {
             popover::setup(handle)?;
             tray::setup(handle)?;
             projects::start_background_sync(handle.clone());
+            watch::rewatch(handle);
             if !cfg!(debug_assertions) {
                 updater::check_in_background(handle.clone());
             }
