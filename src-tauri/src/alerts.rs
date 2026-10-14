@@ -1,4 +1,4 @@
-//! Turns snapshot changes into notifications and the tray badge: deadline reminders, new
+//! Turns snapshot changes into notifications and the tray badge (a teammate's push only): deadline reminders, new
 //! grades, new feedback and newly published assignments. What was already announced is
 //! remembered in `alerts.json` (app cache dir) so a restart doesn't repeat it, and the
 //! first snapshot only records a baseline. The UI formats and sends the notifications
@@ -22,8 +22,6 @@ pub const NOTIFY_EVENT: &str = "notify";
 pub const UNSEEN_EVENT: &str = "unseen-updated";
 
 const FILE_NAME: &str = "alerts.json";
-/// Something due this soon and not done lights the badge.
-const DUE_SOON: TimeDelta = TimeDelta::hours(24);
 /// A grade or comment first seen for a repo is announced only if this recent; older ones
 /// predate the app.
 const FRESH: TimeDelta = TimeDelta::days(1);
@@ -89,6 +87,8 @@ struct Memory {
     /// Project and unaccepted-assignment ids with news the user hasn't opened the popover
     /// on yet. They light the badge and get a dot in the list.
     unseen: BTreeSet<String>,
+    /// The subset of `unseen` that lights the tray badge: a teammate pushed.
+    badge: BTreeSet<String>,
 }
 
 pub struct AlertsState {
@@ -150,7 +150,7 @@ pub fn process(app: &AppHandle, snapshot: &Snapshot) {
     let notices = diff(&mut memory, snapshot, &hours, Utc::now());
     state.save(&memory);
     let unseen: Vec<String> = memory.unseen.iter().cloned().collect();
-    let attention = !unseen.is_empty() || due_soon(snapshot, Utc::now());
+    let attention = !memory.badge.is_empty();
     drop(memory);
 
     for notice in notices {
@@ -162,12 +162,11 @@ pub fn process(app: &AppHandle, snapshot: &Snapshot) {
     set_badge(app, attention);
 }
 
-/// At startup: the badge from the saved news and snapshot, before any sync.
+/// At startup: the badge from the saved news, before any sync.
 pub fn restore_badge(app: &AppHandle) {
     let state = app.state::<AlertsState>();
-    let unseen = state.memory.lock().is_ok_and(|m| !m.unseen.is_empty());
-    let snapshot = app.state::<crate::projects::ProjectsState>().snapshot();
-    set_badge(app, unseen || due_soon(&snapshot, Utc::now()));
+    let on = state.memory.lock().is_ok_and(|m| !m.badge.is_empty());
+    set_badge(app, on);
 }
 
 /// The popover was open, so its news has been seen.
@@ -180,11 +179,11 @@ pub fn mark_seen(app: &AppHandle) {
         return;
     }
     memory.unseen.clear();
+    memory.badge.clear();
     state.save(&memory);
     drop(memory);
     let _ = app.emit(UNSEEN_EVENT, Vec::<String>::new());
-    let snapshot = app.state::<crate::projects::ProjectsState>().snapshot();
-    set_badge(app, due_soon(&snapshot, Utc::now()));
+    set_badge(app, false);
 }
 
 fn set_badge(app: &AppHandle, on: bool) {
@@ -306,6 +305,7 @@ fn diff(
                     author: author.clone(),
                 });
                 memory.unseen.insert(project.id.clone());
+                memory.badge.insert(project.id.clone());
             }
         }
 
@@ -374,14 +374,6 @@ fn diff(
             .is_some_and(|due| due > now)
     });
     notices
-}
-
-/// Something open is due within `DUE_SOON` and not done, or a clone risks a conflict.
-fn due_soon(snapshot: &Snapshot, now: DateTime<Utc>) -> bool {
-    snapshot.projects.iter().any(|p| {
-        p.pending == Some(crate::projects::Pending::Conflict)
-            || (open_due(p).is_some_and(|due| due > now && due - now <= DUE_SOON) && needs_work(p))
-    })
 }
 
 /// The due date of an assignment that can still take work.
@@ -569,7 +561,6 @@ mod tests {
         let notices = diff(&mut memory, &snap, &[24, 1], now);
         assert_eq!(notices.len(), 1);
         assert!(diff(&mut memory, &snap, &[24, 1], now).is_empty());
-        assert!(due_soon(&snap, now));
     }
 
     #[test]
@@ -628,5 +619,6 @@ mod tests {
                 },
             ]
         );
+        assert!(memory.badge.contains("org/c-lab1-alice"));
     }
 }
