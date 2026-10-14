@@ -1,17 +1,51 @@
 name: Release
 
-# Push a `v*` tag whose version matches package.json. This builds every platform, attaches
-# the installers to a draft GitHub Release and writes latest.json for the updater. Publishing
-# the draft is what ships the update to existing installs.
+# Runs on every merge into main, but only builds when package.json carries a version that
+# has no release yet (bump it in the PR with `pnpm bump X.Y.Z`). The result is a draft
+# release with installers and latest.json; publishing the draft ships the update to
+# installed apps.
 on:
   push:
-    tags: ["v*"]
+    branches: [main]
+  workflow_dispatch:
 
 permissions:
   contents: write
 
+concurrency:
+  group: release
+  cancel-in-progress: false
+
 jobs:
+  version:
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.check.outputs.version }}
+      release: ${{ steps.check.outputs.release }}
+    steps:
+      - uses: actions/checkout@v7
+      - id: check
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          version=$(node -p "require('./package.json').version")
+          cargo_version=$(sed -n 's/^version = "\(.*\)"$/\1/p' src-tauri/Cargo.toml | head -1)
+          if [ "$version" != "$cargo_version" ]; then
+            echo "::error::package.json ($version) and src-tauri/Cargo.toml ($cargo_version) disagree; use pnpm bump"
+            exit 1
+          fi
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          # Drafts have no git tag yet, so ask the releases API (it sees drafts with this token).
+          if gh release view "v$version" --repo "$GITHUB_REPOSITORY" > /dev/null 2>&1; then
+            echo "v$version already released; nothing to build"
+            echo "release=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "release=true" >> "$GITHUB_OUTPUT"
+          fi
+
   build:
+    needs: version
+    if: needs.version.outputs.release == 'true'
     strategy:
       fail-fast: false
       matrix:
@@ -58,8 +92,9 @@ jobs:
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
         with:
-          tagName: ${{ github.ref_name }}
-          releaseName: Classroom 50 Toolbox ${{ github.ref_name }}
+          tagName: v${{ needs.version.outputs.version }}
+          releaseCommitish: ${{ github.sha }}
+          releaseName: Classroom 50 Toolbox v${{ needs.version.outputs.version }}
           releaseBody: See the assets below to download and install this version.
           releaseDraft: true
           prerelease: false
