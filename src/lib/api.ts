@@ -169,8 +169,12 @@ export interface Settings {
   watchedFolders: string[];
   scanEditorProjects: boolean;
   launchAtLogin: boolean;
+  listFilter: ListFilter;
   notifyHoursBefore: number[];
 }
+
+/** The date filter above the project list. */
+export type ListFilter = "all" | "open" | "week" | "past";
 
 /** Payload of the `login-device-code` event emitted during `login`. */
 export interface DeviceCode {

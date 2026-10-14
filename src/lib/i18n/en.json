@@ -129,5 +129,10 @@
   "auth.addAccount": "Add another account…",
   "auth.switchAccount": "Switch GitHub account",
   "settings.sync.show": "Show sync details",
-  "settings.sync.hide": "Hide sync details"
+  "settings.sync.hide": "Hide sync details",
+  "projects.filter.label": "Show",
+  "projects.filter.all": "All",
+  "projects.filter.open": "Open",
+  "projects.filter.week": "This week",
+  "projects.filter.past": "Past"
 }

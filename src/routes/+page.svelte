@@ -12,6 +12,7 @@
     type Project,
     type Snapshot,
     type SyncProgress,
+    type ListFilter,
     type Unaccepted,
     type ToolStatus,
     type UpdateInfo,
@@ -19,7 +20,7 @@
   } from "$lib/api";
   import { fromNow, t } from "$lib/i18n";
   import { session } from "$lib/session.svelte";
-  import { loadSettings } from "$lib/settings.svelte";
+  import { loadSettings, saveSettings, settings } from "$lib/settings.svelte";
   import Section from "$lib/components/Section.svelte";
   import ToolRow from "$lib/components/ToolRow.svelte";
   import ProjectRow from "$lib/components/ProjectRow.svelte";
@@ -69,20 +70,45 @@
   const allProjects = $derived(session.snapshot?.projects ?? []);
   const query = $derived(session.search.trim().toLowerCase());
   const unseen = $derived(new Set(session.unseen));
+  const FILTERS: ListFilter[] = ["all", "open", "week", "past"];
+  const WEEK = 7 * 24 * 60 * 60 * 1000;
+  const filter = $derived(settings.current?.listFilter ?? "all");
+
+  /** Whether an assignment with this due date and state passes the date filter. */
+  function inRange(due: string | null, closed: boolean): boolean {
+    const at = due ? new Date(due).getTime() : null;
+    const ahead = at !== null && at > now.getTime();
+    switch (filter) {
+      case "open":
+        return !closed && (at === null || ahead);
+      case "week":
+        return !closed && ahead && at - now.getTime() <= WEEK;
+      case "past":
+        return closed || (at !== null && !ahead);
+      default:
+        return true;
+    }
+  }
   const groups = $derived(
     groupByClass(
-      allProjects.filter((p) => matches(q(p), query)),
-      (session.snapshot?.unaccepted ?? []).filter((u) =>
-        matches(
-          [
-            u.assignment.name,
-            u.assignment.slug,
-            u.classroom.slug,
-            u.classroom.name,
-            u.classroom.org,
-          ],
-          query,
-        ),
+      allProjects.filter(
+        (p) =>
+          matches(q(p), query) &&
+          inRange(p.assignment?.due ?? null, Boolean(p.assignment?.closed || p.remote?.archived)),
+      ),
+      (session.snapshot?.unaccepted ?? []).filter(
+        (u) =>
+          inRange(u.assignment.due, u.assignment.closed) &&
+          matches(
+            [
+              u.assignment.name,
+              u.assignment.slug,
+              u.classroom.slug,
+              u.classroom.name,
+              u.classroom.org,
+            ],
+            query,
+          ),
       ),
     ),
   );
@@ -283,6 +309,17 @@
   {/if}
 </header>
 
+<div class="filters" role="radiogroup" aria-label={t("projects.filter.label")}>
+  {#each FILTERS as option (option)}
+    <button
+      role="radio"
+      aria-checked={filter === option}
+      class:active={filter === option}
+      onclick={() => saveSettings({ listFilter: option })}>{t(`projects.filter.${option}`)}</button
+    >
+  {/each}
+</div>
+
 <main>
   {#if session.update}
     <div class="banner">
@@ -316,7 +353,7 @@
     </Section>
   {:else}
     <p class="empty">
-      {#if query && (allProjects.length > 0 || session.snapshot?.unaccepted.length)}
+      {#if (query || filter !== "all") && (allProjects.length > 0 || session.snapshot?.unaccepted.length)}
         {t("projects.noMatch")}
       {:else if syncing}
         {t("projects.loading")}
@@ -374,6 +411,32 @@
     to {
       transform: translateX(340%);
     }
+  }
+
+  /* A segmented control, like the native ones: a track with the chosen segment raised. */
+  .filters {
+    display: flex;
+    gap: 2px;
+    margin: 8px 12px 0;
+    padding: 2px;
+    border-radius: 7px;
+    background: var(--bg-control);
+  }
+
+  .filters button {
+    flex: 1;
+    height: 20px;
+    padding: 0 6px;
+    border-radius: 5px;
+    background: transparent;
+    font-size: 0.8em;
+    color: var(--fg-muted);
+  }
+
+  .filters button.active {
+    background: var(--bg-card);
+    color: var(--fg);
+    box-shadow: 0 1px 2px rgb(0 0 0 / 0.15);
   }
 
   .search {

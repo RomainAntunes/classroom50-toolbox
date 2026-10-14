@@ -21,8 +21,24 @@ pub struct Settings {
     /// Also look for clones in the editors' recent projects and default project folders.
     pub scan_editor_projects: bool,
     pub launch_at_login: bool,
+    /// Which assignments the list shows.
+    pub list_filter: ListFilter,
     /// Hours before a due date at which to send a reminder, largest first.
     pub notify_hours_before: Vec<u32>,
+}
+
+/// The date filter above the project list.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub enum ListFilter {
+    #[default]
+    All,
+    /// Not closed, due ahead or without a due date.
+    Open,
+    /// Due within the next 7 days.
+    Week,
+    /// Due date passed, or closed.
+    Past,
 }
 
 impl Default for Settings {
@@ -31,6 +47,7 @@ impl Default for Settings {
             watched_folders: Vec::new(),
             scan_editor_projects: true,
             launch_at_login: true,
+            list_filter: ListFilter::All,
             notify_hours_before: vec![24, 1],
         }
     }
@@ -121,6 +138,7 @@ mod tests {
             watched_folders: vec!["/a".into(), "/b".into(), "/a".into()],
             scan_editor_projects: true,
             launch_at_login: false,
+            list_filter: ListFilter::All,
             notify_hours_before: vec![1, 24, 0, 1, 1000, 6],
         }
         .normalized();
