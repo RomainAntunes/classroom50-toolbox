@@ -1,0 +1,22 @@
+{
+  "app.title": "Classroom 50",
+  "app.refresh": "Refresh",
+  "app.quit": "Quit",
+  "setup.title": "Setup",
+  "setup.install": "Install",
+  "setup.installing": "Installing…",
+  "setup.notInstalled": "Not installed",
+  "setup.installConfirm": "This will run:\n\n{command}\n\nContinue?",
+  "setup.tool.git": "Git",
+  "setup.tool.gh": "GitHub CLI",
+  "setup.tool.gh-student": "Classroom 50 (gh student)",
+  "auth.loggedInAs": "Signed in as {login}",
+  "auth.loggedOut": "Not signed in. Run `gh student login` in a terminal.",
+  "projects.title": "Assignments",
+  "projects.addFolder": "Add folder",
+  "projects.empty": "No Classroom 50 repositories found yet. Add the folder where you keep your assignments.",
+  "projects.openFolder": "Show in file manager",
+  "projects.openTerminal": "Open terminal",
+  "update.available": "Version {version} is available",
+  "update.install": "Update and restart"
+}

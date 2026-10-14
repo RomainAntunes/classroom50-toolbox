@@ -1,0 +1,54 @@
+use tauri::AppHandle;
+use tauri::image::Image;
+use tauri::menu::{Menu, MenuItem, PredefinedMenuItem};
+use tauri::tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent};
+
+use crate::popover;
+
+pub const ID: &str = "main";
+
+pub fn setup(app: &AppHandle) -> tauri::Result<()> {
+    let open = MenuItem::with_id(app, "open", "Open Classroom 50 Toolbox", true, None::<&str>)?;
+    let quit = MenuItem::with_id(app, "quit", "Quit", true, None::<&str>)?;
+    let separator = PredefinedMenuItem::separator(app)?;
+    let menu = Menu::with_items(app, &[&open, &separator, &quit])?;
+
+    let builder = TrayIconBuilder::with_id(ID)
+        .icon(icon(app)?)
+        .icon_as_template(cfg!(target_os = "macos"))
+        .tooltip("Classroom 50 Toolbox")
+        .menu(&menu)
+        // Left click opens the popover; the menu stays on right click. Linux trays don't
+        // emit click events at all, so the "Open" item is the way in there.
+        .show_menu_on_left_click(false)
+        .on_menu_event(|app, event| match event.id().as_ref() {
+            "open" => popover::show(app),
+            "quit" => app.exit(0),
+            _ => {}
+        })
+        .on_tray_icon_event(|tray, event| {
+            tauri_plugin_positioner::on_tray_event(tray.app_handle(), &event);
+            if let TrayIconEvent::Click {
+                button: MouseButton::Left,
+                button_state: MouseButtonState::Up,
+                ..
+            } = event
+            {
+                popover::toggle(tray.app_handle());
+            }
+        });
+    builder.build(app)?;
+    Ok(())
+}
+
+/// macOS uses a monochrome template image that adapts to the menu bar; elsewhere the
+/// coloured app icon reads on both light and dark taskbars.
+fn icon(app: &AppHandle) -> tauri::Result<Image<'static>> {
+    if cfg!(target_os = "macos") {
+        return Image::from_bytes(include_bytes!("../icons/tray-template.png"));
+    }
+    app.default_window_icon()
+        .cloned()
+        .map(Image::to_owned)
+        .ok_or_else(|| tauri::Error::AssetNotFound("default window icon".into()))
+}

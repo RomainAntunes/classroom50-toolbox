@@ -13,7 +13,7 @@ A tray app for [Classroom 50](https://github.com/foundation50/classroom50) stude
 The first release is for students only. Keep the domain layer role-agnostic so a teacher mode (`gh teacher`) can be added later without a rewrite.
 
 - Repo: `github.com/RomainAntunes/classroom50-toolbox`. License: GPL-3.0, the same as Classroom 50.
-- Status: pre-scaffold. Only this file exists so far. Update the Commands section once the project has been generated.
+- Status: base scaffold. Tray, popover, tool detection and install, local scan and the Pages manifest fetch are done. Not yet built: the GitHub API client, deadline tracking and notifications, grades, accept and submit, settings persistence, and the login flow.
 
 ## Stack and decisions (settled, don't re-litigate)
 
@@ -30,7 +30,7 @@ The first release is for students only. Keep the domain layer role-agnostic so a
 Classroom 50 has no server. All state lives in GitHub, so the app reads GitHub directly. Upstream publishes JSON Schemas in `schemas/` that are meant for GUI clients like this one. Validate against them instead of guessing field names.
 
 - **`.classroom50.yaml`** (schema `repo-config-v1`) sits at the root of every accepted repo. Its required keys are `classroom` and `assignment`, and it may also hold `secret` (the unlisted-classroom key). Its presence is what makes a repo a Classroom 50 project.
-- **`assignments.json`** (schema `assignments-v1`) is the published list of a classroom's assignments. It holds due dates, release dates (`--available-from`), submission mode and group settings. A due date only marks work as **late** and never blocks it. Only the teacher's "Close submission" makes a repo read-only, so don't show a deadline as "locked".
+- **`assignments.json`** (schema `assignments-v1`) is the published list of a classroom's assignments. It's public and needs no token: `https://<org>.github.io/classroom50/<classroom>[/<secret>]/assignments.json` (see `classroom50::assignments_url`). It holds due dates, release dates (`--available-from`), submission mode and group settings. A due date only marks work as **late** and never blocks it. Only the teacher's "Close submission" makes a repo read-only, so don't show a deadline as "locked".
 - **Submissions:** depending on the assignment's mode, either every push to the default branch counts or only `submit/<UTC-timestamp>-<short-sha>` tags do (pushed by `gh student submit`). A teacher-named milestone tag pattern may also grade.
 - **Grades:** each graded submission produces a **GitHub Release** on the student repo containing `result.json` (schema `result-v1`: `score`, `max-score`, `tests`, `commit`, `datetime`, ...). An optional feedback PR is opened at accept.
 - **Group assignments** are GitHub Teams named `classroom50-group-<hash>-<n>`, owning `<classroom>-<assignment>-group-<n>`.
@@ -45,21 +45,42 @@ Classroom 50 has no server. All state lives in GitHub, so the app reads GitHub d
 
 Remote data (due dates, releases) is cached locally. Refresh it on a timer and on tray open, and respect GitHub rate limits through conditional requests (ETags).
 
-## Commands (planned once scaffolded; package manager: pnpm)
+## Commands
 
 ```sh
 pnpm install
-pnpm tauri dev                     # run the app with hot reload
-pnpm tauri build                   # local release build for the current OS
-pnpm check                         # svelte-check + TypeScript
-cargo clippy --manifest-path src-tauri/Cargo.toml -- -D warnings
-cargo fmt --manifest-path src-tauri/Cargo.toml
-cargo test --manifest-path src-tauri/Cargo.toml                 # all Rust tests
-cargo test --manifest-path src-tauri/Cargo.toml <test_name>     # single test
+pnpm tauri dev                     # run the app (Vite on :1420 + cargo run)
+pnpm tauri build                   # release bundles for the current OS
+pnpm lint                          # prettier --check + svelte-check
+pnpm format                        # prettier --write
+cd src-tauri && cargo fmt && cargo clippy --all-targets -- -D warnings
+cd src-tauri && cargo test                       # all Rust tests
+cd src-tauri && cargo test parses_github_remotes  # single test (name filter)
 ```
+
+`cargo build` and `cargo clippy` embed the built frontend through `generate_context!`, so run `pnpm build` once on a fresh checkout before using cargo directly.
+
+The dev build is tray-only (no Dock icon, starts hidden). Open it from the tray icon, or launch the binary a second time: the single-instance plugin shows the popover.
+
+## Layout
+
+- `src-tauri/src/lib.rs` wires the plugins, managed state, tray and popover setup, and the command list.
+- `commands.rs` is the IPC surface. Each command has a typed twin in `src/lib/api.ts`, and the two must stay in sync because Rust serializes with camelCase.
+- `error.rs` holds the one `Error` enum, which crosses IPC as `{ kind, message }`.
+- `process.rs` is the only place that spawns programs. It adds the usual install dirs to PATH, because a Finder-launched app has no `/opt/homebrew/bin`. It also sets `GH_PROMPT_DISABLED` and hides console windows on Windows.
+- `platform/{macos,windows,linux}.rs` implement the same functions (install command, extra PATH dirs, open terminal) and are selected with `cfg(target_os)`.
+- `tools.rs` detects and installs git, gh and gh-student, and reads gh's auth.
+- `classroom50.rs` holds the typed upstream contracts and Pages URLs. `discovery.rs` is the local scanner.
+- `tray.rs`, `popover.rs` and `updater.rs` handle the tray icon and menu, the anchored window (hide on blur, vibrancy or Mica) and self-update.
+- `src/lib/theme/theme.css` holds the semantic tokens plus a skin per `data-os`. Components use tokens only.
+- `src/lib/i18n` is a flat `en.json` read through `t(key, params)`. New strings go there.
+- The updater public key is in `tauri.conf.json`. The private key and its password are in `~/.tauri/classroom50-toolbox.key{,.password}` locally and in the CI secrets `TAURI_SIGNING_PRIVATE_KEY` and `TAURI_SIGNING_PRIVATE_KEY_PASSWORD`. Losing them strands existing installs on their current version.
+- Release: bump `version` in `package.json` (`tauri.conf.json` and the updater read it from there; also bump `Cargo.toml`), then push a `vX.Y.Z` tag. CI creates a draft release with `latest.json`, and publishing the draft ships the update.
 
 ## Conventions
 
-- Keep platform-specific code (package managers, tray behavior, autostart, opening editors) behind a small Rust trait with one implementation per OS (`cfg(target_os)`). The UI never branches on OS for behavior, only for theming.
+- Keep platform-specific code (package managers, tray behavior, autostart, opening editors) in `platform/`, one file per OS exposing the same functions. The UI never branches on OS for behavior, only for theming.
 - Every call to `gh` or `git` goes through one Rust process wrapper that captures stderr and exit codes and returns typed errors. Never build shell strings; pass arguments as a vector.
-- Rust owns all state and I/O. Svelte only renders and invokes typed Tauri commands, and receives events for progress and refreshes.
+- Rust owns all state and I/O. Svelte only renders and invokes typed Tauri commands, and receives events for progress and refreshes. (The watched-folder list is in `localStorage` for now and should move to Rust with the settings work.)
+- Tauri permissions are allow-listed in `src-tauri/capabilities/default.json`. A plugin API called from JS needs its permission added there.
+- Don't use em-dashes in code, comments or UI strings.
