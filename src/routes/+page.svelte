@@ -459,9 +459,10 @@
     align-items: center;
     justify-content: space-between;
     gap: var(--space);
-    /* Holds its height while the login status loads, so it never collapses. */
-    min-height: 1.4em;
-    padding: 8px 14px 10px;
+    /* Holds its height while the login status loads, so it never collapses. Same side
+       padding as the list, so the account pill lines up with the cards. */
+    min-height: 26px;
+    padding: 6px 12px;
     font-size: 0.85em;
     color: var(--fg-muted);
     border-top: 1px solid var(--border);
@@ -469,6 +470,7 @@
 
   .synced {
     flex-shrink: 0;
+    padding-right: 4px;
     white-space: nowrap;
   }
 </style>

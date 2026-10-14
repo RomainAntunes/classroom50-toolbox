@@ -167,15 +167,19 @@
   }
 
   /* Quiet until hovered, like a toolbar item. */
+  /* A pill as tall as the titlebar controls; the avatar sits 4px inside its round end. */
   .account {
     display: inline-flex;
     align-items: center;
     gap: 6px;
+    box-sizing: border-box;
+    height: 26px;
     max-width: 100%;
-    margin-left: -6px;
-    padding: 2px 6px;
+    padding: 0 8px 0 4px;
+    border-radius: 13px;
     background: transparent;
     color: inherit;
+    line-height: 1;
   }
 
   .account img,
