@@ -56,5 +56,6 @@
   "projects.noMatch": "No assignment matches your search.",
   "projects.syncing": "Syncing",
   "settings.folders.editors": "Find clones from JetBrains and VS Code",
-  "settings.folders.editorsHint": "Looks in the folders your editors opened recently and in ~/IdeaProjects-style project folders. Add a folder below for anything else."
+  "settings.folders.editorsHint": "Looks in the folders your editors opened recently and in ~/IdeaProjects-style project folders. Add a folder below for anything else.",
+  "projects.openClassroom50": "Open on Classroom 50"
 }

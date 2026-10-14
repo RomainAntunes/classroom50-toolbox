@@ -101,6 +101,8 @@ export interface Project {
   classroom: Classroom | null;
   assignment: Assignment | null;
   pending: Pending | null;
+  /** The assignment's page in the Classroom 50 web app. */
+  webUrl: string | null;
 }
 
 export interface Snapshot {

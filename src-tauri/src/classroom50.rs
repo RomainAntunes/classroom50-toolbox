@@ -248,6 +248,15 @@ pub fn assignments_url(
     format!("{base}/{segment}/assignments.json")
 }
 
+/// Where the Classroom 50 web app runs (`web/CNAME` upstream).
+pub const WEB_APP_URL: &str = "https://classroom50.org";
+
+/// The student's page for an assignment in the Classroom 50 web app: submissions, grades
+/// and feedback. Org and slugs are GitHub names, which need no escaping.
+pub fn submission_url(org: &str, classroom: &str, assignment: &str) -> String {
+    format!("{WEB_APP_URL}/{org}/{classroom}/assignments/{assignment}/submission")
+}
+
 /// The assignment a repo belongs to by the upstream naming rule
 /// `<classroom>-<assignment>-<username or group>` (all lowercase). Needed because
 /// `no_autograder` and `empty_repo` assignments commit no `.classroom50.yaml`. The longest
@@ -314,6 +323,14 @@ mod tests {
         assert_eq!(
             assignments_url("cs50", "fall", None, Some("https://pages.cs50.edu/c50/")),
             "https://pages.cs50.edu/c50/fall/assignments.json"
+        );
+    }
+
+    #[test]
+    fn builds_submission_urls() {
+        assert_eq!(
+            submission_url("HEIGVD-202609-BDR-A", "bdr-a", "lab2"),
+            "https://classroom50.org/HEIGVD-202609-BDR-A/bdr-a/assignments/lab2/submission"
         );
     }
 

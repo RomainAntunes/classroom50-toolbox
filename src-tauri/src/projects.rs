@@ -113,6 +113,8 @@ pub struct Project {
     pub classroom: Option<Classroom>,
     pub assignment: Option<Assignment>,
     pub pending: Option<Pending>,
+    /// The assignment's page in the Classroom 50 web app.
+    pub web_url: Option<String>,
 }
 
 /// Why the last sync was partial, as `{ kind, message }` like command errors.
@@ -529,6 +531,13 @@ async fn build(
             .and_then(|list| list.iter().find(|a| a.slug == project.config.assignment))
             .cloned();
         project.pending = pending(project);
+        project.web_url = project.owner.as_deref().map(|owner| {
+            classroom50::submission_url(
+                owner,
+                &project.config.classroom,
+                &project.config.assignment,
+            )
+        });
     }
     projects.sort_by_cached_key(|p| sort_key(p, now));
     projects
@@ -1112,6 +1121,7 @@ fn merge(
                 classroom: None,
                 assignment: None,
                 pending: None,
+                web_url: None,
             };
             (id, project)
         })
@@ -1147,6 +1157,7 @@ fn merge(
                         classroom: None,
                         assignment: None,
                         pending: None,
+                        web_url: None,
                     },
                 );
             }
@@ -1377,6 +1388,7 @@ mod tests {
             classroom: None,
             assignment: Some(assignment.clone()),
             pending: None,
+            web_url: None,
         };
 
         let unsubmitted = project(remote("r", "aaa", Some("old")), None);
