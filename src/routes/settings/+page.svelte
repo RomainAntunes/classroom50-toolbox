@@ -54,7 +54,9 @@
 </script>
 
 <header class="titlebar">
-  <button onclick={() => goto("/")} title={t("app.back")}>‹</button>
+  <button class="icon" onclick={() => goto("/")} title={t("app.back")} aria-label={t("app.back")}>
+    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m15 18-6-6 6-6" /></svg>
+  </button>
   <h1>{t("app.settings")}</h1>
 </header>
 

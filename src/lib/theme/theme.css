@@ -143,6 +143,25 @@ button.primary {
   color: var(--accent-fg);
 }
 
+/* Square icon buttons; the SVGs are from Lucide (ISC). */
+button.icon {
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 26px;
+  padding: 0;
+}
+
+button.icon svg {
+  width: 16px;
+  height: 16px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
 button:focus-visible {
   outline: 2px solid var(--accent);
   outline-offset: 1px;

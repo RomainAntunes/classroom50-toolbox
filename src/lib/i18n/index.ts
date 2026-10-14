@@ -7,11 +7,17 @@ type Catalog = Record<string, string>;
 const catalogs: Record<string, Catalog> = { en };
 const fallback = "en";
 
+let currentLocale = fallback;
 let current: Catalog = en;
+// Dates and numbers follow the catalog's language, not the OS's, so a French system
+// doesn't get "Due il y a 6 jours" while the app is in English.
+let relative = new Intl.RelativeTimeFormat(currentLocale, { numeric: "auto" });
 
 export function setLocale(locale: string): void {
   const base = locale.toLowerCase().split("-")[0];
-  current = catalogs[base] ?? catalogs[fallback];
+  currentLocale = base in catalogs ? base : fallback;
+  current = catalogs[currentLocale];
+  relative = new Intl.RelativeTimeFormat(currentLocale, { numeric: "auto" });
 }
 
 /** `fallbackKey` is used when `key` is missing, e.g. for keys built from an error kind. */
@@ -26,8 +32,6 @@ export function t(
     name in params ? String(params[name]) : match,
   );
 }
-
-const relative = new Intl.RelativeTimeFormat(undefined, { numeric: "auto" });
 
 /** "in 3 hours", "yesterday": for due dates. */
 export function fromNow(date: Date, now = new Date()): string {
@@ -46,7 +50,7 @@ export function fromNow(date: Date, now = new Date()): string {
 /** 24 -> "1 day", 6 -> "6 hours", in the user's locale. */
 export function hoursLabel(hours: number): string {
   const [value, unit] = hours % 24 === 0 ? [hours / 24, "day"] : [hours, "hour"];
-  return new Intl.NumberFormat(undefined, { style: "unit", unit, unitDisplay: "long" }).format(
+  return new Intl.NumberFormat(currentLocale, { style: "unit", unit, unitDisplay: "long" }).format(
     value,
   );
 }
