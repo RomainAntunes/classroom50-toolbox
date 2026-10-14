@@ -60,6 +60,10 @@
     }
   }
 
+  $effect(() => {
+    session.signingIn = device !== null;
+  });
+
   const login = $derived(auth?.loggedIn ? auth.login : null);
   const avatar = $derived(login ? session.avatars[login] : undefined);
 

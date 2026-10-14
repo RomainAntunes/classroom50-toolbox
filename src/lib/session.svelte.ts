@@ -10,6 +10,8 @@ export const session = $state<{
   progress: SyncProgress | null;
   /** Ids with news not seen yet (a dot in the list). */
   unseen: string[];
+  /** A sign-in code is on screen in the footer, which then needs the whole width. */
+  signingIn: boolean;
   /** Avatar `data:` URLs by login, fetched once per run. */
   avatars: Record<string, string>;
   search: string;
@@ -20,6 +22,7 @@ export const session = $state<{
   update: null,
   progress: null,
   unseen: [],
+  signingIn: false,
   avatars: {},
   search: "",
 });

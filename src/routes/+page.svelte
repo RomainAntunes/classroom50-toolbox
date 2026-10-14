@@ -330,7 +330,7 @@
 
 <footer>
   <LoginStatus auth={session.auth} {ghInstalled} onchange={signedIn} />
-  {#if syncedLabel && syncedAt}
+  {#if syncedLabel && syncedAt && !session.signingIn}
     <span class="synced" title={syncedAt.toLocaleString()}>{syncedLabel}</span>
   {/if}
 </footer>
