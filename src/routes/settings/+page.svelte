@@ -8,12 +8,14 @@
   import { loadSettings, pickWatchedFolder, saveSettings, settings } from "$lib/settings.svelte";
   import Section from "$lib/components/Section.svelte";
   import Toggle from "$lib/components/Toggle.svelte";
+  import { session } from "$lib/session.svelte";
 
   const REMINDER_CHOICES = [72, 24, 6, 1];
 
   let info = $state<AppInfo | null>(null);
   let checking = $state(false);
   let upToDate = $state(false);
+  let rescanning = $state(false);
 
   const current = $derived(settings.current);
 
@@ -32,6 +34,15 @@
   function toggleReminder(hours: number, on: boolean) {
     const rest = current?.notifyHoursBefore.filter((h) => h !== hours) ?? [];
     save({ notifyHoursBefore: on ? [...rest, hours] : rest });
+  }
+
+  async function rescan() {
+    rescanning = true;
+    try {
+      session.snapshot = await api.rescanLocal();
+    } finally {
+      rescanning = false;
+    }
   }
 
   async function checkUpdates() {
@@ -64,7 +75,10 @@
   <main>
     <Section title={t("settings.folders.title")}>
       {#snippet actions()}
-        <button onclick={pickWatchedFolder}>{t("projects.addFolder")}</button>
+        <div class="actions">
+          <button disabled={rescanning} onclick={rescan}>{t("projects.rescan")}</button>
+          <button onclick={pickWatchedFolder}>{t("projects.addFolder")}</button>
+        </div>
       {/snippet}
       <Toggle
         label={t("settings.folders.editors")}
@@ -136,6 +150,11 @@
     flex-direction: column;
     gap: calc(var(--space) * 2);
     padding: var(--space) 12px 14px;
+  }
+
+  .actions {
+    display: flex;
+    gap: 6px;
   }
 
   .row {

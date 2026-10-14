@@ -158,6 +158,7 @@ export const api = {
   listProjects: () => invoke<Snapshot>("list_projects"),
   refreshProjects: () => invoke<Snapshot>("refresh_projects"),
   syncProgress: () => invoke<SyncProgress>("sync_progress"),
+  rescanLocal: () => invoke<Snapshot>("rescan_local"),
   getSettings: () => invoke<Settings>("get_settings"),
   updateSettings: (next: Settings) => invoke<Settings>("update_settings", { next }),
   login: () => invoke<AuthStatus>("login"),

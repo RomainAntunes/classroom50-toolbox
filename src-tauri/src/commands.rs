@@ -72,6 +72,12 @@ pub async fn refresh_projects(app: AppHandle) -> Snapshot {
     projects::refresh(&app).await
 }
 
+/// Rescans the disk only (watched folders and editor projects), with no GitHub request.
+#[tauri::command]
+pub async fn rescan_local(app: AppHandle) -> Snapshot {
+    projects::refresh_local(&app).await
+}
+
 /// Whether a sync is running and how far it is; `sync-progress` follows.
 #[tauri::command]
 pub fn sync_progress(state: State<'_, ProjectsState>) -> SyncProgress {

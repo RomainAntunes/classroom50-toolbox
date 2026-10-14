@@ -2,6 +2,7 @@
   import { onMount } from "svelte";
   import { goto } from "$app/navigation";
   import { listen } from "@tauri-apps/api/event";
+  import { Menu, MenuItem } from "@tauri-apps/api/menu";
   import {
     api,
     PROJECTS_UPDATED_EVENT,
@@ -13,8 +14,9 @@
     type SyncProgress,
     type ToolStatus,
     type UpdateInfo,
+    withDialog,
   } from "$lib/api";
-  import { t } from "$lib/i18n";
+  import { fromNow, t } from "$lib/i18n";
   import { session } from "$lib/session.svelte";
   import { loadSettings } from "$lib/settings.svelte";
   import Section from "$lib/components/Section.svelte";
@@ -43,6 +45,17 @@
   // Indeterminate until the sync knows how much work it has.
   const fraction = $derived(
     session.progress?.total ? session.progress.done / session.progress.total : null,
+  );
+  const syncedAt = $derived(
+    session.snapshot?.syncedAt ? new Date(session.snapshot.syncedAt) : null,
+  );
+  // `now` ticks every minute, so anything under a minute reads "just now".
+  const syncedLabel = $derived(
+    syncedAt === null
+      ? null
+      : now.getTime() - syncedAt.getTime() < 60_000
+        ? t("projects.syncedJustNow")
+        : t("projects.synced", { when: fromNow(syncedAt, now) }),
   );
   const allProjects = $derived(session.snapshot?.projects ?? []);
   const query = $derived(session.search.trim().toLowerCase());
@@ -116,6 +129,27 @@
     }
   }
 
+  /** Disk only: picks up clones and commits without a GitHub request. */
+  async function rescan() {
+    loading = true;
+    try {
+      session.snapshot = await api.rescanLocal();
+      now = new Date();
+    } finally {
+      loading = false;
+    }
+  }
+
+  async function refreshMenu(event: MouseEvent) {
+    event.preventDefault();
+    const items = await Promise.all([
+      MenuItem.new({ text: t("app.refresh"), enabled: !loading, action: refresh }),
+      MenuItem.new({ text: t("projects.rescan"), enabled: !loading, action: rescan }),
+    ]);
+    const menu = await Menu.new({ items });
+    await withDialog(() => menu.popup());
+  }
+
   function replaceTool(next: ToolStatus) {
     session.tools = session.tools.map((tool) => (tool.tool === next.tool ? next : tool));
   }
@@ -161,7 +195,8 @@
       class:spinning={syncing}
       disabled={loading}
       onclick={refresh}
-      title={t("app.refresh")}
+      oncontextmenu={refreshMenu}
+      title={syncedLabel ? `${t("app.refresh")} (${syncedLabel})` : t("app.refresh")}
       aria-label={t("app.refresh")}
     >
       <svg viewBox="0 0 24 24" aria-hidden="true">
@@ -242,6 +277,9 @@
 
 <footer>
   <LoginStatus auth={session.auth} {ghInstalled} onchange={signedIn} />
+  {#if syncedLabel && syncedAt}
+    <span class="synced" title={syncedAt.toLocaleString()}>{syncedLabel}</span>
+  {/if}
 </footer>
 
 <style>
@@ -364,11 +402,20 @@
   }
 
   footer {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--space);
     /* Holds its height while the login status loads, so it never collapses. */
     min-height: 1.4em;
     padding: 8px 14px 10px;
     font-size: 0.85em;
     color: var(--fg-muted);
     border-top: 1px solid var(--border);
+  }
+
+  .synced {
+    flex-shrink: 0;
+    white-space: nowrap;
   }
 </style>

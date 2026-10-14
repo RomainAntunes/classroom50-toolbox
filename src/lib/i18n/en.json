@@ -13,7 +13,6 @@
   "auth.loggedInAs": "Signed in as {login}",
   "projects.addFolder": "Add folder",
   "projects.empty": "No Classroom 50 assignments found yet. Sign in to GitHub, or add the folder where you keep your assignments.",
-  "projects.openFolder": "Show in file manager",
   "projects.openTerminal": "Open terminal",
   "update.available": "Version {version} is available",
   "update.install": "Update and restart",
@@ -57,5 +56,11 @@
   "projects.syncing": "Syncing",
   "settings.folders.editors": "Find clones from JetBrains and VS Code",
   "settings.folders.editorsHint": "Looks in the folders your editors opened recently and in ~/IdeaProjects-style project folders. Add a folder below for anything else.",
-  "projects.openClassroom50": "Open on Classroom 50"
+  "projects.openClassroom50": "Open on Classroom 50",
+  "projects.openFolder.macos": "Show in Finder",
+  "projects.openFolder.windows": "Show in File Explorer",
+  "projects.openFolder.linux": "Show in Files",
+  "projects.rescan": "Rescan local folders",
+  "projects.synced": "Synced {when}",
+  "projects.syncedJustNow": "Synced just now"
 }

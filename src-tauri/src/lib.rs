@@ -88,6 +88,7 @@ pub fn run() {
             commands::list_projects,
             commands::refresh_projects,
             commands::sync_progress,
+            commands::rescan_local,
             commands::get_settings,
             commands::update_settings,
             commands::login,
