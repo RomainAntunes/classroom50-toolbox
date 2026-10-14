@@ -376,16 +376,16 @@ fn diff(
     notices
 }
 
-/// Something open is due within `DUE_SOON` and not done.
+/// Something open is due within `DUE_SOON` and not done, or a clone risks a conflict.
 fn due_soon(snapshot: &Snapshot, now: DateTime<Utc>) -> bool {
-    snapshot
-        .projects
-        .iter()
-        .any(|p| open_due(p).is_some_and(|due| due > now && due - now <= DUE_SOON) && needs_work(p))
+    snapshot.projects.iter().any(|p| {
+        p.pending == Some(crate::projects::Pending::Conflict)
+            || (open_due(p).is_some_and(|due| due > now && due - now <= DUE_SOON) && needs_work(p))
+    })
 }
 
 /// The due date of an assignment that can still take work.
-fn open_due(project: &Project) -> Option<DateTime<Utc>> {
+pub(crate) fn open_due(project: &Project) -> Option<DateTime<Utc>> {
     let assignment = project.assignment.as_ref()?;
     let archived = project.remote.as_ref().is_some_and(|r| r.archived);
     if assignment.closed || archived {
@@ -396,7 +396,7 @@ fn open_due(project: &Project) -> Option<DateTime<Utc>> {
 
 /// Whether the assignment may still need the student: anything pending, or no clone to
 /// tell (unless a tag-mode submission covers the remote head).
-fn needs_work(project: &Project) -> bool {
+pub(crate) fn needs_work(project: &Project) -> bool {
     if project.pending.is_some() {
         return true;
     }
@@ -475,6 +475,7 @@ mod tests {
             assignment: Some(assignment(slug, due)),
             pending: None,
             web_url: None,
+            late_seconds: None,
         }
     }
 

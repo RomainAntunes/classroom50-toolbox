@@ -112,7 +112,7 @@ export interface LocalState {
   remoteAhead: boolean;
 }
 
-export type Pending = "uncommitted" | "unpushed" | "unmerged" | "unsubmitted";
+export type Pending = "conflict" | "uncommitted" | "unpushed" | "unmerged" | "unsubmitted";
 
 export interface Assignment {
   slug: string;
@@ -142,6 +142,8 @@ export interface Project {
   pending: Pending | null;
   /** The assignment's page in the Classroom 50 web app. */
   webUrl: string | null;
+  /** How far past the due date the graded work is; advisory, nothing is blocked. */
+  lateSeconds: number | null;
 }
 
 /** A published assignment the user hasn't accepted yet. */

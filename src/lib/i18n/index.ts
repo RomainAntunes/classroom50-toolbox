@@ -58,6 +58,19 @@ export function fromNow(date: Date, now = new Date()): string {
   return relative.format(seconds, "second");
 }
 
+/** 7200 -> "2 hours", 90000 -> "1 day": the largest whole unit, for lateness. */
+export function durationLabel(seconds: number): string {
+  const units: [Intl.NumberFormatOptions["unit"], number][] = [
+    ["day", 86400],
+    ["hour", 3600],
+    ["minute", 60],
+  ];
+  const [unit, size] = units.find(([, size]) => seconds >= size) ?? ["minute", 60];
+  return new Intl.NumberFormat(currentLocale, { style: "unit", unit, unitDisplay: "long" }).format(
+    Math.max(1, Math.floor(seconds / size)),
+  );
+}
+
 /** 24 -> "1 day", 6 -> "6 hours", in the user's locale. */
 export function hoursLabel(hours: number): string {
   const [value, unit] = hours % 24 === 0 ? [hours / 24, "day"] : [hours, "hour"];

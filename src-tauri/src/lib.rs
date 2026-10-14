@@ -51,6 +51,9 @@ pub fn run() {
         .manage(github::Http(
             reqwest::Client::builder()
                 .user_agent(USER_AGENT)
+                // Fail fast when offline instead of hanging a sync.
+                .connect_timeout(std::time::Duration::from_secs(10))
+                .timeout(std::time::Duration::from_secs(60))
                 .build()
                 .expect("HTTP client"),
         ))

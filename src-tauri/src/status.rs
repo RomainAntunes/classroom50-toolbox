@@ -211,7 +211,11 @@ impl StatusFields {
 /// Downloads and reads `result.json`. The signed URL carries its own authorization, so no
 /// token is sent.
 pub async fn download_grade(http: &reqwest::Client, release: &GradedRelease) -> Result<Grade> {
-    let response = http.get(&release.result_url).send().await?;
+    let response = http
+        .get(&release.result_url)
+        .send()
+        .await
+        .map_err(Error::network)?;
     if !response.status().is_success() {
         return Err(Error::GitHub(format!(
             "result.json of {}: HTTP {}",

@@ -2,7 +2,7 @@
   import { Menu, MenuItem, PredefinedMenuItem } from "@tauri-apps/api/menu";
   import { openUrl, revealItemInDir } from "@tauri-apps/plugin-opener";
   import { api, withDialog, type Project } from "$lib/api";
-  import { formatDate, fromNow, t } from "$lib/i18n";
+  import { durationLabel, formatDate, fromNow, t } from "$lib/i18n";
   import Details from "./Details.svelte";
 
   let { project, now, unseen }: { project: Project; now: Date; unseen: boolean } = $props();
@@ -37,6 +37,13 @@
         label: t("projects.pending.unmerged", { branch: defaultBranch }),
         warn: true,
         hint: t("projects.unmergedBranches", { branches: unmerged.join(", ") }),
+      };
+    }
+    if (project.pending === "conflict") {
+      return {
+        label: t("projects.pending.conflict"),
+        warn: true,
+        hint: t("projects.conflictHint"),
       };
     }
     if (project.pending) {
@@ -175,6 +182,11 @@
         {#if dueLabel}
           <span class:soon={dueSoon}>{dueLabel}</span> ·
         {/if}
+        {#if project.lateSeconds}
+          <span class="late" title={t("projects.lateHint")}
+            >{t("projects.late", { duration: durationLabel(project.lateSeconds) })}</span
+          > ·
+        {/if}
         {path ? (project.repo ?? project.config.assignment) : t("projects.notCloned")}
       </span>
     </div>
@@ -251,6 +263,10 @@
   }
 
   .status.warn {
+    color: var(--warning);
+  }
+
+  .late {
     color: var(--warning);
   }
 

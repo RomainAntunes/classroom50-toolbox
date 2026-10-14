@@ -134,5 +134,10 @@
   "projects.filter.all": "All",
   "projects.filter.open": "Open",
   "projects.filter.week": "This week",
-  "projects.filter.past": "Past"
+  "projects.filter.past": "Past",
+  "projects.pending.conflict": "Pull first",
+  "projects.conflictHint": "A teammate pushed while you have uncommitted or unpushed work. Pull now to avoid a merge conflict.",
+  "projects.late": "Submitted {duration} late",
+  "projects.lateHint": "Graded work is dated after the deadline. Nothing is blocked; your teacher sees it as late.",
+  "projects.issue.offline": "You're offline. Showing what was last synced."
 }

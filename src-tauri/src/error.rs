@@ -41,6 +41,9 @@ pub enum Error {
     #[error("GitHub API: {0}")]
     GitHub(String),
 
+    #[error("can't reach GitHub")]
+    Offline,
+
     #[error("invalid .classroom50.yaml: {0}")]
     RepoConfig(#[from] serde_norway::Error),
 
@@ -61,6 +64,16 @@ pub enum Error {
 }
 
 impl Error {
+    /// A request that never got an answer (no network, DNS, timeout) means offline; other
+    /// HTTP errors stay as they are.
+    pub fn network(err: reqwest::Error) -> Self {
+        if err.is_connect() || err.is_timeout() {
+            Error::Offline
+        } else {
+            Error::Http(err)
+        }
+    }
+
     pub fn kind(&self) -> &'static str {
         match self {
             Error::NotInstalled { .. } => "notInstalled",
@@ -72,6 +85,7 @@ impl Error {
             Error::NotSignedIn => "notSignedIn",
             Error::RateLimited { .. } => "rateLimited",
             Error::GitHub(_) => "github",
+            Error::Offline => "offline",
             Error::RepoConfig(_) => "repoConfig",
             Error::Io(_) => "io",
             Error::Http(_) => "http",

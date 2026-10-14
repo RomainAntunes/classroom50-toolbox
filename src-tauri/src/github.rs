@@ -48,7 +48,7 @@ pub async fn graphql<T: DeserializeOwned>(
         .post(GRAPHQL_URL)
         .bearer_auth(token)
         .json(&json!({ "query": query, "variables": variables }));
-    let response = request.send().await?;
+    let response = request.send().await.map_err(Error::network)?;
     record_rate_limit(response.headers());
     let response = checked(response)?;
     let body: GraphQlResponse<T> = response.json().await?;
@@ -187,7 +187,7 @@ impl HttpCache {
             Some(entry) => request.header(header::IF_NONE_MATCH, &entry.etag),
             None => request,
         };
-        let response = request.send().await?;
+        let response = request.send().await.map_err(Error::network)?;
         if response.status() == StatusCode::NOT_MODIFIED
             && let Some(entry) = cached
         {

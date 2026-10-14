@@ -39,10 +39,7 @@ const CACHE_FILE: &str = "repos-v2.json";
 /// The last snapshot and sync stats, so a restart shows everything at once and doesn't
 /// sync again before it's due.
 const STATE_FILE: &str = "snapshot.json";
-/// How often the assignment repos' status (grades, feedback, branches) is re-read between
-/// full syncs. About one GraphQL point each time.
-const STATUS_INTERVAL: Duration = Duration::from_secs(5 * 60);
-/// A full sync (repo list, teams) is due after this long.
+/// A full sync (repo list, teams) is due after this long while work is due this week.
 const FULL_SYNC_AGE: chrono::TimeDelta = chrono::TimeDelta::minutes(15);
 /// Opening the popover re-reads the status at most this often.
 const MIN_STATUS_ON_OPEN: chrono::TimeDelta = chrono::TimeDelta::minutes(1);
@@ -124,6 +121,9 @@ pub struct LocalState {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub enum Pending {
+    /// Someone pushed commits the clone doesn't have while it holds uncommitted or
+    /// unpushed work: pull now, before the two diverge further.
+    Conflict,
     Uncommitted,
     Unpushed,
     /// A branch, local or pushed, holds commits that aren't on the default branch, which
@@ -150,6 +150,10 @@ pub struct Project {
     pub pending: Option<Pending>,
     /// The assignment's page in the Classroom 50 web app.
     pub web_url: Option<String>,
+    /// How late the graded work is: the submit tag's time (tag mode) or the head commit's
+    /// date, as upstream grades it, past the due date. Advisory: nothing is blocked.
+    #[serde(default)]
+    pub late_seconds: Option<i64>,
 }
 
 /// Why the last sync was partial, as `{ kind, message }` like command errors.
@@ -324,6 +328,19 @@ impl ProjectsState {
                 }
             }
             Err(err) => log::warn!("could not encode snapshot: {err}"),
+        }
+    }
+
+    fn is_offline(&self) -> bool {
+        self.snapshot().issue.is_some_and(|i| i.kind == "offline")
+    }
+
+    /// The network is back: forget the offline issue so syncs may run again.
+    fn clear_offline(&self) {
+        if let Ok(mut snapshot) = self.snapshot.lock()
+            && snapshot.issue.as_ref().is_some_and(|i| i.kind == "offline")
+        {
+            snapshot.issue = None;
         }
     }
 
@@ -535,7 +552,8 @@ fn refresh_due(app: &AppHandle, min_status_age: chrono::TimeDelta) {
     let now = Utc::now();
     let older = |at: Option<DateTime<Utc>>, age| at.is_none_or(|at| now - at >= age);
     let app = app.clone();
-    let mode = if older(snapshot.synced_at, FULL_SYNC_AGE) {
+    let (_, full_age) = cadence(&snapshot, now);
+    let mode = if older(snapshot.synced_at, full_age) {
         Mode::Full
     } else if older(snapshot.checked_at, min_status_age) {
         Mode::Status
@@ -565,7 +583,8 @@ fn may_call_github(app: &AppHandle) -> bool {
     if low_budget {
         log::info!("GitHub budget below 10%; background syncs paused until it resets");
     }
-    !backing_off && !low_budget
+    // Offline, only the reachability probe in the background loop runs.
+    !backing_off && !low_budget && !state.is_offline()
 }
 
 /// When the popover opens.
@@ -573,23 +592,80 @@ pub fn refresh_if_stale(app: &AppHandle) {
     refresh_due(app, MIN_STATUS_ON_OPEN);
 }
 
-/// At startup, re-reads the disk on top of the saved snapshot (no request), then checks
-/// every `STATUS_INTERVAL` what is due. A restart doesn't sync GitHub again before then.
+/// At startup, re-reads the disk on top of the saved snapshot (no request). Then a tick
+/// every 30 s decides what is due, at a pace set by the nearest unfinished deadline, and
+/// reacts to waking from sleep and to the network coming back.
 pub fn start_background_sync(app: AppHandle) {
     tauri::async_runtime::spawn(async move {
         if app.state::<ProjectsState>().snapshot().checked_at.is_some() {
             refresh_local(&app, false).await;
         }
+        let mut wall = std::time::SystemTime::now();
+        let mut monotonic = std::time::Instant::now();
         loop {
-            // A little slack so a tick isn't skipped for being a few seconds early.
-            refresh_due(&app, STATUS_AGE);
-            tokio::time::sleep(STATUS_INTERVAL).await;
+            // The monotonic clock stops while the machine sleeps; the wall clock doesn't.
+            let (wall_now, monotonic_now) =
+                (std::time::SystemTime::now(), std::time::Instant::now());
+            let slept = wall_now
+                .duration_since(wall)
+                .unwrap_or_default()
+                .saturating_sub(monotonic_now - monotonic)
+                > Duration::from_secs(60);
+            (wall, monotonic) = (wall_now, monotonic_now);
+
+            let state = app.state::<ProjectsState>();
+            if state.is_offline() {
+                if github_reachable().await {
+                    log::info!("network is back; syncing");
+                    state.clear_offline();
+                    refresh_due(&app, chrono::TimeDelta::zero());
+                }
+            } else if slept {
+                log::info!("woke from sleep; syncing");
+                // Give Wi-Fi a moment to reconnect.
+                tokio::time::sleep(Duration::from_secs(5)).await;
+                refresh_due(&app, chrono::TimeDelta::zero());
+            } else {
+                let (status_age, _) = cadence(&state.snapshot(), Utc::now());
+                refresh_due(&app, status_age);
+            }
+            tokio::time::sleep(TICK).await;
         }
     });
 }
 
-/// A background status check is due once the last GitHub read is this old.
-const STATUS_AGE: chrono::TimeDelta = chrono::TimeDelta::seconds(4 * 60 + 40);
+const TICK: Duration = Duration::from_secs(30);
+
+/// How old the last status check and the last full sync may get, from the nearest
+/// deadline of unfinished work: every minute in its last 3 hours, every 2 within a day,
+/// every 5 within a week, and 15 (full sync hourly) when nothing is due that soon.
+fn cadence(snapshot: &Snapshot, now: DateTime<Utc>) -> (chrono::TimeDelta, chrono::TimeDelta) {
+    use chrono::TimeDelta as T;
+    let soonest = snapshot
+        .projects
+        .iter()
+        .filter(|p| crate::alerts::needs_work(p))
+        .filter_map(crate::alerts::open_due)
+        .filter(|due| *due > now)
+        .min();
+    // A few seconds under each period, so a 30 s tick doesn't skip a turn.
+    let slack = T::seconds(10);
+    match soonest.map(|due| due - now) {
+        Some(left) if left <= T::hours(3) => (T::minutes(1) - slack, FULL_SYNC_AGE),
+        Some(left) if left <= T::hours(24) => (T::minutes(2) - slack, FULL_SYNC_AGE),
+        Some(left) if left <= T::days(7) => (T::minutes(5) - slack, FULL_SYNC_AGE),
+        _ => (T::minutes(15) - slack, T::hours(1)),
+    }
+}
+
+/// A TCP handshake with the API host: no HTTP request, so nothing counts against any limit.
+async fn github_reachable() -> bool {
+    let connect = tokio::net::TcpStream::connect(("api.github.com", 443));
+    matches!(
+        tokio::time::timeout(Duration::from_secs(3), connect).await,
+        Ok(Ok(_))
+    )
+}
 
 /// Returns the snapshot and what to watch for local changes.
 async fn sync(
@@ -845,6 +921,7 @@ async fn build(
     check_clones(&mut projects).await;
     for project in &mut projects {
         project.pending = pending(project);
+        project.late_seconds = late_seconds(project);
     }
     projects.sort_by_cached_key(|p| sort_key(p, now));
     let unaccepted = unaccepted(&projects, &classrooms, &manifests);
@@ -1704,6 +1781,7 @@ fn merge(
                 assignment: None,
                 pending: None,
                 web_url: None,
+                late_seconds: None,
             };
             (id, project)
         })
@@ -1740,12 +1818,26 @@ fn merge(
                         assignment: None,
                         pending: None,
                         web_url: None,
+                        late_seconds: None,
                     },
                 );
             }
         }
     }
     by_id.into_values().collect()
+}
+
+fn late_seconds(project: &Project) -> Option<i64> {
+    let assignment = project.assignment.as_ref()?;
+    let due = assignment.due?.with_timezone(&Utc);
+    let remote = project.remote.as_ref()?;
+    let graded_at = if assignment.submission_mode == Some(SubmissionMode::Tag) {
+        remote.last_submission.as_ref()?.at?
+    } else {
+        remote.head.as_ref()?.at?
+    };
+    let late = (graded_at - due).num_seconds();
+    (late > 0).then_some(late)
 }
 
 /// When the clone's index last changed (any stage, commit, checkout or pull).
@@ -1757,6 +1849,11 @@ fn last_activity(path: &Path) -> Option<std::time::SystemTime> {
 
 fn pending(project: &Project) -> Option<Pending> {
     if let Some(local) = &project.local {
+        let incoming = local.remote_ahead || local.behind.is_some_and(|n| n > 0);
+        let outgoing = local.changed_files > 0 || local.ahead.is_some_and(|n| n > 0);
+        if incoming && outgoing {
+            return Some(Pending::Conflict);
+        }
         if local.changed_files > 0 {
             return Some(Pending::Uncommitted);
         }
@@ -1985,6 +2082,7 @@ mod tests {
             assignment: Some(assignment.clone()),
             pending: None,
             web_url: None,
+            late_seconds: None,
         };
 
         let unsubmitted = project(remote("r", "aaa", Some("old")), None);
@@ -1996,7 +2094,71 @@ mod tests {
             ahead: Some(3),
             ..LocalState::default()
         };
-        let edited = project(remote("r", "aaa", Some("aaa")), Some(dirty));
+        let edited = project(remote("r", "aaa", Some("aaa")), Some(dirty.clone()));
         assert_eq!(pending(&edited), Some(Pending::Uncommitted));
+        // A teammate pushed while there is local work: pull first.
+        let diverging = LocalState {
+            remote_ahead: true,
+            ..dirty
+        };
+        let risky = project(remote("r", "aaa", Some("aaa")), Some(diverging));
+        assert_eq!(pending(&risky), Some(Pending::Conflict));
+
+        // Graded at the submit tag's time in tag mode: 2 hours after the deadline.
+        let mut late = project(remote("r", "aaa", Some("aaa")), None);
+        late.assignment.as_mut().unwrap().due = Some("2026-10-14T10:00:00Z".parse().unwrap());
+        late.remote
+            .as_mut()
+            .unwrap()
+            .last_submission
+            .as_mut()
+            .unwrap()
+            .at = Some("2026-10-14T12:00:00Z".parse().unwrap());
+        assert_eq!(late_seconds(&late), Some(7200));
+        late.remote
+            .as_mut()
+            .unwrap()
+            .last_submission
+            .as_mut()
+            .unwrap()
+            .at = Some("2026-10-14T09:00:00Z".parse().unwrap());
+        assert_eq!(late_seconds(&late), None);
+    }
+
+    #[test]
+    fn checks_more_often_as_a_deadline_nears() {
+        let now = Utc::now();
+        let snapshot = |hours: i64| Snapshot {
+            projects: vec![Project {
+                id: "x".into(),
+                owner: None,
+                repo: None,
+                config: config("hello"),
+                path: None,
+                local: None,
+                remote: None,
+                classroom: None,
+                assignment: Some(
+                    serde_json::from_value(json!({
+                        "slug": "hello", "name": "Hello", "mode": "individual",
+                        "due": (now + chrono::TimeDelta::hours(hours)).to_rfc3339()
+                    }))
+                    .unwrap(),
+                ),
+                pending: None,
+                web_url: None,
+                late_seconds: None,
+            }],
+            ..Snapshot::default()
+        };
+        let status_minutes = |hours| cadence(&snapshot(hours), now).0.num_minutes();
+        assert_eq!(status_minutes(2), 0); // just under a minute
+        assert_eq!(status_minutes(20), 1);
+        assert_eq!(status_minutes(72), 4);
+        assert_eq!(status_minutes(24 * 30), 14);
+        assert_eq!(
+            cadence(&snapshot(24 * 30), now).1,
+            chrono::TimeDelta::hours(1)
+        );
     }
 }
