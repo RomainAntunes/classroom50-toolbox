@@ -2,10 +2,12 @@ pub mod classroom50;
 mod commands;
 pub mod discovery;
 pub mod error;
+pub mod github;
 mod login;
 pub mod platform;
 mod popover;
 pub mod process;
+pub mod projects;
 pub mod settings;
 pub mod tools;
 mod tray;
@@ -40,7 +42,7 @@ pub fn run() {
         .plugin(tauri_plugin_opener::init())
         .manage(popover::PopoverState::default())
         .manage(login::LoginState::default())
-        .manage(commands::Http(
+        .manage(github::Http(
             reqwest::Client::builder()
                 .user_agent(USER_AGENT)
                 .build()
@@ -63,9 +65,11 @@ pub fn run() {
                 }
             }
             app.manage(settings);
+            app.manage(projects::ProjectsState::load(&app.path().app_cache_dir()?));
 
             popover::setup(handle)?;
             tray::setup(handle)?;
+            projects::start_background_sync(handle.clone());
             if !cfg!(debug_assertions) {
                 updater::check_in_background(handle.clone());
             }
@@ -78,12 +82,12 @@ pub fn run() {
             commands::install_command,
             commands::install_tool,
             commands::auth_status,
-            commands::scan_projects,
+            commands::list_projects,
+            commands::refresh_projects,
             commands::get_settings,
             commands::update_settings,
             commands::login,
             commands::cancel_login,
-            commands::fetch_assignments,
             commands::open_terminal,
             commands::check_update,
             commands::install_update,

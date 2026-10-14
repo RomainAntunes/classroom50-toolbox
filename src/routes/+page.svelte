@@ -4,9 +4,10 @@
   import { listen } from "@tauri-apps/api/event";
   import {
     api,
+    PROJECTS_UPDATED_EVENT,
     UPDATE_AVAILABLE_EVENT,
     type AuthStatus,
-    type LocalProject,
+    type Snapshot,
     type ToolStatus,
     type UpdateInfo,
   } from "$lib/api";
@@ -19,42 +20,62 @@
 
   let tools = $state<ToolStatus[]>([]);
   let auth = $state<AuthStatus | null>(null);
-  let projects = $state<LocalProject[]>([]);
+  let snapshot = $state<Snapshot | null>(null);
+  let now = $state(new Date());
   let update = $state<UpdateInfo | null>(null);
   let loading = $state(false);
 
   const missingTool = $derived(tools.some((tool) => !tool.installed));
   const ghInstalled = $derived(tools.some((tool) => tool.tool === "gh" && tool.installed));
+  // Signing in is already offered in the footer.
+  const issue = $derived(snapshot?.issue?.kind === "notSignedIn" ? null : snapshot?.issue);
+  const syncing = $derived(loading || snapshot?.syncedAt == null);
 
   async function refresh() {
     loading = true;
     try {
       await loadSettings();
-      [tools, auth, projects] = await Promise.all([
+      [tools, auth, snapshot] = await Promise.all([
         api.toolStatuses(),
         api.authStatus(),
-        api.scanProjects(),
+        api.refreshProjects(),
       ]);
+      now = new Date();
     } finally {
       loading = false;
     }
   }
 
   async function addFolder() {
-    if (await pickWatchedFolder()) projects = await api.scanProjects();
+    if (await pickWatchedFolder()) snapshot = await api.refreshProjects();
   }
 
   function replaceTool(next: ToolStatus) {
     tools = tools.map((tool) => (tool.tool === next.tool ? next : tool));
   }
 
+  async function signedIn(next: AuthStatus) {
+    auth = next;
+    snapshot = await api.refreshProjects();
+  }
+
   onMount(() => {
+    // Show the last sync right away; `refresh` replaces it once the new one lands.
+    api.listProjects().then((last) => (snapshot ??= last));
     refresh();
-    const unlisten = listen<UpdateInfo>(
-      UPDATE_AVAILABLE_EVENT,
-      (event) => (update = event.payload),
-    );
-    return () => void unlisten.then((stop) => stop());
+    const unlisteners = [
+      listen<UpdateInfo>(UPDATE_AVAILABLE_EVENT, (event) => (update = event.payload)),
+      listen<Snapshot>(PROJECTS_UPDATED_EVENT, (event) => {
+        snapshot = event.payload;
+        now = new Date();
+      }),
+    ];
+    // Keeps "due in ..." labels current while the popover stays open.
+    const tick = setInterval(() => (now = new Date()), 60_000);
+    return () => {
+      clearInterval(tick);
+      for (const unlisten of unlisteners) void unlisten.then((stop) => stop());
+    };
   });
 </script>
 
@@ -86,16 +107,21 @@
     {#snippet actions()}
       <button onclick={addFolder}>{t("projects.addFolder")}</button>
     {/snippet}
-    {#each projects as project (project.path)}
-      <ProjectRow {project} />
+    {#if issue}
+      <p class="issue" title={issue.message}>
+        {t(`projects.issue.${issue.kind}`, {}, "projects.issue.other")}
+      </p>
+    {/if}
+    {#each snapshot?.projects ?? [] as project (project.id)}
+      <ProjectRow {project} {now} />
     {:else}
-      <p class="empty">{t("projects.empty")}</p>
+      <p class="empty">{t(syncing ? "projects.loading" : "projects.empty")}</p>
     {/each}
   </Section>
 </main>
 
 <footer>
-  <LoginStatus {auth} {ghInstalled} onchange={(next) => (auth = next)} />
+  <LoginStatus {auth} {ghInstalled} onchange={signedIn} />
 </footer>
 
 <style>
@@ -135,6 +161,14 @@
     border-radius: var(--radius-card);
     background: var(--bg-card);
     border: 1px solid var(--border);
+  }
+
+  .issue {
+    margin: 0;
+    padding: 8px 12px;
+    font-size: 0.85em;
+    color: var(--warning);
+    border-bottom: 1px solid var(--border);
   }
 
   .empty {

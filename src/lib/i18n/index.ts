@@ -14,8 +14,14 @@ export function setLocale(locale: string): void {
   current = catalogs[base] ?? catalogs[fallback];
 }
 
-export function t(key: string, params: Record<string, string | number> = {}): string {
-  const template = current[key] ?? catalogs[fallback][key] ?? key;
+/** `fallbackKey` is used when `key` is missing, e.g. for keys built from an error kind. */
+export function t(
+  key: string,
+  params: Record<string, string | number> = {},
+  fallbackKey?: string,
+): string {
+  const lookup = (k: string) => current[k] ?? catalogs[fallback][k];
+  const template = lookup(key) ?? (fallbackKey && lookup(fallbackKey)) ?? key;
   return template.replace(/\{(\w+)\}/g, (match, name: string) =>
     name in params ? String(params[name]) : match,
   );

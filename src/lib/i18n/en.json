@@ -13,7 +13,7 @@
   "auth.loggedInAs": "Signed in as {login}",
   "projects.title": "Assignments",
   "projects.addFolder": "Add folder",
-  "projects.empty": "No Classroom 50 repositories found yet. Add the folder where you keep your assignments.",
+  "projects.empty": "No Classroom 50 assignments found yet. Sign in to GitHub, or add the folder where you keep your assignments.",
   "projects.openFolder": "Show in file manager",
   "projects.openTerminal": "Open terminal",
   "update.available": "Version {version} is available",
@@ -39,5 +39,18 @@
   "settings.about.checkUpdates": "Check for updates",
   "settings.about.upToDate": "You're up to date",
   "settings.quit": "Quit Classroom 50 Toolbox",
-  "settings.reminders.before": "{duration} before"
+  "settings.reminders.before": "{duration} before",
+  "projects.loading": "Looking for your assignments…",
+  "projects.due": "Due {when}",
+  "projects.wasDue": "Was due {when}",
+  "projects.notCloned": "Not cloned",
+  "projects.closed": "Closed",
+  "projects.behind": "{count} to pull",
+  "projects.pending.uncommitted": "Uncommitted",
+  "projects.pending.unpushed": "Not pushed",
+  "projects.pending.unsubmitted": "Not submitted",
+  "projects.openGitHub": "Open on GitHub",
+  "projects.issue.rateLimited": "GitHub rate limit reached. Showing the last known state.",
+  "projects.issue.notInstalled": "Install the GitHub CLI to see your assignments on GitHub.",
+  "projects.issue.other": "Couldn't reach GitHub. Showing the last known state."
 }

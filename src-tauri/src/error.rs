@@ -27,6 +27,17 @@ pub enum Error {
         expected: &'static str,
     },
 
+    #[error("not signed in to GitHub")]
+    NotSignedIn,
+
+    #[error("GitHub rate limit reached, retrying after {reset_at:?}")]
+    RateLimited {
+        reset_at: Option<chrono::DateTime<chrono::Utc>>,
+    },
+
+    #[error("GitHub API: {0}")]
+    GitHub(String),
+
     #[error("invalid .classroom50.yaml: {0}")]
     RepoConfig(#[from] serde_norway::Error),
 
@@ -47,13 +58,16 @@ pub enum Error {
 }
 
 impl Error {
-    fn kind(&self) -> &'static str {
+    pub fn kind(&self) -> &'static str {
         match self {
             Error::NotInstalled { .. } => "notInstalled",
             Error::CommandFailed { .. } => "commandFailed",
             Error::Unsupported(_) => "unsupported",
             Error::Cancelled => "cancelled",
             Error::SchemaMismatch { .. } => "schemaMismatch",
+            Error::NotSignedIn => "notSignedIn",
+            Error::RateLimited { .. } => "rateLimited",
+            Error::GitHub(_) => "github",
             Error::RepoConfig(_) => "repoConfig",
             Error::Io(_) => "io",
             Error::Http(_) => "http",

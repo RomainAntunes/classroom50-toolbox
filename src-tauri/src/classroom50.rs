@@ -145,23 +145,6 @@ pub fn parse_assignments(url: &str, json: &str) -> Result<Vec<Assignment>> {
     Ok(file.assignments)
 }
 
-pub async fn fetch_assignments(
-    client: &reqwest::Client,
-    org: &str,
-    classroom: &str,
-    secret: Option<&str>,
-) -> Result<Vec<Assignment>> {
-    let url = assignments_url(org, classroom, secret);
-    let body = client
-        .get(&url)
-        .send()
-        .await?
-        .error_for_status()?
-        .text()
-        .await?;
-    parse_assignments(&url, &body)
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -228,7 +211,7 @@ mod tests {
         let json = r#"{
             "schema": "classroom50/result/v1", "classroom": "fall-2026", "assignment": "hello",
             "assignment_type": "individual", "owner": "alice",
-            "submission": "submit/20261014T120000Z-abc1234",
+            "submission": "submit/2026-10-14T12-00-00Z-abc1234",
             "commit": "https://github.com/cs50/x/commit/abc", "release": "https://github.com/cs50/x/releases/tag/t",
             "review": "https://github.com/cs50/x/compare/a...b", "datetime": "2026-10-14T12:00:00Z",
             "score": 3, "max-score": 4,

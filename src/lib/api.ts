@@ -32,12 +32,38 @@ export interface RepoConfig {
   secret: string | null;
 }
 
-export interface LocalProject {
-  path: string;
-  owner: string | null;
-  repo: string | null;
+export interface Commit {
+  oid: string;
+  at: string | null;
+}
+
+export interface Submission {
+  tag: string;
+  commit: string;
+  at: string | null;
+}
+
+export interface RemoteRepo {
+  owner: string;
+  name: string;
+  url: string;
+  archived: boolean;
+  canPush: boolean;
+  defaultBranch: string | null;
+  head: Commit | null;
+  lastSubmission: Submission | null;
   config: RepoConfig;
 }
+
+export interface LocalState {
+  branch: string | null;
+  head: string | null;
+  ahead: number | null;
+  behind: number | null;
+  changedFiles: number;
+}
+
+export type Pending = "uncommitted" | "unpushed" | "unsubmitted";
 
 export interface Assignment {
   slug: string;
@@ -51,6 +77,26 @@ export interface Assignment {
   closed: boolean;
   feedbackPr: boolean;
   passThreshold: number | null;
+}
+
+/** One assignment repo, merged from GitHub, the watched folders and the Pages manifest. */
+export interface Project {
+  id: string;
+  owner: string | null;
+  repo: string | null;
+  config: RepoConfig;
+  path: string | null;
+  local: LocalState | null;
+  remote: RemoteRepo | null;
+  assignment: Assignment | null;
+  pending: Pending | null;
+}
+
+export interface Snapshot {
+  projects: Project[];
+  syncedAt: string | null;
+  /** Why the last sync was partial; same shape as `CommandError`. */
+  issue: CommandError | null;
 }
 
 export interface Settings {
@@ -67,6 +113,7 @@ export interface DeviceCode {
 
 export const DEVICE_CODE_EVENT = "login-device-code";
 export const UPDATE_AVAILABLE_EVENT = "update-available";
+export const PROJECTS_UPDATED_EVENT = "projects-updated";
 
 export interface UpdateInfo {
   version: string;
@@ -86,13 +133,12 @@ export const api = {
   installCommand: (tool: Tool) => invoke<CommandSpec>("install_command", { tool }),
   installTool: (tool: Tool) => invoke<ToolStatus>("install_tool", { tool }),
   authStatus: () => invoke<AuthStatus>("auth_status"),
-  scanProjects: () => invoke<LocalProject[]>("scan_projects"),
+  listProjects: () => invoke<Snapshot>("list_projects"),
+  refreshProjects: () => invoke<Snapshot>("refresh_projects"),
   getSettings: () => invoke<Settings>("get_settings"),
   updateSettings: (next: Settings) => invoke<Settings>("update_settings", { next }),
   login: () => invoke<AuthStatus>("login"),
   cancelLogin: () => invoke<void>("cancel_login"),
-  fetchAssignments: (org: string, classroom: string, secret: string | null) =>
-    invoke<Assignment[]>("fetch_assignments", { org, classroom, secret }),
   openTerminal: (path: string) => invoke<void>("open_terminal", { path }),
   checkUpdate: () => invoke<UpdateInfo | null>("check_update"),
   installUpdate: () => invoke<void>("install_update"),

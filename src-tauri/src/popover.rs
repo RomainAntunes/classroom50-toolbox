@@ -79,6 +79,7 @@ pub fn show(app: &AppHandle) {
     }
     let _ = window.show();
     let _ = window.set_focus();
+    crate::projects::refresh_if_stale(app);
 }
 
 pub fn hide(app: &AppHandle) {

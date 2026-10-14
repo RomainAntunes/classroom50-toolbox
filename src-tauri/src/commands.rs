@@ -7,17 +7,14 @@ use serde::Serialize;
 use tauri::{AppHandle, State};
 use tauri_plugin_autostart::ManagerExt;
 
-use crate::classroom50::{self, Assignment};
-use crate::discovery::{self, LocalProject};
 use crate::error::Result;
 use crate::login::{self, LoginState};
 use crate::platform::{self, CommandSpec, Os};
 use crate::popover::PopoverState;
+use crate::projects::{self, ProjectsState, Snapshot};
 use crate::settings::{Settings, SettingsStore};
 use crate::tools::{self, AuthStatus, Tool, ToolStatus};
 use crate::updater::{self, UpdateInfo};
-
-pub struct Http(pub reqwest::Client);
 
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -62,18 +59,17 @@ pub async fn auth_status() -> AuthStatus {
     tools::auth_status().await
 }
 
-/// Scans every watched folder from the settings.
+/// The last synced project list, without waiting for the network. Empty before the first
+/// sync finishes; `projects-updated` follows.
 #[tauri::command]
-pub async fn scan_projects(settings: State<'_, SettingsStore>) -> Result<Vec<LocalProject>> {
-    let folders = settings.get().watched_folders;
-    let projects = tauri::async_runtime::spawn_blocking(move || {
-        folders
-            .iter()
-            .flat_map(|root| discovery::scan(root, discovery::DEFAULT_MAX_DEPTH))
-            .collect()
-    })
-    .await?;
-    Ok(projects)
+pub fn list_projects(state: State<'_, ProjectsState>) -> Snapshot {
+    state.snapshot()
+}
+
+/// Syncs GitHub, the watched folders and the assignment manifests now.
+#[tauri::command]
+pub async fn refresh_projects(app: AppHandle) -> Snapshot {
+    projects::refresh(&app).await
 }
 
 #[tauri::command]
@@ -122,16 +118,6 @@ pub async fn login(app: AppHandle, state: State<'_, LoginState>) -> Result<AuthS
 #[tauri::command]
 pub fn cancel_login(state: State<'_, LoginState>) {
     state.cancel();
-}
-
-#[tauri::command]
-pub async fn fetch_assignments(
-    http: State<'_, Http>,
-    org: String,
-    classroom: String,
-    secret: Option<String>,
-) -> Result<Vec<Assignment>> {
-    classroom50::fetch_assignments(&http.0, &org, &classroom, secret.as_deref()).await
 }
 
 #[tauri::command]

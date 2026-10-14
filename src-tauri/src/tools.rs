@@ -93,8 +93,13 @@ pub async fn auth_status() -> AuthStatus {
     }
 }
 
+/// gh's token for github.com, read fresh for each use and kept only in memory.
 pub async fn gh_token() -> Result<String> {
-    Ok(process::run("gh", ["auth", "token"], None).await?.stdout)
+    match process::run("gh", ["auth", "token", "--hostname", "github.com"], None).await {
+        Ok(out) if !out.stdout.is_empty() => Ok(out.stdout),
+        Ok(_) | Err(Error::CommandFailed { .. }) => Err(Error::NotSignedIn),
+        Err(err) => Err(err),
+    }
 }
 
 /// `git version 2.50.1 (Apple Git-155)` -> `2.50.1`

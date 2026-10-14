@@ -13,7 +13,7 @@ A tray app for [Classroom 50](https://github.com/foundation50/classroom50) stude
 The first release is for students only. Keep the domain layer role-agnostic so a teacher mode (`gh teacher`) can be added later without a rewrite.
 
 - Repo: `github.com/RomainAntunes/classroom50-toolbox`. License: GPL-3.0, the same as Classroom 50.
-- Status: tray, popover, tool detection and install, local scan, Pages manifest fetch, persisted settings and in-app sign-in are done. Not yet built: the GitHub API client, deadline tracking and notifications, grades, and accept and submit.
+- Status: tray, popover, tool detection and install, persisted settings, in-app sign-in and the merged project list (GitHub discovery, local scan with git status, Pages manifests) are done. Not yet built: deadline notifications and the tray badge, grades, and accept and submit.
 
 ## Stack and decisions (settled, don't re-litigate)
 
@@ -73,6 +73,8 @@ The dev build is tray-only (no Dock icon, starts hidden). Open it from the tray 
 - `login.rs` runs `gh auth login --web` with no TTY. gh prints the one-time code and the device URL on stderr, which are parsed and emitted as `login-device-code`. The browser takes focus and hides the popover, so the UI reports success through a system notification.
 - `settings.rs` stores `settings.json` in the app config dir, written atomically. A corrupt file is moved to `.bak`. On first run (no file) the login item is registered. `apply_launch_at_login` skips this in debug builds, and `get_settings` reports the OS's real login-item state.
 - `classroom50.rs` holds the typed upstream contracts and Pages URLs. `discovery.rs` is the local scanner.
+- `github.rs` is the read-only GitHub layer: GraphQL with typed rate-limit errors, and `HttpCache`, which revalidates GETs with ETags and persists bodies in the app cache dir. The token is read from `gh auth token` per sync and never stored.
+- `projects.rs` owns the merged project list. A sync lists every repo the user can see (cheap query), re-reads `.classroom50.yaml` and the newest `submit/*` tag only for repos whose `pushedAt` changed (aliased batches of 25; bigger batches time out), runs `git status` in each local clone, fetches each classroom's manifest once and computes `pending`. The discovery cache is `repos.json` in the app cache dir. Syncs run at startup, every 15 min, when the popover opens (at most every 2 min) and on demand, and the result goes out as `projects-updated`. Concurrent refreshes share the sync in flight.
 - `tray.rs`, `popover.rs` and `updater.rs` handle the tray icon and menu, the anchored window (hide on blur, vibrancy or Mica) and self-update. A native dialog steals focus and would hide the popover, so every dialog-plugin call in the UI is wrapped in `withDialog()` (`src/lib/api.ts`), which pins the popover while the dialog is open.
 - `src/lib/settings.svelte.ts` holds the shared settings state. Rust is the source of truth: write through `saveSettings`, never mutate locally. It also migrates the v0.1.0 `localStorage` folder list.
 - `src/lib/theme/theme.css` holds the semantic tokens plus a skin per `data-os`. Components use tokens only.
