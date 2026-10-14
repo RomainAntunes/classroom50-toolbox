@@ -36,9 +36,12 @@ pub const PROGRESS_EVENT: &str = "sync-progress";
 
 /// v2 keeps every inspected repo, not only those with a marker file.
 const CACHE_FILE: &str = "repos-v2.json";
+/// The last snapshot and sync stats, so a restart shows everything at once and doesn't
+/// sync again before it's due.
+const STATE_FILE: &str = "snapshot.json";
 /// How often the assignment repos' status (grades, feedback, branches) is re-read between
 /// full syncs. About one GraphQL point each time.
-const STATUS_INTERVAL: Duration = Duration::from_secs(2 * 60);
+const STATUS_INTERVAL: Duration = Duration::from_secs(5 * 60);
 /// A full sync (repo list, teams) is due after this long.
 const FULL_SYNC_AGE: chrono::TimeDelta = chrono::TimeDelta::minutes(15);
 /// Opening the popover re-reads the status at most this often.
@@ -47,6 +50,14 @@ const MIN_STATUS_ON_OPEN: chrono::TimeDelta = chrono::TimeDelta::minutes(1);
 const DETAIL_BATCH: usize = 25;
 /// Batches in flight at once on a cold cache; GitHub discourages more concurrency.
 const PARALLEL_BATCHES: usize = 3;
+/// Repos per status request. GitHub's response time grows with the batch, so a few small
+/// requests in parallel answer faster than one big one.
+const STATUS_BATCH: usize = 3;
+/// A class's assignment list is re-downloaded at most this often (it's on GitHub Pages,
+/// and rarely changes).
+const MANIFEST_MAX_AGE: chrono::TimeDelta = chrono::TimeDelta::minutes(10);
+/// Status requests in flight at once.
+const MAX_STATUS_REQUESTS: usize = 4;
 /// 100 repos per page; anything past 2000 accessible repos isn't scanned.
 const MAX_LIST_PAGES: usize = 20;
 
@@ -56,6 +67,9 @@ pub struct Commit {
     pub oid: String,
     #[serde(default)]
     pub at: Option<DateTime<Utc>>,
+    /// GitHub login of the author, else the name in the commit.
+    #[serde(default)]
+    pub author: Option<String>,
 }
 
 /// The newest `submit/*` tag (names sort chronologically).
@@ -91,7 +105,7 @@ pub struct RemoteRepo {
     pub feedback: Option<Feedback>,
 }
 
-#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize)]
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct LocalState {
     pub branch: Option<String>,
@@ -107,7 +121,7 @@ pub struct LocalState {
 }
 
 /// The most pressing reason the graded state lags behind the student's work.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub enum Pending {
     Uncommitted,
@@ -119,7 +133,7 @@ pub enum Pending {
     Unsubmitted,
 }
 
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Project {
     /// `owner/repo` in lowercase, or the clone path when it has no GitHub origin.
@@ -139,12 +153,13 @@ pub struct Project {
 }
 
 /// Why the last sync was partial, as `{ kind, message }` like command errors.
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct SyncIssue {
     pub kind: String,
     pub message: String,
-    #[serde(skip)]
+    /// Kept across restarts, so a rate-limit backoff survives one.
+    #[serde(default)]
     retry_after: Option<DateTime<Utc>>,
 }
 
@@ -163,7 +178,7 @@ impl From<&Error> for SyncIssue {
     }
 }
 
-#[derive(Debug, Clone, Default, Serialize)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Snapshot {
     pub projects: Vec<Project>,
@@ -174,9 +189,11 @@ pub struct Snapshot {
     /// Last time GitHub was read at all, full sync or status check.
     pub checked_at: Option<DateTime<Utc>>,
     pub issue: Option<SyncIssue>,
+    /// The GitHub account the data belongs to.
+    pub login: Option<String>,
 }
 
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Unaccepted {
     /// `org/classroom/assignment`, lowercase.
@@ -205,12 +222,48 @@ struct RemoteCache {
 #[serde(rename_all = "camelCase")]
 pub struct SyncProgress {
     pub running: bool,
+    /// Started by the user (refresh button, rescan, sign-in). Background checks run
+    /// without a spinner.
+    pub foreground: bool,
     pub done: usize,
     pub total: usize,
 }
 
+/// How the last sync of a kind went, for the sync details in Settings.
+#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct LastRun {
+    pub at: DateTime<Utc>,
+    pub seconds: f32,
+}
+
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SyncStats {
+    /// The GraphQL budget as of the last response.
+    pub rate_limit: Option<github::RateLimit>,
+    pub full: Option<LastRun>,
+    pub status: Option<LastRun>,
+    pub local: Option<LastRun>,
+    /// Repos the user can see on GitHub (inspected for the marker file).
+    pub repos_seen: usize,
+    pub scan_roots: usize,
+    pub watch_targets: usize,
+}
+
+#[derive(Default, Serialize, Deserialize)]
+struct Saved {
+    snapshot: Snapshot,
+    stats: SyncStats,
+}
+
 pub struct ProjectsState {
     snapshot: Mutex<Snapshot>,
+    state_path: PathBuf,
+    /// The first error of the last status read, picked up by the snapshot.
+    status_issue: Mutex<Option<SyncIssue>>,
+    after_push: std::sync::atomic::AtomicBool,
+    stats: Mutex<SyncStats>,
     progress: Mutex<SyncProgress>,
     sync_lock: tokio::sync::Mutex<()>,
     remote: Mutex<RemoteCache>,
@@ -225,8 +278,17 @@ impl ProjectsState {
             .ok()
             .and_then(|json| serde_json::from_str(&json).ok())
             .unwrap_or_default();
+        let state_path = cache_dir.join(STATE_FILE);
+        let saved: Saved = std::fs::read_to_string(&state_path)
+            .ok()
+            .and_then(|json| serde_json::from_str(&json).ok())
+            .unwrap_or_default();
         Self {
-            snapshot: Mutex::default(),
+            snapshot: Mutex::new(saved.snapshot),
+            state_path,
+            status_issue: Mutex::default(),
+            after_push: std::sync::atomic::AtomicBool::new(false),
+            stats: Mutex::new(saved.stats),
             progress: Mutex::default(),
             sync_lock: tokio::sync::Mutex::new(()),
             remote: Mutex::new(remote),
@@ -237,6 +299,36 @@ impl ProjectsState {
 
     pub fn snapshot(&self) -> Snapshot {
         self.snapshot.lock().map(|s| s.clone()).unwrap_or_default()
+    }
+
+    pub fn stats(&self) -> SyncStats {
+        self.stats.lock().map(|s| s.clone()).unwrap_or_default()
+    }
+
+    /// Forgets everything learned from GitHub; the next sync starts cold.
+    pub fn clear_cache(&self) {
+        self.store_remote(RemoteCache::default());
+        self.http_cache.clear();
+        let _ = std::fs::remove_file(&self.state_path);
+    }
+
+    fn save_state(&self) {
+        let saved = Saved {
+            snapshot: self.snapshot(),
+            stats: self.stats(),
+        };
+        match serde_json::to_vec(&saved) {
+            Ok(json) => {
+                if let Err(err) = github::write_atomic(&self.state_path, &json) {
+                    log::warn!("could not save {}: {err}", self.state_path.display());
+                }
+            }
+            Err(err) => log::warn!("could not encode snapshot: {err}"),
+        }
+    }
+
+    fn take_status_issue(&self) -> Option<SyncIssue> {
+        self.status_issue.lock().ok().and_then(|mut i| i.take())
     }
 
     pub fn progress(&self) -> SyncProgress {
@@ -262,36 +354,66 @@ impl ProjectsState {
     }
 }
 
-/// Runs a full sync and broadcasts the result. Concurrent callers wait for the sync in
-/// flight and get its result instead of starting another.
+/// Runs a full sync for the user and broadcasts the result. Concurrent callers wait for
+/// the sync in flight and get its result instead of starting another.
 pub async fn refresh(app: &AppHandle) -> Snapshot {
     let state = app.state::<ProjectsState>();
     let Ok(guard) = state.sync_lock.try_lock() else {
         drop(state.sync_lock.lock().await);
         return state.snapshot();
     };
-    publish(app, Mode::Full, guard).await
+    publish(app, Mode::Full, true, guard).await
 }
 
 /// Re-reads only the disk (after a clone, commit or settings change) and keeps the last
 /// GitHub data, so it costs no API request.
-pub async fn refresh_local(app: &AppHandle) -> Snapshot {
+pub async fn refresh_local(app: &AppHandle, foreground: bool) -> Snapshot {
     let state = app.state::<ProjectsState>();
     let guard = state.sync_lock.lock().await;
-    publish(app, Mode::Local, guard).await
+    publish(app, Mode::Local, foreground, guard).await
 }
 
-/// Re-reads the assignment repos' status and the disk, skipping repo discovery. Does
-/// nothing when a sync is already running.
-pub async fn refresh_status(app: &AppHandle) {
+/// Background syncs skip their turn when another one is running.
+async fn refresh_in_background(app: &AppHandle, mode: Mode) {
     let state = app.state::<ProjectsState>();
     let Ok(guard) = state.sync_lock.try_lock() else {
         return;
     };
-    publish(app, Mode::Status, guard).await;
+    publish(app, mode, false, guard).await;
 }
 
-#[derive(Clone, Copy, PartialEq, Eq)]
+/// A push or pull just changed a clone's remote refs: re-read the status now, then twice
+/// more while the autograder runs, so the new state and grade show up quickly.
+pub async fn refresh_after_push(app: &AppHandle) {
+    let state = app.state::<ProjectsState>();
+    // An editor's auto-fetch can fire this often; one round of checks at a time.
+    if state
+        .after_push
+        .swap(true, std::sync::atomic::Ordering::AcqRel)
+    {
+        return;
+    }
+    for delay in AFTER_PUSH_CHECKS {
+        tokio::time::sleep(delay).await;
+        if !may_call_github(app) {
+            break;
+        }
+        let guard = state.sync_lock.lock().await;
+        publish(app, Mode::Status, false, guard).await;
+    }
+    state
+        .after_push
+        .store(false, std::sync::atomic::Ordering::Release);
+}
+
+/// Delays between the status checks that follow a push; grading takes a minute or two.
+const AFTER_PUSH_CHECKS: [Duration; 3] = [
+    Duration::ZERO,
+    Duration::from_secs(60),
+    Duration::from_secs(120),
+];
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum Mode {
     /// GitHub discovery, assignment status, local scan and manifests.
     Full,
@@ -301,20 +423,54 @@ enum Mode {
     Local,
 }
 
-async fn publish(app: &AppHandle, mode: Mode, _guard: tokio::sync::MutexGuard<'_, ()>) -> Snapshot {
+async fn publish(
+    app: &AppHandle,
+    mode: Mode,
+    foreground: bool,
+    _guard: tokio::sync::MutexGuard<'_, ()>,
+) -> Snapshot {
     let state = app.state::<ProjectsState>();
     let http = &app.state::<Http>().0;
     let settings = app.state::<SettingsStore>().get();
 
-    let progress = Progress::start(app);
+    // After `gh auth switch` the cached repos belong to the other account: start over.
+    let mut mode = mode;
+    if mode == Mode::Status && tools::active_login().await != state.remote().login {
+        log::info!("GitHub account changed; running a full sync");
+        mode = Mode::Full;
+    }
+
+    let progress = Progress::start(app, foreground);
+    let started = std::time::Instant::now();
     let (snapshot, targets) = sync(&state, http, &settings, mode, &progress).await;
     progress.finish();
+    let run = LastRun {
+        at: Utc::now(),
+        seconds: started.elapsed().as_secs_f32(),
+    };
+    log::info!(
+        "{mode:?} sync: {} projects in {:.1}s",
+        snapshot.projects.len(),
+        run.seconds
+    );
+    if let Ok(mut stats) = state.stats.lock() {
+        match mode {
+            Mode::Full => stats.full = Some(run),
+            Mode::Status => stats.status = Some(run),
+            Mode::Local => stats.local = Some(run),
+        }
+        stats.watch_targets = targets.len();
+        if let Some(rate) = github::rate_limit() {
+            stats.rate_limit = Some(rate);
+        }
+    }
     if let Ok(mut current) = state.snapshot.lock() {
         *current = snapshot.clone();
     }
     if let Err(err) = app.emit(UPDATED_EVENT, &snapshot) {
         log::warn!("could not emit {UPDATED_EVENT}: {err}");
     }
+    state.save_state();
     watch::rewatch(app, targets);
     crate::alerts::process(app, &snapshot);
     snapshot
@@ -325,11 +481,12 @@ async fn publish(app: &AppHandle, mode: Mode, _guard: tokio::sync::MutexGuard<'_
 struct Progress(AppHandle);
 
 impl Progress {
-    fn start(app: &AppHandle) -> Self {
+    fn start(app: &AppHandle, foreground: bool) -> Self {
         let progress = Self(app.clone());
         progress.update(|p| {
             *p = SyncProgress {
                 running: true,
+                foreground,
                 done: 0,
                 total: 0,
             }
@@ -341,6 +498,10 @@ impl Progress {
         if steps > 0 {
             self.update(|p| p.total += steps);
         }
+    }
+
+    fn add_done(&self, steps: usize) {
+        self.update(|p| p.done = (p.done + steps).min(p.total));
     }
 
     fn advance(&self) {
@@ -367,26 +528,44 @@ impl Progress {
 /// `FULL_SYNC_AGE`, else a status check when the last GitHub read is older than
 /// `min_status_age`. Nothing while GitHub asks to back off.
 fn refresh_due(app: &AppHandle, min_status_age: chrono::TimeDelta) {
+    if !may_call_github(app) {
+        return;
+    }
     let snapshot = app.state::<ProjectsState>().snapshot();
     let now = Utc::now();
-    let backing_off = snapshot
+    let older = |at: Option<DateTime<Utc>>, age| at.is_none_or(|at| now - at >= age);
+    let app = app.clone();
+    let mode = if older(snapshot.synced_at, FULL_SYNC_AGE) {
+        Mode::Full
+    } else if older(snapshot.checked_at, min_status_age) {
+        Mode::Status
+    } else {
+        return;
+    };
+    tauri::async_runtime::spawn(async move {
+        refresh_in_background(&app, mode).await;
+    });
+}
+
+/// Background requests wait while GitHub asks to back off, and keep a reserve of the
+/// budget for the user's own tools: they pause below 10% until the window resets.
+fn may_call_github(app: &AppHandle) -> bool {
+    let state = app.state::<ProjectsState>();
+    let now = Utc::now();
+    let backing_off = state
+        .snapshot()
         .issue
         .and_then(|issue| issue.retry_after)
         .is_some_and(|until| now < until);
-    if backing_off {
-        return;
-    }
-    let older = |at: Option<DateTime<Utc>>, age| at.is_none_or(|at| now - at >= age);
-    let app = app.clone();
-    if older(snapshot.synced_at, FULL_SYNC_AGE) {
-        tauri::async_runtime::spawn(async move {
-            refresh(&app).await;
+    let low_budget = github::rate_limit()
+        .or(state.stats().rate_limit)
+        .is_some_and(|r| {
+            r.remaining.saturating_mul(10) < r.limit && r.reset_at.is_none_or(|at| now < at)
         });
-    } else if older(snapshot.checked_at, min_status_age) {
-        tauri::async_runtime::spawn(async move {
-            refresh_status(&app).await;
-        });
+    if low_budget {
+        log::info!("GitHub budget below 10%; background syncs paused until it resets");
     }
+    !backing_off && !low_budget
 }
 
 /// When the popover opens.
@@ -394,16 +573,23 @@ pub fn refresh_if_stale(app: &AppHandle) {
     refresh_due(app, MIN_STATUS_ON_OPEN);
 }
 
-/// Syncs at startup, then checks every `STATUS_INTERVAL` what is due.
+/// At startup, re-reads the disk on top of the saved snapshot (no request), then checks
+/// every `STATUS_INTERVAL` what is due. A restart doesn't sync GitHub again before then.
 pub fn start_background_sync(app: AppHandle) {
     tauri::async_runtime::spawn(async move {
+        if app.state::<ProjectsState>().snapshot().checked_at.is_some() {
+            refresh_local(&app, false).await;
+        }
         loop {
             // A little slack so a tick isn't skipped for being a few seconds early.
-            refresh_due(&app, chrono::TimeDelta::seconds(100));
+            refresh_due(&app, STATUS_AGE);
             tokio::time::sleep(STATUS_INTERVAL).await;
         }
     });
 }
+
+/// A background status check is due once the last GitHub read is this old.
+const STATUS_AGE: chrono::TimeDelta = chrono::TimeDelta::seconds(4 * 60 + 40);
 
 /// Returns the snapshot and what to watch for local changes.
 async fn sync(
@@ -433,6 +619,8 @@ async fn sync(
             targets,
         )
     };
+    let mut snapshot = snapshot;
+    snapshot.login = state.remote().login;
     let targets = watch_targets(&settings.watched_folders, scan_targets, &snapshot.projects);
     (snapshot, targets)
 }
@@ -491,12 +679,19 @@ async fn local_snapshot(
         locals,
     };
     let (projects, unaccepted) = build(sources, state, http, auth.as_ref(), now, progress).await;
+    // A status read replaces the issue: cleared when it worked, its error when it didn't.
+    let (checked_at, issue) = match (auth.is_some(), state.take_status_issue()) {
+        (true, None) => (checked_at, None),
+        (true, Some(issue)) => (previous.checked_at, Some(issue)),
+        (false, _) => (checked_at, previous.issue),
+    };
     Snapshot {
         projects,
         unaccepted,
         synced_at: previous.synced_at,
         checked_at,
-        issue: previous.issue,
+        issue,
+        login: None,
     }
 }
 
@@ -545,7 +740,8 @@ async fn full_snapshot(
         unaccepted,
         synced_at: Some(now),
         checked_at: Some(now),
-        issue,
+        issue: issue.or_else(|| state.take_status_issue()),
+        login: None,
     }
 }
 
@@ -651,16 +847,16 @@ async fn build(
         project.pending = pending(project);
     }
     projects.sort_by_cached_key(|p| sort_key(p, now));
-    let unaccepted = unaccepted(&projects, &classrooms, &manifests, now);
+    let unaccepted = unaccepted(&projects, &classrooms, &manifests);
     (projects, unaccepted)
 }
 
-/// Published, open assignments of the user's classrooms with no repo yet, by due date.
+/// Open assignments of the user's classrooms with no repo yet, published or upcoming, by
+/// due date.
 fn unaccepted(
     projects: &[Project],
     classrooms: &BTreeMap<ClassroomKey, Classroom>,
     manifests: &HashMap<ClassroomKey, Vec<Assignment>>,
-    now: DateTime<Utc>,
 ) -> Vec<Unaccepted> {
     let accepted: HashSet<(ClassroomKey, &str)> = projects
         .iter()
@@ -679,7 +875,8 @@ fn unaccepted(
         .flat_map(|(classroom, key, assignments)| {
             assignments
                 .iter()
-                .filter(|a| !a.closed && a.available_from.is_none_or(|from| from <= now))
+                // Upcoming ones (`available_from` ahead) are listed too, as "Opens ...".
+                .filter(|a| !a.closed)
                 .filter(|a| !accepted.contains(&(key.clone(), a.slug.as_str())))
                 .map(|a| Unaccepted {
                     id: format!("{}/{}/{}", key.0, key.1, a.slug),
@@ -735,7 +932,7 @@ async fn fetch_manifests(
     progress.add(classrooms.len());
     let fetches = classrooms.iter().map(|(key, classroom)| async move {
         let url = classroom.assignments_url();
-        let manifest = match cache.get_text(http, &url).await {
+        let manifest = match cache.get_text(http, &url, MANIFEST_MAX_AGE).await {
             Ok(body) => classroom50::parse_assignments(&url, &body)
                 .inspect_err(|err| log::warn!("{err}"))
                 .ok(),
@@ -773,7 +970,9 @@ fragment Repo on Repository {
   url
   isArchived
   viewerPermission
-  defaultBranchRef { name target { oid ... on Commit { committedDate } } }
+  defaultBranchRef {
+    name target { oid ... on Commit { committedDate author { name user { login } } } }
+  }
   config: object(expression: "HEAD:.classroom50.yaml") { ... on Blob { text } }
   submissions: refs(refPrefix: "refs/tags/submit/", first: 1,
                     orderBy: {field: ALPHABETICAL, direction: DESC}) {
@@ -842,8 +1041,15 @@ struct BranchRef {
 struct GitObject {
     oid: String,
     committed_date: Option<DateTime<Utc>>,
+    author: Option<CommitAuthor>,
     /// Set on annotated tags: the object the tag points at.
     target: Option<Box<GitObject>>,
+}
+
+#[derive(Deserialize)]
+struct CommitAuthor {
+    name: Option<String>,
+    user: Option<Login>,
 }
 
 #[derive(Deserialize)]
@@ -886,6 +1092,7 @@ impl RepoNode {
                 branch.target.map(|t| Commit {
                     oid: t.oid,
                     at: t.committed_date,
+                    author: t.author.and_then(|a| a.user.map(|u| u.login).or(a.name)),
                 }),
             ),
             None => (None, None),
@@ -929,10 +1136,26 @@ async fn sync_remote(
     // Listing repos and reading teams; the detail batches are added once known.
     progress.add(2);
     let token = tools::gh_token().await?;
-    let (login, listed) = list_repos(http, &token).await?;
-    progress.advance();
-    let classrooms = list_classrooms(http, &token, &login).await;
-    progress.advance();
+    // The teams query needs the login; gh knows it locally, so both run at once.
+    let (login, listed, classrooms) = match tools::active_login().await {
+        Some(active) => {
+            let (repos, classrooms) = tokio::join!(
+                list_repos(http, &token),
+                list_classrooms(http, &token, &active)
+            );
+            let (login, listed) = repos?;
+            (login, listed, classrooms)
+        }
+        None => {
+            let (login, listed) = list_repos(http, &token).await?;
+            let classrooms = list_classrooms(http, &token, &login).await;
+            (login, listed, classrooms)
+        }
+    };
+    progress.add_done(2);
+    if let Ok(mut stats) = state.stats.lock() {
+        stats.repos_seen = listed.len();
+    }
 
     let mut cache = state.remote();
     if cache.login.as_deref() != Some(login.as_str()) {
@@ -1157,17 +1380,29 @@ async fn refresh_statuses(
         .map(|(r, _)| format!("{}/{}", r.owner, r.name))
         .collect();
     let batches: Vec<Vec<&str>> = names
-        .chunks(DETAIL_BATCH)
+        .chunks(STATUS_BATCH)
         .map(|batch| batch.iter().map(String::as_str).collect())
         .collect();
     progress.add(batches.len());
-    let responses = join_all(batches.iter().map(|batch| async {
-        let response =
-            fetch_nodes::<StatusNode>(http, &auth.token, batch, "Status", &fragments).await;
-        progress.advance();
-        response
-    }))
-    .await;
+    let mut responses = Vec::with_capacity(batches.len());
+    for group in batches.chunks(MAX_STATUS_REQUESTS) {
+        // GitHub asked to slow down: no more requests this round.
+        if responses
+            .iter()
+            .any(|r: &Result<_>| matches!(r, Err(Error::RateLimited { .. })))
+        {
+            break;
+        }
+        responses.extend(
+            join_all(group.iter().map(|batch| async {
+                let response =
+                    fetch_nodes::<StatusNode>(http, &auth.token, batch, "Status", &fragments).await;
+                progress.advance();
+                response
+            }))
+            .await,
+        );
+    }
 
     let mut nodes: HashMap<usize, StatusNode> = HashMap::new();
     for (b, response) in responses.into_iter().enumerate() {
@@ -1181,11 +1416,16 @@ async fn refresh_statuses(
                         continue;
                     };
                     if let Some(node) = node {
-                        nodes.insert(b * DETAIL_BATCH + i, node);
+                        nodes.insert(b * STATUS_BATCH + i, node);
                     }
                 }
             }
-            Err(err) => log::warn!("status check failed: {err}"),
+            Err(err) => {
+                log::warn!("status check failed: {err}");
+                if let Ok(mut issue) = state.status_issue.lock() {
+                    issue.get_or_insert_with(|| SyncIssue::from(&err));
+                }
+            }
         }
     }
 
@@ -1239,6 +1479,9 @@ async fn scan_local(
     tauri::async_runtime::spawn_blocking(move || {
         let (roots, targets) = scan_roots(folders, editors);
         progress.add(roots.len());
+        if let Ok(mut stats) = progress.0.state::<ProjectsState>().stats.lock() {
+            stats.scan_roots = roots.len();
+        }
         let mut seen = HashSet::new();
         let mut locals = Vec::new();
         for (root, depth) in &roots {
@@ -1590,6 +1833,7 @@ mod tests {
             head: Some(Commit {
                 oid: head.into(),
                 at: None,
+                author: None,
             }),
             last_submission: submitted.map(|commit| Submission {
                 tag: "submit/x".into(),

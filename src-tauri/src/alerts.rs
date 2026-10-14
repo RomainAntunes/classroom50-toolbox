@@ -53,17 +53,37 @@ pub enum Notice {
         assignment: String,
         classroom: String,
     },
+    TeammatePush {
+        assignment: String,
+        author: String,
+    },
+    /// `due` is `None` when the deadline was removed.
+    DeadlineChanged {
+        assignment: String,
+        due: Option<DateTime<Utc>>,
+    },
+    Closed {
+        assignment: String,
+    },
 }
 
 #[derive(Debug, Default, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", default)]
 struct Memory {
+    /// The account this memory belongs to; another account starts a new baseline.
+    login: Option<String>,
     /// Assignment slugs seen per `org/classroom`.
     assignments: BTreeMap<String, BTreeSet<String>>,
     /// Graded `submit/*` tag per project.
     grades: BTreeMap<String, String>,
     /// Feedback PR comment count per project.
     feedback: BTreeMap<String, u32>,
+    /// Default-branch head per project.
+    heads: BTreeMap<String, String>,
+    /// Due date (Unix seconds, `None` for no deadline) per `org/classroom/assignment`.
+    dues: BTreeMap<String, Option<i64>>,
+    /// Assignments seen closed, by the same key.
+    closed: BTreeSet<String>,
     /// `<project>|<due>|<hours>` reminders already sent.
     reminded: BTreeSet<String>,
     /// Project and unaccepted-assignment ids with news the user hasn't opened the popover
@@ -121,6 +141,12 @@ pub fn process(app: &AppHandle, snapshot: &Snapshot) {
     let Ok(mut memory) = state.memory.lock() else {
         return;
     };
+    if snapshot.login.is_some() && memory.login != snapshot.login {
+        *memory = Memory {
+            login: snapshot.login.clone(),
+            ..Memory::default()
+        };
+    }
     let notices = diff(&mut memory, snapshot, &hours, Utc::now());
     state.save(&memory);
     let unseen: Vec<String> = memory.unseen.iter().cloned().collect();
@@ -134,6 +160,14 @@ pub fn process(app: &AppHandle, snapshot: &Snapshot) {
     }
     let _ = app.emit(UNSEEN_EVENT, &unseen);
     set_badge(app, attention);
+}
+
+/// At startup: the badge from the saved news and snapshot, before any sync.
+pub fn restore_badge(app: &AppHandle) {
+    let state = app.state::<AlertsState>();
+    let unseen = state.memory.lock().is_ok_and(|m| !m.unseen.is_empty());
+    let snapshot = app.state::<crate::projects::ProjectsState>().snapshot();
+    set_badge(app, unseen || due_soon(&snapshot, Utc::now()));
 }
 
 /// The popover was open, so its news has been seen.
@@ -215,11 +249,65 @@ fn diff(
         }
     }
 
+    // Deadline moves and closings, for accepted and unaccepted assignments alike.
+    let schedule = snapshot
+        .projects
+        .iter()
+        .filter_map(|p| {
+            let assignment = p.assignment.as_ref()?;
+            let key = format!(
+                "{}/{}",
+                classroom_key(p.owner.as_deref()?, &p.config.classroom),
+                p.config.assignment.to_ascii_lowercase()
+            );
+            Some((key, assignment))
+        })
+        .chain(
+            snapshot
+                .unaccepted
+                .iter()
+                .map(|u| (u.id.clone(), &u.assignment)),
+        );
+    for (key, assignment) in schedule {
+        let due = assignment.due.map(|d| d.timestamp());
+        let previous = memory.dues.insert(key.clone(), due);
+        if assignment.closed {
+            if memory.closed.insert(key) && previous.is_some() {
+                notices.push(Notice::Closed {
+                    assignment: assignment.name.clone(),
+                });
+            }
+        } else if previous.is_some_and(|before| before != due) {
+            notices.push(Notice::DeadlineChanged {
+                assignment: assignment.name.clone(),
+                due: assignment.due.map(|d| d.with_timezone(&Utc)),
+            });
+        }
+    }
+
+    let login = memory.login.clone().unwrap_or_default();
     for project in &snapshot.projects {
         let Some(remote) = &project.remote else {
             continue;
         };
         let name = assignment_name(project);
+
+        if let Some(head) = &remote.head {
+            let previous = memory.heads.insert(project.id.clone(), head.oid.clone());
+            let teammate = head
+                .author
+                .as_ref()
+                .filter(|author| !login.is_empty() && !author.eq_ignore_ascii_case(&login));
+            if let (Some(before), Some(author)) = (previous, teammate)
+                && before != head.oid
+            {
+                notices.push(Notice::TeammatePush {
+                    assignment: name.clone(),
+                    author: author.clone(),
+                });
+                memory.unseen.insert(project.id.clone());
+            }
+        }
 
         if let Some(grade) = &remote.grade {
             let previous = memory.grades.insert(project.id.clone(), grade.tag.clone());
@@ -481,5 +569,63 @@ mod tests {
         assert_eq!(notices.len(), 1);
         assert!(diff(&mut memory, &snap, &[24, 1], now).is_empty());
         assert!(due_soon(&snap, now));
+    }
+
+    #[test]
+    fn announces_teammate_pushes_and_deadline_moves() {
+        let now = Utc::now();
+        let mut memory = Memory {
+            login: Some("alice".into()),
+            ..Memory::default()
+        };
+        let with_head = |oid: &str, author: &str, due: DateTime<Utc>| {
+            let mut p = project("lab1", Some(due));
+            p.remote.as_mut().unwrap().head = Some(crate::projects::Commit {
+                oid: oid.into(),
+                at: None,
+                author: Some(author.into()),
+            });
+            p
+        };
+        let due = now + TimeDelta::days(5);
+        assert!(
+            diff(
+                &mut memory,
+                &snapshot(vec![with_head("a", "alice", due)]),
+                &[],
+                now
+            )
+            .is_empty()
+        );
+        // Own push: silent. Teammate push and a moved deadline: announced.
+        assert!(
+            diff(
+                &mut memory,
+                &snapshot(vec![with_head("b", "Alice", due)]),
+                &[],
+                now
+            )
+            .is_empty()
+        );
+        let later = due + TimeDelta::days(2);
+        let notices = diff(
+            &mut memory,
+            &snapshot(vec![with_head("c", "gilles", later)]),
+            &[],
+            now,
+        );
+        assert_eq!(
+            notices,
+            vec![
+                Notice::DeadlineChanged {
+                    assignment: "LAB1".into(),
+                    due: Some(later.with_timezone(&Utc)),
+                },
+                Notice::TeammatePush {
+                    assignment: "LAB1".into(),
+                    author: "gilles".into()
+                },
+            ]
+        );
     }
 }

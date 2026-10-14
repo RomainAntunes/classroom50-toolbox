@@ -43,8 +43,11 @@
   const issue = $derived(
     session.snapshot?.issue?.kind === "notSignedIn" ? null : session.snapshot?.issue,
   );
+  // Background checks stay silent; only syncs the user started show progress.
   const syncing = $derived(
-    loading || session.progress?.running || session.snapshot?.syncedAt == null,
+    loading ||
+      (session.progress?.running && session.progress.foreground) ||
+      session.snapshot?.syncedAt == null,
   );
   // Indeterminate until the sync knows how much work it has.
   const fraction = $derived(
@@ -206,6 +209,12 @@
         session.progress = event.payload;
       }),
       listen<Snapshot>(PROJECTS_UPDATED_EVENT, (event) => {
+        // `gh auth switch`: the footer follows the account the data now belongs to.
+        if (event.payload.login && event.payload.login !== session.auth?.login) {
+          void api.authStatus().then((auth) => {
+            session.auth = auth;
+          });
+        }
         session.snapshot = event.payload;
         now = new Date();
       }),

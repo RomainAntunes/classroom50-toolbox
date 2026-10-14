@@ -93,6 +93,16 @@ pub async fn auth_status() -> AuthStatus {
     }
 }
 
+/// The account gh uses for github.com, read from its local config (no network). Lets a
+/// sync notice `gh auth switch` before asking GitHub anything.
+pub async fn active_login() -> Option<String> {
+    process::run("gh", ["config", "get", "user", "-h", "github.com"], None)
+        .await
+        .ok()
+        .map(|out| out.stdout)
+        .filter(|login| !login.is_empty())
+}
+
 /// gh's token for github.com, read fresh for each use and kept only in memory.
 pub async fn gh_token() -> Result<String> {
     match process::run("gh", ["auth", "token", "--hostname", "github.com"], None).await {

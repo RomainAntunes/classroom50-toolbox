@@ -48,7 +48,9 @@ pub async fn graphql<T: DeserializeOwned>(
         .post(GRAPHQL_URL)
         .bearer_auth(token)
         .json(&json!({ "query": query, "variables": variables }));
-    let response = checked(request.send().await?)?;
+    let response = request.send().await?;
+    record_rate_limit(response.headers());
+    let response = checked(response)?;
     let body: GraphQlResponse<T> = response.json().await?;
     if body
         .errors
@@ -71,6 +73,37 @@ pub async fn graphql<T: DeserializeOwned>(
 }
 
 /// Maps auth and rate-limit statuses to typed errors; other failures stay HTTP errors.
+/// The GraphQL budget as of the last response, for the sync details in Settings.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct RateLimit {
+    pub remaining: u32,
+    pub limit: u32,
+    pub reset_at: Option<DateTime<Utc>>,
+}
+
+static RATE_LIMIT: std::sync::Mutex<Option<RateLimit>> = std::sync::Mutex::new(None);
+
+pub fn rate_limit() -> Option<RateLimit> {
+    RATE_LIMIT.lock().ok().and_then(|r| *r)
+}
+
+fn record_rate_limit(headers: &HeaderMap) {
+    let number = |name| header_str(headers, name).and_then(|s| s.parse::<u32>().ok());
+    if let (Some(remaining), Some(limit)) =
+        (number("x-ratelimit-remaining"), number("x-ratelimit-limit"))
+        && let Ok(mut current) = RATE_LIMIT.lock()
+    {
+        *current = Some(RateLimit {
+            remaining,
+            limit,
+            reset_at: header_str(headers, "x-ratelimit-reset")
+                .and_then(|s| s.parse::<i64>().ok())
+                .and_then(|epoch| DateTime::from_timestamp(epoch, 0)),
+        });
+    }
+}
+
 fn checked(response: Response) -> Result<Response> {
     match response.status() {
         StatusCode::UNAUTHORIZED => Err(Error::NotSignedIn),
@@ -109,6 +142,9 @@ fn header_str<'a>(headers: &'a HeaderMap, name: &str) -> Option<&'a str> {
 struct Cached {
     etag: String,
     body: String,
+    /// When the server last confirmed this body.
+    #[serde(default)]
+    checked_at: Option<DateTime<Utc>>,
 }
 
 /// Bodies of earlier GET responses keyed by URL, replayed when the server answers
@@ -132,9 +168,21 @@ impl HttpCache {
     }
 
     /// GETs `url` as text, revalidating a cached copy with `If-None-Match`.
-    pub async fn get_text(&self, http: &reqwest::Client, url: &str) -> Result<String> {
-        let request = http.get(url);
+    /// A body confirmed less than `max_age` ago is returned without any request.
+    pub async fn get_text(
+        &self,
+        http: &reqwest::Client,
+        url: &str,
+        max_age: chrono::TimeDelta,
+    ) -> Result<String> {
+        let now = Utc::now();
         let cached = self.entries.lock().ok().and_then(|e| e.get(url).cloned());
+        if let Some(entry) = &cached
+            && entry.checked_at.is_some_and(|at| now - at < max_age)
+        {
+            return Ok(entry.body.clone());
+        }
+        let request = http.get(url);
         let request = match &cached {
             Some(entry) => request.header(header::IF_NONE_MATCH, &entry.etag),
             None => request,
@@ -143,6 +191,11 @@ impl HttpCache {
         if response.status() == StatusCode::NOT_MODIFIED
             && let Some(entry) = cached
         {
+            if let Ok(mut entries) = self.entries.lock()
+                && let Some(stored) = entries.get_mut(url)
+            {
+                stored.checked_at = Some(now);
+            }
             return Ok(entry.body);
         }
         let response = checked(response)?;
@@ -154,10 +207,19 @@ impl HttpCache {
                 Cached {
                     etag,
                     body: body.clone(),
+                    checked_at: Some(now),
                 },
             );
         }
         Ok(body)
+    }
+
+    /// Forgets every cached body, so the next GETs download in full.
+    pub fn clear(&self) {
+        if let Ok(mut entries) = self.entries.lock() {
+            entries.clear();
+        }
+        let _ = std::fs::remove_file(&self.path);
     }
 
     /// Writes the cache to disk (temp file + rename). Failures only cost a cold cache.

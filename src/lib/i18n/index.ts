@@ -33,6 +33,17 @@ export function t(
   );
 }
 
+/** "Fri 17 Oct, 23:59" in the catalog's language: for exact dates in details. */
+export function formatDate(date: Date): string {
+  return new Intl.DateTimeFormat(currentLocale, {
+    weekday: "short",
+    day: "numeric",
+    month: "short",
+    hour: "2-digit",
+    minute: "2-digit",
+  }).format(date);
+}
+
 /** "in 3 hours", "yesterday": for due dates. */
 export function fromNow(date: Date, now = new Date()): string {
   const seconds = Math.round((date.getTime() - now.getTime()) / 1000);

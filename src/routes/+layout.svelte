@@ -8,7 +8,7 @@
     sendNotification,
   } from "@tauri-apps/plugin-notification";
   import { api, NOTIFY_EVENT, UNSEEN_EVENT, type Notice } from "$lib/api";
-  import { fromNow, setLocale, t } from "$lib/i18n";
+  import { formatDate, fromNow, setLocale, t } from "$lib/i18n";
   import { session } from "$lib/session.svelte";
 
   let { children } = $props();
@@ -25,8 +25,14 @@
   /** Words a notice from Rust (`alerts.rs`) and shows it as a system notification. */
   async function notify(notice: Notice) {
     const { kind, ...params } = notice;
-    const values: Record<string, string | number> = { ...params };
+    const values: Record<string, string | number> = {};
+    for (const [key, value] of Object.entries(params)) {
+      if (value !== null) values[key] = value;
+    }
     if (notice.kind === "due") values.when = fromNow(new Date(notice.due));
+    if (notice.kind === "deadlineChanged") {
+      values.when = notice.due ? formatDate(new Date(notice.due)) : t("alerts.noDeadline");
+    }
     const granted = (await isPermissionGranted()) || (await requestPermission()) === "granted";
     if (granted) {
       sendNotification({

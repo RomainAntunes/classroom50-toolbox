@@ -3,8 +3,17 @@
   import { goto } from "$app/navigation";
   import { message } from "@tauri-apps/plugin-dialog";
   import { exit } from "@tauri-apps/plugin-process";
-  import { api, errorMessage, withDialog, type AppInfo } from "$lib/api";
-  import { hoursLabel, t } from "$lib/i18n";
+  import { listen } from "@tauri-apps/api/event";
+  import {
+    api,
+    errorMessage,
+    PROJECTS_UPDATED_EVENT,
+    withDialog,
+    type AppInfo,
+    type LastRun,
+    type SyncDetails,
+  } from "$lib/api";
+  import { formatDate, fromNow, hoursLabel, t } from "$lib/i18n";
   import { loadSettings, pickWatchedFolder, saveSettings, settings } from "$lib/settings.svelte";
   import Section from "$lib/components/Section.svelte";
   import Toggle from "$lib/components/Toggle.svelte";
@@ -16,6 +25,28 @@
   let checking = $state(false);
   let upToDate = $state(false);
   let rescanning = $state(false);
+  let sync = $state<SyncDetails | null>(null);
+  let clearing = $state(false);
+
+  const rate = $derived(sync?.rateLimit ?? sync?.stats.rateLimit ?? null);
+
+  function lastRun(run: LastRun | null): string {
+    if (!run) return t("settings.sync.never");
+    return t("settings.sync.run", {
+      when: fromNow(new Date(run.at)),
+      seconds: run.seconds.toFixed(1),
+    });
+  }
+
+  async function clearCache() {
+    clearing = true;
+    try {
+      session.snapshot = await api.clearCache();
+    } finally {
+      clearing = false;
+      sync = await api.syncDetails();
+    }
+  }
 
   const current = $derived(settings.current);
 
@@ -59,8 +90,17 @@
     }
   }
 
-  onMount(async () => {
-    [info] = await Promise.all([api.appInfo(), loadSettings()]);
+  onMount(() => {
+    void Promise.all([api.appInfo(), loadSettings(), api.syncDetails()]).then(
+      ([appInfo, , details]) => {
+        info = appInfo;
+        sync = details;
+      },
+    );
+    const unlisten = listen(PROJECTS_UPDATED_EVENT, async () => {
+      sync = await api.syncDetails();
+    });
+    return () => void unlisten.then((stop) => stop());
   });
 </script>
 
@@ -116,6 +156,53 @@
       {/each}
     </Section>
 
+    {#if sync}
+      <Section title={t("settings.sync.title")}>
+        {#snippet actions()}
+          <button disabled={clearing} onclick={clearCache}>{t("settings.sync.clear")}</button>
+        {/snippet}
+        <dl class="sync">
+          <dt>{t("settings.sync.account")}</dt>
+          <dd>{sync.login ?? t("settings.sync.none")}</dd>
+          <dt>{t("settings.sync.full")}</dt>
+          <dd>{lastRun(sync.stats.full)}</dd>
+          <dt>{t("settings.sync.status")}</dt>
+          <dd>{lastRun(sync.stats.status)}</dd>
+          <dt>{t("settings.sync.local")}</dt>
+          <dd>{lastRun(sync.stats.local)}</dd>
+          {#if rate}
+            <dt>{t("settings.sync.budget")}</dt>
+            <dd
+              title={rate.resetAt
+                ? t("settings.sync.resets", { when: formatDate(new Date(rate.resetAt)) })
+                : undefined}
+            >
+              {t("settings.sync.budgetValue", { remaining: rate.remaining, limit: rate.limit })}
+            </dd>
+          {/if}
+          <dt>{t("settings.sync.found")}</dt>
+          <dd>
+            {t("settings.sync.foundValue", {
+              repos: sync.stats.reposSeen,
+              assignments: sync.assignments,
+              clones: sync.clones,
+            })}
+          </dd>
+          <dt>{t("settings.sync.disk")}</dt>
+          <dd>
+            {t("settings.sync.diskValue", {
+              folders: sync.stats.scanRoots,
+              watched: sync.stats.watchTargets,
+            })}
+          </dd>
+          {#if sync.issue}
+            <dt>{t("settings.sync.issue")}</dt>
+            <dd class="issue" title={sync.issue.message}>{sync.issue.message}</dd>
+          {/if}
+        </dl>
+      </Section>
+    {/if}
+
     <Section title={t("settings.about.title")}>
       <div class="row">
         <span>{info ? t("settings.about.version", { version: info.version }) : ""}</span>
@@ -150,6 +237,31 @@
     flex-direction: column;
     gap: calc(var(--space) * 2);
     padding: var(--space) 12px 14px;
+  }
+
+  .sync {
+    display: grid;
+    grid-template-columns: max-content 1fr;
+    gap: 4px 12px;
+    margin: 0;
+    padding: 10px 12px;
+    font-size: 0.9em;
+  }
+
+  .sync dt {
+    color: var(--fg-muted);
+  }
+
+  .sync dd {
+    margin: 0;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .sync .issue {
+    color: var(--warning);
   }
 
   .actions {

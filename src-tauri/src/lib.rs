@@ -76,6 +76,7 @@ pub fn run() {
 
             popover::setup(handle)?;
             tray::setup(handle)?;
+            alerts::restore_badge(handle);
             projects::start_background_sync(handle.clone());
             if !cfg!(debug_assertions) {
                 updater::check_in_background(handle.clone());
@@ -94,6 +95,8 @@ pub fn run() {
             commands::sync_progress,
             commands::rescan_local,
             commands::unseen,
+            commands::sync_details,
+            commands::clear_cache,
             commands::get_settings,
             commands::update_settings,
             commands::login,

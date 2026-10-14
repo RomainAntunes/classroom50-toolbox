@@ -35,6 +35,8 @@ export interface RepoConfig {
 export interface Commit {
   oid: string;
   at: string | null;
+  /** GitHub login of the author, else the name in the commit. */
+  author: string | null;
 }
 
 export interface Submission {
@@ -151,6 +153,8 @@ export interface Snapshot {
   syncedAt: string | null;
   /** Last GitHub read, full sync or status check. */
   checkedAt: string | null;
+  /** The GitHub account the data belongs to. */
+  login: string | null;
   /** Why the last sync was partial; same shape as `CommandError`. */
   issue: CommandError | null;
 }
@@ -181,13 +185,49 @@ export type Notice =
   | { kind: "due"; assignment: string; due: string }
   | { kind: "grade"; assignment: string; score: number; maxScore: number }
   | { kind: "feedback"; assignment: string; count: number }
-  | { kind: "newAssignment"; assignment: string; classroom: string };
+  | { kind: "newAssignment"; assignment: string; classroom: string }
+  | { kind: "teammatePush"; assignment: string; author: string }
+  | { kind: "deadlineChanged"; assignment: string; due: string | null }
+  | { kind: "closed"; assignment: string };
 
 /** Payload of `sync-progress`. `total` grows as work is found; 0 means not known yet. */
 export interface SyncProgress {
   running: boolean;
+  /** Started by the user; background checks show no spinner. */
+  foreground: boolean;
   done: number;
   total: number;
+}
+
+export interface LastRun {
+  at: string;
+  seconds: number;
+}
+
+export interface RateLimit {
+  remaining: number;
+  limit: number;
+  resetAt: string | null;
+}
+
+/** What the sync engine did lately (Settings). */
+export interface SyncDetails {
+  login: string | null;
+  syncedAt: string | null;
+  checkedAt: string | null;
+  stats: {
+    rateLimit: RateLimit | null;
+    full: LastRun | null;
+    status: LastRun | null;
+    local: LastRun | null;
+    reposSeen: number;
+    scanRoots: number;
+    watchTargets: number;
+  };
+  rateLimit: RateLimit | null;
+  issue: CommandError | null;
+  assignments: number;
+  clones: number;
 }
 
 export interface UpdateInfo {
@@ -213,6 +253,8 @@ export const api = {
   syncProgress: () => invoke<SyncProgress>("sync_progress"),
   rescanLocal: () => invoke<Snapshot>("rescan_local"),
   unseen: () => invoke<string[]>("unseen"),
+  syncDetails: () => invoke<SyncDetails>("sync_details"),
+  clearCache: () => invoke<Snapshot>("clear_cache"),
   getSettings: () => invoke<Settings>("get_settings"),
   updateSettings: (next: Settings) => invoke<Settings>("update_settings", { next }),
   login: () => invoke<AuthStatus>("login"),

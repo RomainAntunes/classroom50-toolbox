@@ -2,7 +2,8 @@
   import { Menu, MenuItem, PredefinedMenuItem } from "@tauri-apps/api/menu";
   import { openUrl, revealItemInDir } from "@tauri-apps/plugin-opener";
   import { api, withDialog, type Project } from "$lib/api";
-  import { fromNow, t } from "$lib/i18n";
+  import { formatDate, fromNow, t } from "$lib/i18n";
+  import Details from "./Details.svelte";
 
   let { project, now, unseen }: { project: Project; now: Date; unseen: boolean } = $props();
 
@@ -60,6 +61,46 @@
   );
   const openTarget = $derived(project.webUrl ?? githubUrl);
 
+  let open = $state(false);
+  const details = $derived.by(() => {
+    const a = project.assignment;
+    const remote = project.remote;
+    const items: [string, string][] = [];
+    const add = (key: string, value: string | null | undefined) => {
+      if (value) items.push([t(`details.${key}`), value]);
+    };
+    add("class", project.classroom?.name ?? project.config.classroom);
+    if (a) {
+      add("type", t(`details.mode.${a.mode}`));
+      add("submission", t(`details.submissionMode.${a.submissionMode ?? "every-push"}`));
+      if (a.availableFrom) add("opens", formatDate(new Date(a.availableFrom)));
+    }
+    if (due) add("due", formatDate(due));
+    if (remote?.head?.at) {
+      const when = fromNow(new Date(remote.head.at), now);
+      add("lastPush", remote.head.author ? `${remote.head.author}, ${when}` : when);
+    }
+    if (remote?.lastSubmission?.at) {
+      add("lastSubmission", fromNow(new Date(remote.lastSubmission.at), now));
+    }
+    if (grade) {
+      add(
+        "grade",
+        `${grade.score}/${grade.maxScore} · ${t("projects.gradeTests", { passed: grade.testsPassed, total: grade.testsTotal })}`,
+      );
+    }
+    if (feedback) add("feedback", String(feedback.comments));
+    if (unmerged.length) add("unmerged", unmerged.join(", "));
+    if (project.local) {
+      const local = project.local;
+      add("branch", local.branch);
+      if (local.changedFiles) add("changes", String(local.changedFiles));
+    }
+    add("folder", path);
+    add("repository", project.owner && project.repo ? `${project.owner}/${project.repo}` : null);
+    return items;
+  });
+
   /** The row's native context menu with every action. */
   async function showMenu(event: MouseEvent) {
     event.preventDefault();
@@ -104,37 +145,59 @@
   }
 </script>
 
-<div class="row" role="group" aria-label={name} oncontextmenu={showMenu}>
-  <div class="text">
-    <span class="name" title={project.repo ?? path ?? undefined}>
-      {#if unseen}<span class="dot" aria-label={t("projects.new")}></span>{/if}{name}
-    </span>
-    <span class="meta">
-      {#if status}
-        <span class="status" class:warn={status.warn} title={status.hint}>{status.label}</span> ·
-      {/if}
-      {#if feedback && feedback.comments > 0}
-        <span class="feedback">{t("projects.comments", { count: feedback.comments })}</span> ·
-      {/if}
-      {#if dueLabel}
-        <span class:soon={dueSoon}>{dueLabel}</span> ·
-      {/if}
-      {path ? (project.repo ?? project.config.assignment) : t("projects.notCloned")}
-    </span>
+<div class="item">
+  <div
+    class="row"
+    role="button"
+    tabindex="0"
+    aria-expanded={open}
+    aria-label={name}
+    oncontextmenu={showMenu}
+    onclick={() => (open = !open)}
+    onkeydown={(event) => {
+      if (event.key === "Enter" || event.key === " ") {
+        event.preventDefault();
+        open = !open;
+      }
+    }}
+  >
+    <div class="text">
+      <span class="name" title={project.repo ?? path ?? undefined}>
+        {#if unseen}<span class="dot" aria-label={t("projects.new")}></span>{/if}{name}
+      </span>
+      <span class="meta">
+        {#if status}
+          <span class="status" class:warn={status.warn} title={status.hint}>{status.label}</span> ·
+        {/if}
+        {#if feedback && feedback.comments > 0}
+          <span class="feedback">{t("projects.comments", { count: feedback.comments })}</span> ·
+        {/if}
+        {#if dueLabel}
+          <span class:soon={dueSoon}>{dueLabel}</span> ·
+        {/if}
+        {path ? (project.repo ?? project.config.assignment) : t("projects.notCloned")}
+      </span>
+    </div>
+    {#if grade}
+      <span
+        class="grade"
+        class:full={grade.score === grade.maxScore}
+        title={t("projects.gradeTests", { passed: grade.testsPassed, total: grade.testsTotal })}
+        >{grade.score}/{grade.maxScore}</span
+      >
+    {/if}
+    {#if openTarget}
+      <button
+        title={t(project.webUrl ? "projects.openClassroom50" : "projects.openGitHub")}
+        onclick={(event) => {
+          event.stopPropagation();
+          openUrl(openTarget);
+        }}>↗</button
+      >
+    {/if}
   </div>
-  {#if grade}
-    <span
-      class="grade"
-      class:full={grade.score === grade.maxScore}
-      title={t("projects.gradeTests", { passed: grade.testsPassed, total: grade.testsTotal })}
-      >{grade.score}/{grade.maxScore}</span
-    >
-  {/if}
-  {#if openTarget}
-    <button
-      title={t(project.webUrl ? "projects.openClassroom50" : "projects.openGitHub")}
-      onclick={() => openUrl(openTarget)}>↗</button
-    >
+  {#if open}
+    <Details description={project.assignment?.description ?? null} items={details} />
   {/if}
 </div>
 
@@ -149,6 +212,11 @@
 
   .row:hover {
     background: var(--bg-control);
+  }
+
+  .row:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: -2px;
   }
 
   .text {
