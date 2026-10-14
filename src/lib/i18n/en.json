@@ -53,5 +53,8 @@
   "projects.issue.notInstalled": "Install the GitHub CLI to see your assignments on GitHub.",
   "projects.issue.other": "Couldn't reach GitHub. Showing the last known state.",
   "projects.search": "Search",
-  "projects.noMatch": "No assignment matches your search."
+  "projects.noMatch": "No assignment matches your search.",
+  "projects.syncing": "Syncing",
+  "settings.folders.editors": "Find clones from JetBrains and VS Code",
+  "settings.folders.editorsHint": "Looks in the folders your editors opened recently and in ~/IdeaProjects-style project folders. Add a folder below for anything else."
 }

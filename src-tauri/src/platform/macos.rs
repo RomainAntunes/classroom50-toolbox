@@ -33,6 +33,14 @@ pub fn install_command(tool: Tool) -> Result<CommandSpec> {
     }
 }
 
+/// Where editors keep their settings (JetBrains, VS Code and its forks all use it).
+pub fn editor_config_dirs() -> Vec<PathBuf> {
+    home_dir()
+        .map(|home| home.join("Library/Application Support"))
+        .into_iter()
+        .collect()
+}
+
 pub fn open_terminal(dir: &Path) -> Result<()> {
     process::spawn_detached(
         "open",

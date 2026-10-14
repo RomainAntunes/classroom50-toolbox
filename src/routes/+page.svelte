@@ -5,10 +5,12 @@
   import {
     api,
     PROJECTS_UPDATED_EVENT,
+    SYNC_PROGRESS_EVENT,
     UPDATE_AVAILABLE_EVENT,
     type AuthStatus,
     type Project,
     type Snapshot,
+    type SyncProgress,
     type ToolStatus,
     type UpdateInfo,
   } from "$lib/api";
@@ -35,7 +37,13 @@
   const issue = $derived(
     session.snapshot?.issue?.kind === "notSignedIn" ? null : session.snapshot?.issue,
   );
-  const syncing = $derived(loading || session.snapshot?.syncedAt == null);
+  const syncing = $derived(
+    loading || session.progress?.running || session.snapshot?.syncedAt == null,
+  );
+  // Indeterminate until the sync knows how much work it has.
+  const fraction = $derived(
+    session.progress?.total ? session.progress.done / session.progress.total : null,
+  );
   const allProjects = $derived(session.snapshot?.projects ?? []);
   const query = $derived(session.search.trim().toLowerCase());
   const groups = $derived(groupByClass(allProjects.filter((p) => matches(p, query))));
@@ -77,12 +85,14 @@
   /** Cheap local state: settings, tools, login and the last synced list. */
   async function load() {
     await loadSettings();
-    const [tools, auth, snapshot] = await Promise.all([
+    const [tools, auth, snapshot, progress] = await Promise.all([
       api.toolStatuses(),
       api.authStatus(),
       api.listProjects(),
+      api.syncProgress(),
     ]);
     session.tools = tools;
+    session.progress = progress;
     session.auth = auth;
     // The startup sync may still be running; its event fills the list.
     if (snapshot.syncedAt || !session.snapshot) session.snapshot = snapshot;
@@ -119,6 +129,7 @@
     load();
     const unlisteners = [
       listen<UpdateInfo>(UPDATE_AVAILABLE_EVENT, (event) => (session.update = event.payload)),
+      listen<SyncProgress>(SYNC_PROGRESS_EVENT, (event) => (session.progress = event.payload)),
       listen<Snapshot>(PROJECTS_UPDATED_EVENT, (event) => {
         session.snapshot = event.payload;
         now = new Date();
@@ -172,6 +183,19 @@
       </svg>
     </button>
   </div>
+  {#if syncing}
+    <div
+      class="progress"
+      class:indeterminate={fraction === null}
+      role="progressbar"
+      aria-label={t("projects.syncing")}
+      aria-valuemin="0"
+      aria-valuemax="100"
+      aria-valuenow={fraction === null ? undefined : Math.round(fraction * 100)}
+    >
+      <div style:width={fraction === null ? undefined : `${fraction * 100}%`}></div>
+    </div>
+  {/if}
 </header>
 
 <main>
@@ -226,6 +250,39 @@
     align-items: center;
     gap: 8px;
     padding: 12px 14px 4px;
+    position: relative;
+  }
+
+  /* A hairline under the titlebar; the spinning refresh icon stays the main cue. */
+  .progress {
+    position: absolute;
+    left: 14px;
+    right: 14px;
+    bottom: -4px;
+    height: 2px;
+    border-radius: 1px;
+    overflow: hidden;
+    background: var(--bg-control);
+  }
+
+  .progress > div {
+    height: 100%;
+    background: var(--accent);
+    transition: width 0.2s ease-out;
+  }
+
+  .progress.indeterminate > div {
+    width: 30%;
+    animation: slide 1.2s ease-in-out infinite;
+  }
+
+  @keyframes slide {
+    from {
+      transform: translateX(-100%);
+    }
+    to {
+      transform: translateX(340%);
+    }
   }
 
   .search {

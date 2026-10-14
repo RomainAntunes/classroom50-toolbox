@@ -11,7 +11,7 @@ use crate::error::Result;
 use crate::login::{self, LoginState};
 use crate::platform::{self, CommandSpec, Os};
 use crate::popover::PopoverState;
-use crate::projects::{self, ProjectsState, Snapshot};
+use crate::projects::{self, ProjectsState, Snapshot, SyncProgress};
 use crate::settings::{Settings, SettingsStore};
 use crate::tools::{self, AuthStatus, Tool, ToolStatus};
 use crate::updater::{self, UpdateInfo};
@@ -66,10 +66,16 @@ pub fn list_projects(state: State<'_, ProjectsState>) -> Snapshot {
     state.snapshot()
 }
 
-/// Syncs GitHub, the watched folders and the assignment manifests now.
+/// Syncs GitHub, the local clones and the assignment manifests now.
 #[tauri::command]
 pub async fn refresh_projects(app: AppHandle) -> Snapshot {
     projects::refresh(&app).await
+}
+
+/// Whether a sync is running and how far it is; `sync-progress` follows.
+#[tauri::command]
+pub fn sync_progress(state: State<'_, ProjectsState>) -> SyncProgress {
+    state.progress()
 }
 
 #[tauri::command]
@@ -93,8 +99,9 @@ pub fn update_settings(
         apply_launch_at_login(&app, next.launch_at_login)?;
     }
     let saved = settings.set(next)?;
-    if saved.watched_folders != previous.watched_folders {
-        crate::watch::rewatch(&app);
+    if saved.watched_folders != previous.watched_folders
+        || saved.scan_editor_projects != previous.scan_editor_projects
+    {
         let app = app.clone();
         tauri::async_runtime::spawn(async move {
             projects::refresh_local(&app).await;

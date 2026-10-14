@@ -112,6 +112,7 @@ export interface Snapshot {
 
 export interface Settings {
   watchedFolders: string[];
+  scanEditorProjects: boolean;
   launchAtLogin: boolean;
   notifyHoursBefore: number[];
 }
@@ -125,6 +126,14 @@ export interface DeviceCode {
 export const DEVICE_CODE_EVENT = "login-device-code";
 export const UPDATE_AVAILABLE_EVENT = "update-available";
 export const PROJECTS_UPDATED_EVENT = "projects-updated";
+export const SYNC_PROGRESS_EVENT = "sync-progress";
+
+/** Payload of `sync-progress`. `total` grows as work is found; 0 means not known yet. */
+export interface SyncProgress {
+  running: boolean;
+  done: number;
+  total: number;
+}
 
 export interface UpdateInfo {
   version: string;
@@ -146,6 +155,7 @@ export const api = {
   authStatus: () => invoke<AuthStatus>("auth_status"),
   listProjects: () => invoke<Snapshot>("list_projects"),
   refreshProjects: () => invoke<Snapshot>("refresh_projects"),
+  syncProgress: () => invoke<SyncProgress>("sync_progress"),
   getSettings: () => invoke<Settings>("get_settings"),
   updateSettings: (next: Settings) => invoke<Settings>("update_settings", { next }),
   login: () => invoke<AuthStatus>("login"),

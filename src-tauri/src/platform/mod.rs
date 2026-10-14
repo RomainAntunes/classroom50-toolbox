@@ -65,6 +65,11 @@ pub fn open_terminal(dir: &Path) -> Result<()> {
     imp::open_terminal(dir)
 }
 
-fn home_dir() -> Option<PathBuf> {
+/// Config dirs that may hold editor state (recent projects), most likely first.
+pub fn editor_config_dirs() -> Vec<PathBuf> {
+    imp::editor_config_dirs()
+}
+
+pub fn home_dir() -> Option<PathBuf> {
     std::env::var_os(if cfg!(windows) { "USERPROFILE" } else { "HOME" }).map(PathBuf::from)
 }

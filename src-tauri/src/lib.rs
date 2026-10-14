@@ -1,6 +1,7 @@
 pub mod classroom50;
 mod commands;
 pub mod discovery;
+pub mod editors;
 pub mod error;
 pub mod github;
 mod login;
@@ -72,7 +73,6 @@ pub fn run() {
             popover::setup(handle)?;
             tray::setup(handle)?;
             projects::start_background_sync(handle.clone());
-            watch::rewatch(handle);
             if !cfg!(debug_assertions) {
                 updater::check_in_background(handle.clone());
             }
@@ -87,6 +87,7 @@ pub fn run() {
             commands::auth_status,
             commands::list_projects,
             commands::refresh_projects,
+            commands::sync_progress,
             commands::get_settings,
             commands::update_settings,
             commands::login,

@@ -66,13 +66,21 @@
       {#snippet actions()}
         <button onclick={pickWatchedFolder}>{t("projects.addFolder")}</button>
       {/snippet}
+      <Toggle
+        label={t("settings.folders.editors")}
+        checked={current.scanEditorProjects}
+        onchange={(on) => save({ scanEditorProjects: on })}
+      />
+      <p class="hint">{t("settings.folders.editorsHint")}</p>
       {#each current.watchedFolders as folder (folder)}
         <div class="row">
           <span class="path" title={folder}>{folder}</span>
           <button onclick={() => removeFolder(folder)}>{t("settings.folders.remove")}</button>
         </div>
       {:else}
-        <p class="hint">{t("settings.folders.hint")}</p>
+        {#if !current.scanEditorProjects}
+          <p class="hint">{t("settings.folders.hint")}</p>
+        {/if}
       {/each}
     </Section>
 

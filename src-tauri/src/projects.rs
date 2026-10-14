@@ -21,13 +21,16 @@ use crate::classroom50::{
     self, Assignment, Classroom, RepoConfig, SUBMIT_TAG_PREFIX, SubmissionMode,
 };
 use crate::discovery::{self, LocalProject};
+use crate::editors;
 use crate::error::{Error, Result};
 use crate::github::{self, Http, HttpCache};
 use crate::process;
-use crate::settings::SettingsStore;
+use crate::settings::{Settings, SettingsStore};
 use crate::tools;
+use crate::watch::{self, WatchTarget};
 
 pub const UPDATED_EVENT: &str = "projects-updated";
+pub const PROGRESS_EVENT: &str = "sync-progress";
 
 /// v2 keeps every inspected repo, not only those with a marker file.
 const CACHE_FILE: &str = "repos-v2.json";
@@ -158,8 +161,19 @@ struct RemoteCache {
     classrooms: Vec<Classroom>,
 }
 
+/// How far the sync in flight is. `total` grows as the work is discovered (repo batches,
+/// scan roots, clones), so the fraction can step back a little.
+#[derive(Debug, Clone, Copy, Default, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SyncProgress {
+    pub running: bool,
+    pub done: usize,
+    pub total: usize,
+}
+
 pub struct ProjectsState {
     snapshot: Mutex<Snapshot>,
+    progress: Mutex<SyncProgress>,
     sync_lock: tokio::sync::Mutex<()>,
     remote: Mutex<RemoteCache>,
     remote_path: PathBuf,
@@ -175,6 +189,7 @@ impl ProjectsState {
             .unwrap_or_default();
         Self {
             snapshot: Mutex::default(),
+            progress: Mutex::default(),
             sync_lock: tokio::sync::Mutex::new(()),
             remote: Mutex::new(remote),
             remote_path,
@@ -184,6 +199,10 @@ impl ProjectsState {
 
     pub fn snapshot(&self) -> Snapshot {
         self.snapshot.lock().map(|s| s.clone()).unwrap_or_default()
+    }
+
+    pub fn progress(&self) -> SyncProgress {
+        self.progress.lock().map(|p| *p).unwrap_or_default()
     }
 
     fn remote(&self) -> RemoteCache {
@@ -216,8 +235,8 @@ pub async fn refresh(app: &AppHandle) -> Snapshot {
     publish(app, Mode::Full, guard).await
 }
 
-/// Re-reads only the watched folders (after a clone, commit or settings change) and keeps
-/// the last GitHub data, so it costs no API request.
+/// Re-reads only the disk (after a clone, commit or settings change) and keeps the last
+/// GitHub data, so it costs no API request.
 pub async fn refresh_local(app: &AppHandle) -> Snapshot {
     let state = app.state::<ProjectsState>();
     let guard = state.sync_lock.lock().await;
@@ -235,16 +254,62 @@ enum Mode {
 async fn publish(app: &AppHandle, mode: Mode, _guard: tokio::sync::MutexGuard<'_, ()>) -> Snapshot {
     let state = app.state::<ProjectsState>();
     let http = &app.state::<Http>().0;
-    let folders = app.state::<SettingsStore>().get().watched_folders;
+    let settings = app.state::<SettingsStore>().get();
 
-    let snapshot = sync(&state, http, folders, mode).await;
+    let progress = Progress::start(app);
+    let (snapshot, targets) = sync(&state, http, &settings, mode, &progress).await;
+    progress.finish();
     if let Ok(mut current) = state.snapshot.lock() {
         *current = snapshot.clone();
     }
     if let Err(err) = app.emit(UPDATED_EVENT, &snapshot) {
         log::warn!("could not emit {UPDATED_EVENT}: {err}");
     }
+    watch::rewatch(app, targets);
     snapshot
+}
+
+/// Reports sync progress to the UI as `sync-progress`.
+#[derive(Clone)]
+struct Progress(AppHandle);
+
+impl Progress {
+    fn start(app: &AppHandle) -> Self {
+        let progress = Self(app.clone());
+        progress.update(|p| {
+            *p = SyncProgress {
+                running: true,
+                done: 0,
+                total: 0,
+            }
+        });
+        progress
+    }
+
+    fn add(&self, steps: usize) {
+        if steps > 0 {
+            self.update(|p| p.total += steps);
+        }
+    }
+
+    fn advance(&self) {
+        self.update(|p| p.done = (p.done + 1).min(p.total));
+    }
+
+    fn finish(&self) {
+        self.update(|p| p.running = false);
+    }
+
+    fn update(&self, change: impl FnOnce(&mut SyncProgress)) {
+        let state = self.0.state::<ProjectsState>();
+        let Ok(mut progress) = state.progress.lock() else {
+            return;
+        };
+        change(&mut progress);
+        if let Err(err) = self.0.emit(PROGRESS_EVENT, *progress) {
+            log::debug!("could not emit {PROGRESS_EVENT}: {err}");
+        }
+    }
 }
 
 /// Refreshes in the background unless a sync ran recently or GitHub asked to back off.
@@ -277,38 +342,90 @@ pub fn start_background_sync(app: AppHandle) {
     });
 }
 
+/// Returns the snapshot and what to watch for local changes.
 async fn sync(
     state: &ProjectsState,
     http: &reqwest::Client,
-    folders: Vec<PathBuf>,
+    settings: &Settings,
     mode: Mode,
-) -> Snapshot {
+    progress: &Progress,
+) -> (Snapshot, Vec<WatchTarget>) {
     let now = Utc::now();
-    if mode == Mode::Local {
-        let previous = state.snapshot();
-        let remote_repos = previous
-            .projects
-            .into_iter()
-            .filter_map(|p| p.remote)
-            .collect();
-        let classrooms = state.remote().classrooms;
-        let projects = build(
-            remote_repos,
-            classrooms,
-            scan_local(folders).await,
-            state,
-            http,
-            now,
+    let scan = scan_local(
+        settings.watched_folders.clone(),
+        settings.scan_editor_projects,
+        progress.clone(),
+    );
+    let (snapshot, scan_targets) = if mode == Mode::Local {
+        let (locals, targets) = scan.await;
+        (
+            local_snapshot(state, http, locals, now, progress).await,
+            targets,
         )
-        .await;
-        return Snapshot {
-            projects,
-            synced_at: previous.synced_at,
-            issue: previous.issue,
-        };
-    }
+    } else {
+        let (remote, (locals, targets)) = tokio::join!(sync_remote(state, http, progress), scan);
+        (
+            full_snapshot(state, http, remote, locals, now, progress).await,
+            targets,
+        )
+    };
+    let targets = watch_targets(&settings.watched_folders, scan_targets, &snapshot.projects);
+    (snapshot, targets)
+}
 
-    let (remote, locals) = tokio::join!(sync_remote(state, http), scan_local(folders));
+/// Watched folders recursively, clones found elsewhere recursively too (to see commits),
+/// and the editor files and folders that could reveal a new clone, non-recursively.
+fn watch_targets(
+    folders: &[PathBuf],
+    scan_targets: Vec<WatchTarget>,
+    projects: &[Project],
+) -> Vec<WatchTarget> {
+    let clones = projects
+        .iter()
+        .filter_map(|p| p.path.clone())
+        .filter(|path| !folders.iter().any(|f| path.starts_with(f)));
+    let mut targets: Vec<WatchTarget> = folders
+        .iter()
+        .cloned()
+        .chain(clones)
+        .map(WatchTarget::recursive)
+        .chain(scan_targets)
+        .collect();
+    targets.sort();
+    targets.dedup_by(|a, b| a.path == b.path);
+    targets
+}
+
+async fn local_snapshot(
+    state: &ProjectsState,
+    http: &reqwest::Client,
+    locals: Vec<LocalProject>,
+    now: DateTime<Utc>,
+    progress: &Progress,
+) -> Snapshot {
+    let previous = state.snapshot();
+    let remote_repos = previous
+        .projects
+        .into_iter()
+        .filter_map(|p| p.remote)
+        .collect();
+    let classrooms = state.remote().classrooms;
+    let projects = build(remote_repos, classrooms, locals, state, http, now, progress).await;
+    Snapshot {
+        projects,
+        synced_at: previous.synced_at,
+        issue: previous.issue,
+    }
+}
+
+async fn full_snapshot(
+    state: &ProjectsState,
+    http: &reqwest::Client,
+    remote: Result<()>,
+    locals: Vec<LocalProject>,
+    now: DateTime<Utc>,
+    progress: &Progress,
+) -> Snapshot {
     let (repos, classrooms, issue) = match remote {
         Ok(()) => {
             let cache = state.remote();
@@ -331,7 +448,7 @@ async fn sync(
     };
 
     Snapshot {
-        projects: build(repos, classrooms, locals, state, http, now).await,
+        projects: build(repos, classrooms, locals, state, http, now, progress).await,
         synced_at: Some(now),
         issue,
     }
@@ -347,6 +464,7 @@ async fn build(
     state: &ProjectsState,
     http: &reqwest::Client,
     now: DateTime<Utc>,
+    progress: &Progress,
 ) -> Vec<Project> {
     // Teams carry the display name and secret, so they win over marker files.
     let mut classrooms: BTreeMap<ClassroomKey, Classroom> =
@@ -363,7 +481,7 @@ async fn build(
         let classroom = Classroom::from_config(owner, config);
         classrooms.entry(classroom.key()).or_insert(classroom);
     }
-    let manifests = fetch_manifests(&classrooms, &state.http_cache, http).await;
+    let manifests = fetch_manifests(&classrooms, &state.http_cache, http, progress).await;
     state.http_cache.save();
 
     let identify = |owner: Option<&str>, name: Option<&str>, config: Option<&RepoConfig>| {
@@ -387,7 +505,7 @@ async fn build(
             Some((clone, config))
         })
         .collect();
-    let states = local_states(locals.iter().map(|(clone, _)| clone.path.clone())).await;
+    let states = local_states(locals.iter().map(|(clone, _)| clone.path.clone()), progress).await;
 
     let mut projects = merge(
         remote,
@@ -448,7 +566,9 @@ async fn fetch_manifests(
     classrooms: &BTreeMap<ClassroomKey, Classroom>,
     cache: &HttpCache,
     http: &reqwest::Client,
+    progress: &Progress,
 ) -> HashMap<ClassroomKey, Vec<Assignment>> {
+    progress.add(classrooms.len());
     let fetches = classrooms.iter().map(|(key, classroom)| async move {
         let url = classroom.assignments_url();
         let manifest = match cache.get_text(http, &url).await {
@@ -460,6 +580,7 @@ async fn fetch_manifests(
                 None
             }
         };
+        progress.advance();
         manifest.map(|m| (key.clone(), m))
     });
     join_all(fetches).await.into_iter().flatten().collect()
@@ -633,10 +754,18 @@ fn parse_submit_time(name: &str) -> Option<DateTime<Utc>> {
 /// Lists every repo the user can see, inspects only those pushed since the last sync, and
 /// reads the user's classroom teams. Results land in the persisted cache; progress is kept
 /// even when a later request fails.
-async fn sync_remote(state: &ProjectsState, http: &reqwest::Client) -> Result<()> {
+async fn sync_remote(
+    state: &ProjectsState,
+    http: &reqwest::Client,
+    progress: &Progress,
+) -> Result<()> {
+    // Listing repos and reading teams; the detail batches are added once known.
+    progress.add(2);
     let token = tools::gh_token().await?;
     let (login, listed) = list_repos(http, &token).await?;
+    progress.advance();
     let classrooms = list_classrooms(http, &token, &login).await;
+    progress.advance();
 
     let mut cache = state.remote();
     if cache.login.as_deref() != Some(login.as_str()) {
@@ -653,6 +782,7 @@ async fn sync_remote(state: &ProjectsState, http: &reqwest::Client) -> Result<()
         .iter()
         .filter(|r| cache.checked.get(&key(&r.name_with_owner)) != Some(&r.pushed_at))
         .collect();
+    progress.add(stale.len().div_ceil(DETAIL_BATCH));
     let mut result = Ok(());
     'requests: for group in stale.chunks(DETAIL_BATCH * PARALLEL_BATCHES) {
         let batches: Vec<_> = group.chunks(DETAIL_BATCH).collect();
@@ -663,6 +793,7 @@ async fn sync_remote(state: &ProjectsState, http: &reqwest::Client) -> Result<()
         )
         .await;
         for (batch, response) in batches.into_iter().zip(responses) {
+            progress.advance();
             let mut nodes = match response {
                 Ok(nodes) => nodes,
                 Err(err) => {
@@ -812,27 +943,108 @@ fn key(name_with_owner: &str) -> String {
 
 // ---- Local clones ----------------------------------------------------------------------
 
-async fn scan_local(folders: Vec<PathBuf>) -> Vec<LocalProject> {
+/// Candidate clones, and the editor files and folders to watch for new ones. Looks in the
+/// watched folders and, when `editors` is on, in the editors' recent projects, the folders
+/// holding them and the IDEs' default project folders.
+async fn scan_local(
+    folders: Vec<PathBuf>,
+    editors: bool,
+    progress: Progress,
+) -> (Vec<LocalProject>, Vec<WatchTarget>) {
     tauri::async_runtime::spawn_blocking(move || {
-        folders
-            .iter()
-            .flat_map(|root| discovery::scan(root, discovery::DEFAULT_MAX_DEPTH))
-            .collect()
+        let (roots, targets) = scan_roots(folders, editors);
+        progress.add(roots.len());
+        let mut seen = HashSet::new();
+        let mut locals = Vec::new();
+        for (root, depth) in &roots {
+            let found = discovery::scan(root, *depth);
+            locals.extend(found.into_iter().filter(|l| seen.insert(l.path.clone())));
+            progress.advance();
+        }
+        (locals, targets)
     })
     .await
     .unwrap_or_default()
 }
 
+/// Folders to scan with their depth, and the non-recursive watch targets.
+fn scan_roots(folders: Vec<PathBuf>, editors: bool) -> (Vec<(PathBuf, usize)>, Vec<WatchTarget>) {
+    let mut roots: Vec<(PathBuf, usize)> = folders
+        .iter()
+        .map(|folder| (folder.clone(), discovery::DEFAULT_MAX_DEPTH))
+        .collect();
+    let mut targets = Vec::new();
+    if !editors {
+        return (roots, targets);
+    }
+    let found = editors::find();
+    let home = crate::platform::home_dir();
+    let usable =
+        |dir: &Path| !folders.iter().any(|f| dir.starts_with(f)) && is_narrow(dir, home.as_deref());
+    let parents: Vec<PathBuf> = found
+        .recent
+        .iter()
+        .filter_map(|dir| dir.parent().map(Path::to_path_buf))
+        .collect();
+    // A recent folder may be a course folder holding the clones; its siblings may be
+    // clones the editor never opened.
+    let candidates = found
+        .recent
+        .into_iter()
+        .map(|dir| (dir, EDITOR_SCAN_DEPTH))
+        .chain(parents.iter().cloned().map(|dir| (dir, 1)))
+        .chain(
+            found
+                .roots
+                .iter()
+                .cloned()
+                .map(|dir| (dir, EDITOR_SCAN_DEPTH)),
+        );
+    for (dir, depth) in candidates {
+        if !usable(&dir) {
+            continue;
+        }
+        match roots.iter_mut().find(|(root, _)| *root == dir) {
+            Some((_, existing)) => *existing = (*existing).max(depth),
+            None => roots.push((dir, depth)),
+        }
+    }
+    targets.extend(found.files.into_iter().map(WatchTarget::flat));
+    targets.extend(
+        parents
+            .into_iter()
+            .chain(found.roots)
+            .filter(|dir| usable(dir))
+            .map(WatchTarget::flat),
+    );
+    (roots, targets)
+}
+
+/// Deep enough for `~/IdeaProjects/<course>/<assignment>`.
+const EDITOR_SCAN_DEPTH: usize = 2;
+
+/// Whether walking `dir` stays clear of the home dir as a whole: on macOS, touching
+/// `~/Documents`, `~/Desktop` or `~/Downloads` raises a permission prompt, and the home
+/// dir is too big anyway. Filesystem roots are refused for the same reason.
+fn is_narrow(dir: &Path, home: Option<&Path>) -> bool {
+    dir.parent().is_some() && home.is_none_or(|home| !home.starts_with(dir))
+}
+
 /// `git status` of each clone, concurrently, in input order.
-async fn local_states(paths: impl Iterator<Item = PathBuf>) -> Vec<Option<LocalState>> {
+async fn local_states(
+    paths: impl Iterator<Item = PathBuf>,
+    progress: &Progress,
+) -> Vec<Option<LocalState>> {
     let mut tasks = JoinSet::new();
     let mut count = 0;
     for (i, path) in paths.enumerate() {
         tasks.spawn(async move { (i, local_state(&path).await) });
         count += 1;
     }
+    progress.add(count);
     let mut states = vec![None; count];
     while let Some(Ok((i, state))) = tasks.join_next().await {
+        progress.advance();
         states[i] = state;
     }
     states
@@ -911,8 +1123,12 @@ fn merge(
             _ => clone.path.to_string_lossy().into_owned(),
         };
         match by_id.get_mut(&id) {
-            // Two clones of one repo: the first one found is shown.
-            Some(project) if project.path.is_some() => {}
+            // Two clones of one repo: the one worked in last is shown.
+            Some(project)
+                if project
+                    .path
+                    .as_deref()
+                    .is_some_and(|shown| last_activity(shown) >= last_activity(&clone.path)) => {}
             Some(project) => {
                 project.path = Some(clone.path);
                 project.local = state;
@@ -937,6 +1153,13 @@ fn merge(
         }
     }
     by_id.into_values().collect()
+}
+
+/// When the clone's index last changed (any stage, commit, checkout or pull).
+fn last_activity(path: &Path) -> Option<std::time::SystemTime> {
+    std::fs::metadata(path.join(".git").join("index"))
+        .and_then(|meta| meta.modified())
+        .ok()
 }
 
 fn pending(project: &Project) -> Option<Pending> {
@@ -1169,4 +1392,3 @@ mod tests {
         assert_eq!(pending(&edited), Some(Pending::Uncommitted));
     }
 }
-

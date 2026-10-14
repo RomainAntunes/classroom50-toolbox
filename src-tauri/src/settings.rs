@@ -18,6 +18,8 @@ const MAX_NOTIFY_HOURS: u32 = 7 * 24;
 pub struct Settings {
     /// Folders scanned for `.classroom50.yaml` clones.
     pub watched_folders: Vec<PathBuf>,
+    /// Also look for clones in the editors' recent projects and default project folders.
+    pub scan_editor_projects: bool,
     pub launch_at_login: bool,
     /// Hours before a due date at which to send a reminder, largest first.
     pub notify_hours_before: Vec<u32>,
@@ -27,6 +29,7 @@ impl Default for Settings {
     fn default() -> Self {
         Self {
             watched_folders: Vec::new(),
+            scan_editor_projects: true,
             launch_at_login: true,
             notify_hours_before: vec![24, 1],
         }
@@ -116,6 +119,7 @@ mod tests {
     fn normalizes_folders_and_hours() {
         let settings = Settings {
             watched_folders: vec!["/a".into(), "/b".into(), "/a".into()],
+            scan_editor_projects: true,
             launch_at_login: false,
             notify_hours_before: vec![1, 24, 0, 1, 1000, 6],
         }
@@ -131,6 +135,7 @@ mod tests {
     fn missing_fields_take_defaults() {
         let settings: Settings = serde_json::from_str(r#"{"watchedFolders": ["/x"]}"#).unwrap();
         assert!(settings.launch_at_login);
+        assert!(settings.scan_editor_projects);
         assert_eq!(settings.notify_hours_before, vec![24, 1]);
     }
 
