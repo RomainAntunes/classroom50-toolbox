@@ -17,6 +17,9 @@ pub enum Error {
     #[error("{0}")]
     Unsupported(String),
 
+    #[error("cancelled")]
+    Cancelled,
+
     #[error("{url} uses schema {found:?}, expected {expected:?}; update the toolbox")]
     SchemaMismatch {
         url: String,
@@ -38,6 +41,9 @@ pub enum Error {
 
     #[error(transparent)]
     Updater(#[from] tauri_plugin_updater::Error),
+
+    #[error(transparent)]
+    Autostart(#[from] tauri_plugin_autostart::Error),
 }
 
 impl Error {
@@ -46,12 +52,14 @@ impl Error {
             Error::NotInstalled { .. } => "notInstalled",
             Error::CommandFailed { .. } => "commandFailed",
             Error::Unsupported(_) => "unsupported",
+            Error::Cancelled => "cancelled",
             Error::SchemaMismatch { .. } => "schemaMismatch",
             Error::RepoConfig(_) => "repoConfig",
             Error::Io(_) => "io",
             Error::Http(_) => "http",
             Error::Tauri(_) => "tauri",
             Error::Updater(_) => "updater",
+            Error::Autostart(_) => "autostart",
         }
     }
 }

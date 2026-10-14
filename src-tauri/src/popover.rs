@@ -2,6 +2,7 @@
 //! focus, like a menu-bar popover.
 
 use std::sync::Mutex;
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::time::{Duration, Instant};
 
 use tauri::{AppHandle, Manager, WebviewWindow, WindowEvent};
@@ -16,6 +17,15 @@ const REOPEN_GUARD: Duration = Duration::from_millis(250);
 #[derive(Default)]
 pub struct PopoverState {
     hidden_at: Mutex<Option<Instant>>,
+    /// Set while a native dialog (folder picker, confirm) is open: it takes focus, and the
+    /// popover must not hide underneath it.
+    pinned: AtomicBool,
+}
+
+impl PopoverState {
+    pub fn set_pinned(&self, pinned: bool) {
+        self.pinned.store(pinned, Ordering::Relaxed);
+    }
 }
 
 pub fn setup(app: &AppHandle) -> tauri::Result<()> {
@@ -26,7 +36,12 @@ pub fn setup(app: &AppHandle) -> tauri::Result<()> {
 
     let handle = app.clone();
     window.on_window_event(move |event| {
-        if let WindowEvent::Focused(false) = event {
+        if let WindowEvent::Focused(false) = event
+            && !handle
+                .state::<PopoverState>()
+                .pinned
+                .load(Ordering::Relaxed)
+        {
             hide(&handle);
         }
     });

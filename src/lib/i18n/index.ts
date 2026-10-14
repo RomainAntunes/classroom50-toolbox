@@ -36,3 +36,11 @@ export function fromNow(date: Date, now = new Date()): string {
   }
   return relative.format(seconds, "second");
 }
+
+/** 24 -> "1 day", 6 -> "6 hours", in the user's locale. */
+export function hoursLabel(hours: number): string {
+  const [value, unit] = hours % 24 === 0 ? [hours / 24, "day"] : [hours, "hour"];
+  return new Intl.NumberFormat(undefined, { style: "unit", unit, unitDisplay: "long" }).format(
+    value,
+  );
+}

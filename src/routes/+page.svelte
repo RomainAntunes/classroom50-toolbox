@@ -1,38 +1,39 @@
 <script lang="ts">
   import { onMount } from "svelte";
+  import { goto } from "$app/navigation";
   import { listen } from "@tauri-apps/api/event";
-  import { open } from "@tauri-apps/plugin-dialog";
   import {
     api,
+    UPDATE_AVAILABLE_EVENT,
     type AuthStatus,
     type LocalProject,
     type ToolStatus,
     type UpdateInfo,
   } from "$lib/api";
   import { t } from "$lib/i18n";
+  import { loadSettings, pickWatchedFolder } from "$lib/settings.svelte";
   import Section from "$lib/components/Section.svelte";
   import ToolRow from "$lib/components/ToolRow.svelte";
   import ProjectRow from "$lib/components/ProjectRow.svelte";
-
-  // Watched folders live in localStorage until settings move to the Rust side.
-  const FOLDERS_KEY = "watchedFolders";
+  import LoginStatus from "$lib/components/LoginStatus.svelte";
 
   let tools = $state<ToolStatus[]>([]);
   let auth = $state<AuthStatus | null>(null);
-  let folders = $state<string[]>(JSON.parse(localStorage.getItem(FOLDERS_KEY) ?? "[]"));
   let projects = $state<LocalProject[]>([]);
   let update = $state<UpdateInfo | null>(null);
   let loading = $state(false);
 
   const missingTool = $derived(tools.some((tool) => !tool.installed));
+  const ghInstalled = $derived(tools.some((tool) => tool.tool === "gh" && tool.installed));
 
   async function refresh() {
     loading = true;
     try {
+      await loadSettings();
       [tools, auth, projects] = await Promise.all([
         api.toolStatuses(),
         api.authStatus(),
-        api.scanFolders(folders),
+        api.scanProjects(),
       ]);
     } finally {
       loading = false;
@@ -40,11 +41,7 @@
   }
 
   async function addFolder() {
-    const picked = await open({ directory: true, multiple: false });
-    if (typeof picked !== "string" || folders.includes(picked)) return;
-    folders = [...folders, picked];
-    localStorage.setItem(FOLDERS_KEY, JSON.stringify(folders));
-    projects = await api.scanFolders(folders);
+    if (await pickWatchedFolder()) projects = await api.scanProjects();
   }
 
   function replaceTool(next: ToolStatus) {
@@ -53,14 +50,20 @@
 
   onMount(() => {
     refresh();
-    const unlisten = listen<UpdateInfo>("update-available", (event) => (update = event.payload));
+    const unlisten = listen<UpdateInfo>(
+      UPDATE_AVAILABLE_EVENT,
+      (event) => (update = event.payload),
+    );
     return () => void unlisten.then((stop) => stop());
   });
 </script>
 
 <header class="titlebar">
   <h1>{t("app.title")}</h1>
-  <button disabled={loading} onclick={refresh} title={t("app.refresh")}>↻</button>
+  <div class="tools">
+    <button disabled={loading} onclick={refresh} title={t("app.refresh")}>↻</button>
+    <button onclick={() => goto("/settings")} title={t("app.settings")}>⚙</button>
+  </div>
 </header>
 
 <main>
@@ -92,13 +95,7 @@
 </main>
 
 <footer>
-  {#if auth}
-    <span
-      >{auth.loggedIn
-        ? t("auth.loggedInAs", { login: auth.login ?? "" })
-        : t("auth.loggedOut")}</span
-    >
-  {/if}
+  <LoginStatus {auth} {ghInstalled} onchange={(next) => (auth = next)} />
 </footer>
 
 <style>
@@ -107,6 +104,11 @@
     align-items: center;
     justify-content: space-between;
     padding: 12px 14px 4px;
+  }
+
+  .tools {
+    display: flex;
+    gap: 4px;
   }
 
   h1 {
