@@ -27,6 +27,8 @@
   let rescanning = $state(false);
   let sync = $state<SyncDetails | null>(null);
   let clearing = $state(false);
+  // Diagnostics: folded away unless asked for.
+  let showSync = $state(false);
 
   const rate = $derived(sync?.rateLimit ?? sync?.stats.rateLimit ?? null);
 
@@ -161,45 +163,51 @@
         {#snippet actions()}
           <button disabled={clearing} onclick={clearCache}>{t("settings.sync.clear")}</button>
         {/snippet}
-        <dl class="sync">
-          <dt>{t("settings.sync.account")}</dt>
-          <dd>{sync.login ?? t("settings.sync.none")}</dd>
-          <dt>{t("settings.sync.full")}</dt>
-          <dd>{lastRun(sync.stats.full)}</dd>
-          <dt>{t("settings.sync.status")}</dt>
-          <dd>{lastRun(sync.stats.status)}</dd>
-          <dt>{t("settings.sync.local")}</dt>
-          <dd>{lastRun(sync.stats.local)}</dd>
-          {#if rate}
-            <dt>{t("settings.sync.budget")}</dt>
-            <dd
-              title={rate.resetAt
-                ? t("settings.sync.resets", { when: formatDate(new Date(rate.resetAt)) })
-                : undefined}
-            >
-              {t("settings.sync.budgetValue", { remaining: rate.remaining, limit: rate.limit })}
+        <button class="disclosure" aria-expanded={showSync} onclick={() => (showSync = !showSync)}>
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m9 18 6-6-6-6" /></svg>
+          {t(showSync ? "settings.sync.hide" : "settings.sync.show")}
+        </button>
+        {#if showSync}
+          <dl class="sync">
+            <dt>{t("settings.sync.account")}</dt>
+            <dd>{sync.login ?? t("settings.sync.none")}</dd>
+            <dt>{t("settings.sync.full")}</dt>
+            <dd>{lastRun(sync.stats.full)}</dd>
+            <dt>{t("settings.sync.status")}</dt>
+            <dd>{lastRun(sync.stats.status)}</dd>
+            <dt>{t("settings.sync.local")}</dt>
+            <dd>{lastRun(sync.stats.local)}</dd>
+            {#if rate}
+              <dt>{t("settings.sync.budget")}</dt>
+              <dd
+                title={rate.resetAt
+                  ? t("settings.sync.resets", { when: formatDate(new Date(rate.resetAt)) })
+                  : undefined}
+              >
+                {t("settings.sync.budgetValue", { remaining: rate.remaining, limit: rate.limit })}
+              </dd>
+            {/if}
+            <dt>{t("settings.sync.found")}</dt>
+            <dd>
+              {t("settings.sync.foundValue", {
+                repos: sync.stats.reposSeen,
+                assignments: sync.assignments,
+                clones: sync.clones,
+              })}
             </dd>
-          {/if}
-          <dt>{t("settings.sync.found")}</dt>
-          <dd>
-            {t("settings.sync.foundValue", {
-              repos: sync.stats.reposSeen,
-              assignments: sync.assignments,
-              clones: sync.clones,
-            })}
-          </dd>
-          <dt>{t("settings.sync.disk")}</dt>
-          <dd>
-            {t("settings.sync.diskValue", {
-              folders: sync.stats.scanRoots,
-              watched: sync.stats.watchTargets,
-            })}
-          </dd>
-          {#if sync.issue}
-            <dt>{t("settings.sync.issue")}</dt>
-            <dd class="issue" title={sync.issue.message}>{sync.issue.message}</dd>
-          {/if}
-        </dl>
+            <dt>{t("settings.sync.disk")}</dt>
+            <dd>
+              {t("settings.sync.diskValue", {
+                folders: sync.stats.scanRoots,
+                watched: sync.stats.watchTargets,
+              })}
+            </dd>
+            {#if sync.issue}
+              <dt>{t("settings.sync.issue")}</dt>
+              <dd class="issue" title={sync.issue.message}>{sync.issue.message}</dd>
+            {/if}
+          </dl>
+        {/if}
       </Section>
     {/if}
 
@@ -237,6 +245,33 @@
     flex-direction: column;
     gap: calc(var(--space) * 2);
     padding: var(--space) 12px 14px;
+  }
+
+  .disclosure {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    width: 100%;
+    padding: 8px 12px;
+    border-radius: 0;
+    background: transparent;
+    text-align: left;
+    color: var(--fg-muted);
+  }
+
+  .disclosure svg {
+    width: 14px;
+    height: 14px;
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 2;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+    transition: transform 0.15s;
+  }
+
+  .disclosure[aria-expanded="true"] svg {
+    transform: rotate(90deg);
   }
 
   .sync {

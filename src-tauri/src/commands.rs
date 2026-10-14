@@ -178,6 +178,31 @@ pub fn apply_launch_at_login(app: &AppHandle, enabled: bool) -> Result<()> {
     Ok(())
 }
 
+/// The github.com accounts gh is signed in to, the active one first.
+#[tauri::command]
+pub async fn list_accounts() -> Result<Vec<crate::accounts::Account>> {
+    crate::accounts::list().await
+}
+
+/// Switches gh to `login`, then syncs that account's projects.
+#[tauri::command]
+pub async fn switch_account(app: AppHandle, login: String) -> Result<AuthStatus> {
+    crate::accounts::switch(&login).await?;
+    let status = tools::auth_status().await;
+    tauri::async_runtime::spawn(async move {
+        projects::refresh(&app).await;
+    });
+    Ok(status)
+}
+
+/// The account's avatar as a `data:` URL (cached for a week).
+#[tauri::command]
+pub async fn account_avatar(app: AppHandle, login: String) -> Result<String> {
+    let http = app.state::<crate::github::Http>().0.clone();
+    let cache_dir = app.path().app_cache_dir()?;
+    crate::accounts::avatar(&http, &cache_dir, &login).await
+}
+
 /// Runs gh's device flow; the code arrives through the `login-device-code` event.
 #[tauri::command]
 pub async fn login(app: AppHandle, state: State<'_, LoginState>) -> Result<AuthStatus> {

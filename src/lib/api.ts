@@ -21,6 +21,12 @@ export interface AuthStatus {
   login: string | null;
 }
 
+/** A github.com account gh is signed in to. */
+export interface Account {
+  login: string;
+  active: boolean;
+}
+
 export interface CommandSpec {
   program: string;
   args: string[];
@@ -254,6 +260,10 @@ export const api = {
   rescanLocal: () => invoke<Snapshot>("rescan_local"),
   unseen: () => invoke<string[]>("unseen"),
   syncDetails: () => invoke<SyncDetails>("sync_details"),
+  listAccounts: () => invoke<Account[]>("list_accounts"),
+  switchAccount: (login: string) => invoke<AuthStatus>("switch_account", { login }),
+  /** A `data:` URL, cached on disk for a week. */
+  accountAvatar: (login: string) => invoke<string>("account_avatar", { login }),
   clearCache: () => invoke<Snapshot>("clear_cache"),
   getSettings: () => invoke<Settings>("get_settings"),
   updateSettings: (next: Settings) => invoke<Settings>("update_settings", { next }),

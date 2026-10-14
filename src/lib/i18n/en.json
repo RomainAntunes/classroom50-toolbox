@@ -125,5 +125,9 @@
   "settings.sync.foundValue": "{assignments} assignments, {clones} cloned, in {repos} repositories",
   "settings.sync.disk": "On disk",
   "settings.sync.diskValue": "{folders} folders scanned, {watched} watched",
-  "settings.sync.issue": "Last problem"
+  "settings.sync.issue": "Last problem",
+  "auth.addAccount": "Add another account…",
+  "auth.switchAccount": "Switch GitHub account",
+  "settings.sync.show": "Show sync details",
+  "settings.sync.hide": "Hide sync details"
 }

@@ -566,6 +566,7 @@ dependencies = [
 name = "classroom50-toolbox"
 version = "0.2.0"
 dependencies = [
+ "base64 0.22.1",
  "chrono",
  "futures-util",
  "log",

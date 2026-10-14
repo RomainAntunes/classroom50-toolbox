@@ -1,3 +1,4 @@
+pub mod accounts;
 pub mod alerts;
 pub mod classroom50;
 mod commands;
@@ -97,6 +98,9 @@ pub fn run() {
             commands::unseen,
             commands::sync_details,
             commands::clear_cache,
+            commands::list_accounts,
+            commands::switch_account,
+            commands::account_avatar,
             commands::get_settings,
             commands::update_settings,
             commands::login,

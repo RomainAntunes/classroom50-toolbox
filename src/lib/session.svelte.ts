@@ -10,6 +10,8 @@ export const session = $state<{
   progress: SyncProgress | null;
   /** Ids with news not seen yet (a dot in the list). */
   unseen: string[];
+  /** Avatar `data:` URLs by login, fetched once per run. */
+  avatars: Record<string, string>;
   search: string;
 }>({
   tools: [],
@@ -18,5 +20,6 @@ export const session = $state<{
   update: null,
   progress: null,
   unseen: [],
+  avatars: {},
   search: "",
 });
