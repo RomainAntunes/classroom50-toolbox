@@ -11,7 +11,6 @@
   "setup.tool.gh": "GitHub CLI",
   "setup.tool.gh-student": "Classroom 50 (gh student)",
   "auth.loggedInAs": "Signed in as {login}",
-  "projects.title": "Assignments",
   "projects.addFolder": "Add folder",
   "projects.empty": "No Classroom 50 assignments found yet. Sign in to GitHub, or add the folder where you keep your assignments.",
   "projects.openFolder": "Show in file manager",
@@ -52,5 +51,7 @@
   "projects.openGitHub": "Open on GitHub",
   "projects.issue.rateLimited": "GitHub rate limit reached. Showing the last known state.",
   "projects.issue.notInstalled": "Install the GitHub CLI to see your assignments on GitHub.",
-  "projects.issue.other": "Couldn't reach GitHub. Showing the last known state."
+  "projects.issue.other": "Couldn't reach GitHub. Showing the last known state.",
+  "projects.search": "Search",
+  "projects.noMatch": "No assignment matches your search."
 }

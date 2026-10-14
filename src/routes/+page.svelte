@@ -7,66 +7,120 @@
     PROJECTS_UPDATED_EVENT,
     UPDATE_AVAILABLE_EVENT,
     type AuthStatus,
+    type Project,
     type Snapshot,
     type ToolStatus,
     type UpdateInfo,
   } from "$lib/api";
   import { t } from "$lib/i18n";
+  import { session } from "$lib/session.svelte";
   import { loadSettings, pickWatchedFolder } from "$lib/settings.svelte";
   import Section from "$lib/components/Section.svelte";
   import ToolRow from "$lib/components/ToolRow.svelte";
   import ProjectRow from "$lib/components/ProjectRow.svelte";
   import LoginStatus from "$lib/components/LoginStatus.svelte";
 
-  let tools = $state<ToolStatus[]>([]);
-  let auth = $state<AuthStatus | null>(null);
-  let snapshot = $state<Snapshot | null>(null);
+  interface ClassGroup {
+    key: string;
+    title: string;
+    projects: Project[];
+  }
+
   let now = $state(new Date());
-  let update = $state<UpdateInfo | null>(null);
   let loading = $state(false);
 
-  const missingTool = $derived(tools.some((tool) => !tool.installed));
-  const ghInstalled = $derived(tools.some((tool) => tool.tool === "gh" && tool.installed));
+  const missingTool = $derived(session.tools.some((tool) => !tool.installed));
+  const ghInstalled = $derived(session.tools.some((tool) => tool.tool === "gh" && tool.installed));
   // Signing in is already offered in the footer.
-  const issue = $derived(snapshot?.issue?.kind === "notSignedIn" ? null : snapshot?.issue);
-  const syncing = $derived(loading || snapshot?.syncedAt == null);
+  const issue = $derived(
+    session.snapshot?.issue?.kind === "notSignedIn" ? null : session.snapshot?.issue,
+  );
+  const syncing = $derived(loading || session.snapshot?.syncedAt == null);
+  const allProjects = $derived(session.snapshot?.projects ?? []);
+  const query = $derived(session.search.trim().toLowerCase());
+  const groups = $derived(groupByClass(allProjects.filter((p) => matches(p, query))));
 
+  function matches(project: Project, q: string): boolean {
+    if (!q) return true;
+    return [
+      project.assignment?.name,
+      project.config.assignment,
+      project.config.classroom,
+      project.owner,
+      project.repo,
+    ].some((field) => field?.toLowerCase().includes(q));
+  }
+
+  /** Keeps Rust's urgency order: a class appears where its most urgent assignment is. */
+  function groupByClass(projects: Project[]): ClassGroup[] {
+    const groups = new Map<string, ClassGroup>();
+    for (const project of projects) {
+      const key = `${project.owner ?? ""}/${project.config.classroom}`.toLowerCase();
+      let group = groups.get(key);
+      if (!group) {
+        group = { key, title: project.config.classroom, projects: [] };
+        groups.set(key, group);
+      }
+      group.projects.push(project);
+    }
+    // Two orgs can use the same classroom slug; name the org only then.
+    const list = [...groups.values()];
+    for (const group of list) {
+      const [owner] = group.key.split("/");
+      if (owner && list.some((g) => g !== group && g.title === group.title)) {
+        group.title = `${group.title} (${group.projects[0].owner})`;
+      }
+    }
+    return list;
+  }
+
+  /** Cheap local state: settings, tools, login and the last synced list. */
+  async function load() {
+    await loadSettings();
+    const [tools, auth, snapshot] = await Promise.all([
+      api.toolStatuses(),
+      api.authStatus(),
+      api.listProjects(),
+    ]);
+    session.tools = tools;
+    session.auth = auth;
+    // The startup sync may still be running; its event fills the list.
+    if (snapshot.syncedAt || !session.snapshot) session.snapshot = snapshot;
+    now = new Date();
+  }
+
+  /** The refresh button: everything, including a GitHub sync. */
   async function refresh() {
     loading = true;
     try {
       await loadSettings();
-      [tools, auth, snapshot] = await Promise.all([
+      const [tools, auth, snapshot] = await Promise.all([
         api.toolStatuses(),
         api.authStatus(),
         api.refreshProjects(),
       ]);
+      Object.assign(session, { tools, auth, snapshot });
       now = new Date();
     } finally {
       loading = false;
     }
   }
 
-  async function addFolder() {
-    if (await pickWatchedFolder()) snapshot = await api.refreshProjects();
-  }
-
   function replaceTool(next: ToolStatus) {
-    tools = tools.map((tool) => (tool.tool === next.tool ? next : tool));
+    session.tools = session.tools.map((tool) => (tool.tool === next.tool ? next : tool));
   }
 
   async function signedIn(next: AuthStatus) {
-    auth = next;
-    snapshot = await api.refreshProjects();
+    session.auth = next;
+    session.snapshot = await api.refreshProjects();
   }
 
   onMount(() => {
-    // Show the last sync right away; `refresh` replaces it once the new one lands.
-    api.listProjects().then((last) => (snapshot ??= last));
-    refresh();
+    load();
     const unlisteners = [
-      listen<UpdateInfo>(UPDATE_AVAILABLE_EVENT, (event) => (update = event.payload)),
+      listen<UpdateInfo>(UPDATE_AVAILABLE_EVENT, (event) => (session.update = event.payload)),
       listen<Snapshot>(PROJECTS_UPDATED_EVENT, (event) => {
-        snapshot = event.payload;
+        session.snapshot = event.payload;
         now = new Date();
       }),
     ];
@@ -81,7 +135,30 @@
 
 <header class="titlebar">
   <h1>{t("app.title")}</h1>
+  <input
+    class="search"
+    type="search"
+    placeholder={t("projects.search")}
+    aria-label={t("projects.search")}
+    spellcheck="false"
+    autocomplete="off"
+    bind:value={session.search}
+  />
   <div class="tools">
+    <button
+      class="icon"
+      onclick={pickWatchedFolder}
+      title={t("projects.addFolder")}
+      aria-label={t("projects.addFolder")}
+    >
+      <svg viewBox="0 0 24 24" aria-hidden="true">
+        <path d="M12 10v6" />
+        <path d="M9 13h6" />
+        <path
+          d="M20 20a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z"
+        />
+      </svg>
+    </button>
     <button
       class="icon"
       class:spinning={syncing}
@@ -112,48 +189,74 @@
 </header>
 
 <main>
-  {#if update}
+  {#if session.update}
     <div class="banner">
-      <span>{t("update.available", { version: update.version })}</span>
+      <span>{t("update.available", { version: session.update.version })}</span>
       <button class="primary" onclick={() => api.installUpdate()}>{t("update.install")}</button>
     </div>
   {/if}
 
   {#if missingTool}
     <Section title={t("setup.title")}>
-      {#each tools as status (status.tool)}
+      {#each session.tools as status (status.tool)}
         <ToolRow {status} onchange={replaceTool} />
       {/each}
     </Section>
   {/if}
 
-  <Section title={t("projects.title")}>
-    {#snippet actions()}
-      <button onclick={addFolder}>{t("projects.addFolder")}</button>
-    {/snippet}
-    {#if issue}
-      <p class="issue" title={issue.message}>
-        {t(`projects.issue.${issue.kind}`, {}, "projects.issue.other")}
-      </p>
-    {/if}
-    {#each snapshot?.projects ?? [] as project (project.id)}
-      <ProjectRow {project} {now} />
-    {:else}
-      <p class="empty">{t(syncing ? "projects.loading" : "projects.empty")}</p>
-    {/each}
-  </Section>
+  {#if issue}
+    <p class="issue" title={issue.message}>
+      {t(`projects.issue.${issue.kind}`, {}, "projects.issue.other")}
+    </p>
+  {/if}
+
+  {#each groups as group (group.key)}
+    <Section title={group.title}>
+      {#each group.projects as project (project.id)}
+        <ProjectRow {project} {now} />
+      {/each}
+    </Section>
+  {:else}
+    <p class="empty">
+      {#if query && allProjects.length > 0}
+        {t("projects.noMatch")}
+      {:else if syncing}
+        {t("projects.loading")}
+      {:else}
+        {t("projects.empty")}
+        <button onclick={pickWatchedFolder}>{t("projects.addFolder")}</button>
+      {/if}
+    </p>
+  {/each}
 </main>
 
 <footer>
-  <LoginStatus {auth} {ghInstalled} onchange={signedIn} />
+  <LoginStatus auth={session.auth} {ghInstalled} onchange={signedIn} />
 </footer>
 
 <style>
   .titlebar {
     display: flex;
     align-items: center;
-    justify-content: space-between;
+    gap: 8px;
     padding: 12px 14px 4px;
+  }
+
+  .search {
+    flex: 1;
+    min-width: 0;
+    font: inherit;
+    font-size: 0.9em;
+    color: inherit;
+    padding: 4px 8px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-control);
+    background: var(--bg-control);
+    outline: none;
+  }
+
+  .search:focus-visible {
+    border-color: var(--accent);
   }
 
   .tools {
@@ -199,20 +302,25 @@
 
   .issue {
     margin: 0;
-    padding: 8px 12px;
+    padding: 0 4px;
     font-size: 0.85em;
     color: var(--warning);
-    border-bottom: 1px solid var(--border);
   }
 
   .empty {
     margin: 0;
-    padding: 12px;
+    padding: 24px 12px;
     color: var(--fg-muted);
     text-align: center;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: var(--space);
   }
 
   footer {
+    /* Holds its height while the login status loads, so it never collapses. */
+    min-height: 1.4em;
     padding: 8px 14px 10px;
     font-size: 0.85em;
     color: var(--fg-muted);

@@ -27,13 +27,10 @@
   <div class="text">
     <span class="name" title={project.repo ?? path ?? undefined}>{name}</span>
     <span class="meta">
-      {project.config.classroom}
       {#if dueLabel}
-        · <span class:soon={dueSoon}>{dueLabel}</span>
+        <span class:soon={dueSoon}>{dueLabel}</span> ·
       {/if}
-      {#if !path}
-        · {t("projects.notCloned")}
-      {/if}
+      {path ? (project.repo ?? project.config.assignment) : t("projects.notCloned")}
     </span>
   </div>
   {#if closed}
