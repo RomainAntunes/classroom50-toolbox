@@ -228,3 +228,17 @@ pub async fn check_update(app: AppHandle) -> Result<Option<UpdateInfo>> {
 pub async fn install_update(app: AppHandle) -> Result<()> {
     updater::install_and_restart(&app).await
 }
+
+/// Dev builds only: lights the tray badge after a few seconds, once the popover has
+/// closed (closing it clears the badge). The next open and close clears it again.
+#[tauri::command]
+pub async fn preview_badge(app: AppHandle) -> Result<()> {
+    if !cfg!(debug_assertions) {
+        return Err(crate::error::Error::Unsupported(
+            "the badge preview is for dev builds".into(),
+        ));
+    }
+    tokio::time::sleep(std::time::Duration::from_secs(3)).await;
+    crate::tray::set_badge(&app, true);
+    Ok(())
+}

@@ -104,6 +104,7 @@ pub fn run() {
             commands::list_accounts,
             commands::switch_account,
             commands::account_avatar,
+            commands::preview_badge,
             commands::get_settings,
             commands::update_settings,
             commands::login,

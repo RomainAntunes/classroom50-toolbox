@@ -3,6 +3,7 @@
   import { goto } from "$app/navigation";
   import { message } from "@tauri-apps/plugin-dialog";
   import { exit } from "@tauri-apps/plugin-process";
+  import { openUrl } from "@tauri-apps/plugin-opener";
   import { listen } from "@tauri-apps/api/event";
   import {
     api,
@@ -14,12 +15,16 @@
     type SyncDetails,
   } from "$lib/api";
   import { formatDate, fromNow, hoursLabel, t } from "$lib/i18n";
+  import { sampleNotices, showNotice } from "$lib/notices";
   import { loadSettings, pickWatchedFolder, saveSettings, settings } from "$lib/settings.svelte";
   import Section from "$lib/components/Section.svelte";
   import Toggle from "$lib/components/Toggle.svelte";
   import { session } from "$lib/session.svelte";
 
   const REMINDER_CHOICES = [72, 24, 6, 1];
+  const REPO_URL = "https://github.com/RomainAntunes/classroom50-toolbox";
+  // A `-dirty` build has no commit page of its own; link the commit it started from.
+  const commitUrl = __COMMIT__ ? `${REPO_URL}/commit/${__COMMIT__.replace(/-dirty$/, "")}` : null;
 
   let info = $state<AppInfo | null>(null);
   let checking = $state(false);
@@ -29,6 +34,17 @@
   let clearing = $state(false);
   // Diagnostics: folded away unless asked for.
   let showSync = $state(false);
+  let showDev = $state(false);
+  let badgeQueued = $state(false);
+
+  async function previewBadge() {
+    badgeQueued = true;
+    try {
+      await api.previewBadge();
+    } finally {
+      badgeQueued = false;
+    }
+  }
 
   const rate = $derived(sync?.rateLimit ?? sync?.stats.rateLimit ?? null);
 
@@ -211,9 +227,33 @@
       </Section>
     {/if}
 
+    {#if import.meta.env.DEV}
+      <Section title={t("settings.dev.title")}>
+        <button class="disclosure" aria-expanded={showDev} onclick={() => (showDev = !showDev)}>
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m9 18 6-6-6-6" /></svg>
+          {t("settings.dev.notifications")}
+        </button>
+        {#if showDev}
+          <p class="hint">{t("settings.dev.hint")}</p>
+          {#each sampleNotices() as notice (notice.kind)}
+            <div class="row">
+              <span>{t(`settings.dev.kind.${notice.kind}`)}</span>
+              <button onclick={() => showNotice(notice)}>{t("settings.dev.send")}</button>
+            </div>
+          {/each}
+          <div class="row">
+            <span title={t("settings.dev.badgeHint")}>{t("settings.dev.badge")}</span>
+            <button disabled={badgeQueued} onclick={previewBadge}>
+              {t(badgeQueued ? "settings.dev.badgeQueued" : "settings.dev.badgeShow")}
+            </button>
+          </div>
+        {/if}
+      </Section>
+    {/if}
+
     <Section title={t("settings.about.title")}>
       <div class="row">
-        <span>{info ? t("settings.about.version", { version: info.version }) : ""}</span>
+        <span>{t("settings.about.updates")}</span>
         <button disabled={checking} onclick={checkUpdates}>
           {upToDate ? t("settings.about.upToDate") : t("settings.about.checkUpdates")}
         </button>
@@ -221,6 +261,20 @@
     </Section>
 
     <button class="quit" onclick={() => exit(0)}>{t("settings.quit")}</button>
+
+    <footer>
+      {#if info}
+        <span>{t("settings.about.version", { version: info.version })}</span>
+      {/if}
+      {#if __COMMIT__ && commitUrl}
+        <span aria-hidden="true">·</span>
+        <button class="link" title={t("settings.about.commit")} onclick={() => openUrl(commitUrl)}
+          >{__COMMIT__}</button
+        >
+      {/if}
+      <span aria-hidden="true">·</span>
+      <button class="link" onclick={() => openUrl(REPO_URL)}>{t("settings.about.github")}</button>
+    </footer>
   </main>
 {/if}
 
@@ -325,6 +379,27 @@
     margin: 0;
     padding: 12px;
     color: var(--fg-muted);
+  }
+
+  footer {
+    display: flex;
+    justify-content: center;
+    gap: 6px;
+    font-size: 0.8em;
+    color: var(--fg-muted);
+  }
+
+  .link {
+    padding: 0;
+    background: transparent;
+    color: inherit;
+    font: inherit;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .link:hover {
+    color: var(--accent);
+    text-decoration: underline;
   }
 
   .quit {

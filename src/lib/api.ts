@@ -257,6 +257,8 @@ export interface CommandError {
 
 export const api = {
   appInfo: () => invoke<AppInfo>("app_info"),
+  /** Dev builds only: lights the tray badge 3 s from now. */
+  previewBadge: () => invoke<void>("preview_badge"),
   setPopoverPinned: (pinned: boolean) => invoke<void>("set_popover_pinned", { pinned }),
   toolStatuses: () => invoke<ToolStatus[]>("tool_statuses"),
   installCommand: (tool: Tool) => invoke<CommandSpec>("install_command", { tool }),
