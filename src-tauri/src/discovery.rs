@@ -164,7 +164,10 @@ mod tests {
             assert_eq!(parse_github_remote(url), expected, "{url}");
         }
         assert_eq!(parse_github_remote("https://gitlab.com/cs50/x.git"), None);
-        assert_eq!(parse_github_remote("https://github.com.evil.io/cs50/x"), None);
+        assert_eq!(
+            parse_github_remote("https://github.com.evil.io/cs50/x"),
+            None
+        );
         assert_eq!(parse_github_remote("git@gitlab.com:cs50/x.git"), None);
         assert_eq!(parse_github_remote("https://github.com/cs50"), None);
         assert_eq!(parse_github_remote("C:/Users/alice/hello"), None);

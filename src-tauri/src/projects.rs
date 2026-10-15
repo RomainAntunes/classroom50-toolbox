@@ -1074,10 +1074,8 @@ async fn full_snapshot(
         progress.skip(Phase::Listing);
         progress.skip(Phase::Details);
     }
-    let discovered = !matches!(
-        remote,
-        Err(Error::NotSignedIn | Error::NotInstalled { .. })
-    ) && state.remote().complete();
+    let discovered = !matches!(remote, Err(Error::NotSignedIn | Error::NotInstalled { .. }))
+        && state.remote().complete();
     let (repos, classrooms, issue) = match remote {
         Ok(()) => {
             let cache = state.remote();
@@ -1272,7 +1270,11 @@ fn unaccepted(
             continue;
         };
         for (key, classroom) in classrooms.iter().filter(|((org, _), _)| *org == owner) {
-            let slugs = manifests.get(key).into_iter().flatten().map(|a| a.slug.as_str());
+            let slugs = manifests
+                .get(key)
+                .into_iter()
+                .flatten()
+                .map(|a| a.slug.as_str());
             if let Some(slug) = classroom50::assignment_for_repo(name, &classroom.slug, slugs) {
                 accepted.insert((key.clone(), slug.to_ascii_lowercase()));
             }
@@ -2703,8 +2705,14 @@ mod tests {
         let cache = RemoteCache {
             login: Some("alice".into()),
             repos: BTreeMap::from([
-                ("cs50/fall-hello-alice".into(), remote("fall-hello-alice", "a", None)),
-                ("cs50/fall-lab2-alice".into(), remote("fall-lab2-alice", "b", None)),
+                (
+                    "cs50/fall-hello-alice".into(),
+                    remote("fall-hello-alice", "a", None),
+                ),
+                (
+                    "cs50/fall-lab2-alice".into(),
+                    remote("fall-lab2-alice", "b", None),
+                ),
             ]),
             ..RemoteCache::default()
         };
@@ -2717,16 +2725,18 @@ mod tests {
             vec![(remote("fall-hello-alice", "a", None), config("hello"))],
             Vec::new(),
         );
-        let names = |repos: Vec<RemoteRepo>| -> Vec<String> {
-            repos.into_iter().map(|r| r.name).collect()
-        };
+        let names =
+            |repos: Vec<RemoteRepo>| -> Vec<String> { repos.into_iter().map(|r| r.name).collect() };
         assert_eq!(
             names(last_discovery(&previous, &cache)),
             ["fall-hello-alice", "fall-lab2-alice"]
         );
         // Signed out: the cache may hold another account's repos.
         previous.issue = Some(SyncIssue::from(&Error::NotSignedIn));
-        assert_eq!(names(last_discovery(&previous, &cache)), ["fall-hello-alice"]);
+        assert_eq!(
+            names(last_discovery(&previous, &cache)),
+            ["fall-hello-alice"]
+        );
     }
 
     #[test]
