@@ -74,6 +74,14 @@
   --bg-card: rgb(255 255 255 / 0.78);
 }
 
+/* Mica's light base (#f3f3f3), laid over the backdrop so text keeps its contrast whatever
+   shows through: a dark wallpaper, or no Mica at all on Windows 10. */
+@media (prefers-color-scheme: light) {
+  :root[data-os="windows"] {
+    --bg-window: rgb(243 243 243 / 0.6);
+  }
+}
+
 @media (prefers-color-scheme: dark) {
   :root[data-os="windows"] {
     --accent: #60cdff;
