@@ -109,6 +109,26 @@ pub struct SyncDetails {
     clones: usize,
 }
 
+/// Writes the due dates as an `.ics` file at `path` (chosen in a save dialog) and returns
+/// how many events it holds.
+#[tauri::command]
+pub fn export_calendar(
+    path: PathBuf,
+    state: State<'_, ProjectsState>,
+    settings: State<'_, SettingsStore>,
+) -> Result<usize> {
+    let settings = settings.get();
+    let (ics, count) = crate::calendar::ics(
+        &state.snapshot(),
+        &settings.hidden,
+        &settings.hidden_classes,
+        &settings.notify_hours_before,
+        chrono::Utc::now(),
+    );
+    crate::github::write_atomic(&path, ics.as_bytes())?;
+    Ok(count)
+}
+
 #[tauri::command]
 pub fn sync_details(state: State<'_, ProjectsState>) -> SyncDetails {
     let snapshot = state.snapshot();
