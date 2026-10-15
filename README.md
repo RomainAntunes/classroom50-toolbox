@@ -27,7 +27,10 @@ notification area.
   it, your terminal, your file manager or on GitHub.
 - **Notifies you** before a deadline, when a grade or feedback arrives, when a new assignment is
   published, when a teammate pushes, and when a classmate joins your group.
-- Starts at login, hidden in the tray, and updates itself.
+- **Hides what you don't need**: a hidden assignment leaves the list and sends no
+  notifications, and search still finds it.
+- Starts at login, hidden in the tray, and updates itself. The first launch walks you through
+  setup.
 
 ## Install
 
@@ -52,9 +55,9 @@ After that the app updates itself.
 
 ## Getting started
 
-1. Click the tray icon. If git, `gh` or `gh student` is missing, install it from the Setup
-   section.
-2. Sign in with GitHub. Use the account your classes know you by.
+1. Click the tray icon. A short guide installs git, `gh` or `gh student` if one is missing and
+   signs you in with GitHub. Use the account your classes know you by.
+2. Choose where clones go and which editor opens them.
 3. Your classrooms and assignments appear. Accept one, clone it, and the row follows its state
    from then on. Projects you already cloned are found in the folders your editor opened
    recently; add other folders in Settings.

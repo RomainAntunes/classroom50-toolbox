@@ -1,9 +1,10 @@
 // Opening clones in an editor: the installed editors (looked up once per run), which one a
 // clone opens in, and the launch with failures reported in a dialog.
+import { CheckMenuItem, Menu } from "@tauri-apps/api/menu";
 import { message } from "@tauri-apps/plugin-dialog";
 import { api, errorMessage, withDialog, type EditorInfo, type Project } from "$lib/api";
 import { t } from "$lib/i18n";
-import { settings } from "$lib/settings.svelte";
+import { saveSettings, settings } from "$lib/settings.svelte";
 
 export const editors = $state<{ installed: EditorInfo[]; loaded: boolean }>({
   installed: [],
@@ -44,4 +45,20 @@ export async function openInEditor(path: string, editor: EditorInfo): Promise<vo
     const text = t("editor.failed", { editor: editor.name, error: errorMessage(err) });
     await withDialog(() => message(text, { kind: "error" }));
   }
+}
+
+/** A native menu of the installed editors, the default one checked; picking one saves it. */
+export async function chooseDefaultEditor(): Promise<void> {
+  const current = defaultEditor();
+  const items = await Promise.all(
+    editors.installed.map((other) =>
+      CheckMenuItem.new({
+        text: other.name,
+        checked: other.id === current?.id,
+        action: () => void saveSettings({ defaultEditor: other.id }),
+      }),
+    ),
+  );
+  const menu = await Menu.new({ items });
+  await withDialog(() => menu.popup());
 }

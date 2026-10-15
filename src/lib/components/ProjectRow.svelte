@@ -7,6 +7,7 @@
   import { pullProject } from "$lib/pull";
   import { submitProject } from "$lib/submit";
   import { addTeammate, joinsGroup } from "$lib/teammate";
+  import { isHidden, setHidden } from "$lib/hidden";
   import { durationLabel, formatDate, fromNow, t } from "$lib/i18n";
   import { tildify } from "$lib/paths.svelte";
   import { groupDetails } from "$lib/group";
@@ -96,6 +97,7 @@
         : null),
   );
   const openTarget = $derived(project.webUrl ?? githubUrl);
+  const hidden = $derived(isHidden(project.id));
   // The editor that last opened the clone, else the default one.
   const editor = $derived(path ? editorFor(project) : null);
   const cloneable = $derived(!path && Boolean(project.owner && project.repo));
@@ -290,6 +292,11 @@
         enabled: Boolean(path),
         action: () => path && api.openTerminal(path),
       }),
+      separator(),
+      MenuItem.new({
+        text: t(hidden ? "projects.unhide" : "projects.hide"),
+        action: () => setHidden(project.id, !hidden),
+      }),
     ]);
     const menu = await Menu.new({ items });
     // Pinned like a dialog, so the popover stays open while the menu is up.
@@ -318,6 +325,9 @@
         {#if unseen}<span class="dot" aria-label={t("projects.new")}></span>{/if}{name}
       </span>
       <span class="meta">
+        {#if hidden}
+          <span class="hidden-tag">{t("projects.hidden")}</span> ·
+        {/if}
         {#if submitting}
           <span class="status">{t("projects.submitting")}</span> ·
         {:else if pulling}
@@ -443,6 +453,10 @@
 
   .soon {
     color: var(--warning);
+  }
+
+  .hidden-tag {
+    font-style: italic;
   }
 
   .status {
