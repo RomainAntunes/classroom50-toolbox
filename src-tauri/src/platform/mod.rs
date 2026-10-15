@@ -149,7 +149,10 @@ pub struct CalendarEvent {
     pub title: String,
     pub notes: Option<String>,
     pub url: Option<String>,
+    /// The event is a block ending at the deadline, so it has room to be clicked.
+    pub start: DateTime<Utc>,
     pub due: DateTime<Utc>,
+    /// Hours before the deadline (the event's end).
     pub alarm_hours: Vec<u32>,
     /// Changes when any field above does, so unchanged events are left alone.
     pub fingerprint: u64,
