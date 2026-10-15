@@ -246,7 +246,7 @@
   "commit.noPush.closed": "Only commits in this clone: submissions are closed.",
   "commit.noPush.otherBranch": "Only commits in this clone: push is offered on {branch}, the graded branch.",
   "commit.noPush.remoteAhead": "Only commits in this clone: GitHub has newer commits to merge before you push.",
-  "commit.noPush.other": "Only commits in this clone: push isn't available for this project.",
+  "commit.noPush.fallback": "Only commits in this clone: push isn't available for this project.",
   "commit.nothingToCommit": "Nothing to commit: there are no changes in this clone.",
   "commit.failed": "Commit failed: {error}",
   "pull.localChanges": "You have changes that aren't committed yet. Commit them first, then pull, so they're not mixed with the new commits.",
