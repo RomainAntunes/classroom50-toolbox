@@ -101,6 +101,8 @@
   "settings.quit.action": "Quit",
   "settings.reminders.before": "{duration} before",
   "projects.loading": "Looking for your assignments…",
+  "projects.firstSync.title": "Finding your classrooms…",
+  "projects.firstSync.hint": "Reading your classes, assignments and clones on GitHub and this computer. Only this first time takes a moment.",
   "projects.due": "Due {when}",
   "projects.wasDue": "Was due {when}",
   "projects.notCloned": "Not cloned",
