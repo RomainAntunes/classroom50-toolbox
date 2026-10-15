@@ -1638,7 +1638,10 @@ async fn refresh_statuses(
             },
             None => None,
         };
-        repo.history = grade_history(http, &releases, repo.grade.as_ref(), &old).await;
+        repo.history = grade_history(&releases, repo.grade.as_ref(), &old, |release| {
+            status::download_grade(http, release)
+        })
+        .await;
         updated.push((repo, config));
     }
 
@@ -1654,12 +1657,16 @@ async fn refresh_statuses(
 
 /// The summary of each graded release, newest first. A result is downloaded once per tag;
 /// after that it comes from the last sync.
-async fn grade_history(
-    http: &reqwest::Client,
-    releases: &[status::GradedRelease],
+async fn grade_history<'a, F, Fut>(
+    releases: &'a [status::GradedRelease],
     newest: Option<&Grade>,
     old: &RemoteRepo,
-) -> Vec<GradeSummary> {
+    mut download: F,
+) -> Vec<GradeSummary>
+where
+    F: FnMut(&'a status::GradedRelease) -> Fut,
+    Fut: std::future::Future<Output = Result<Grade>>,
+{
     let mut history = Vec::with_capacity(releases.len());
     for release in releases {
         let known = newest
@@ -1668,7 +1675,7 @@ async fn grade_history(
             .or_else(|| old.history.iter().find(|g| g.tag == release.tag).cloned());
         let summary = match known {
             Some(summary) => summary,
-            None => match status::download_grade(http, release).await {
+            None => match download(release).await {
                 Ok(grade) => GradeSummary::from(&grade),
                 Err(err) => {
                     log::warn!("{err}");
@@ -2121,6 +2128,45 @@ mod tests {
 
         let fresh = parse_status("# branch.oid (initial)\n# branch.head (detached)");
         assert_eq!(fresh, LocalState::default());
+    }
+
+    #[tokio::test]
+    async fn downloads_each_grade_of_the_history_once() {
+        let release = |tag: &str| status::GradedRelease {
+            tag: tag.into(),
+            published_at: None,
+            url: format!("page-{tag}"),
+            result_url: format!("result-{tag}"),
+        };
+        let grade = |tag: &str, score: u32| Grade {
+            tag: tag.into(),
+            score,
+            max_score: 10,
+            tests_passed: 0,
+            tests_total: 0,
+            tests: Vec::new(),
+            published_at: None,
+            url: format!("page-{tag}"),
+        };
+        let releases = [release("c"), release("b"), release("a"), release("broken")];
+        let newest = grade("c", 9);
+        let mut old = remote("r", "h", None);
+        old.history = vec![GradeSummary::from(&grade("b", 7))];
+        let mut downloaded = Vec::new();
+        let history = grade_history(&releases, Some(&newest), &old, |r| {
+            downloaded.push(r.tag.clone());
+            let result = if r.tag == "broken" {
+                Err(Error::GitHub("gone".into()))
+            } else {
+                Ok(grade(&r.tag, 5))
+            };
+            async move { result }
+        })
+        .await;
+        // The newest grade and the known one are reused; a failed download is left out.
+        assert_eq!(downloaded, ["a", "broken"]);
+        let scores: Vec<(&str, u32)> = history.iter().map(|g| (g.tag.as_str(), g.score)).collect();
+        assert_eq!(scores, [("c", 9), ("b", 7), ("a", 5)]);
     }
 
     #[test]
