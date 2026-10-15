@@ -52,6 +52,13 @@
     network = next;
   }
 
+  // Fires a link through the same handler as the OS: bundled builds only get real ones.
+  let devLink = $state("");
+  async function openDevLink() {
+    await api.simulateDeepLink(devLink);
+    devLink = "";
+  }
+
   async function previewBadge() {
     badgeQueued = true;
     try {
@@ -480,6 +487,25 @@
             {/each}
           </div>
         </div>
+        <form
+          class="row"
+          onsubmit={(event) => {
+            event.preventDefault();
+            void openDevLink();
+          }}
+        >
+          <input
+            class="dev-link"
+            type="text"
+            placeholder={t("settings.dev.linkPlaceholder")}
+            title={t("settings.dev.linkHint")}
+            aria-label={t("settings.dev.link")}
+            spellcheck="false"
+            autocomplete="off"
+            bind:value={devLink}
+          />
+          <button type="submit" disabled={!devLink.trim()}>{t("settings.dev.linkOpen")}</button>
+        </form>
         <button class="disclosure" aria-expanded={showDev} onclick={() => (showDev = !showDev)}>
           <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m9 18 6-6-6-6" /></svg>
           {t("settings.dev.notifications")}
@@ -539,6 +565,25 @@
 {/if}
 
 <style>
+  .dev-link {
+    flex: 1;
+    min-width: 0;
+    box-sizing: border-box;
+    height: 24px;
+    font: inherit;
+    font-size: 0.9em;
+    color: inherit;
+    padding: 0 8px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-control);
+    background: var(--bg-control);
+    outline: none;
+  }
+
+  .dev-link:focus-visible {
+    border-color: var(--accent);
+  }
+
   .titlebar {
     display: flex;
     align-items: center;
