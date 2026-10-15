@@ -24,6 +24,8 @@ export interface ToolStatus {
   tool: Tool;
   installed: boolean;
   version: string | null;
+  /** Installed but older than the app needs (gh only); installing again upgrades it. */
+  outdated: boolean;
 }
 
 /** An install or update still running (`tool_jobs`, the `tool-jobs` event). */
@@ -37,6 +39,10 @@ export interface ToolJob {
 export interface AuthStatus {
   loggedIn: boolean;
   login: string | null;
+  /** gh-student's scopes the token lacks; `grantScopes` adds them. */
+  missingScopes: string[];
+  /** gh uses a token from this environment variable: no sign-in, switch or sign-out. */
+  envToken: string | null;
 }
 
 /** A github.com account gh is signed in to. */
@@ -48,6 +54,12 @@ export interface Account {
 export interface CommandSpec {
   program: string;
   args: string[];
+}
+
+/** How a tool installs here (`install_command`). */
+export interface InstallPlan extends CommandSpec {
+  /** The same install typed in a terminal, shown when it fails. */
+  manual: string;
 }
 
 export interface RepoConfig {
@@ -387,6 +399,10 @@ export interface UpdateInfo {
 export interface CommandError {
   kind: string;
   message: string;
+  /** `manualInstall`: where to download the tool by hand. */
+  url?: string;
+  /** `manualInstall`: the command to run in a terminal. */
+  command?: string;
 }
 
 export const api = {
@@ -405,7 +421,7 @@ export const api = {
   simulatedNetwork: () => invoke<SimulatedNetwork>("simulated_network"),
   setPopoverPinned: (pinned: boolean) => invoke<void>("set_popover_pinned", { pinned }),
   toolStatuses: () => invoke<ToolStatus[]>("tool_statuses"),
-  installCommand: (tool: Tool) => invoke<CommandSpec>("install_command", { tool }),
+  installCommand: (tool: Tool) => invoke<InstallPlan>("install_command", { tool }),
   /** The newer version `upgradeTool` would install; always null for git and gh. */
   toolUpdate: (tool: Tool) => invoke<string | null>("tool_update", { tool }),
   /** gh-student only; git and gh follow the OS package manager. */
@@ -430,7 +446,10 @@ export const api = {
   getSettings: () => invoke<Settings>("get_settings"),
   updateSettings: (next: Settings) => invoke<Settings>("update_settings", { next }),
   login: () => invoke<AuthStatus>("login"),
+  /** `gh auth refresh` with gh-student's scopes, through the same device flow as `login`. */
+  grantScopes: () => invoke<AuthStatus>("grant_scopes"),
   cancelLogin: () => invoke<void>("cancel_login"),
+  signOut: (login: string) => invoke<AuthStatus>("sign_out", { login }),
   openTerminal: (path: string) => invoke<void>("open_terminal", { path }),
   installedEditors: () => invoke<EditorInfo[]>("installed_editors"),
   addTeammate: (id: string, username: string) => invoke<void>("add_teammate", { id, username }),

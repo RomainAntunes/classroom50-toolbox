@@ -1,7 +1,7 @@
 use std::path::{Path, PathBuf};
 
-use super::{CommandSpec, Os, home_dir};
-use crate::error::{Error, Result};
+use super::{CommandSpec, InstallPlan, Os, home_dir, install};
+use crate::error::Result;
 use crate::process;
 use crate::tools::Tool;
 
@@ -18,42 +18,52 @@ pub fn extra_path_dirs() -> Vec<PathBuf> {
     dirs
 }
 
-/// Without these, `brew install` first updates Homebrew and every tap (most of a 9 s
-/// install of a small formula, minutes on a slow link, all of it silent) and may upgrade
-/// other installed formulae that depend on the new one. The formula list itself still
-/// refreshes through Homebrew's API cache.
-pub const INSTALL_ENV: &[(&str, &str)] = &[
-    ("HOMEBREW_NO_AUTO_UPDATE", "1"),
-    ("HOMEBREW_NO_INSTALLED_DEPENDENTS_CHECK", "1"),
-    ("HOMEBREW_NO_INSTALL_CLEANUP", "1"),
-    ("HOMEBREW_NO_ENV_HINTS", "1"),
-];
-
-/// Lines `brew install` prints at each step (no TTY, so no progress bar), in order.
+/// Lines `brew install` prints at each step (no TTY, so no progress bar), in order, then
+/// the Command Line Tools installer's (`xcode-select --install` prints one line and returns).
 pub const INSTALL_STEPS: &[(&str, f32)] = &[
     ("==> Fetching", 0.1),
     ("==> Downloading", 0.15),
     ("Bottle ", 0.65),
     ("==> Installing", 0.7),
     ("==> Reinstalling", 0.7),
+    ("==> Upgrading", 0.7),
     ("==> Pouring", 0.8),
     ("\u{1f37a}", 0.95),
     ("==> Caveats", 0.95),
     ("==> Summary", 0.95),
 ];
 
-pub fn install_command(tool: Tool) -> Result<CommandSpec> {
-    if process::find_in_path("brew").is_none() {
-        return Err(Error::Unsupported(
-            "Homebrew is required to install tools on macOS: https://brew.sh".into(),
-        ));
-    }
-    match tool {
-        Tool::Git => Ok(CommandSpec::new("brew", &["install", "git"])),
-        Tool::Gh => Ok(CommandSpec::new("brew", &["install", "gh"])),
-        Tool::GhStudent => Err(Error::Unsupported(
-            "gh-student is installed through gh".into(),
-        )),
+pub fn install_plan(tool: Tool) -> Result<InstallPlan> {
+    let has = |program: &str| process::find_in_path(program).is_some();
+    install::macos(
+        tool,
+        &install::Probe {
+            has: &has,
+            immutable: false,
+        },
+    )
+}
+
+/// The xcrun stand-ins in `/usr/bin` (git among them) open Apple's "install the command line
+/// developer tools" dialog when neither the Command Line Tools nor Xcode are installed, on
+/// every run. A status check must not do that.
+pub fn is_stub(program: &str, path: &Path) -> bool {
+    program == "git" && path == Path::new("/usr/bin/git") && !developer_tools_installed()
+}
+
+/// Whether the developer directory `xcode-select` points at (or its defaults) has git: what
+/// `/usr/bin/git` runs. Read from the file system, no process: it runs before every git call.
+fn developer_tools_installed() -> bool {
+    let chosen = std::env::var_os("DEVELOPER_DIR")
+        .map(PathBuf::from)
+        .or_else(|| std::fs::read_link("/var/db/xcode_select_link").ok());
+    let defaults = [
+        PathBuf::from("/Applications/Xcode.app/Contents/Developer"),
+        PathBuf::from("/Library/Developer/CommandLineTools"),
+    ];
+    match chosen {
+        Some(dir) => dir.join("usr/bin/git").is_file(),
+        None => defaults.iter().any(|dir| dir.join("usr/bin/git").is_file()),
     }
 }
 
@@ -136,6 +146,17 @@ pub fn open_terminal(dir: &Path) -> Result<()> {
 mod tests {
     use super::*;
     use crate::editors::ALL;
+
+    #[test]
+    fn only_apples_git_can_be_a_stub() {
+        assert!(!is_stub("gh", Path::new("/usr/bin/git")));
+        assert!(!is_stub("git", Path::new("/opt/homebrew/bin/git")));
+        // With the tools installed (this machine builds the app), the real git is found.
+        if developer_tools_installed() {
+            assert!(!is_stub("git", Path::new("/usr/bin/git")));
+            assert!(crate::process::find_in_path("git").is_some());
+        }
+    }
 
     #[test]
     fn every_folder_opening_editor_has_an_app() {

@@ -1,6 +1,6 @@
 use std::path::{Path, PathBuf};
 
-use super::{CommandSpec, Os, home_dir};
+use super::{CommandSpec, InstallPlan, Os, home_dir, install};
 use crate::error::{Error, Result};
 use crate::process;
 use crate::tools::Tool;
@@ -18,12 +18,11 @@ pub fn extra_path_dirs() -> Vec<PathBuf> {
     dirs
 }
 
-/// `pkexec` doesn't pass the environment on.
-pub const INSTALL_ENV: &[(&str, &str)] = &[];
-
-/// Lines apt, dnf, pacman and zypper print at each step.
+/// Lines apt, dnf, pacman and zypper print at each step (in English: `pkexec` drops the
+/// locale only on some systems, so elsewhere the bar stays indeterminate).
 pub const INSTALL_STEPS: &[(&str, f32)] = &[
     ("Reading package lists", 0.05),
+    ("Hit:", 0.1),
     ("Get:", 0.2),
     ("Downloading Packages", 0.2),
     ("downloading ", 0.2),
@@ -37,43 +36,22 @@ pub const INSTALL_STEPS: &[(&str, f32)] = &[
     ("Complete!", 0.95),
 ];
 
-/// Package-manager installs need root; `pkexec` shows the desktop's own polkit prompt.
-/// Without a desktop agent it would ask on a terminal the app doesn't have, so it is told
-/// to fail instead (`--disable-internal-agent`).
-pub fn install_command(tool: Tool) -> Result<CommandSpec> {
-    let package = match tool {
-        Tool::Git => "git",
-        Tool::Gh => "gh",
-        Tool::GhStudent => {
-            return Err(Error::Unsupported(
-                "gh-student is installed through gh".into(),
-            ));
-        }
-    };
-    let (manager, install_args): (&str, &[&str]) = if process::find_in_path("apt-get").is_some() {
-        ("apt-get", &["install", "-y"])
-    } else if process::find_in_path("dnf").is_some() {
-        ("dnf", &["install", "-y"])
-    } else if process::find_in_path("pacman").is_some() {
-        ("pacman", &["-S", "--noconfirm"])
-    } else if process::find_in_path("zypper").is_some() {
-        ("zypper", &["--non-interactive", "install"])
-    } else {
-        return Err(Error::Unsupported(
-            "no supported package manager found (apt, dnf, pacman, zypper)".into(),
-        ));
-    };
-    // Arch names the GitHub CLI package `github-cli`.
-    let package = if manager == "pacman" && package == "gh" {
-        "github-cli"
-    } else {
-        package
-    };
+pub fn install_plan(tool: Tool) -> Result<InstallPlan> {
+    let has = |program: &str| process::find_in_path(program).is_some();
+    // An ostree deployment (Fedora Atomic, Bazzite, Bluefin) or NixOS: the package manager
+    // can't add to the running system.
+    let immutable = Path::new("/run/ostree-booted").exists() || Path::new("/etc/NIXOS").exists();
+    install::linux(
+        tool,
+        &install::Probe {
+            has: &has,
+            immutable,
+        },
+    )
+}
 
-    let mut args = vec!["--disable-internal-agent", manager];
-    args.extend_from_slice(install_args);
-    args.push(package);
-    Ok(CommandSpec::new("pkexec", &args))
+pub fn is_stub(_program: &str, _path: &Path) -> bool {
+    false
 }
 
 /// Terminals open in the working directory they are spawned from.

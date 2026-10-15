@@ -20,7 +20,7 @@
   const current = $derived(settings.current);
   const editor = $derived(current ? defaultEditor() : null);
   const ghInstalled = $derived(session.tools.some((tool) => tool.tool === "gh" && tool.installed));
-  const missing = $derived(session.tools.filter((tool) => !tool.installed).length);
+  const missing = $derived(session.tools.filter((tool) => !tool.installed || tool.outdated).length);
 
   function replaceTool(next: ToolStatus) {
     session.tools = session.tools.map((tool) => (tool.tool === next.tool ? next : tool));

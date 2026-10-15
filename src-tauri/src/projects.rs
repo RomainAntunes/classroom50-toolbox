@@ -46,6 +46,8 @@ const STATE_FILE: &str = "snapshot.json";
 const FULL_SYNC_AGE: chrono::TimeDelta = chrono::TimeDelta::minutes(15);
 /// Opening the popover re-reads the status at most this often.
 const MIN_STATUS_ON_OPEN: chrono::TimeDelta = chrono::TimeDelta::minutes(1);
+/// How old the full sync may get when the popover opens on an assignment to accept.
+const MIN_FULL_ON_OPEN: chrono::TimeDelta = chrono::TimeDelta::minutes(2);
 /// Repos per GraphQL request when reading `.classroom50.yaml`; larger batches time out.
 const DETAIL_BATCH: usize = 25;
 /// Batches in flight at once on a cold cache; GitHub discourages more concurrency.
@@ -241,6 +243,16 @@ struct RemoteCache {
     /// The user's group teams with their members.
     #[serde(default)]
     groups: Vec<Group>,
+    /// The last sync stopped before reading every listed repo, so `repos` may lack some.
+    #[serde(default)]
+    incomplete: bool,
+}
+
+impl RemoteCache {
+    /// Holds the whole repo list of an account, so a repo missing from it doesn't exist.
+    fn complete(&self) -> bool {
+        self.login.is_some() && !self.incomplete
+    }
 }
 
 /// How far the sync in flight is (see `sync_progress`).
@@ -292,6 +304,9 @@ pub struct ProjectsState {
     /// The first error of the last status read, picked up by the snapshot.
     status_issue: Mutex<Option<SyncIssue>>,
     after_push: std::sync::atomic::AtomicBool,
+    /// When the last full sync started, worked or not: a failed one keeps the snapshot's
+    /// `synced_at`, and this spaces out the retries.
+    full_attempt: Mutex<Option<DateTime<Utc>>>,
     stats: Mutex<SyncStats>,
     progress: Mutex<SyncProgress>,
     sync_lock: tokio::sync::Mutex<()>,
@@ -317,6 +332,7 @@ impl ProjectsState {
             state_path,
             status_issue: Mutex::default(),
             after_push: std::sync::atomic::AtomicBool::new(false),
+            full_attempt: Mutex::default(),
             stats: Mutex::new(saved.stats),
             progress: Mutex::default(),
             sync_lock: tokio::sync::Mutex::new(()),
@@ -404,6 +420,14 @@ pub async fn refresh(app: &AppHandle) -> Snapshot {
         drop(state.sync_lock.lock().await);
         return state.snapshot();
     };
+    publish(app, Mode::Full, true, guard).await
+}
+
+/// Runs a full sync of its own, after any sync in flight: for a change the app just made on
+/// GitHub (accept, adding a teammate), which a sync started earlier may not have seen.
+pub async fn refresh_after_write(app: &AppHandle) -> Snapshot {
+    let state = app.state::<ProjectsState>();
+    let guard = state.sync_lock.lock().await;
     publish(app, Mode::Full, true, guard).await
 }
 
@@ -666,25 +690,47 @@ impl Progress {
 /// Starts whatever is due in the background: a full sync when the last one is older than
 /// `FULL_SYNC_AGE`, else a status check when the last GitHub read is older than
 /// `min_status_age`. Nothing while GitHub asks to back off.
-fn refresh_due(app: &AppHandle, min_status_age: chrono::TimeDelta) {
+fn refresh_due(app: &AppHandle, min_status_age: chrono::TimeDelta, on_open: bool) {
     if !may_call_github(app) {
         return;
     }
-    let snapshot = app.state::<ProjectsState>().snapshot();
+    let state = app.state::<ProjectsState>();
+    let snapshot = state.snapshot();
+    let full_attempt = state.full_attempt.lock().ok().and_then(|at| *at);
     let now = Utc::now();
-    let older = |at: Option<DateTime<Utc>>, age| at.is_none_or(|at| now - at >= age);
     let app = app.clone();
-    let (_, full_age) = cadence(&snapshot, now);
-    let mode = if older(snapshot.synced_at, full_age) {
-        Mode::Full
-    } else if older(snapshot.checked_at, min_status_age) {
-        Mode::Status
-    } else {
+    let (_, mut full_age) = cadence(&snapshot, now);
+    // Only a full sync finds a repo accepted elsewhere (the web page, the CLI), so while an
+    // assignment waits for it, opening the popover looks again.
+    if on_open && awaiting_accept(&snapshot, &app.state::<SettingsStore>().get(), now) {
+        full_age = full_age.min(MIN_FULL_ON_OPEN);
+    }
+    let Some(mode) = due_mode(&snapshot, full_attempt, now, full_age, min_status_age) else {
         return;
     };
     tauri::async_runtime::spawn(async move {
         refresh_in_background(&app, mode).await;
     });
+}
+
+/// What is due: a full sync once the last one that worked is `full_age` old, retried after a
+/// failure no more often than status checks run; else a status check once the last GitHub
+/// read is `min_status_age` old.
+fn due_mode(
+    snapshot: &Snapshot,
+    full_attempt: Option<DateTime<Utc>>,
+    now: DateTime<Utc>,
+    full_age: chrono::TimeDelta,
+    min_status_age: chrono::TimeDelta,
+) -> Option<Mode> {
+    let older = |at: Option<DateTime<Utc>>, age| at.is_none_or(|at| now - at >= age);
+    if older(snapshot.synced_at, full_age) && older(full_attempt, min_status_age) {
+        Some(Mode::Full)
+    } else if older(snapshot.checked_at, min_status_age) {
+        Some(Mode::Status)
+    } else {
+        None
+    }
 }
 
 /// Background requests wait while GitHub asks to back off, and keep a reserve of the
@@ -711,7 +757,19 @@ fn may_call_github(app: &AppHandle) -> bool {
 
 /// When the popover opens.
 pub fn refresh_if_stale(app: &AppHandle) {
-    refresh_due(app, MIN_STATUS_ON_OPEN);
+    refresh_due(app, MIN_STATUS_ON_OPEN, true);
+}
+
+/// Whether the list offers an assignment the user could accept right now (not hidden,
+/// locked or upcoming).
+fn awaiting_accept(snapshot: &Snapshot, settings: &Settings, now: DateTime<Utc>) -> bool {
+    snapshot.unaccepted.iter().any(|item| {
+        let class = format!("{}/{}", item.classroom.org, item.classroom.slug).to_ascii_lowercase();
+        !item.assignment.locked
+            && item.assignment.available_from.is_none_or(|at| at <= now)
+            && !settings.hidden.contains(&item.id)
+            && !settings.hidden_classes.contains(&class)
+    })
 }
 
 /// At startup, re-reads the disk on top of the saved snapshot (no request). Then a tick
@@ -740,16 +798,16 @@ pub fn start_background_sync(app: AppHandle) {
                 if github_reachable().await {
                     log::info!("network is back; syncing");
                     state.clear_offline();
-                    refresh_due(&app, chrono::TimeDelta::zero());
+                    refresh_due(&app, chrono::TimeDelta::zero(), false);
                 }
             } else if slept {
                 log::info!("woke from sleep; syncing");
                 // Give Wi-Fi a moment to reconnect.
                 tokio::time::sleep(Duration::from_secs(5)).await;
-                refresh_due(&app, chrono::TimeDelta::zero());
+                refresh_due(&app, chrono::TimeDelta::zero(), false);
             } else {
                 let (status_age, _) = cadence(&state.snapshot(), Utc::now());
-                refresh_due(&app, status_age);
+                refresh_due(&app, status_age, false);
             }
             tokio::time::sleep(TICK).await;
         }
@@ -949,6 +1007,32 @@ fn watch_targets(
     targets
 }
 
+/// Whether `previous` holds the account's GitHub repos: a full sync has run, and the last
+/// one wasn't cut short by a missing sign-in or gh (it then lists clones only).
+fn discovered(previous: &Snapshot) -> bool {
+    previous.synced_at.is_some()
+        && !previous
+            .issue
+            .as_ref()
+            .is_some_and(|issue| matches!(issue.kind.as_str(), "notSignedIn" | "notInstalled"))
+}
+
+/// The GitHub repos a build without discovery starts from: every repo of the last one, not
+/// only those the last build recognized. A build without a class manifest (offline, a
+/// failed download) drops the repos recognized by name only, which then come back as soon
+/// as the manifest is read again.
+fn last_discovery(previous: &Snapshot, cache: &RemoteCache) -> Vec<RemoteRepo> {
+    if discovered(previous) {
+        cache.repos.values().cloned().collect()
+    } else {
+        previous
+            .projects
+            .iter()
+            .filter_map(|p| p.remote.clone())
+            .collect()
+    }
+}
+
 async fn local_snapshot(
     state: &ProjectsState,
     http: &reqwest::Client,
@@ -959,12 +1043,10 @@ async fn local_snapshot(
     progress: &Progress,
 ) -> Snapshot {
     let previous = state.snapshot();
-    let remote_repos = previous
-        .projects
-        .into_iter()
-        .filter_map(|p| p.remote)
-        .collect();
-    let classrooms = state.remote().classrooms;
+    let cache = state.remote();
+    let remote_repos = last_discovery(&previous, &cache);
+    let discovered = discovered(&previous) && cache.complete();
+    let classrooms = cache.classrooms;
     let auth = if status {
         status_auth(state).await
     } else {
@@ -979,6 +1061,7 @@ async fn local_snapshot(
         remote: remote_repos,
         classrooms,
         locals,
+        discovered,
     };
     let (projects, unaccepted) =
         build(sources, state, http, auth.as_ref(), network, now, progress).await;
@@ -1012,6 +1095,19 @@ async fn full_snapshot(
         progress.skip(Phase::Listing);
         progress.skip(Phase::Details);
     }
+    if let Ok(mut at) = state.full_attempt.lock() {
+        *at = Some(now);
+    }
+    // A failed sync doesn't count as one, so the next is due soon. The very first keeps a
+    // time anyway: the list waits for one before showing.
+    let previous = state.snapshot();
+    let (synced_at, checked_at) = if remote.is_ok() {
+        (Some(now), Some(now))
+    } else {
+        (previous.synced_at.or(Some(now)), previous.checked_at)
+    };
+    let discovered = !matches!(remote, Err(Error::NotSignedIn | Error::NotInstalled { .. }))
+        && state.remote().complete();
     let (repos, classrooms, issue) = match remote {
         Ok(()) => {
             let cache = state.remote();
@@ -1042,14 +1138,15 @@ async fn full_snapshot(
         remote: repos,
         classrooms,
         locals,
+        discovered,
     };
     let (projects, unaccepted) =
         build(sources, state, http, auth.as_ref(), true, now, progress).await;
     Snapshot {
         projects,
         unaccepted,
-        synced_at: Some(now),
-        checked_at: Some(now),
+        synced_at,
+        checked_at,
         issue: issue.or_else(|| state.take_status_issue()),
         login: None,
     }
@@ -1063,6 +1160,9 @@ struct Sources {
     remote: Vec<RemoteRepo>,
     classrooms: Vec<Classroom>,
     locals: Vec<LocalProject>,
+    /// Whether `remote` is the account's repo list (fresh or cached). Without it a missing
+    /// repo proves nothing, so no assignment is offered for accepting.
+    discovered: bool,
 }
 
 async fn build(
@@ -1078,6 +1178,7 @@ async fn build(
         remote,
         classrooms: team_classrooms,
         locals,
+        discovered,
     } = sources;
     // Teams carry the display name and secret, so they win over marker files.
     let mut classrooms: BTreeMap<ClassroomKey, Classroom> =
@@ -1150,7 +1251,10 @@ async fn build(
         project.assignment = key
             .as_ref()
             .and_then(|k| manifests.get(k))
-            .and_then(|list| list.iter().find(|a| a.slug == project.config.assignment))
+            .and_then(|list| {
+                list.iter()
+                    .find(|a| a.slug.eq_ignore_ascii_case(&project.config.assignment))
+            })
             .cloned();
         project.web_url = project.owner.as_deref().map(|owner| {
             classroom50::submission_url(
@@ -1167,27 +1271,47 @@ async fn build(
         project.late_seconds = late_seconds(project);
     }
     projects.sort_by_cached_key(|p| sort_key(p, now));
-    let unaccepted = unaccepted(&projects, &classrooms, &manifests);
+    let unaccepted = if discovered {
+        unaccepted(&projects, &classrooms, &manifests)
+    } else {
+        Vec::new()
+    };
     (projects, unaccepted)
 }
 
 /// Open assignments of the user's classrooms with no repo yet, published or upcoming, by
-/// due date.
+/// due date. An assignment counts as accepted when a repo of the classroom's org names it
+/// in its marker file or by the naming rule, slugs compared without regard to case (a marker
+/// written by hand or by an older CLI may differ from the manifest in case, or name the
+/// assignment differently from the repo).
 fn unaccepted(
     projects: &[Project],
     classrooms: &BTreeMap<ClassroomKey, Classroom>,
     manifests: &HashMap<ClassroomKey, Vec<Assignment>>,
 ) -> Vec<Unaccepted> {
-    let accepted: HashSet<(ClassroomKey, &str)> = projects
-        .iter()
-        .filter_map(|p| {
-            let key = (
-                p.owner.as_deref()?.to_ascii_lowercase(),
-                p.config.classroom.to_ascii_lowercase(),
-            );
-            Some((key, p.config.assignment.as_str()))
-        })
-        .collect();
+    let mut accepted: HashSet<(ClassroomKey, String)> = HashSet::new();
+    for p in projects {
+        let Some(owner) = p.owner.as_deref().map(str::to_ascii_lowercase) else {
+            continue;
+        };
+        accepted.insert((
+            (owner.clone(), p.config.classroom.to_ascii_lowercase()),
+            p.config.assignment.to_ascii_lowercase(),
+        ));
+        let Some(name) = p.repo.as_deref() else {
+            continue;
+        };
+        for (key, classroom) in classrooms.iter().filter(|((org, _), _)| *org == owner) {
+            let slugs = manifests
+                .get(key)
+                .into_iter()
+                .flatten()
+                .map(|a| a.slug.as_str());
+            if let Some(slug) = classroom50::assignment_for_repo(name, &classroom.slug, slugs) {
+                accepted.insert((key.clone(), slug.to_ascii_lowercase()));
+            }
+        }
+    }
     let mut list: Vec<Unaccepted> = manifests
         .iter()
         .filter_map(|(key, assignments)| Some((classrooms.get(key)?, key, assignments)))
@@ -1197,7 +1321,7 @@ fn unaccepted(
                 .iter()
                 // Upcoming ones (`available_from` ahead) are listed too, as "Opens ...".
                 .filter(|a| !a.closed)
-                .filter(|a| !accepted.contains(&(key.clone(), a.slug.as_str())))
+                .filter(|a| !accepted.contains(&(key.clone(), a.slug.to_ascii_lowercase())))
                 .map(|a| Unaccepted {
                     id: format!("{}/{}/{}", key.0, key.1, a.slug),
                     classroom: classroom.clone(),
@@ -1548,10 +1672,12 @@ async fn sync_remote(
             }
         }
     }
+    // Repos never read (the sync stopped first) are unknown: not proof of anything missing.
+    cache.incomplete = listed_keys.iter().any(|k| !cache.checked.contains_key(k));
     match classrooms {
         Ok((classrooms, group_teams)) => {
             cache.classrooms = classrooms;
-            match groups::load(http, &token, &group_teams).await {
+            match groups::load(http, &token, &state.http_cache, &group_teams).await {
                 Ok(groups) => cache.groups = groups,
                 Err(err) => log::warn!("could not read group members: {err}"),
             }
@@ -2507,6 +2633,204 @@ mod tests {
             find(Some("other-org"), Some("26-poo-c-lab02-group-1"), None),
             None
         );
+    }
+
+    #[test]
+    fn lists_only_assignments_without_a_repo() {
+        let poo = Classroom::from_team("HEIGVD-POO", "classroom50-26-poo-c", None).unwrap();
+        let classrooms = BTreeMap::from([(poo.key(), poo)]);
+        let manifest: Vec<Assignment> = serde_json::from_value(json!([
+            {"slug": "lab01", "name": "Labo 1", "mode": "team"},
+            {"slug": "lab02", "name": "Labo 2", "mode": "team"},
+            {"slug": "labo-3", "name": "Labo 3", "mode": "team"},
+            {"slug": "labo-4", "name": "Labo 4", "mode": "team"},
+            {"slug": "labo-5", "name": "Labo 5", "mode": "team"},
+            {"slug": "old", "name": "Old", "mode": "team", "closed": true}
+        ]))
+        .unwrap();
+        let manifests =
+            HashMap::from([(("heigvd-poo".to_owned(), "26-poo-c".to_owned()), manifest)]);
+        let poo_config = |assignment: &str| RepoConfig {
+            classroom: "26-poo-c".into(),
+            assignment: assignment.into(),
+            secret: None,
+        };
+        let on_github = |name: &str, config: RepoConfig| {
+            let mut repo = remote(name, "aaa", None);
+            repo.owner = "HEIGVD-POO".into();
+            (repo, config)
+        };
+        let clone = |path: &str, owner: Option<&str>, name: Option<&str>| LocalProject {
+            path: path.into(),
+            owner: owner.map(str::to_owned),
+            repo: name.map(str::to_owned),
+            config: Some(poo_config("labo-4")),
+        };
+        let projects = merge(
+            vec![
+                // A marker spelled in another case than the manifest.
+                on_github("26-poo-c-lab01-group-3", poo_config("LAB01")),
+                // A marker naming something else; the repo's name still says lab02.
+                on_github("26-poo-c-lab02-group-6", poo_config("template-lab")),
+            ],
+            vec![
+                // A clone not seen on GitHub yet, found by its origin.
+                (
+                    clone(
+                        "/code/lab3",
+                        Some("heigvd-poo"),
+                        Some("26-poo-c-labo-3-alice"),
+                    ),
+                    poo_config("labo-3"),
+                    None,
+                ),
+                // No GitHub origin: which org it belongs to is unknown.
+                (clone("/code/copy", None, None), poo_config("labo-4"), None),
+            ],
+        );
+
+        let list = unaccepted(&projects, &classrooms, &manifests);
+        let slugs: Vec<&str> = list.iter().map(|u| u.assignment.slug.as_str()).collect();
+        assert_eq!(slugs, ["labo-4", "labo-5"]);
+        assert_eq!(list[0].id, "heigvd-poo/26-poo-c/labo-4");
+    }
+
+    #[test]
+    fn opening_looks_for_repos_accepted_elsewhere() {
+        let now = Utc::now();
+        let poo = Classroom::from_team("HEIGVD-POO", "classroom50-26-poo-c", None).unwrap();
+        let item = |slug: &str, extra: serde_json::Value| {
+            let mut assignment = json!({"slug": slug, "name": slug, "mode": "team"});
+            assignment
+                .as_object_mut()
+                .unwrap()
+                .extend(extra.as_object().unwrap().clone());
+            Unaccepted {
+                id: format!("heigvd-poo/26-poo-c/{slug}"),
+                classroom: poo.clone(),
+                assignment: serde_json::from_value(assignment).unwrap(),
+                accept_url: String::new(),
+                group: None,
+            }
+        };
+        let later = (now + chrono::TimeDelta::days(1)).to_rfc3339();
+        let mut snapshot = Snapshot {
+            unaccepted: vec![
+                item("labo-4", json!({"locked": true})),
+                item("labo-5", json!({"available_from": later})),
+            ],
+            ..Snapshot::default()
+        };
+        let mut settings = Settings::default();
+        assert!(!awaiting_accept(&snapshot, &settings, now));
+        snapshot.unaccepted.push(item("labo-6", json!({})));
+        assert!(awaiting_accept(&snapshot, &settings, now));
+        settings.hidden = vec!["heigvd-poo/26-poo-c/labo-6".into()];
+        assert!(!awaiting_accept(&snapshot, &settings, now));
+        settings.hidden.clear();
+        settings.hidden_classes = vec!["heigvd-poo/26-poo-c".into()];
+        assert!(!awaiting_accept(&snapshot, &settings, now));
+    }
+
+    #[test]
+    fn rebuilds_from_every_repo_of_the_last_discovery() {
+        let cache = RemoteCache {
+            login: Some("alice".into()),
+            repos: BTreeMap::from([
+                (
+                    "cs50/fall-hello-alice".into(),
+                    remote("fall-hello-alice", "a", None),
+                ),
+                (
+                    "cs50/fall-lab2-alice".into(),
+                    remote("fall-lab2-alice", "b", None),
+                ),
+            ]),
+            ..RemoteCache::default()
+        };
+        // The last build had no manifest and kept only the repo with a marker file.
+        let mut previous = Snapshot {
+            synced_at: Some(Utc::now()),
+            ..Snapshot::default()
+        };
+        previous.projects = merge(
+            vec![(remote("fall-hello-alice", "a", None), config("hello"))],
+            Vec::new(),
+        );
+        let names =
+            |repos: Vec<RemoteRepo>| -> Vec<String> { repos.into_iter().map(|r| r.name).collect() };
+        assert_eq!(
+            names(last_discovery(&previous, &cache)),
+            ["fall-hello-alice", "fall-lab2-alice"]
+        );
+        // Signed out: the cache may hold another account's repos.
+        previous.issue = Some(SyncIssue::from(&Error::NotSignedIn));
+        assert_eq!(
+            names(last_discovery(&previous, &cache)),
+            ["fall-hello-alice"]
+        );
+    }
+
+    #[test]
+    fn retries_a_failed_full_sync_at_the_status_pace() {
+        use chrono::TimeDelta as T;
+        let now = Utc::now();
+        let (full_age, status_age) = (T::hours(1), T::minutes(5));
+        // The last full sync that worked is 50 min old, a failed one ran 10 min ago.
+        let snapshot = Snapshot {
+            synced_at: Some(now - T::minutes(50)),
+            checked_at: Some(now - T::minutes(50)),
+            ..Snapshot::default()
+        };
+        let attempt = Some(now - T::minutes(10));
+        assert_eq!(
+            due_mode(&snapshot, attempt, now, full_age, status_age),
+            Some(Mode::Status)
+        );
+        // Due by age: retried, but not on every tick after a failure.
+        let old = Snapshot {
+            synced_at: Some(now - T::hours(2)),
+            ..snapshot.clone()
+        };
+        assert_eq!(
+            due_mode(&old, attempt, now, full_age, status_age),
+            Some(Mode::Full)
+        );
+        let just_failed = Some(now - T::minutes(1));
+        assert_eq!(
+            due_mode(&old, just_failed, now, full_age, status_age),
+            Some(Mode::Status)
+        );
+        // Network back or waking up asks with no minimum age: right away.
+        assert_eq!(
+            due_mode(&old, just_failed, now, full_age, T::zero()),
+            Some(Mode::Full)
+        );
+        let fresh = Snapshot {
+            synced_at: Some(now),
+            checked_at: Some(now),
+            ..Snapshot::default()
+        };
+        assert_eq!(due_mode(&fresh, Some(now), now, full_age, status_age), None);
+    }
+
+    #[test]
+    fn offers_accepting_only_with_the_account_repo_list() {
+        let mut snapshot = Snapshot::default();
+        assert!(!discovered(&snapshot), "no full sync yet");
+        snapshot.synced_at = Some(Utc::now());
+        assert!(discovered(&snapshot));
+        snapshot.issue = Some(SyncIssue::from(&Error::Offline));
+        assert!(discovered(&snapshot), "offline keeps the cached list");
+        snapshot.issue = Some(SyncIssue::from(&Error::NotSignedIn));
+        assert!(!discovered(&snapshot), "signed out lists clones only");
+
+        let mut cache = RemoteCache::default();
+        assert!(!cache.complete());
+        cache.login = Some("alice".into());
+        assert!(cache.complete());
+        cache.incomplete = true;
+        assert!(!cache.complete());
     }
 
     #[test]

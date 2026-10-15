@@ -25,6 +25,15 @@ pub enum Error {
     #[error("{0}")]
     Unsupported(String),
 
+    /// The app can't install a tool here (no package manager, no way to ask for a password);
+    /// the user does it by hand, from `url` or with `command` in a terminal.
+    #[error("{reason}")]
+    ManualInstall {
+        reason: String,
+        url: Option<String>,
+        command: Option<String>,
+    },
+
     #[error("`{0}` is disabled in development builds")]
     BlockedInDev(String),
 
@@ -66,6 +75,10 @@ pub enum Error {
 
     #[error("not signed in to GitHub")]
     NotSignedIn,
+
+    /// gh takes its token from this environment variable, so it can't store a sign-in.
+    #[error("the GitHub CLI is using the {0} environment variable; unset it to sign in here")]
+    TokenFromEnv(String),
 
     #[error("GitHub rate limit reached, retrying after {reset_at:?}")]
     RateLimited {
@@ -118,6 +131,7 @@ impl Error {
             Error::CommandFailed { .. } => "commandFailed",
             Error::TimedOut { .. } => "timedOut",
             Error::Unsupported(_) => "unsupported",
+            Error::ManualInstall { .. } => "manualInstall",
             Error::BlockedInDev(_) => "blockedInDev",
             Error::Cancelled => "cancelled",
             Error::Busy => "busy",
@@ -129,6 +143,7 @@ impl Error {
             Error::OtherBranch(_) => "otherBranch",
             Error::Diverged => "diverged",
             Error::NotSignedIn => "notSignedIn",
+            Error::TokenFromEnv(_) => "tokenFromEnv",
             Error::RateLimited { .. } => "rateLimited",
             Error::GitHub(_) => "github",
             Error::Offline => "offline",
@@ -151,10 +166,20 @@ impl Serialize for Error {
         struct Payload<'a> {
             kind: &'a str,
             message: String,
+            #[serde(skip_serializing_if = "Option::is_none")]
+            url: Option<&'a str>,
+            #[serde(skip_serializing_if = "Option::is_none")]
+            command: Option<&'a str>,
         }
+        let (url, command) = match self {
+            Error::ManualInstall { url, command, .. } => (url.as_deref(), command.as_deref()),
+            _ => (None, None),
+        };
         Payload {
             kind: self.kind(),
             message: self.to_string(),
+            url,
+            command,
         }
         .serialize(serializer)
     }
