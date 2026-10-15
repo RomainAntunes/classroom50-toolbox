@@ -203,6 +203,7 @@
   "submit.unchanged": "Nothing changed since the last push: this grades the same work again.",
   "submit.late": "The due date has passed, so this submission will be marked late.",
   "submit.noMarker": "This assignment has no autograder setup to submit through. Commit and push your work with git instead.",
+  "submit.noMarkerPush": "This assignment has no submit setup: every push to GitHub counts as your submission. Commit and push your work instead?",
   "submit.deleted": "Some files were deleted without git knowing: {files}. Run git rm on them (or restore them), then submit again.",
   "submit.done": "Submitted. The autograder runs now, and the grade shows up here when it's done. Your clone is now one commit behind GitHub: click Pull to get the submission commit.",
   "submit.view": "View submission",

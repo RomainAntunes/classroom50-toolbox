@@ -5,7 +5,7 @@ import { ask, message } from "@tauri-apps/plugin-dialog";
 import { api, errorKind, errorMessage, withDialog, type Project } from "$lib/api";
 import { t } from "$lib/i18n";
 import { askText } from "$lib/prompt.svelte";
-import { fileList } from "$lib/submit";
+import { fileList } from "$lib/files";
 
 const REASONS = [
   "otherBranch",

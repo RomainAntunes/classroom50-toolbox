@@ -5,6 +5,7 @@ import { prompt } from "$lib/prompt.svelte";
 const dialog = vi.hoisted(() => ({ ask: vi.fn(), message: vi.fn() }));
 const api = vi.hoisted(() => ({
   pushCheck: vi.fn(),
+  submitCheck: vi.fn(),
   commitPush: vi.fn(),
   suggestedGitIdentity: vi.fn(),
   setGitIdentity: vi.fn(),
@@ -17,6 +18,7 @@ vi.mock("$lib/api", async (importOriginal) => ({
 }));
 
 const { commitPush, gradedOnPush } = await import("$lib/push");
+const { submitProject } = await import("$lib/submit");
 
 const project = (assignment: Partial<Assignment> | null = {}) =>
   ({
@@ -114,5 +116,27 @@ describe("commitPush", () => {
       expect.stringContaining("Pull first"),
       expect.objectContaining({ kind: "warning" }),
     );
+  });
+});
+
+describe("submitProject without a marker", () => {
+  const noMarker = { hasMarker: false, untracked: [], deleted: [] };
+
+  it("offers Commit & push on every-push assignments", async () => {
+    api.submitCheck.mockResolvedValue(noMarker);
+    api.pushCheck.mockResolvedValue(check());
+    dialog.ask.mockResolvedValue(true);
+    const done = submitProject(project(), "Lab");
+    await answer("First version");
+    expect(await done).toBe(true);
+    expect(api.commitPush).toHaveBeenCalledWith("o/r", "First version");
+  });
+
+  it("only explains on tag-mode assignments", async () => {
+    api.submitCheck.mockResolvedValue(noMarker);
+    expect(await submitProject(project({ submissionMode: "tag" }), "Lab")).toBe(false);
+    expect(dialog.ask).not.toHaveBeenCalled();
+    expect(dialog.message).toHaveBeenCalledOnce();
+    expect(api.pushCheck).not.toHaveBeenCalled();
   });
 });
