@@ -53,40 +53,41 @@ pub fn valid_login(login: &str) -> bool {
 
 /// Gives `username` push access, with `team add` or `invite`.
 pub async fn add(addition: &Addition<'_>, username: &str) -> Result<()> {
+    let args = add_args(addition, username)?;
+    let temp = std::env::temp_dir();
+    let cwd = match addition {
+        Addition::Invite {
+            clone: Some(clone), ..
+        } => clone,
+        _ => temp.as_path(),
+    };
+    run(args, cwd, ADD_TIMEOUT).await?;
+    Ok(())
+}
+
+/// The `gh` arguments for an addition, after checking the username.
+fn add_args(addition: &Addition<'_>, username: &str) -> Result<Vec<OsString>> {
     let username = username.trim().trim_start_matches('@');
     if !valid_login(username) {
         return Err(Error::Student(format!(
             "\"{username}\" isn't a GitHub username"
         )));
     }
-    let temp = std::env::temp_dir();
-    let (mut args, cwd): (Vec<&str>, &Path) = match addition {
+    let mut args: Vec<&str> = match addition {
         Addition::Team {
             org,
             classroom,
             assignment,
             ..
-        } => (
-            vec![
-                "student", "team", "add", org, classroom, assignment, username,
-            ],
-            &temp,
-        ),
-        Addition::Invite { repo, clone } => (
-            vec!["student", "invite", repo, username],
-            clone.unwrap_or(&temp),
-        ),
+        } => vec![
+            "student", "team", "add", org, classroom, assignment, username,
+        ],
+        Addition::Invite { repo, .. } => vec!["student", "invite", repo, username],
     };
     if let Addition::Team { key: Some(key), .. } = addition {
         args.extend(["--key", key]);
     }
-    run(
-        args.into_iter().map(OsString::from).collect(),
-        cwd,
-        ADD_TIMEOUT,
-    )
-    .await?;
-    Ok(())
+    Ok(args.into_iter().map(OsString::from).collect())
 }
 
 /// What accept needs to know about an assignment.
@@ -274,6 +275,66 @@ mod tests {
         assert!(!valid_login("trailing-"));
         assert!(!valid_login("two words"));
         assert!(!valid_login(&"a".repeat(40)));
+    }
+
+    #[test]
+    fn builds_team_add_and_invite_arguments() {
+        let words = |args: Vec<OsString>| -> Vec<String> {
+            args.iter()
+                .map(|a| a.to_string_lossy().into_owned())
+                .collect()
+        };
+        let team = Addition::Team {
+            org: "HEIGVD-POO",
+            classroom: "26-poo-c",
+            assignment: "labo-3",
+            key: Some("s3cret"),
+        };
+        assert_eq!(
+            words(add_args(&team, " @cs50-duck ").unwrap()),
+            [
+                "student",
+                "team",
+                "add",
+                "HEIGVD-POO",
+                "26-poo-c",
+                "labo-3",
+                "cs50-duck",
+                "--key",
+                "s3cret"
+            ]
+        );
+        let invite = Addition::Invite {
+            repo: "o/r",
+            clone: None,
+        };
+        assert_eq!(
+            words(add_args(&invite, "alice").unwrap()),
+            ["student", "invite", "o/r", "alice"]
+        );
+        assert!(matches!(
+            add_args(&invite, "--help"),
+            Err(Error::Student(_))
+        ));
+    }
+
+    /// Dev builds must refuse both writes, whatever the flags.
+    #[test]
+    fn additions_count_as_writes_to_github() {
+        let team = Addition::Team {
+            org: "o",
+            classroom: "c",
+            assignment: "a",
+            key: Some("k"),
+        };
+        let invite = Addition::Invite {
+            repo: "o/r",
+            clone: None,
+        };
+        for addition in [team, invite] {
+            let args = add_args(&addition, "alice").unwrap();
+            assert!(process::writes_to_github("gh", &args));
+        }
     }
 
     #[test]

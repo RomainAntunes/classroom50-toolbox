@@ -128,7 +128,7 @@ where
     Ok(args)
 }
 
-fn writes_to_github(program: &str, args: &[OsString]) -> bool {
+pub(crate) fn writes_to_github(program: &str, args: &[OsString]) -> bool {
     let words: Vec<String> = args
         .iter()
         .map(|a| a.to_string_lossy().to_ascii_lowercase())
