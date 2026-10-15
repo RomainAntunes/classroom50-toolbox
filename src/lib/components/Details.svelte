@@ -1,5 +1,6 @@
 <script lang="ts">
-  import type { GradeTest } from "$lib/api";
+  import { openUrl } from "@tauri-apps/plugin-opener";
+  import type { GradeTest, ReleaseNotes } from "$lib/api";
   import { t } from "$lib/i18n";
 
   /** Failed tests listed before "and N more". */
@@ -7,18 +8,41 @@
 
   /**
    * The expanded part of a row: the assignment's description, label/value lines, then the
-   * tests the last grade failed.
+   * tests the last grade failed, each opening on why (the autograder's output), and what
+   * else the release says.
    */
   let {
     description,
     items,
     failed = [],
+    notes = null,
+    gradeUrl = null,
   }: {
     description: string | null;
     items: [label: string, value: string][];
     failed?: GradeTest[];
+    notes?: ReleaseNotes | null;
+    /** The graded release, for output cut short here. */
+    gradeUrl?: string | null;
   } = $props();
+
+  // Which failed tests (by index) and whether the notes are open.
+  let opened = $state<Record<number, boolean>>({});
+  let notesOpen = $state(false);
+  // Until the release body is read, only its page says why.
+  const explained = $derived(failed.some((test) => test.output !== null) || !!notes?.notes);
 </script>
+
+{#snippet output(text: string, clipped: boolean)}
+  <div class="output">
+    {#if text}<pre>{text}</pre>{/if}
+    {#if clipped && gradeUrl}
+      <button class="link" onclick={() => gradeUrl && openUrl(gradeUrl)}
+        >{t("details.seeOnGitHub")}</button
+      >
+    {/if}
+  </div>
+{/snippet}
 
 <div class="details">
   {#if description}
@@ -31,17 +55,45 @@
     {/each}
   </dl>
   {#if failed.length}
-    <p class="heading">{t("details.failedTests")}</p>
+    <p class="heading">{t(explained ? "details.failedTests" : "details.failedTestsHint")}</p>
     <ul class="tests">
       {#each failed.slice(0, MAX_TESTS) as test, i (i)}
         <li>
-          <span class="name" title={test.name}>{test.name}</span>
-          <span class="points">{test.score}/{test.maxScore}</span>
+          {#if test.output !== null || test.outputClipped}
+            <button
+              class="test"
+              aria-expanded={!!opened[i]}
+              title={test.name}
+              onclick={() => (opened[i] = !opened[i])}
+            >
+              <span class="chevron" class:open={opened[i]} aria-hidden="true">›</span>
+              <span class="name">{test.name}</span>
+              <span class="points">{test.score}/{test.maxScore}</span>
+            </button>
+            {#if opened[i]}
+              {@render output(test.output ?? "", test.outputClipped)}
+            {/if}
+          {:else}
+            <div class="test">
+              {#if explained}<span class="chevron" aria-hidden="true"></span>{/if}
+              <span class="name" title={test.name}>{test.name}</span>
+              <span class="points">{test.score}/{test.maxScore}</span>
+            </div>
+          {/if}
         </li>
       {/each}
     </ul>
     {#if failed.length > MAX_TESTS}
       <p class="more">{t("details.moreTests", { count: failed.length - MAX_TESTS })}</p>
+    {/if}
+    {#if notes?.notes}
+      <button class="test" aria-expanded={notesOpen} onclick={() => (notesOpen = !notesOpen)}>
+        <span class="chevron" class:open={notesOpen} aria-hidden="true">›</span>
+        <span class="name">{t("details.releaseNotes")}</span>
+      </button>
+      {#if notesOpen}
+        {@render output(notes.notes, notes.notesClipped)}
+      {/if}
     {/if}
   {/if}
 </div>
@@ -102,9 +154,83 @@
     list-style: none;
   }
 
-  .tests li {
+  .test {
     display: flex;
-    gap: 12px;
+    align-items: baseline;
+    gap: 4px;
+    width: 100%;
+  }
+
+  .test .points {
+    margin-left: 8px;
+  }
+
+  button.test {
+    margin: 0;
+    padding: 0;
+    border: none;
+    background: none;
+    color: inherit;
+    font: inherit;
+    text-align: left;
+    cursor: pointer;
+    white-space: normal;
+    flex-shrink: 1;
+    min-width: 0;
+  }
+
+  button.test:hover:not(:disabled),
+  .link:hover:not(:disabled) {
+    background: none;
+  }
+
+  button.test:hover .name {
+    text-decoration: underline;
+  }
+
+  .chevron {
+    flex: none;
+    width: 1ch;
+    color: var(--fg-muted);
+    transition: transform 0.12s ease;
+  }
+
+  .chevron.open {
+    transform: rotate(90deg);
+  }
+
+  .output {
+    margin: 3px 0 6px;
+  }
+
+  pre {
+    margin: 0;
+    padding: 6px 8px;
+    max-height: 16em;
+    overflow: auto;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-control);
+    background: var(--bg-control);
+    color: var(--fg);
+    font-family: var(--font-mono);
+    font-size: 0.92em;
+    line-height: 1.35;
+    white-space: pre;
+    tab-size: 4;
+  }
+
+  .link {
+    margin: 2px 0 0;
+    padding: 0;
+    border: none;
+    background: none;
+    color: var(--accent);
+    font: inherit;
+    cursor: pointer;
+  }
+
+  .link:hover:not(:disabled) {
+    text-decoration: underline;
   }
 
   .tests .name {

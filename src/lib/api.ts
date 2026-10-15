@@ -118,20 +118,32 @@ export interface Grade {
   maxScore: number;
   testsPassed: number;
   testsTotal: number;
-  /** Each test, in the autograder's order; why one failed is only on the release page. */
+  /** Each test, in the autograder's order; a failed one carries why, from the release body. */
   tests: GradeTest[];
   publishedAt: string | null;
   url: string;
+  /** The release body beyond each test's output; null until it was read (only when a test failed). */
+  releaseNotes: ReleaseNotes | null;
 }
 
 /** A past grade: the score without the test list. */
-export type GradeSummary = Omit<Grade, "tests">;
+export type GradeSummary = Omit<Grade, "tests" | "releaseNotes">;
 
 export interface GradeTest {
   name: string;
   passed: boolean;
   score: number;
   maxScore: number;
+  /** Why it failed: the autograder's captured output, plain text, capped. */
+  output: string | null;
+  /** The release page has more than `output`. */
+  outputClipped: boolean;
+}
+
+/** The release body's text that isn't a test's output (a custom autograder's report). */
+export interface ReleaseNotes {
+  notes: string | null;
+  notesClipped: boolean;
 }
 
 /** Teacher comments and reviews on the Feedback PR. */

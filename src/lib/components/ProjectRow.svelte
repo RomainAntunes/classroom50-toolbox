@@ -406,6 +406,8 @@
       description={project.assignment?.description ?? null}
       items={details}
       failed={failedTests}
+      notes={grading?.state === "running" ? null : (grade?.releaseNotes ?? null)}
+      gradeUrl={grade?.url ?? null}
     />
   {/if}
 </div>
