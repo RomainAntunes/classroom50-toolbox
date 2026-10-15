@@ -399,21 +399,41 @@ pub async fn accept_assignment(
         .into_iter()
         .find(|u| u.id == id)
         .ok_or_else(|| Error::Unsupported(format!("unknown assignment {id}")))?;
-    let repo = student::accept(&student::AcceptRequest {
+    let accepted = student::accept(&student::AcceptRequest {
         org: &item.classroom.org,
         classroom: &item.classroom.slug,
         assignment: &item.assignment.slug,
         key: item.classroom.secret.as_deref(),
         new_team,
     })
-    .await?;
-    let snapshot = projects::refresh(&app).await;
+    .await;
+    let repo = match accepted {
+        Ok(repo) => repo,
+        // A failure or a timeout may come after the repo was made: look again.
+        Err(err @ Error::Student(_)) => {
+            let app = app.clone();
+            tauri::async_runtime::spawn(async move {
+                projects::refresh_after_write(&app).await;
+            });
+            return Err(err);
+        }
+        Err(err) => return Err(err),
+    };
+    let snapshot = projects::refresh_after_write(&app).await;
     let key = repo.to_ascii_lowercase();
     let project_id = snapshot
         .projects
         .iter()
         .find(|p| p.id == key)
         .map(|p| p.id.clone());
+    if project_id.is_none() {
+        // GitHub may list a new repo a little later; the next full sync could be an hour off.
+        let app = app.clone();
+        tauri::async_runtime::spawn(async move {
+            tokio::time::sleep(std::time::Duration::from_secs(20)).await;
+            projects::refresh_after_write(&app).await;
+        });
+    }
     Ok(Accepted { repo, project_id })
 }
 
@@ -460,7 +480,7 @@ pub async fn add_teammate(
         }
     };
     student::add(&addition, &username).await?;
-    projects::refresh(&app).await;
+    projects::refresh_after_write(&app).await;
     Ok(())
 }
 

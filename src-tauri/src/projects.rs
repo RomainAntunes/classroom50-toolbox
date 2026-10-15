@@ -46,6 +46,8 @@ const STATE_FILE: &str = "snapshot.json";
 const FULL_SYNC_AGE: chrono::TimeDelta = chrono::TimeDelta::minutes(15);
 /// Opening the popover re-reads the status at most this often.
 const MIN_STATUS_ON_OPEN: chrono::TimeDelta = chrono::TimeDelta::minutes(1);
+/// How old the full sync may get when the popover opens on an assignment to accept.
+const MIN_FULL_ON_OPEN: chrono::TimeDelta = chrono::TimeDelta::minutes(2);
 /// Repos per GraphQL request when reading `.classroom50.yaml`; larger batches time out.
 const DETAIL_BATCH: usize = 25;
 /// Batches in flight at once on a cold cache; GitHub discourages more concurrency.
@@ -417,6 +419,14 @@ pub async fn refresh(app: &AppHandle) -> Snapshot {
     publish(app, Mode::Full, true, guard).await
 }
 
+/// Runs a full sync of its own, after any sync in flight: for a change the app just made on
+/// GitHub (accept, adding a teammate), which a sync started earlier may not have seen.
+pub async fn refresh_after_write(app: &AppHandle) -> Snapshot {
+    let state = app.state::<ProjectsState>();
+    let guard = state.sync_lock.lock().await;
+    publish(app, Mode::Full, true, guard).await
+}
+
 /// Re-reads only the disk (after a clone, commit or settings change) and keeps the last
 /// GitHub data, so it costs no API request.
 pub async fn refresh_local(app: &AppHandle, foreground: bool) -> Snapshot {
@@ -676,7 +686,7 @@ impl Progress {
 /// Starts whatever is due in the background: a full sync when the last one is older than
 /// `FULL_SYNC_AGE`, else a status check when the last GitHub read is older than
 /// `min_status_age`. Nothing while GitHub asks to back off.
-fn refresh_due(app: &AppHandle, min_status_age: chrono::TimeDelta) {
+fn refresh_due(app: &AppHandle, min_status_age: chrono::TimeDelta, on_open: bool) {
     if !may_call_github(app) {
         return;
     }
@@ -684,7 +694,12 @@ fn refresh_due(app: &AppHandle, min_status_age: chrono::TimeDelta) {
     let now = Utc::now();
     let older = |at: Option<DateTime<Utc>>, age| at.is_none_or(|at| now - at >= age);
     let app = app.clone();
-    let (_, full_age) = cadence(&snapshot, now);
+    let (_, mut full_age) = cadence(&snapshot, now);
+    // Only a full sync finds a repo accepted elsewhere (the web page, the CLI), so while an
+    // assignment waits for it, opening the popover looks again.
+    if on_open && awaiting_accept(&snapshot, &app.state::<SettingsStore>().get(), now) {
+        full_age = full_age.min(MIN_FULL_ON_OPEN);
+    }
     let mode = if older(snapshot.synced_at, full_age) {
         Mode::Full
     } else if older(snapshot.checked_at, min_status_age) {
@@ -721,7 +736,19 @@ fn may_call_github(app: &AppHandle) -> bool {
 
 /// When the popover opens.
 pub fn refresh_if_stale(app: &AppHandle) {
-    refresh_due(app, MIN_STATUS_ON_OPEN);
+    refresh_due(app, MIN_STATUS_ON_OPEN, true);
+}
+
+/// Whether the list offers an assignment the user could accept right now (not hidden,
+/// locked or upcoming).
+fn awaiting_accept(snapshot: &Snapshot, settings: &Settings, now: DateTime<Utc>) -> bool {
+    snapshot.unaccepted.iter().any(|item| {
+        let class = format!("{}/{}", item.classroom.org, item.classroom.slug).to_ascii_lowercase();
+        !item.assignment.locked
+            && item.assignment.available_from.is_none_or(|at| at <= now)
+            && !settings.hidden.contains(&item.id)
+            && !settings.hidden_classes.contains(&class)
+    })
 }
 
 /// At startup, re-reads the disk on top of the saved snapshot (no request). Then a tick
@@ -750,16 +777,16 @@ pub fn start_background_sync(app: AppHandle) {
                 if github_reachable().await {
                     log::info!("network is back; syncing");
                     state.clear_offline();
-                    refresh_due(&app, chrono::TimeDelta::zero());
+                    refresh_due(&app, chrono::TimeDelta::zero(), false);
                 }
             } else if slept {
                 log::info!("woke from sleep; syncing");
                 // Give Wi-Fi a moment to reconnect.
                 tokio::time::sleep(Duration::from_secs(5)).await;
-                refresh_due(&app, chrono::TimeDelta::zero());
+                refresh_due(&app, chrono::TimeDelta::zero(), false);
             } else {
                 let (status_age, _) = cadence(&state.snapshot(), Utc::now());
-                refresh_due(&app, status_age);
+                refresh_due(&app, status_age, false);
             }
             tokio::time::sleep(TICK).await;
         }
@@ -2619,6 +2646,43 @@ mod tests {
         let slugs: Vec<&str> = list.iter().map(|u| u.assignment.slug.as_str()).collect();
         assert_eq!(slugs, ["labo-4", "labo-5"]);
         assert_eq!(list[0].id, "heigvd-poo/26-poo-c/labo-4");
+    }
+
+    #[test]
+    fn opening_looks_for_repos_accepted_elsewhere() {
+        let now = Utc::now();
+        let poo = Classroom::from_team("HEIGVD-POO", "classroom50-26-poo-c", None).unwrap();
+        let item = |slug: &str, extra: serde_json::Value| {
+            let mut assignment = json!({"slug": slug, "name": slug, "mode": "team"});
+            assignment
+                .as_object_mut()
+                .unwrap()
+                .extend(extra.as_object().unwrap().clone());
+            Unaccepted {
+                id: format!("heigvd-poo/26-poo-c/{slug}"),
+                classroom: poo.clone(),
+                assignment: serde_json::from_value(assignment).unwrap(),
+                accept_url: String::new(),
+                group: None,
+            }
+        };
+        let later = (now + chrono::TimeDelta::days(1)).to_rfc3339();
+        let mut snapshot = Snapshot {
+            unaccepted: vec![
+                item("labo-4", json!({"locked": true})),
+                item("labo-5", json!({"available_from": later})),
+            ],
+            ..Snapshot::default()
+        };
+        let mut settings = Settings::default();
+        assert!(!awaiting_accept(&snapshot, &settings, now));
+        snapshot.unaccepted.push(item("labo-6", json!({})));
+        assert!(awaiting_accept(&snapshot, &settings, now));
+        settings.hidden = vec!["heigvd-poo/26-poo-c/labo-6".into()];
+        assert!(!awaiting_accept(&snapshot, &settings, now));
+        settings.hidden.clear();
+        settings.hidden_classes = vec!["heigvd-poo/26-poo-c".into()];
+        assert!(!awaiting_accept(&snapshot, &settings, now));
     }
 
     #[test]
