@@ -1,8 +1,8 @@
 use serde::Deserialize;
 use tauri::image::Image;
-use tauri::{AppHandle, Wry};
 use tauri::menu::{Menu, MenuItem, PredefinedMenuItem};
 use tauri::tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent};
+use tauri::{AppHandle, Wry};
 
 use crate::popover;
 

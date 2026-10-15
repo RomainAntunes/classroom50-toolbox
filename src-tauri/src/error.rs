@@ -31,7 +31,7 @@ pub enum Error {
     /// the user does it by hand, from `url` or with `command` in a terminal.
     #[error("{reason}")]
     ManualInstall {
-        reason: String,
+        reason: ManualReason,
         url: Option<String>,
         command: Option<String>,
     },
@@ -62,6 +62,18 @@ pub enum Error {
 
     #[error("you are not in a group for this assignment yet")]
     NeedsTeam,
+
+    /// Submit refused: the teacher closed submissions or archived the repo.
+    #[error("submissions are closed for this assignment")]
+    SubmissionsClosed,
+
+    /// Not a GitHub login, checked before it reaches `gh student`.
+    #[error("\"{0}\" isn't a GitHub username")]
+    InvalidUsername(String),
+
+    /// Linux: none of the terminal emulators the app knows is installed.
+    #[error("no terminal emulator found")]
+    NoTerminal,
 
     /// Pull refused: uncommitted changes to tracked files.
     #[error("the clone has uncommitted changes")]
@@ -116,6 +128,61 @@ pub enum Error {
     Autostart(#[from] tauri_plugin_autostart::Error),
 }
 
+/// Why the app can't install a tool itself (`Error::ManualInstall`); the UI words it as
+/// `setup.manualReason.<code>`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ManualReason {
+    NoHomebrew,
+    NoWinget,
+    OldWinget,
+    ReadOnlySystem,
+    NoPackageManager,
+    NoPkexec,
+}
+
+impl ManualReason {
+    pub const ALL: [Self; 6] = [
+        Self::NoHomebrew,
+        Self::NoWinget,
+        Self::OldWinget,
+        Self::ReadOnlySystem,
+        Self::NoPackageManager,
+        Self::NoPkexec,
+    ];
+
+    pub fn code(self) -> &'static str {
+        match self {
+            Self::NoHomebrew => "noHomebrew",
+            Self::NoWinget => "noWinget",
+            Self::OldWinget => "oldWinget",
+            Self::ReadOnlySystem => "readOnlySystem",
+            Self::NoPackageManager => "noPackageManager",
+            Self::NoPkexec => "noPkexec",
+        }
+    }
+}
+
+impl std::fmt::Display for ManualReason {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(match self {
+            Self::NoHomebrew => "Homebrew isn't installed",
+            Self::NoWinget => "winget (App Installer) isn't installed",
+            Self::OldWinget => {
+                "winget is out of date; update App Installer from the Microsoft Store"
+            }
+            Self::ReadOnlySystem => {
+                "this system's packages are read-only; install it with Homebrew or in a toolbox"
+            }
+            Self::NoPackageManager => {
+                "no supported package manager found (apt, dnf, pacman, zypper)"
+            }
+            Self::NoPkexec => {
+                "pkexec (polkit) isn't installed, so the app can't ask for your password"
+            }
+        })
+    }
+}
+
 /// ", retrying after 14:05 UTC", or nothing when GitHub didn't say.
 fn retry_at(reset_at: &Option<chrono::DateTime<chrono::Utc>>) -> String {
     reset_at
@@ -134,6 +201,8 @@ impl Error {
             Error::PathExists(path) => vec![("path", path.display().to_string())],
             Error::OtherBranch(branch) => vec![("branch", branch.clone())],
             Error::TokenFromEnv(var) => vec![("var", var.clone())],
+            Error::InvalidUsername(name) => vec![("username", name.clone())],
+            Error::ManualInstall { reason, .. } => vec![("reason", reason.code().to_owned())],
             _ => Vec::new(),
         }
     }
@@ -162,6 +231,9 @@ impl Error {
             Error::SchemaMismatch { .. } => "schemaMismatch",
             Error::Student(_) => "student",
             Error::NeedsTeam => "needsTeam",
+            Error::SubmissionsClosed => "submissionsClosed",
+            Error::InvalidUsername(_) => "invalidUsername",
+            Error::NoTerminal => "noTerminal",
             Error::LocalChanges => "localChanges",
             Error::OtherBranch(_) => "otherBranch",
             Error::Diverged => "diverged",
@@ -229,6 +301,9 @@ mod tests {
             Error::Busy,
             Error::PathExists("/tmp/lab-1".into()),
             Error::NeedsTeam,
+            Error::SubmissionsClosed,
+            Error::InvalidUsername("--help".into()),
+            Error::NoTerminal,
             Error::LocalChanges,
             Error::OtherBranch("main".into()),
             Error::Diverged,
@@ -244,6 +319,10 @@ mod tests {
                 text = text.replace(&format!("{{{name}}}"), &value);
             }
             assert_eq!(text, err.to_string(), "{key}");
+        }
+        for reason in ManualReason::ALL {
+            let key = format!("setup.manualReason.{}", reason.code());
+            assert_eq!(en.get(&key), Some(&reason.to_string()), "{key}");
         }
     }
 

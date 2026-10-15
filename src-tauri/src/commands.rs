@@ -559,9 +559,7 @@ fn submittable_clone(state: &ProjectsState, id: &str) -> Result<PathBuf> {
     let closed = project.assignment.as_ref().is_some_and(|a| a.closed)
         || project.remote.as_ref().is_some_and(|r| r.archived);
     if closed {
-        return Err(Error::Student(
-            "submissions are closed for this assignment".into(),
-        ));
+        return Err(Error::SubmissionsClosed);
     }
     project
         .path

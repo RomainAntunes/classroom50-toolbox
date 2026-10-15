@@ -69,9 +69,7 @@ pub async fn add(addition: &Addition<'_>, username: &str) -> Result<()> {
 fn add_args(addition: &Addition<'_>, username: &str) -> Result<Vec<OsString>> {
     let username = username.trim().trim_start_matches('@');
     if !valid_login(username) {
-        return Err(Error::Student(format!(
-            "\"{username}\" isn't a GitHub username"
-        )));
+        return Err(Error::InvalidUsername(username.to_owned()));
     }
     let mut args: Vec<&str> = match addition {
         Addition::Team {
@@ -314,7 +312,7 @@ mod tests {
         );
         assert!(matches!(
             add_args(&invite, "--help"),
-            Err(Error::Student(_))
+            Err(Error::InvalidUsername(_))
         ));
     }
 
