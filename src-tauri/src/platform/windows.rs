@@ -7,20 +7,80 @@ use crate::tools::Tool;
 
 pub const OS: Os = Os::Windows;
 
-/// winget updates PATH in the registry, which an already-running process never sees, so
-/// the default install locations are added explicitly.
+/// Where gh and git may be when the PATH the app started with doesn't list them. An
+/// installer writes the new folder to PATH in the registry, which an already-running
+/// process (or one started by an Explorer that missed the change) never sees, so PATH is
+/// read from the registry the way a new terminal gets it. winget installs per user when
+/// it can (`%LOCALAPPDATA%\Programs`), per machine otherwise; Scoop and Chocolatey have
+/// their own shim folders.
 pub fn extra_path_dirs() -> Vec<PathBuf> {
-    let mut dirs = Vec::new();
-    for var in ["ProgramFiles", "ProgramW6432"] {
-        if let Some(base) = std::env::var_os(var).map(PathBuf::from) {
-            dirs.push(base.join("GitHub CLI"));
-            dirs.push(base.join("Git").join("cmd"));
-        }
+    let env = |var: &str| std::env::var_os(var).map(PathBuf::from);
+    let mut dirs = registry_path();
+    for base in ["ProgramFiles", "ProgramW6432"].into_iter().filter_map(env) {
+        dirs.push(base.join("GitHub CLI"));
+        dirs.push(base.join("Git").join("cmd"));
     }
-    if let Some(local) = std::env::var_os("LOCALAPPDATA").map(PathBuf::from) {
+    if let Some(local) = env("LOCALAPPDATA") {
+        let programs = local.join("Programs");
+        dirs.push(programs.join("GitHub CLI"));
+        dirs.push(programs.join("Git").join("cmd"));
+        dirs.push(local.join("Microsoft").join("WinGet").join("Links"));
         dirs.push(local.join("Microsoft").join("WindowsApps"));
     }
+    if let Some(home) = env("USERPROFILE") {
+        dirs.push(home.join("scoop").join("shims"));
+    }
+    if let Some(data) = env("ProgramData") {
+        dirs.push(data.join("chocolatey").join("bin"));
+    }
     dirs
+}
+
+/// The machine's then the user's `Path` from the registry, `%VARS%` expanded.
+fn registry_path() -> Vec<PathBuf> {
+    use windows_registry::{CURRENT_USER, LOCAL_MACHINE};
+    let machine = LOCAL_MACHINE
+        .open(r"SYSTEM\CurrentControlSet\Control\Session Manager\Environment")
+        .and_then(|key| key.get_string("Path"));
+    let user = CURRENT_USER
+        .open("Environment")
+        .and_then(|key| key.get_string("Path"));
+    [machine, user]
+        .into_iter()
+        .flatten()
+        .flat_map(|value| {
+            let value = expand_env(&value, |name| std::env::var(name).ok());
+            std::env::split_paths(&value).collect::<Vec<_>>()
+        })
+        .filter(|dir| !dir.as_os_str().is_empty())
+        .collect()
+}
+
+/// Replaces each `%NAME%` with the variable's value; an unknown one is left as written,
+/// like `ExpandEnvironmentStrings` does.
+fn expand_env(value: &str, lookup: impl Fn(&str) -> Option<String>) -> String {
+    let mut out = String::with_capacity(value.len());
+    let mut rest = value;
+    while let Some(start) = rest.find('%') {
+        out.push_str(&rest[..start]);
+        let after = &rest[start + 1..];
+        let Some(end) = after.find('%') else {
+            rest = &rest[start..];
+            break;
+        };
+        let name = &after[..end];
+        match lookup(name).filter(|_| !name.is_empty()) {
+            Some(found) => out.push_str(&found),
+            None => {
+                out.push('%');
+                out.push_str(name);
+                out.push('%');
+            }
+        }
+        rest = &after[end + 1..];
+    }
+    out.push_str(rest);
+    out
 }
 
 pub const INSTALL_ENV: &[(&str, &str)] = &[];
@@ -249,6 +309,41 @@ mod tests {
                 || editor.id == "visual-studio";
             assert_eq!(found, editor.id != "eclipse", "{}", editor.id);
         }
+    }
+
+    #[test]
+    fn expands_variables_like_windows() {
+        let lookup = |name: &str| match name {
+            "LOCALAPPDATA" => Some(r"C:\Users\a\AppData\Local".to_owned()),
+            "SystemRoot" => Some(r"C:\Windows".to_owned()),
+            _ => None,
+        };
+        assert_eq!(
+            expand_env(
+                r"%SystemRoot%\system32;%LOCALAPPDATA%\Programs\GitHub CLI\",
+                lookup
+            ),
+            r"C:\Windows\system32;C:\Users\a\AppData\Local\Programs\GitHub CLI\"
+        );
+        assert_eq!(expand_env(r"%NOPE%\bin;50%", lookup), r"%NOPE%\bin;50%");
+        assert_eq!(expand_env("%%", lookup), "%%");
+    }
+
+    /// The registry holds the system folders on every Windows install.
+    #[test]
+    fn reads_path_from_the_registry() {
+        let dirs = registry_path();
+        assert!(
+            dirs.iter().any(|dir| dir
+                .to_string_lossy()
+                .to_ascii_lowercase()
+                .ends_with("system32")),
+            "{dirs:?}"
+        );
+        assert!(
+            dirs.iter().all(|dir| !dir.to_string_lossy().contains('%')),
+            "{dirs:?}"
+        );
     }
 
     #[test]
