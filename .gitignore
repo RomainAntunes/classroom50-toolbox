@@ -18,3 +18,4 @@ vite.config.ts.timestamp-*
 # Updater signing keys never live in the repo
 *.key
 *.key.password
+site/icon.svg

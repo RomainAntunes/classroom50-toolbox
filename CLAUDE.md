@@ -91,6 +91,7 @@ The dev build is tray-only (no Dock icon, starts hidden). Open it from the tray 
 - Icons: `assets/icon.svg`, `assets/icon-small.svg` (heavier strokes, used at 44px and below) and `assets/tray.svg` are the sources. Never edit `src-tauri/icons/` by hand; run `scripts/build-icons.sh` (macOS only, needs `rsvg-convert` and ImageMagick).
 - `src/lib/i18n` is a flat `en.json` read through `t(key, params)`. New strings go there.
 - The updater public key is in `tauri.conf.json`. The private key and its password are in `~/.tauri/classroom50-toolbox.key{,.password}` locally and in the CI secrets `TAURI_SIGNING_PRIVATE_KEY` and `TAURI_SIGNING_PRIVATE_KEY_PASSWORD`. Losing them strands existing installs on their current version.
+- `site/` is the download page at `romainantunes.github.io/classroom50-toolbox`: plain HTML, CSS and JS, deployed by `pages.yml` when `site/` changes (the workflow copies `assets/icon.svg` in). `download.js` reads the latest published release from the GitHub API in the browser and points the button at the visitor's installer, so releases need no redeploy. Drafts are invisible to it.
 - Release: run `pnpm bump X.Y.Z` in the PR, which updates `package.json` (read by `tauri.conf.json`) and `Cargo.toml`. On merge, `release.yml` sees that `vX.Y.Z` has no release yet, builds every platform and creates a draft release with `latest.json`, tagging the merge commit. Merges without a bump build nothing. Publishing the draft ships the update. Don't push tags by hand.
 
 ## Conventions
