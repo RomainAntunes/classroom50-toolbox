@@ -16,6 +16,12 @@ use crate::projects::{ProjectsState, Snapshot};
 use crate::settings::{Settings, SettingsStore};
 
 const PRODID: &str = "-//classroom50-toolbox//EN";
+/// Each deadline is a block of this length ending at the due time: a zero-length event
+/// at 23:59 is a hairline at the bottom of the day.
+const BLOCK: chrono::TimeDelta = chrono::TimeDelta::hours(1);
+/// Calendar events always alert this many hours before the deadline, besides the
+/// reminders picked for notifications.
+const CALENDAR_ALERT_HOURS: u32 = 1;
 /// What the app wrote into the OS calendar, by list id (app config dir: clearing the cache
 /// must not orphan events).
 const WRITTEN_FILE: &str = "calendar-events.json";
@@ -65,13 +71,18 @@ pub fn events(
         .filter_map(|(uid, assignment, classroom, slug, url)| {
             let due = assignment.due?.with_timezone(&Utc);
             let class = classroom.and_then(|c| c.name.as_deref()).unwrap_or(slug);
+            let mut alarm_hours: Vec<u32> = reminder_hours.to_vec();
+            alarm_hours.push(CALENDAR_ALERT_HOURS);
+            alarm_hours.sort_unstable_by(|a, b| b.cmp(a));
+            alarm_hours.dedup();
             let mut event = CalendarEvent {
                 uid: uid.clone(),
                 title: format!("{} · {class}", assignment.name),
                 notes: assignment.description.clone(),
                 url: url.map(str::to_owned),
+                start: due - BLOCK,
                 due,
-                alarm_hours: reminder_hours.to_vec(),
+                alarm_hours,
                 fingerprint: 0,
             };
             event.fingerprint = fingerprint(&event);
@@ -86,6 +97,7 @@ fn fingerprint(event: &CalendarEvent) -> u64 {
         &event.title,
         &event.notes,
         &event.url,
+        event.start,
         event.due,
         &event.alarm_hours,
     )
@@ -109,14 +121,14 @@ pub fn ics(
     line(&mut out, "METHOD:PUBLISH");
     let stamp = utc(now);
     for event in &events {
-        let due = utc(event.due);
+        let (start, due) = (utc(event.start), utc(event.due));
         line(&mut out, "BEGIN:VEVENT");
         line(
             &mut out,
             &format!("UID:{}@classroom50-toolbox", escape(&event.uid)),
         );
         line(&mut out, &format!("DTSTAMP:{stamp}"));
-        line(&mut out, &format!("DTSTART:{due}"));
+        line(&mut out, &format!("DTSTART:{start}"));
         line(&mut out, &format!("DTEND:{due}"));
         line(&mut out, &format!("SUMMARY:{}", escape(&event.title)));
         if let Some(text) = event.notes.as_deref() {
@@ -131,7 +143,7 @@ pub fn ics(
             line(&mut out, "BEGIN:VALARM");
             line(&mut out, "ACTION:DISPLAY");
             line(&mut out, &format!("DESCRIPTION:{}", escape(&event.title)));
-            line(&mut out, &format!("TRIGGER:-PT{hours}H"));
+            line(&mut out, &format!("TRIGGER;RELATED=END:-PT{hours}H"));
             line(&mut out, "END:VALARM");
         }
         line(&mut out, "END:VEVENT");
@@ -337,11 +349,15 @@ mod tests {
         let (ics, count) = ics(&snapshot, &[], &[], &[24, 1], Utc::now());
         assert_eq!(count, 1);
         assert!(ics.starts_with("BEGIN:VCALENDAR\r\n"));
-        assert!(ics.contains("DTSTART:20261102T225900Z\r\n"));
+        assert!(ics.contains("DTSTART:20261102T215900Z\r\n"));
+        assert!(ics.contains("DTEND:20261102T225900Z\r\n"));
         assert!(ics.contains("SUMMARY:Lab 1\\; part A · POO\\, C\r\n"));
         assert!(ics.contains("UID:org/poo/lab1@classroom50-toolbox\r\n"));
         assert_eq!(ics.matches("BEGIN:VALARM").count(), 2);
-        assert!(ics.contains("TRIGGER:-PT24H\r\n"));
+        assert!(ics.contains("TRIGGER;RELATED=END:-PT24H\r\n"));
+        // The 1h alert is always there, without doubling one already picked.
+        let (only_week, _) = super::ics(&snapshot, &[], &[], &[168], Utc::now());
+        assert!(only_week.contains("TRIGGER;RELATED=END:-PT1H\r\n"));
         assert!(!ics.contains("No date"));
     }
 

@@ -82,11 +82,13 @@ fn date(at: chrono::DateTime<chrono::Utc>) -> Retained<NSDate> {
 }
 
 fn fill(event: &EKEvent, calendar: &EKCalendar, item: &CalendarEvent) {
-    let due = date(item.due);
+    let (start, due) = (date(item.start), date(item.due));
+    // EventKit offsets count from the start; the hours count back from the deadline (end).
+    let block = (item.due - item.start).num_seconds() as f64;
     let alarms: Vec<Retained<EKAlarm>> = item
         .alarm_hours
         .iter()
-        .map(|h| unsafe { EKAlarm::alarmWithRelativeOffset(-(f64::from(*h) * 3600.0)) })
+        .map(|h| unsafe { EKAlarm::alarmWithRelativeOffset(block - f64::from(*h) * 3600.0) })
         .collect();
     unsafe {
         event.setCalendar(Some(calendar));
@@ -97,7 +99,7 @@ fn fill(event: &EKEvent, calendar: &EKCalendar, item: &CalendarEvent) {
             .as_deref()
             .and_then(|u| NSURL::URLWithString(&NSString::from_str(u)));
         event.setURL(url.as_deref());
-        event.setStartDate(Some(&due));
+        event.setStartDate(Some(&start));
         event.setEndDate(Some(&due));
         event.setAvailability(EKEventAvailability::Free);
         event.setAlarms(Some(&NSArray::from_retained_slice(&alarms)));
