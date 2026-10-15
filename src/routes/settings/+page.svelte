@@ -158,15 +158,17 @@
       {/snippet}
       <Toggle
         label={t("settings.folders.editors")}
+        hint={t("settings.folders.editorsHint")}
         checked={current.scanEditorProjects}
         onchange={(on) => save({ scanEditorProjects: on })}
       />
-      <p class="hint">{t("settings.folders.editorsHint")}</p>
-      <div class="row clone-into">
-        <span>{t("settings.folders.cloneInto")}</span>
-        <span class="path" title={current.cloneFolder ?? undefined}
-          >{current.cloneFolder ?? t("settings.folders.cloneUnset")}</span
-        >
+      <div class="row">
+        <span class="text">
+          <span>{t("settings.folders.cloneInto")}</span>
+          <span class="sub path" title={current.cloneFolder ?? undefined}
+            >{current.cloneFolder ?? t("settings.folders.cloneUnset")}</span
+          >
+        </span>
         <button onclick={pickCloneFolder}>{t("settings.folders.change")}</button>
       </div>
       {#each current.watchedFolders as folder (folder)}
@@ -401,8 +403,15 @@
     padding: 8px 12px;
   }
 
-  .clone-into .path {
-    flex: 1;
+  .text {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    min-width: 0;
+  }
+
+  .sub {
+    font-size: 0.85em;
     color: var(--fg-muted);
   }
 
