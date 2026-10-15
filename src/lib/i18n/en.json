@@ -250,5 +250,6 @@
   "teammate.inviteOk": "Invite",
   "teammate.teamDone": "{user} is in your group now. They should accept {assignment} next.",
   "teammate.inviteDone": "{user} got an invitation to push to {repo}.",
-  "teammate.failed": "Couldn't add {user}: {error}"
+  "teammate.failed": "Couldn't add {user}: {error}",
+  "projects.inGroup": "In {group}"
 }

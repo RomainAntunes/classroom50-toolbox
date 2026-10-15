@@ -216,6 +216,9 @@ pub struct Unaccepted {
     pub classroom: Classroom,
     pub assignment: Assignment,
     pub accept_url: String,
+    /// The group the user is already on (a teacher-formed group, or one they joined).
+    #[serde(default)]
+    pub group: Option<Group>,
 }
 
 /// Discovery results persisted between runs, so a sync only re-reads repos pushed since.
@@ -742,6 +745,15 @@ async fn sync(
     };
     let mut snapshot = snapshot;
     let groups = state.remote().groups;
+    for item in &mut snapshot.unaccepted {
+        item.group = groups::find(
+            &groups,
+            &item.classroom.org,
+            &item.classroom.slug,
+            &item.assignment.slug,
+        )
+        .cloned();
+    }
     for project in &mut snapshot.projects {
         project.group = project
             .owner
@@ -1030,6 +1042,7 @@ fn unaccepted(
                         &a.slug,
                         classroom.secret.as_deref(),
                     ),
+                    group: None,
                 })
         })
         .collect();

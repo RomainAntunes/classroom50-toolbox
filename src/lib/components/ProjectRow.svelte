@@ -9,7 +9,7 @@
   import { addTeammate, joinsGroup } from "$lib/teammate";
   import { durationLabel, formatDate, fromNow, t } from "$lib/i18n";
   import { tildify } from "$lib/paths.svelte";
-  import { session } from "$lib/session.svelte";
+  import { groupDetails } from "$lib/group";
   import Details from "./Details.svelte";
 
   let { project, now, unseen }: { project: Project; now: Date; unseen: boolean } = $props();
@@ -172,21 +172,7 @@
       );
     }
     if (feedback?.comments) add("feedback", String(feedback.comments));
-    if (project.group) {
-      const group = project.group;
-      const me = session.snapshot?.login?.toLowerCase();
-      add("group", group.name ?? t("details.groupNumber", { number: group.number }));
-      add(
-        "members",
-        group.members
-          .map((m) =>
-            m.login.toLowerCase() === me
-              ? t("details.you", { name: m.name ?? m.login })
-              : (m.name ?? m.login),
-          )
-          .join("\n"),
-      );
-    }
+    if (project.group) items.push(...groupDetails(project.group));
     if (unmerged.length) add("unmerged", unmerged.join(", "));
     if (project.local) {
       const local = project.local;

@@ -193,6 +193,8 @@ export interface Unaccepted {
   classroom: Classroom;
   assignment: Assignment;
   acceptUrl: string;
+  /** The group the user is already on (a teacher-formed group, or one they joined). */
+  group: Group | null;
 }
 
 /** Result of `accept_assignment`. */

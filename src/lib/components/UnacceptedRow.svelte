@@ -2,6 +2,7 @@
   import { openUrl } from "@tauri-apps/plugin-opener";
   import type { Unaccepted } from "$lib/api";
   import { acceptAssignment } from "$lib/accept";
+  import { groupDetails, groupName } from "$lib/group";
   import { formatDate, fromNow, t } from "$lib/i18n";
   import Details from "./Details.svelte";
 
@@ -45,6 +46,7 @@
     ];
     if (opens) items.push([t("details.opens"), formatDate(opens)]);
     if (due) items.push([t("details.due"), formatDate(due)]);
+    if (item.group) items.push(...groupDetails(item.group));
     return items;
   });
 </script>
@@ -78,6 +80,9 @@
               ? t("projects.opens", { when: fromNow(opens, now) })
               : t("projects.notAccepted")}</span
         >
+        {#if item.group}
+          · {t("projects.inGroup", { group: groupName(item.group) })}
+        {/if}
         {#if dueLabel}
           · {dueLabel}
         {/if}

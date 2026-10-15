@@ -106,6 +106,8 @@
               u.classroom.slug,
               u.classroom.name,
               u.classroom.org,
+              u.group?.name,
+              ...(u.group?.members.flatMap((m) => [m.login, m.name]) ?? []),
             ],
             query,
           ),
