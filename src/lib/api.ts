@@ -300,6 +300,8 @@ export interface Settings {
   /** Classes whose section is folded in the list. */
   collapsedClasses: string[];
   appearance: Appearance;
+  /** A catalog code (`en`), or `system` for the OS's language (see `resolveLocale`). */
+  language: string;
   /** The last exported `.ics`, rewritten by Rust after each sync while set. */
   calendarFile: string | null;
   /** The OS calendar the due dates are kept in. */

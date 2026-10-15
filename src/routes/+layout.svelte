@@ -3,12 +3,13 @@
   import { onMount } from "svelte";
   import { listen } from "@tauri-apps/api/event";
   import { api, NOTIFY_EVENT, UNSEEN_EVENT, type Notice } from "$lib/api";
-  import { setLocale, t } from "$lib/i18n";
+  import { currentLocale, setLocale, t } from "$lib/i18n";
   import { showNotice } from "$lib/notices";
   import { loadEditors } from "$lib/editor.svelte";
   import { initTheme } from "$lib/theme/preview.svelte";
   import Prompt from "$lib/components/Prompt.svelte";
   import { session } from "$lib/session.svelte";
+  import { loadSettings, settings } from "$lib/settings.svelte";
 
   let { children } = $props();
 
@@ -21,10 +22,16 @@
     }
   }
 
-  // Lives in the layout so notices arrive whichever page is shown, and while hidden.
-  onMount(() => {
-    setLocale(navigator.language);
-    // Rust writes calendar notes with these words (placeholders filled there).
+  // The `language` setting, live: `t` is reactive, so the whole UI follows at once.
+  const language = $derived(settings.current?.language ?? "system");
+  $effect(() => {
+    setLocale(language, navigator.languages);
+    document.documentElement.lang = currentLocale();
+  });
+
+  // Rust writes calendar notes with these words (placeholders filled
+  // there); sent again when the language changes.
+  $effect(() => {
     void api.setCalendarLabels({
       class: t("calendar.notes.class"),
       group: t("calendar.notes.group"),
@@ -33,6 +40,11 @@
       submitted: t("calendar.notes.submitted"),
       notAccepted: t("calendar.notes.notAccepted"),
     });
+  });
+
+  // Lives in the layout so notices arrive whichever page is shown, and while hidden.
+  onMount(() => {
+    void loadSettings();
     void loadEditors();
     void api.appInfo().then((info) => initTheme(info.os));
     void api.unseen().then((ids) => {

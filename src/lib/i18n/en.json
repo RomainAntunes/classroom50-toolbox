@@ -92,6 +92,8 @@
   "settings.appearance.system": "System",
   "settings.appearance.light": "Light",
   "settings.appearance.dark": "Dark",
+  "settings.language": "Language",
+  "settings.language.system": "System",
   "settings.dev.network": "Network",
   "settings.dev.networkHint": "Pretends GitHub is down (server errors) or the device is offline, until set back to Normal. Refresh to see it.",
   "settings.dev.network.normal": "Normal",

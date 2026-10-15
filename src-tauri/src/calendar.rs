@@ -31,7 +31,7 @@ const WRITTEN_FILE: &str = "calendar-events.json";
 
 /// The words of the event notes, from the UI's i18n (`set_calendar_labels`), so Rust writes
 /// no English of its own. `{name}`, `{n}`, `{score}` and `{max}` are filled in.
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Labels {
     pub class: String,
@@ -303,10 +303,14 @@ impl CalendarState {
         }
     }
 
-    pub fn set_labels(&self, labels: Labels) {
-        if let Ok(mut current) = self.labels.lock() {
-            *current = labels;
-        }
+    /// Returns true when the words changed.
+    pub fn set_labels(&self, labels: Labels) -> bool {
+        let Ok(mut current) = self.labels.lock() else {
+            return false;
+        };
+        let changed = *current != labels;
+        *current = labels;
+        changed
     }
 
     pub fn labels(&self) -> Labels {

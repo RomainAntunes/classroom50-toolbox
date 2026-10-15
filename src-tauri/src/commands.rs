@@ -148,10 +148,16 @@ pub fn export_calendar(
 /// The words of calendar event notes, from the UI's i18n.
 #[tauri::command]
 pub fn set_calendar_labels(
+    app: AppHandle,
     state: State<'_, crate::calendar::CalendarState>,
+    projects: State<'_, ProjectsState>,
     labels: crate::calendar::Labels,
 ) {
-    state.set_labels(labels);
+    // Another language: rewrite the notes now rather than after the next sync. Not before
+    // the first sync, when the list is still empty.
+    if state.set_labels(labels) && projects.snapshot().synced_at.is_some() {
+        crate::calendar::sync(&app);
+    }
 }
 
 /// The OS calendars the user can write to; asks for access the first time.
