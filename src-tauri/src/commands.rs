@@ -54,6 +54,13 @@ pub async fn install_tool(tool: Tool) -> Result<ToolStatus> {
     Ok(tools::status(tool).await)
 }
 
+/// Updates gh-student and returns its new status.
+#[tauri::command]
+pub async fn upgrade_tool(tool: Tool) -> Result<ToolStatus> {
+    tools::upgrade(tool).await?;
+    Ok(tools::status(tool).await)
+}
+
 #[tauri::command]
 pub async fn auth_status() -> AuthStatus {
     tools::auth_status().await

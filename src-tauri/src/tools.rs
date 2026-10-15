@@ -80,6 +80,18 @@ pub async fn install(tool: Tool) -> Result<()> {
     Ok(())
 }
 
+/// Updates gh-student, which changes often upstream. git and gh are left to the OS
+/// package manager, which updates them with the rest of the system.
+pub async fn upgrade(tool: Tool) -> Result<()> {
+    if tool != Tool::GhStudent {
+        return Err(Error::Unsupported(
+            "git and gh are updated by your package manager".into(),
+        ));
+    }
+    process::run("gh", ["extension", "upgrade", "gh-student"], None).await?;
+    Ok(())
+}
+
 /// Reads gh's stored login. The token itself never leaves Rust.
 pub async fn auth_status() -> AuthStatus {
     let login = process::run("gh", ["api", "user", "--jq", ".login"], None)

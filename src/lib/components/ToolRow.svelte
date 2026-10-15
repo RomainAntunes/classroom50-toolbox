@@ -6,6 +6,24 @@
   let { status, onchange }: { status: ToolStatus; onchange: (s: ToolStatus) => void } = $props();
 
   let installing = $state(false);
+  let upgrading = $state(false);
+  let upToDate = $state(false);
+  // git and gh are updated by the OS package manager; gh-student by gh.
+  const upgradable = $derived(status.installed && status.tool === "gh-student");
+
+  async function upgrade() {
+    upgrading = true;
+    upToDate = false;
+    try {
+      const next = await api.upgradeTool(status.tool);
+      upToDate = next.version === status.version;
+      onchange(next);
+    } catch (err) {
+      await withDialog(() => message(errorMessage(err), { kind: "error" }));
+    } finally {
+      upgrading = false;
+    }
+  }
 
   async function install() {
     try {
@@ -29,7 +47,12 @@
   <span class="dot" class:ok={status.installed}></span>
   <span class="name">{t(`setup.tool.${status.tool}`)}</span>
   {#if status.installed}
-    <span class="meta">{status.version}</span>
+    <span class="meta">{upToDate ? t("setup.upToDate") : status.version}</span>
+    {#if upgradable}
+      <button disabled={upgrading} onclick={upgrade}>
+        {upgrading ? t("setup.updating") : t("setup.update")}
+      </button>
+    {/if}
   {:else}
     <button class="primary" disabled={installing} onclick={install}>
       {installing ? t("setup.installing") : t("setup.install")}
