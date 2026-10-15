@@ -291,6 +291,10 @@ export const api = {
   setPopoverPinned: (pinned: boolean) => invoke<void>("set_popover_pinned", { pinned }),
   toolStatuses: () => invoke<ToolStatus[]>("tool_statuses"),
   installCommand: (tool: Tool) => invoke<CommandSpec>("install_command", { tool }),
+  /** The newer version `upgradeTool` would install; always null for git and gh. */
+  toolUpdate: (tool: Tool) => invoke<string | null>("tool_update", { tool }),
+  /** gh-student only; git and gh follow the OS package manager. */
+  upgradeTool: (tool: Tool) => invoke<ToolStatus>("upgrade_tool", { tool }),
   installTool: (tool: Tool) => invoke<ToolStatus>("install_tool", { tool }),
   authStatus: () => invoke<AuthStatus>("auth_status"),
   listProjects: () => invoke<Snapshot>("list_projects"),

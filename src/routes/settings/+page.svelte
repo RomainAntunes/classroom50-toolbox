@@ -13,6 +13,7 @@
     type AppInfo,
     type LastRun,
     type SyncDetails,
+    type ToolStatus,
   } from "$lib/api";
   import { formatDate, fromNow, hoursLabel, t } from "$lib/i18n";
   import { sampleNotices, showNotice } from "$lib/notices";
@@ -20,6 +21,7 @@
   import { pickCloneFolder } from "$lib/clone";
   import Section from "$lib/components/Section.svelte";
   import Toggle from "$lib/components/Toggle.svelte";
+  import ToolRow from "$lib/components/ToolRow.svelte";
   import { session } from "$lib/session.svelte";
 
   const REMINDER_CHOICES = [72, 24, 6, 1];
@@ -45,6 +47,20 @@
     } finally {
       badgeQueued = false;
     }
+  }
+
+  let checkingTools = $state(false);
+  async function checkTools() {
+    checkingTools = true;
+    try {
+      session.tools = await api.toolStatuses();
+    } finally {
+      checkingTools = false;
+    }
+  }
+
+  function replaceTool(next: ToolStatus) {
+    session.tools = session.tools.map((tool) => (tool.tool === next.tool ? next : tool));
   }
 
   const rate = $derived(sync?.rateLimit ?? sync?.stats.rateLimit ?? null);
@@ -110,6 +126,7 @@
   }
 
   onMount(() => {
+    if (!session.tools.length) void checkTools();
     void Promise.all([api.appInfo(), loadSettings(), api.syncDetails()]).then(
       ([appInfo, , details]) => {
         info = appInfo;
@@ -161,6 +178,16 @@
         {#if !current.scanEditorProjects}
           <p class="hint">{t("settings.folders.hint")}</p>
         {/if}
+      {/each}
+    </Section>
+
+    <Section title={t("settings.tools.title")}>
+      {#snippet actions()}
+        <button disabled={checkingTools} onclick={checkTools}>{t("setup.recheck")}</button>
+      {/snippet}
+      <p class="hint">{t("settings.tools.hint")}</p>
+      {#each session.tools as status (status.tool)}
+        <ToolRow {status} onchange={replaceTool} checkUpdates />
       {/each}
     </Section>
 

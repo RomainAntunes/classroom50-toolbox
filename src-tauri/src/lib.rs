@@ -96,6 +96,8 @@ pub fn run() {
             commands::tool_statuses,
             commands::install_command,
             commands::install_tool,
+            commands::upgrade_tool,
+            commands::tool_update,
             commands::auth_status,
             commands::list_projects,
             commands::refresh_projects,
