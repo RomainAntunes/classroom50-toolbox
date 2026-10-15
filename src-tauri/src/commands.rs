@@ -235,6 +235,35 @@ pub fn open_terminal(path: PathBuf) -> Result<()> {
     platform::open_terminal(&path)
 }
 
+#[derive(Debug, Serialize)]
+pub struct EditorInfo {
+    id: &'static str,
+    name: &'static str,
+}
+
+/// The editors installed here that can open a folder, in a stable order.
+#[tauri::command]
+pub async fn installed_editors() -> Vec<EditorInfo> {
+    tauri::async_runtime::spawn_blocking(|| {
+        crate::editors::installed()
+            .into_iter()
+            .map(|editor| EditorInfo {
+                id: editor.id,
+                name: editor.name,
+            })
+            .collect()
+    })
+    .await
+    .unwrap_or_default()
+}
+
+#[tauri::command]
+pub async fn open_in_editor(path: PathBuf, editor: String) -> Result<()> {
+    tauri::async_runtime::spawn_blocking(move || crate::editors::open(&editor, &path))
+        .await
+        .map_err(|err| Error::Unsupported(err.to_string()))?
+}
+
 /// Clones a project that has no local copy into `parent/<repo>`, registers the clone and
 /// rescans the disk. Returns the new folder; `projects-updated` follows.
 #[tauri::command]
@@ -303,6 +332,53 @@ pub async fn accept_assignment(
         .find(|p| p.id == key)
         .map(|p| p.id.clone());
     Ok(Accepted { repo, project_id })
+}
+
+/// Gives a classmate push access to project `id`: joins them to the group on a team
+/// assignment, invites them as a collaborator otherwise. A full sync follows, so the
+/// group's members are read again.
+#[tauri::command]
+pub async fn add_teammate(
+    app: AppHandle,
+    state: State<'_, ProjectsState>,
+    id: String,
+    username: String,
+) -> Result<()> {
+    let project = state
+        .snapshot()
+        .projects
+        .into_iter()
+        .find(|p| p.id == id)
+        .ok_or_else(|| Error::Unsupported(format!("unknown project {id}")))?;
+    let (Some(owner), Some(repo)) = (project.owner.as_deref(), project.repo.as_deref()) else {
+        return Err(Error::Unsupported(format!("{id} isn't on GitHub")));
+    };
+    let team = project.group.is_some()
+        || project
+            .assignment
+            .as_ref()
+            .is_some_and(|a| a.mode == crate::classroom50::AssignmentMode::Team);
+    let full_name = format!("{owner}/{repo}");
+    let addition = if team {
+        student::Addition::Team {
+            org: owner,
+            classroom: &project.config.classroom,
+            assignment: &project.config.assignment,
+            key: project
+                .classroom
+                .as_ref()
+                .and_then(|c| c.secret.as_deref())
+                .or(project.config.secret.as_deref()),
+        }
+    } else {
+        student::Addition::Invite {
+            repo: &full_name,
+            clone: project.path.as_deref(),
+        }
+    };
+    student::add(&addition, &username).await?;
+    projects::refresh(&app).await;
+    Ok(())
 }
 
 /// The clone of project `id`, which must exist and still take submissions.

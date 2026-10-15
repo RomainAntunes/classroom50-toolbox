@@ -24,6 +24,11 @@ export default defineConfig(() => ({
   define: {
     __COMMIT__: JSON.stringify(commit()),
   },
+  // Unit tests for the UI's own logic (`pnpm test`); runes compile through the plugin.
+  test: {
+    include: ["src/**/*.test.ts"],
+    environment: "node",
+  },
 
   // Vite options tailored for Tauri development and only applied in `tauri dev` or `tauri build`
   //

@@ -19,10 +19,18 @@
   import { sampleNotices, showNotice } from "$lib/notices";
   import { loadSettings, pickWatchedFolder, saveSettings, settings } from "$lib/settings.svelte";
   import { pickCloneFolder } from "$lib/clone";
+  import { chooseDefaultEditor, defaultEditor, editors, loadEditors } from "$lib/editor.svelte";
   import Section from "$lib/components/Section.svelte";
   import Toggle from "$lib/components/Toggle.svelte";
   import ToolRow from "$lib/components/ToolRow.svelte";
   import { session } from "$lib/session.svelte";
+  import {
+    OS_CHOICES,
+    THEME_CHOICES,
+    preview,
+    setPreviewOs,
+    setPreviewTheme,
+  } from "$lib/theme/preview.svelte";
 
   const REMINDER_CHOICES = [72, 24, 6, 1];
   const REPO_URL = "https://github.com/RomainAntunes/classroom50-toolbox";
@@ -32,7 +40,6 @@
   let info = $state<AppInfo | null>(null);
   let checking = $state(false);
   let upToDate = $state(false);
-  let rescanning = $state(false);
   let sync = $state<SyncDetails | null>(null);
   let clearing = $state(false);
   // Diagnostics: folded away unless asked for.
@@ -84,6 +91,7 @@
   }
 
   const current = $derived(settings.current);
+  const editor = $derived(current ? defaultEditor() : null);
 
   async function save(patch: Parameters<typeof saveSettings>[0]) {
     try {
@@ -102,15 +110,6 @@
     save({ notifyHoursBefore: on ? [...rest, hours] : rest });
   }
 
-  async function rescan() {
-    rescanning = true;
-    try {
-      session.snapshot = await api.rescanLocal();
-    } finally {
-      rescanning = false;
-    }
-  }
-
   async function checkUpdates() {
     checking = true;
     upToDate = false;
@@ -127,6 +126,8 @@
 
   onMount(() => {
     if (!session.tools.length) void checkTools();
+    // An editor installed since the app started shows up here.
+    void loadEditors(true);
     void Promise.all([api.appInfo(), loadSettings(), api.syncDetails()]).then(
       ([appInfo, , details]) => {
         info = appInfo;
@@ -150,34 +151,33 @@
 {#if current}
   <main>
     <Section title={t("settings.folders.title")}>
-      {#snippet actions()}
-        <div class="actions">
-          <button disabled={rescanning} onclick={rescan}>{t("projects.rescan")}</button>
-          <button onclick={pickWatchedFolder}>{t("projects.addFolder")}</button>
-        </div>
-      {/snippet}
       <Toggle
         label={t("settings.folders.editors")}
+        hint={t("settings.folders.editorsHint")}
         checked={current.scanEditorProjects}
         onchange={(on) => save({ scanEditorProjects: on })}
       />
-      <p class="hint">{t("settings.folders.editorsHint")}</p>
-      <div class="row clone-into">
-        <span>{t("settings.folders.cloneInto")}</span>
-        <span class="path" title={current.cloneFolder ?? undefined}
-          >{current.cloneFolder ?? t("settings.folders.cloneUnset")}</span
-        >
+      <div class="row">
+        <span class="text">
+          <span>{t("settings.folders.cloneInto")}</span>
+          <span class="sub path" title={current.cloneFolder ?? undefined}
+            >{current.cloneFolder ?? t("settings.folders.cloneUnset")}</span
+          >
+        </span>
         <button onclick={pickCloneFolder}>{t("settings.folders.change")}</button>
       </div>
+      <div class="row">
+        <span class="text">
+          <span>{t("settings.folders.watched")}</span>
+          <span class="sub">{t("settings.folders.hint")}</span>
+        </span>
+        <button onclick={pickWatchedFolder}>{t("projects.addFolder")}</button>
+      </div>
       {#each current.watchedFolders as folder (folder)}
-        <div class="row">
+        <div class="row nested">
           <span class="path" title={folder}>{folder}</span>
           <button onclick={() => removeFolder(folder)}>{t("settings.folders.remove")}</button>
         </div>
-      {:else}
-        {#if !current.scanEditorProjects}
-          <p class="hint">{t("settings.folders.hint")}</p>
-        {/if}
       {/each}
     </Section>
 
@@ -192,6 +192,26 @@
     </Section>
 
     <Section title={t("settings.general.title")}>
+      <div class="row">
+        <span class="text">
+          <span>{t("settings.editor.label")}</span>
+          <span class="sub"
+            >{t(editors.installed.length ? "settings.editor.hint" : "settings.editor.none")}</span
+          >
+        </span>
+        {#if editor}
+          <button onclick={chooseDefaultEditor}>{editor.name}</button>
+        {/if}
+      </div>
+      {#if current.hidden.length}
+        <div class="row">
+          <span class="text">
+            <span>{t("settings.hidden.label")}</span>
+            <span class="sub">{t("settings.hidden.hint", { count: current.hidden.length })}</span>
+          </span>
+          <button onclick={() => save({ hidden: [] })}>{t("settings.hidden.showAll")}</button>
+        </div>
+      {/if}
       <Toggle
         label={t("settings.launchAtLogin")}
         checked={current.launchAtLogin}
@@ -264,6 +284,26 @@
 
     {#if import.meta.env.DEV}
       <Section title={t("settings.dev.title")}>
+        <div class="row">
+          <span title={t("settings.dev.skinHint")}>{t("settings.dev.skin")}</span>
+          <div class="segmented">
+            {#each OS_CHOICES as os (os)}
+              <button aria-pressed={preview.os === os} onclick={() => setPreviewOs(os)}
+                >{t(`settings.dev.os.${os}`)}</button
+              >
+            {/each}
+          </div>
+        </div>
+        <div class="row">
+          <span>{t("settings.dev.appearance")}</span>
+          <div class="segmented">
+            {#each THEME_CHOICES as theme (theme)}
+              <button aria-pressed={preview.theme === theme} onclick={() => setPreviewTheme(theme)}
+                >{t(`settings.dev.theme.${theme}`)}</button
+              >
+            {/each}
+          </div>
+        </div>
         <button class="disclosure" aria-expanded={showDev} onclick={() => (showDev = !showDev)}>
           <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m9 18 6-6-6-6" /></svg>
           {t("settings.dev.notifications")}
@@ -288,14 +328,23 @@
 
     <Section title={t("settings.about.title")}>
       <div class="row">
+        <span>{t("settings.about.guide")}</span>
+        <button onclick={() => goto("/welcome")}>{t("settings.about.openGuide")}</button>
+      </div>
+      <div class="row">
         <span>{t("settings.about.updates")}</span>
         <button disabled={checking} onclick={checkUpdates}>
           {upToDate ? t("settings.about.upToDate") : t("settings.about.checkUpdates")}
         </button>
       </div>
+      <div class="row">
+        <span class="text">
+          <span>{t("settings.quit.label")}</span>
+          <span class="sub">{t("settings.quit.hint")}</span>
+        </span>
+        <button onclick={() => exit(0)}>{t("settings.quit.action")}</button>
+      </div>
     </Section>
-
-    <button class="quit" onclick={() => exit(0)}>{t("settings.quit")}</button>
 
     <footer>
       {#if info}
@@ -329,11 +378,13 @@
 
   main {
     flex: 1;
-    overflow-y: auto;
+    /* The 10px track is always there (and invisible), so the right margin is 2px plus the
+       track and matches the left one whether or not the page scrolls. */
+    overflow-y: scroll;
     display: flex;
     flex-direction: column;
     gap: calc(var(--space) * 2);
-    padding: var(--space) 12px 14px;
+    padding: var(--space) 2px 14px 12px;
   }
 
   .disclosure {
@@ -388,9 +439,27 @@
     color: var(--warning);
   }
 
-  .actions {
+  .segmented {
     display: flex;
-    gap: 6px;
+    gap: 2px;
+    padding: 2px;
+    border-radius: var(--radius-control);
+    background: var(--bg-control);
+  }
+
+  .segmented button {
+    padding: 2px 8px;
+    background: transparent;
+    font-size: 0.9em;
+  }
+
+  .segmented button[aria-pressed="true"] {
+    background: var(--bg-card);
+    box-shadow: 0 0 0 1px var(--border);
+  }
+
+  .row.nested {
+    padding-left: 24px;
   }
 
   .row {
@@ -401,8 +470,15 @@
     padding: 8px 12px;
   }
 
-  .clone-into .path {
-    flex: 1;
+  .text {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    min-width: 0;
+  }
+
+  .sub {
+    font-size: 0.85em;
     color: var(--fg-muted);
   }
 
@@ -431,20 +507,19 @@
 
   .link {
     padding: 0;
+    border-radius: 0;
     background: transparent;
     color: inherit;
     font: inherit;
     font-variant-numeric: tabular-nums;
+    cursor: pointer;
   }
 
-  .link:hover {
-    color: var(--accent);
-    text-decoration: underline;
-  }
-
-  .quit {
-    align-self: center;
-    color: var(--danger);
+  /* Beats the global `button:hover` background, which drew a box behind the text. */
+  .link:hover:not(:disabled) {
     background: transparent;
+    color: var(--fg);
+    text-decoration: underline;
+    text-underline-offset: 2px;
   }
 </style>

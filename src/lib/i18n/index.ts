@@ -33,6 +33,11 @@ export function t(
   );
 }
 
+/** "Ada, Bob and Carol" in the catalog's language, so a sentence never mixes two. */
+export function formatList(items: string[]): string {
+  return new Intl.ListFormat(currentLocale, { type: "conjunction" }).format(items);
+}
+
 /** "Fri 17 Oct, 23:59" in the catalog's language: for exact dates in details. */
 export function formatDate(date: Date): string {
   return new Intl.DateTimeFormat(currentLocale, {

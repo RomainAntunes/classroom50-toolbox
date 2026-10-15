@@ -26,9 +26,10 @@ use crate::discovery::{self, LocalProject};
 use crate::editors;
 use crate::error::{Error, Result};
 use crate::github::{self, Http, HttpCache};
+use crate::groups::{self, Group, GroupTeam};
 use crate::process;
 use crate::settings::{Settings, SettingsStore};
-use crate::status::{self, Branch, Feedback, Grade, Grading, StatusFields};
+use crate::status::{self, Branch, Feedback, Grade, GradeSummary, Grading, StatusFields};
 use crate::tools;
 use crate::watch::{self, WatchTarget};
 
@@ -99,6 +100,9 @@ pub struct RemoteRepo {
     pub unmerged: Vec<Branch>,
     #[serde(default)]
     pub grade: Option<Grade>,
+    /// Every graded submission still listed (the last 10 releases), newest first.
+    #[serde(default)]
+    pub history: Vec<GradeSummary>,
     /// The autograder's run on the head commit, while running or when it broke.
     #[serde(default)]
     pub grading: Option<Grading>,
@@ -158,6 +162,12 @@ pub struct Project {
     /// date, as upstream grades it, past the due date. Advisory: nothing is blocked.
     #[serde(default)]
     pub late_seconds: Option<i64>,
+    /// The editor that last opened the clone (`editors::Editor::id`), when one did.
+    #[serde(default)]
+    pub editor: Option<String>,
+    /// The user's group, on a team assignment.
+    #[serde(default)]
+    pub group: Option<Group>,
 }
 
 /// Why the last sync was partial, as `{ kind, message }` like command errors.
@@ -209,6 +219,9 @@ pub struct Unaccepted {
     pub classroom: Classroom,
     pub assignment: Assignment,
     pub accept_url: String,
+    /// The group the user is already on (a teacher-formed group, or one they joined).
+    #[serde(default)]
+    pub group: Option<Group>,
 }
 
 /// Discovery results persisted between runs, so a sync only re-reads repos pushed since.
@@ -222,6 +235,9 @@ struct RemoteCache {
     repos: BTreeMap<String, RemoteRepo>,
     /// From the user's classroom teams.
     classrooms: Vec<Classroom>,
+    /// The user's group teams with their members.
+    #[serde(default)]
+    groups: Vec<Group>,
 }
 
 /// How far the sync in flight is. `total` grows as the work is discovered (repo batches,
@@ -713,21 +729,53 @@ async fn sync(
         settings.scan_editor_projects,
         progress.clone(),
     );
-    let (snapshot, scan_targets) = if mode != Mode::Full {
-        let (locals, targets) = scan.await;
+    let (snapshot, scan_targets, recents) = if mode != Mode::Full {
+        let (locals, targets, recents) = scan.await;
         let status = mode == Mode::Status;
         (
             local_snapshot(state, http, locals, now, status, progress).await,
             targets,
+            recents,
         )
     } else {
-        let (remote, (locals, targets)) = tokio::join!(sync_remote(state, http, progress), scan);
+        let (remote, (locals, targets, recents)) =
+            tokio::join!(sync_remote(state, http, progress), scan);
         (
             full_snapshot(state, http, remote, locals, now, progress).await,
             targets,
+            recents,
         )
     };
     let mut snapshot = snapshot;
+    let groups = state.remote().groups;
+    for item in &mut snapshot.unaccepted {
+        item.group = groups::find(
+            &groups,
+            &item.classroom.org,
+            &item.classroom.slug,
+            &item.assignment.slug,
+        )
+        .cloned();
+    }
+    for project in &mut snapshot.projects {
+        project.group = project
+            .owner
+            .as_deref()
+            .and_then(|owner| {
+                groups::find(
+                    &groups,
+                    owner,
+                    &project.config.classroom,
+                    &project.config.assignment,
+                )
+            })
+            .cloned();
+        project.editor = project
+            .path
+            .as_deref()
+            .and_then(|path| editors::editor_for(path, &recents))
+            .map(|editor| editor.id.to_owned());
+    }
     snapshot.login = state.remote().login;
     let targets = watch_targets(&settings.watched_folders, scan_targets, &snapshot.projects);
     (snapshot, targets)
@@ -997,6 +1045,7 @@ fn unaccepted(
                         &a.slug,
                         classroom.secret.as_deref(),
                     ),
+                    group: None,
                 })
         })
         .collect();
@@ -1221,6 +1270,7 @@ impl RepoNode {
             config,
             unmerged: Vec::new(),
             grade: None,
+            history: Vec::new(),
             grading: None,
             feedback: None,
         }
@@ -1326,7 +1376,13 @@ async fn sync_remote(
         }
     }
     match classrooms {
-        Ok(classrooms) => cache.classrooms = classrooms,
+        Ok((classrooms, group_teams)) => {
+            cache.classrooms = classrooms;
+            match groups::load(http, &token, &group_teams).await {
+                Ok(groups) => cache.groups = groups,
+                Err(err) => log::warn!("could not read group members: {err}"),
+            }
+        }
         // Teams are a bonus over marker files; keep the last known list.
         Err(err) => log::warn!("could not read classroom teams: {err}"),
     }
@@ -1376,29 +1432,41 @@ struct TeamNode {
     description: Option<String>,
 }
 
-/// The classrooms the user is enrolled in, from their `classroom50-<classroom>` teams.
+/// The classrooms the user is enrolled in, from their `classroom50-<classroom>` teams, and
+/// their group teams.
 async fn list_classrooms(
     http: &reqwest::Client,
     token: &str,
     login: &str,
-) -> Result<Vec<Classroom>> {
+) -> Result<(Vec<Classroom>, Vec<GroupTeam>)> {
     let mut classrooms = Vec::new();
+    let mut group_teams = Vec::new();
     let mut cursor: Option<String> = None;
     for _ in 0..MAX_LIST_PAGES {
         let variables = json!({ "login": login, "cursor": cursor });
         let data: TeamsData = github::graphql(http, token, TEAMS_QUERY, variables).await?;
         let page = data.viewer.organizations;
         for org in page.nodes.into_iter().flatten() {
-            classrooms.extend(org.teams.nodes.into_iter().flatten().filter_map(|team| {
-                Classroom::from_team(&org.login, &team.slug, team.description.as_deref())
-            }));
+            for team in org.teams.nodes.into_iter().flatten() {
+                if groups::is_group_team(&team.slug) {
+                    group_teams.push(GroupTeam {
+                        org: org.login.clone(),
+                        slug: team.slug,
+                        description: team.description,
+                    });
+                } else if let Some(classroom) =
+                    Classroom::from_team(&org.login, &team.slug, team.description.as_deref())
+                {
+                    classrooms.push(classroom);
+                }
+            }
         }
         match page.page_info.end_cursor {
             Some(next) if page.page_info.has_next_page => cursor = Some(next),
             _ => break,
         }
     }
-    Ok(classrooms)
+    Ok((classrooms, group_teams))
 }
 
 async fn list_repos(http: &reqwest::Client, token: &str) -> Result<(String, Vec<ListedRepo>)> {
@@ -1472,6 +1540,7 @@ struct StatusNode {
 fn keep_status(repo: &mut RemoteRepo, old: &RemoteRepo) {
     repo.unmerged.clone_from(&old.unmerged);
     repo.grade.clone_from(&old.grade);
+    repo.history.clone_from(&old.history);
     repo.grading.clone_from(&old.grading);
     repo.feedback.clone_from(&old.feedback);
 }
@@ -1550,24 +1619,29 @@ async fn refresh_statuses(
         repo.unmerged = status.unmerged(repo.default_branch.as_deref());
         repo.feedback = status.feedback(&auth.login);
         repo.grading = status.grading();
-        repo.grade = match status.graded_release() {
+        let releases = status.graded_releases();
+        repo.grade = match releases.first() {
             Some(release)
                 if old
                     .grade
                     .as_ref()
                     .is_some_and(|g| g.tag == release.tag && g.has_tests()) =>
             {
-                old.grade
+                old.grade.clone()
             }
-            Some(release) => match status::download_grade(http, &release).await {
+            Some(release) => match status::download_grade(http, release).await {
                 Ok(grade) => Some(grade),
                 Err(err) => {
                     log::warn!("{err}");
-                    old.grade
+                    old.grade.clone()
                 }
             },
             None => None,
         };
+        repo.history = grade_history(&releases, repo.grade.as_ref(), &old, |release| {
+            status::download_grade(http, release)
+        })
+        .await;
         updated.push((repo, config));
     }
 
@@ -1579,6 +1653,39 @@ async fn refresh_statuses(
     }
     state.store_remote(cache);
     updated
+}
+
+/// The summary of each graded release, newest first. A result is downloaded once per tag;
+/// after that it comes from the last sync.
+async fn grade_history<'a, F, Fut>(
+    releases: &'a [status::GradedRelease],
+    newest: Option<&Grade>,
+    old: &RemoteRepo,
+    mut download: F,
+) -> Vec<GradeSummary>
+where
+    F: FnMut(&'a status::GradedRelease) -> Fut,
+    Fut: std::future::Future<Output = Result<Grade>>,
+{
+    let mut history = Vec::with_capacity(releases.len());
+    for release in releases {
+        let known = newest
+            .filter(|g| g.tag == release.tag)
+            .map(GradeSummary::from)
+            .or_else(|| old.history.iter().find(|g| g.tag == release.tag).cloned());
+        let summary = match known {
+            Some(summary) => summary,
+            None => match download(release).await {
+                Ok(grade) => GradeSummary::from(&grade),
+                Err(err) => {
+                    log::warn!("{err}");
+                    continue;
+                }
+            },
+        };
+        history.push(summary);
+    }
+    history
 }
 
 fn key(name_with_owner: &str) -> String {
@@ -1595,9 +1702,9 @@ async fn scan_local(
     clones: Vec<PathBuf>,
     editors: bool,
     progress: Progress,
-) -> (Vec<LocalProject>, Vec<WatchTarget>) {
+) -> (Vec<LocalProject>, Vec<WatchTarget>, Vec<editors::Recent>) {
     tauri::async_runtime::spawn_blocking(move || {
-        let (roots, targets) = scan_roots(folders, clones, editors);
+        let (roots, targets, recents) = scan_roots(folders, clones, editors);
         progress.add(roots.len());
         if let Ok(mut stats) = progress.0.state::<ProjectsState>().stats.lock() {
             stats.scan_roots = roots.len();
@@ -1609,18 +1716,23 @@ async fn scan_local(
             locals.extend(found.into_iter().filter(|l| seen.insert(l.path.clone())));
             progress.advance();
         }
-        (locals, targets)
+        (locals, targets, recents)
     })
     .await
     .unwrap_or_default()
 }
 
-/// Folders to scan with their depth, and the non-recursive watch targets.
+/// Folders to scan with their depth, the non-recursive watch targets, and the folders
+/// editors opened (to tell which editor a clone belongs to).
 fn scan_roots(
     folders: Vec<PathBuf>,
     clones: Vec<PathBuf>,
     editors: bool,
-) -> (Vec<(PathBuf, usize)>, Vec<WatchTarget>) {
+) -> (
+    Vec<(PathBuf, usize)>,
+    Vec<WatchTarget>,
+    Vec<editors::Recent>,
+) {
     let mut roots: Vec<(PathBuf, usize)> = folders
         .iter()
         .map(|folder| (folder.clone(), discovery::DEFAULT_MAX_DEPTH))
@@ -1634,27 +1746,28 @@ fn scan_roots(
     );
     let mut targets = Vec::new();
     if !editors {
-        return (roots, targets);
+        return (roots, targets, Vec::new());
     }
     let found = editors::find();
+    let recents: Vec<editors::Recent> = found.recent.iter().chain(&found.roots).cloned().collect();
     let home = crate::platform::home_dir();
     let usable =
         |dir: &Path| !folders.iter().any(|f| dir.starts_with(f)) && is_narrow(dir, home.as_deref());
     let parents: Vec<PathBuf> = found
         .recent
         .iter()
-        .filter_map(|dir| dir.parent().map(Path::to_path_buf))
+        .filter_map(|recent| recent.path.parent().map(Path::to_path_buf))
         .collect();
+    let roots_found: Vec<PathBuf> = found.roots.into_iter().map(|root| root.path).collect();
     // A recent folder may be a course folder holding the clones; its siblings may be
     // clones the editor never opened.
     let candidates = found
         .recent
         .into_iter()
-        .map(|dir| (dir, EDITOR_SCAN_DEPTH))
+        .map(|recent| (recent.path, EDITOR_SCAN_DEPTH))
         .chain(parents.iter().cloned().map(|dir| (dir, 1)))
         .chain(
-            found
-                .roots
+            roots_found
                 .iter()
                 .cloned()
                 .map(|dir| (dir, EDITOR_SCAN_DEPTH)),
@@ -1672,11 +1785,11 @@ fn scan_roots(
     targets.extend(
         parents
             .into_iter()
-            .chain(found.roots)
+            .chain(roots_found)
             .filter(|dir| usable(dir))
             .map(WatchTarget::flat),
     );
-    (roots, targets)
+    (roots, targets, recents)
 }
 
 /// Deep enough for `~/IdeaProjects/<course>/<assignment>`.
@@ -1836,6 +1949,8 @@ fn merge(
                 pending: None,
                 web_url: None,
                 late_seconds: None,
+                editor: None,
+                group: None,
             };
             (id, project)
         })
@@ -1873,6 +1988,8 @@ fn merge(
                         pending: None,
                         web_url: None,
                         late_seconds: None,
+                        editor: None,
+                        group: None,
                     },
                 );
             }
@@ -1994,6 +2111,7 @@ mod tests {
             config: Some(config("hello")),
             unmerged: Vec::new(),
             grade: None,
+            history: Vec::new(),
             grading: None,
             feedback: None,
         }
@@ -2010,6 +2128,45 @@ mod tests {
 
         let fresh = parse_status("# branch.oid (initial)\n# branch.head (detached)");
         assert_eq!(fresh, LocalState::default());
+    }
+
+    #[tokio::test]
+    async fn downloads_each_grade_of_the_history_once() {
+        let release = |tag: &str| status::GradedRelease {
+            tag: tag.into(),
+            published_at: None,
+            url: format!("page-{tag}"),
+            result_url: format!("result-{tag}"),
+        };
+        let grade = |tag: &str, score: u32| Grade {
+            tag: tag.into(),
+            score,
+            max_score: 10,
+            tests_passed: 0,
+            tests_total: 0,
+            tests: Vec::new(),
+            published_at: None,
+            url: format!("page-{tag}"),
+        };
+        let releases = [release("c"), release("b"), release("a"), release("broken")];
+        let newest = grade("c", 9);
+        let mut old = remote("r", "h", None);
+        old.history = vec![GradeSummary::from(&grade("b", 7))];
+        let mut downloaded = Vec::new();
+        let history = grade_history(&releases, Some(&newest), &old, |r| {
+            downloaded.push(r.tag.clone());
+            let result = if r.tag == "broken" {
+                Err(Error::GitHub("gone".into()))
+            } else {
+                Ok(grade(&r.tag, 5))
+            };
+            async move { result }
+        })
+        .await;
+        // The newest grade and the known one are reused; a failed download is left out.
+        assert_eq!(downloaded, ["a", "broken"]);
+        let scores: Vec<(&str, u32)> = history.iter().map(|g| (g.tag.as_str(), g.score)).collect();
+        assert_eq!(scores, [("c", 9), ("b", 7), ("a", 5)]);
     }
 
     #[test]
@@ -2138,6 +2295,8 @@ mod tests {
             pending: None,
             web_url: None,
             late_seconds: None,
+            editor: None,
+            group: None,
         };
 
         let unsubmitted = project(remote("r", "aaa", Some("old")), None);
@@ -2203,6 +2362,8 @@ mod tests {
                 pending: None,
                 web_url: None,
                 late_seconds: None,
+                editor: None,
+                group: None,
             }],
             ..Snapshot::default()
         };

@@ -15,15 +15,22 @@ notification area.
 - **Signs you in** to GitHub through `gh`, with a one-time code in your browser. Several
   accounts are supported; the app never keeps its own copy of your token.
 - **Lists your assignments**, from GitHub and from the folders on your disk (including the
-  projects your JetBrains IDE or VS Code opened recently): due dates, late work, uncommitted or
-  unsubmitted changes, branches not merged yet, grades with how many tests passed, and teacher
-  feedback.
+  projects your editor opened recently: JetBrains IDEs, VS Code and its forks such as Cursor,
+  Zed, Sublime Text, Eclipse, NetBeans or Visual Studio): due dates, late work, uncommitted or
+  unsubmitted changes, branches not merged yet, grades with the tests that failed and your
+  earlier grades, the autograder running or failing, and teacher feedback.
+- **Shows your group** on team assignments, with who is in it, even before you accept. Add a
+  classmate to your group, or invite one to your repository, from the app. Search finds
+  assignments by teammate too.
 - **Shows the assignments you haven't accepted yet**, and accepts them for you.
-- **Clones and submits** your work, and opens a project in your terminal, your file manager or
-  on GitHub.
+- **Clones, pulls and submits** your work, and opens a project in the editor you last used for
+  it, your terminal, your file manager or on GitHub.
 - **Notifies you** before a deadline, when a grade or feedback arrives, when a new assignment is
-  published, and when a teammate pushes.
-- Starts at login, hidden in the tray, and updates itself.
+  published, when a teammate pushes, and when a classmate joins your group.
+- **Hides what you don't need**: a hidden assignment leaves the list and sends no
+  notifications, and search still finds it.
+- Starts at login, hidden in the tray, and updates itself. The first launch walks you through
+  setup.
 
 ## Install
 
@@ -48,9 +55,9 @@ After that the app updates itself.
 
 ## Getting started
 
-1. Click the tray icon. If git, `gh` or `gh student` is missing, install it from the Setup
-   section.
-2. Sign in with GitHub. Use the account your classes know you by.
+1. Click the tray icon. A short guide installs git, `gh` or `gh student` if one is missing and
+   signs you in with GitHub. Use the account your classes know you by.
+2. Choose where clones go and which editor opens them.
 3. Your classrooms and assignments appear. Accept one, clone it, and the row follows its state
    from then on. Projects you already cloned are found in the folders your editor opened
    recently; add other folders in Settings.
@@ -58,8 +65,8 @@ After that the app updates itself.
 ## Privacy
 
 The app talks to GitHub only, with the token `gh` already holds, and never sends data anywhere
-else. It reads your repositories and never changes them on its own: accepting, cloning and
-submitting only happen when you click.
+else. It reads your repositories and never changes them on its own: accepting, cloning, pulling
+and submitting only happen when you click.
 
 ## Support the project
 

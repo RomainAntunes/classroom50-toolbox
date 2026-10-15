@@ -1,7 +1,10 @@
 <script lang="ts">
+  import { Menu, MenuItem, PredefinedMenuItem } from "@tauri-apps/api/menu";
   import { openUrl } from "@tauri-apps/plugin-opener";
-  import type { Unaccepted } from "$lib/api";
+  import { withDialog, type Unaccepted } from "$lib/api";
+  import { isHidden, setHidden } from "$lib/hidden";
   import { acceptAssignment } from "$lib/accept";
+  import { groupDetails, groupName } from "$lib/group";
   import { formatDate, fromNow, t } from "$lib/i18n";
   import Details from "./Details.svelte";
 
@@ -36,6 +39,30 @@
     }
   }
 
+  const hidden = $derived(isHidden(item.id));
+
+  async function showMenu(event: MouseEvent) {
+    event.preventDefault();
+    const items = await Promise.all([
+      MenuItem.new({
+        text: t("projects.accept"),
+        enabled: !accepting && blocked === null,
+        action: () => accept(),
+      }),
+      MenuItem.new({
+        text: t("projects.openAcceptPage"),
+        action: () => openUrl(item.acceptUrl),
+      }),
+      PredefinedMenuItem.new({ item: "Separator" }),
+      MenuItem.new({
+        text: t(hidden ? "projects.unhide" : "projects.hide"),
+        action: () => setHidden(item.id, !hidden),
+      }),
+    ]);
+    const menu = await Menu.new({ items });
+    await withDialog(() => menu.popup());
+  }
+
   let open = $state(false);
   const details = $derived.by(() => {
     const a = item.assignment;
@@ -45,6 +72,7 @@
     ];
     if (opens) items.push([t("details.opens"), formatDate(opens)]);
     if (due) items.push([t("details.due"), formatDate(due)]);
+    if (item.group) items.push(...groupDetails(item.group));
     return items;
   });
 </script>
@@ -57,6 +85,7 @@
     tabindex="0"
     aria-expanded={open}
     aria-label={item.assignment.name}
+    oncontextmenu={showMenu}
     onclick={() => (open = !open)}
     onkeydown={(event) => {
       if (event.key === "Enter" || event.key === " ") {
@@ -71,6 +100,9 @@
           .name}
       </span>
       <span class="meta">
+        {#if hidden}
+          <span class="hidden-tag">{t("projects.hidden")}</span> ·
+        {/if}
         <span class="status" class:upcoming
           >{accepting
             ? t("projects.accepting")
@@ -78,6 +110,9 @@
               ? t("projects.opens", { when: fromNow(opens, now) })
               : t("projects.notAccepted")}</span
         >
+        {#if item.group}
+          · {t("projects.inGroup", { group: groupName(item.group) })}
+        {/if}
         {#if dueLabel}
           · {dueLabel}
         {/if}
@@ -106,6 +141,10 @@
 </div>
 
 <style>
+  .hidden-tag {
+    font-style: italic;
+  }
+
   .row {
     display: flex;
     align-items: center;

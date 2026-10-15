@@ -3,6 +3,7 @@
 import { message, open } from "@tauri-apps/plugin-dialog";
 import { api, errorKind, errorMessage, withDialog } from "$lib/api";
 import { t } from "$lib/i18n";
+import { defaultEditor, loadEditors, openInEditor } from "$lib/editor.svelte";
 import { loadSettings, saveSettings, settings } from "$lib/settings.svelte";
 
 async function cloneFolder(): Promise<string | null> {
@@ -22,14 +23,19 @@ export async function pickCloneFolder(): Promise<string | null> {
 
 /**
  * Clones project `id` into the clone folder, asking for one when none is set or `choose`
- * is true. Returns the new folder, or null when cancelled or failed.
+ * is true, then opens it in the default editor. Returns the new folder, or null when
+ * cancelled or failed.
  */
 export async function cloneProject(id: string, choose = false): Promise<string | null> {
   try {
     const saved = await cloneFolder();
     const parent = choose || !saved ? await pickCloneFolder() : saved;
     if (!parent) return null;
-    return await api.cloneProject(id, parent);
+    const dir = await api.cloneProject(id, parent);
+    await loadEditors();
+    const editor = defaultEditor();
+    if (editor) await openInEditor(dir, editor);
+    return dir;
   } catch (err) {
     const key = errorKind(err) === "pathExists" ? "clone.exists" : "clone.failed";
     const text = t(key, { error: errorMessage(err) });

@@ -64,6 +64,8 @@ export interface RemoteRepo {
   /** Branches with commits missing from the default branch. */
   unmerged: Branch[];
   grade: Grade | null;
+  /** Every graded submission still listed (the last 10 releases), newest first. */
+  history: GradeSummary[];
   /** The autograder's run on the head commit, while running or when it broke. */
   grading: Grading | null;
   feedback: Feedback | null;
@@ -90,6 +92,9 @@ export interface Grade {
   publishedAt: string | null;
   url: string;
 }
+
+/** A past grade: the score without the test list. */
+export type GradeSummary = Omit<Grade, "tests">;
 
 export interface GradeTest {
   name: string;
@@ -163,6 +168,28 @@ export interface Project {
   webUrl: string | null;
   /** How far past the due date the graded work is; advisory, nothing is blocked. */
   lateSeconds: number | null;
+  /** The editor that last opened the clone (`EditorInfo.id`), when one did. */
+  editor: string | null;
+  /** The user's group, on a team assignment. */
+  group: Group | null;
+}
+
+/** A group team (`classroom50-group-<hash>-<n>`) the user is on. */
+export interface Group {
+  org: string;
+  slug: string;
+  /** The `<n>` of the team name, also in the shared repo's name. */
+  number: number;
+  /** The display name the founders chose, when they did. */
+  name: string | null;
+  members: Member[];
+  /** The team's page on GitHub. */
+  url: string;
+}
+
+export interface Member {
+  login: string;
+  name: string | null;
 }
 
 /** A published assignment the user hasn't accepted yet. */
@@ -171,6 +198,8 @@ export interface Unaccepted {
   classroom: Classroom;
   assignment: Assignment;
   acceptUrl: string;
+  /** The group the user is already on (a teacher-formed group, or one they joined). */
+  group: Group | null;
 }
 
 /** Result of `accept_assignment`. */
@@ -217,6 +246,18 @@ export interface Settings {
   launchAtLogin: boolean;
   listFilter: ListFilter;
   notifyHoursBefore: number[];
+  /** Editor for clones no editor has opened yet; `null` picks the first one installed. */
+  defaultEditor: string | null;
+  /** Hidden project and unaccepted-assignment ids: listed only when a search matches. */
+  hidden: string[];
+  /** The first-run guide was finished or skipped. */
+  onboarded: boolean;
+}
+
+/** An editor installed here that can open a folder. */
+export interface EditorInfo {
+  id: string;
+  name: string;
 }
 
 /** The date filter above the project list. */
@@ -246,6 +287,7 @@ export type Notice =
   | { kind: "feedback"; assignment: string; count: number }
   | { kind: "newAssignment"; assignment: string; classroom: string }
   | { kind: "teammatePush"; assignment: string; author: string }
+  | { kind: "groupJoined"; assignment: string; members: string[] }
   | { kind: "deadlineChanged"; assignment: string; due: string | null }
   | { kind: "closed"; assignment: string };
 
@@ -329,6 +371,9 @@ export const api = {
   login: () => invoke<AuthStatus>("login"),
   cancelLogin: () => invoke<void>("cancel_login"),
   openTerminal: (path: string) => invoke<void>("open_terminal", { path }),
+  installedEditors: () => invoke<EditorInfo[]>("installed_editors"),
+  addTeammate: (id: string, username: string) => invoke<void>("add_teammate", { id, username }),
+  openInEditor: (path: string, editor: string) => invoke<void>("open_in_editor", { path, editor }),
   /** Runs `gh student accept`, then syncs; rejects with `needsTeam` when a group is needed. */
   acceptAssignment: (id: string, newTeam: boolean) =>
     invoke<Accepted>("accept_assignment", { id, newTeam }),

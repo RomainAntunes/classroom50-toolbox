@@ -1,13 +1,22 @@
 <script lang="ts">
   let {
     label,
+    hint,
     checked,
     onchange,
-  }: { label: string; checked: boolean; onchange: (checked: boolean) => void } = $props();
+  }: {
+    label: string;
+    hint?: string;
+    checked: boolean;
+    onchange: (checked: boolean) => void;
+  } = $props();
 </script>
 
 <label class="row">
-  <span>{label}</span>
+  <span class="text">
+    <span>{label}</span>
+    {#if hint}<span class="hint">{hint}</span>{/if}
+  </span>
   <input
     type="checkbox"
     role="switch"
@@ -23,6 +32,18 @@
     justify-content: space-between;
     gap: var(--space);
     padding: 8px 12px;
+  }
+
+  .text {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    min-width: 0;
+  }
+
+  .hint {
+    font-size: 0.85em;
+    color: var(--fg-muted);
   }
 
   /* Switch geometry per platform: macOS 26x15, Windows 40x20 with outline when off,

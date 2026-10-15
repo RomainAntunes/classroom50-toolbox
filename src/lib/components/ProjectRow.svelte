@@ -1,12 +1,16 @@
 <script lang="ts">
-  import { Menu, MenuItem, PredefinedMenuItem } from "@tauri-apps/api/menu";
+  import { Menu, MenuItem, PredefinedMenuItem, Submenu } from "@tauri-apps/api/menu";
   import { openUrl, revealItemInDir } from "@tauri-apps/plugin-opener";
   import { api, withDialog, type Project } from "$lib/api";
   import { cloneProject } from "$lib/clone";
+  import { editorFor, editors, openInEditor } from "$lib/editor.svelte";
   import { pullProject } from "$lib/pull";
   import { submitProject } from "$lib/submit";
+  import { addTeammate, joinsGroup } from "$lib/teammate";
+  import { isHidden, setHidden } from "$lib/hidden";
   import { durationLabel, formatDate, fromNow, t } from "$lib/i18n";
   import { tildify } from "$lib/paths.svelte";
+  import { groupDetails } from "$lib/group";
   import Details from "./Details.svelte";
 
   let { project, now, unseen }: { project: Project; now: Date; unseen: boolean } = $props();
@@ -76,6 +80,15 @@
     grading?.state === "running" ? [] : (grade?.tests.filter((test) => !test.passed) ?? []),
   );
   const feedback = $derived(project.remote?.feedback ?? null);
+  // Grades before the current one, newest first.
+  const earlier = $derived((project.remote?.history ?? []).filter((g) => g.tag !== grade?.tag));
+  const gradeLine = (g: { score: number; maxScore: number; publishedAt: string | null }) =>
+    g.publishedAt
+      ? t("details.gradeAt", {
+          score: `${g.score}/${g.maxScore}`,
+          when: fromNow(new Date(g.publishedAt), now),
+        })
+      : `${g.score}/${g.maxScore}`;
   const path = $derived(project.path);
   const githubUrl = $derived(
     project.remote?.url ??
@@ -84,6 +97,9 @@
         : null),
   );
   const openTarget = $derived(project.webUrl ?? githubUrl);
+  const hidden = $derived(isHidden(project.id));
+  // The editor that last opened the clone, else the default one.
+  const editor = $derived(path ? editorFor(project) : null);
   const cloneable = $derived(!path && Boolean(project.owner && project.repo));
 
   const submittable = $derived(Boolean(path) && !closed);
@@ -166,7 +182,9 @@
         `${grade.score}/${grade.maxScore} · ${t("projects.gradeTests", { passed: grade.testsPassed, total: grade.testsTotal })}`,
       );
     }
+    if (earlier.length) add("earlierGrades", earlier.map(gradeLine).join("\n"));
     if (feedback?.comments) add("feedback", String(feedback.comments));
+    if (project.group) items.push(...groupDetails(project.group));
     if (unmerged.length) add("unmerged", unmerged.join(", "));
     if (project.local) {
       const local = project.local;
@@ -200,9 +218,21 @@
         action: () => feedback && openUrl(feedback.url),
       }),
       MenuItem.new({
+        text: t("projects.openGroup"),
+        enabled: Boolean(project.group),
+        action: () => project.group && openUrl(project.group.url),
+      }),
+      MenuItem.new({
         text: t("projects.openGrade"),
         enabled: Boolean(grade),
         action: () => grade && openUrl(grade.url),
+      }),
+      Submenu.new({
+        text: t("projects.earlierGrades"),
+        enabled: earlier.length > 0,
+        items: await Promise.all(
+          earlier.map((g) => MenuItem.new({ text: gradeLine(g), action: () => openUrl(g.url) })),
+        ),
       }),
       MenuItem.new({
         text: t("projects.openGradingRun"),
@@ -221,6 +251,11 @@
         action: () => submit(),
       }),
       MenuItem.new({
+        text: t(joinsGroup(project) ? "teammate.teamMenu" : "teammate.inviteMenu"),
+        enabled: Boolean(project.owner && project.repo) && !closed,
+        action: () => addTeammate(project, name),
+      }),
+      MenuItem.new({
         text: t("projects.clone"),
         enabled: cloneable && !cloning,
         action: () => clone(),
@@ -231,6 +266,23 @@
         action: () => clone(true),
       }),
       MenuItem.new({
+        text: editor ? t("editor.open", { editor: editor.name }) : t("editor.none"),
+        enabled: Boolean(path && editor),
+        action: () => path && editor && openInEditor(path, editor),
+      }),
+      Submenu.new({
+        text: t("editor.openWith"),
+        enabled: Boolean(path) && editors.installed.length > 1,
+        items: await Promise.all(
+          editors.installed.map((other) =>
+            MenuItem.new({
+              text: other.name,
+              action: () => path && openInEditor(path, other),
+            }),
+          ),
+        ),
+      }),
+      MenuItem.new({
         text: t(`projects.openFolder.${os}`, {}, "projects.openFolder.linux"),
         enabled: Boolean(path),
         action: () => path && revealItemInDir(path),
@@ -239,6 +291,11 @@
         text: t("projects.openTerminal"),
         enabled: Boolean(path),
         action: () => path && api.openTerminal(path),
+      }),
+      separator(),
+      MenuItem.new({
+        text: t(hidden ? "projects.unhide" : "projects.hide"),
+        action: () => setHidden(project.id, !hidden),
       }),
     ]);
     const menu = await Menu.new({ items });
@@ -268,6 +325,9 @@
         {#if unseen}<span class="dot" aria-label={t("projects.new")}></span>{/if}{name}
       </span>
       <span class="meta">
+        {#if hidden}
+          <span class="hidden-tag">{t("projects.hidden")}</span> ·
+        {/if}
         {#if submitting}
           <span class="status">{t("projects.submitting")}</span> ·
         {:else if pulling}
@@ -393,6 +453,10 @@
 
   .soon {
     color: var(--warning);
+  }
+
+  .hidden-tag {
+    font-style: italic;
   }
 
   .status {

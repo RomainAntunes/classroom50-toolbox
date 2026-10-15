@@ -1,4 +1,5 @@
 <script lang="ts">
+  import logo from "../../assets/icon-small.svg";
   import { onMount } from "svelte";
   import { goto } from "$app/navigation";
   import { listen } from "@tauri-apps/api/event";
@@ -24,6 +25,7 @@
   import Section from "$lib/components/Section.svelte";
   import ToolRow from "$lib/components/ToolRow.svelte";
   import ProjectRow from "$lib/components/ProjectRow.svelte";
+  import { showsProject, showsUnaccepted } from "$lib/filter";
   import UnacceptedRow from "$lib/components/UnacceptedRow.svelte";
   import LoginStatus from "$lib/components/LoginStatus.svelte";
 
@@ -71,62 +73,14 @@
   const query = $derived(session.search.trim().toLowerCase());
   const unseen = $derived(new Set(session.unseen));
   const FILTERS: ListFilter[] = ["all", "open", "week", "past"];
-  const WEEK = 7 * 24 * 60 * 60 * 1000;
   const filter = $derived(settings.current?.listFilter ?? "all");
-
-  /** Whether an assignment with this due date and state passes the date filter. */
-  function inRange(due: string | null, closed: boolean): boolean {
-    const at = due ? new Date(due).getTime() : null;
-    const ahead = at !== null && at > now.getTime();
-    switch (filter) {
-      case "open":
-        return !closed && (at === null || ahead);
-      case "week":
-        return !closed && ahead && at - now.getTime() <= WEEK;
-      case "past":
-        return closed || (at !== null && !ahead);
-      default:
-        return true;
-    }
-  }
-  const groups = $derived(
-    groupByClass(
-      allProjects.filter(
-        (p) =>
-          matches(q(p), query) &&
-          inRange(p.assignment?.due ?? null, Boolean(p.assignment?.closed || p.remote?.archived)),
-      ),
-      (session.snapshot?.unaccepted ?? []).filter(
-        (u) =>
-          inRange(u.assignment.due, u.assignment.closed) &&
-          matches(
-            [
-              u.assignment.name,
-              u.assignment.slug,
-              u.classroom.slug,
-              u.classroom.name,
-              u.classroom.org,
-            ],
-            query,
-          ),
-      ),
-    ),
-  );
-
-  function q(project: Project): (string | null | undefined)[] {
-    return [
-      project.assignment?.name,
-      project.config.assignment,
-      project.config.classroom,
-      project.classroom?.name,
-      project.owner,
-      project.repo,
-    ];
-  }
-
-  function matches(fields: (string | null | undefined)[], search: string): boolean {
-    return !search || fields.some((field) => field?.toLowerCase().includes(search));
-  }
+  const groups = $derived.by(() => {
+    const list = { filter, query, hidden: settings.current?.hidden ?? [], now };
+    return groupByClass(
+      allProjects.filter((p) => showsProject(p, list)),
+      (session.snapshot?.unaccepted ?? []).filter((u) => showsUnaccepted(u, list)),
+    );
+  });
 
   /** Keeps Rust's urgency order: a class appears where its most urgent assignment is. */
   function groupByClass(projects: Project[], unaccepted: Unaccepted[]): ClassGroup[] {
@@ -163,7 +117,11 @@
 
   /** Cheap local state: settings, tools, login and the last synced list. */
   async function load() {
-    await loadSettings();
+    const loaded = await loadSettings();
+    if (!loaded.onboarded) {
+      await goto("/welcome", { replaceState: true });
+      return;
+    }
     const [tools, auth, snapshot, progress] = await Promise.all([
       api.toolStatuses(),
       api.authStatus(),
@@ -255,7 +213,7 @@
 </script>
 
 <header class="titlebar">
-  <h1>{t("app.title")}</h1>
+  <h1><img class="logo" src={logo} alt={t("app.title")} /></h1>
   <input
     class="search"
     type="search"
@@ -450,8 +408,13 @@
     padding: 0 8px;
     border: 1px solid var(--border);
     border-radius: var(--radius-control);
-    background: var(--bg-control);
+    /* A field, not a button: the card fill keeps it apart from the backdrop. */
+    background: var(--bg-card);
     outline: none;
+  }
+
+  .search::placeholder {
+    color: var(--fg-muted);
   }
 
   .search:focus-visible {
@@ -475,8 +438,14 @@
 
   h1 {
     margin: 0;
-    font-size: 1.1em;
-    font-weight: 600;
+    display: flex;
+    flex-shrink: 0;
+  }
+
+  /* The app icon stands in for the title, as tall as the search field beside it. */
+  .logo {
+    height: 26px;
+    width: 26px;
   }
 
   main {

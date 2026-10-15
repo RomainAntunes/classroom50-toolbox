@@ -60,6 +60,11 @@ pub enum Notice {
         assignment: String,
         author: String,
     },
+    /// Classmates joined the user's group (names, else logins).
+    GroupJoined {
+        assignment: String,
+        members: Vec<String>,
+    },
     /// `due` is `None` when the deadline was removed.
     DeadlineChanged {
         assignment: String,
@@ -85,6 +90,8 @@ struct Memory {
     feedback: BTreeMap<String, u32>,
     /// Default-branch head per project.
     heads: BTreeMap<String, String>,
+    /// Group member logins (lowercase) per project.
+    groups: BTreeMap<String, BTreeSet<String>>,
     /// Due date (Unix seconds, `None` for no deadline) per `org/classroom/assignment`.
     dues: BTreeMap<String, Option<i64>>,
     /// Assignments seen closed, by the same key.
@@ -143,7 +150,9 @@ pub fn process(app: &AppHandle, snapshot: &Snapshot) {
     if snapshot.checked_at.is_none() {
         return;
     }
-    let hours = app.state::<SettingsStore>().get().notify_hours_before;
+    let settings = app.state::<SettingsStore>().get();
+    let hours = settings.notify_hours_before;
+    let snapshot = &without_hidden(snapshot, &settings.hidden);
     let state = app.state::<AlertsState>();
     let Ok(mut memory) = state.memory.lock() else {
         return;
@@ -167,6 +176,15 @@ pub fn process(app: &AppHandle, snapshot: &Snapshot) {
     }
     let _ = app.emit(UNSEEN_EVENT, &unseen);
     set_badge(app, attention);
+}
+
+/// The snapshot minus hidden assignments, which stay quiet; what changed meanwhile is told
+/// once they're shown again.
+fn without_hidden(snapshot: &Snapshot, hidden: &[String]) -> Snapshot {
+    let mut visible = snapshot.clone();
+    visible.projects.retain(|p| !hidden.contains(&p.id));
+    visible.unaccepted.retain(|u| !hidden.contains(&u.id));
+    visible
 }
 
 /// At startup: the badge from the saved news, before any sync.
@@ -293,6 +311,33 @@ fn diff(
 
     let login = memory.login.clone().unwrap_or_default();
     for project in &snapshot.projects {
+        if let Some(group) = &project.group {
+            let members: BTreeSet<String> = group
+                .members
+                .iter()
+                .map(|m| m.login.to_ascii_lowercase())
+                .collect();
+            let previous = memory.groups.insert(project.id.clone(), members);
+            if let Some(before) = previous {
+                let joined: Vec<String> = group
+                    .members
+                    .iter()
+                    .filter(|m| {
+                        let lower = m.login.to_ascii_lowercase();
+                        !before.contains(&lower) && !lower.eq_ignore_ascii_case(&login)
+                    })
+                    .map(|m| m.name.clone().unwrap_or_else(|| m.login.clone()))
+                    .collect();
+                if !joined.is_empty() {
+                    notices.push(Notice::GroupJoined {
+                        assignment: assignment_name(project),
+                        members: joined,
+                    });
+                    memory.unseen.insert(project.id.clone());
+                }
+            }
+        }
+
         let Some(remote) = &project.remote else {
             continue;
         };
@@ -487,6 +532,8 @@ mod tests {
             pending: None,
             web_url: None,
             late_seconds: None,
+            editor: None,
+            group: None,
         }
     }
 
@@ -597,6 +644,65 @@ mod tests {
         assert_eq!(diff(&mut memory, &failed("a"), &[], now), expected);
         assert!(diff(&mut memory, &failed("a"), &[], now).is_empty());
         assert_eq!(diff(&mut memory, &failed("b"), &[], now), expected);
+    }
+
+    #[test]
+    fn announces_classmates_joining_the_group() {
+        let now = Utc::now();
+        let mut memory = Memory {
+            login: Some("alice".into()),
+            ..Memory::default()
+        };
+        let member = |login: &str, name: Option<&str>| crate::groups::Member {
+            login: login.into(),
+            name: name.map(Into::into),
+        };
+        let with_group = |members: Vec<crate::groups::Member>| {
+            let mut p = project("lab1", None);
+            p.group = Some(crate::groups::Group {
+                org: "org".into(),
+                slug: "classroom50-group-0123456789abcdef-1".into(),
+                number: 1,
+                name: None,
+                members,
+                url: String::new(),
+                classroom: None,
+                assignment: None,
+            });
+            snapshot(vec![p])
+        };
+        // The first sight of a group is the baseline.
+        let first = with_group(vec![member("Alice", None)]);
+        assert!(diff(&mut memory, &first, &[], now).is_empty());
+        let joined = with_group(vec![member("Alice", None), member("bob", Some("Bob B"))]);
+        assert_eq!(
+            diff(&mut memory, &joined, &[], now),
+            vec![Notice::GroupJoined {
+                assignment: "LAB1".into(),
+                members: vec!["Bob B".into()],
+            }]
+        );
+        assert!(diff(&mut memory, &joined, &[], now).is_empty());
+        assert!(memory.unseen.contains("org/c-lab1-alice"));
+        // A classmate leaving says nothing, and the user's own login is never news.
+        let left = with_group(vec![member("bob", Some("Bob B"))]);
+        assert!(diff(&mut memory, &left, &[], now).is_empty());
+        let back = with_group(vec![member("bob", Some("Bob B")), member("ALICE", None)]);
+        assert!(diff(&mut memory, &back, &[], now).is_empty());
+    }
+
+    #[test]
+    fn hidden_assignments_stay_quiet() {
+        let now = Utc::now();
+        let soon = || snapshot(vec![project("lab1", Some(now + TimeDelta::minutes(30)))]);
+        let hidden = vec!["org/c-lab1-alice".to_owned()];
+        let mut memory = Memory::default();
+        let quiet = without_hidden(&soon(), &hidden);
+        assert!(quiet.projects.is_empty());
+        assert!(diff(&mut memory, &quiet, &[1], now).is_empty());
+        // Shown again, the pending reminder goes out.
+        let shown = without_hidden(&soon(), &[]);
+        assert_eq!(diff(&mut memory, &shown, &[1], now).len(), 1);
     }
 
     #[test]

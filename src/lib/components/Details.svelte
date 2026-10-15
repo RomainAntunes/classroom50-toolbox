@@ -27,7 +27,7 @@
   <dl>
     {#each items as [label, value] (label)}
       <dt>{label}</dt>
-      <dd title={value}>{value}</dd>
+      <dd title={value} class:lines={value.includes("\n")}>{value}</dd>
     {/each}
   </dl>
   {#if failed.length}
@@ -84,6 +84,11 @@
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
+  }
+
+  /* One entry per line, such as a group's members. */
+  dd.lines {
+    white-space: pre-line;
   }
 
   .heading {
