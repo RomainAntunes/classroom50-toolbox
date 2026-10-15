@@ -121,6 +121,9 @@
       project.classroom?.name,
       project.owner,
       project.repo,
+      // Teammates, so "Maendly" finds the labs shared with them.
+      project.group?.name,
+      ...(project.group?.members.flatMap((m) => [m.login, m.name]) ?? []),
     ];
   }
 
