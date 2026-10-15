@@ -304,6 +304,9 @@ pub struct ProjectsState {
     /// The first error of the last status read, picked up by the snapshot.
     status_issue: Mutex<Option<SyncIssue>>,
     after_push: std::sync::atomic::AtomicBool,
+    /// When the last full sync started, worked or not: a failed one keeps the snapshot's
+    /// `synced_at`, and this spaces out the retries.
+    full_attempt: Mutex<Option<DateTime<Utc>>>,
     stats: Mutex<SyncStats>,
     progress: Mutex<SyncProgress>,
     sync_lock: tokio::sync::Mutex<()>,
@@ -329,6 +332,7 @@ impl ProjectsState {
             state_path,
             status_issue: Mutex::default(),
             after_push: std::sync::atomic::AtomicBool::new(false),
+            full_attempt: Mutex::default(),
             stats: Mutex::new(saved.stats),
             progress: Mutex::default(),
             sync_lock: tokio::sync::Mutex::new(()),
@@ -690,9 +694,10 @@ fn refresh_due(app: &AppHandle, min_status_age: chrono::TimeDelta, on_open: bool
     if !may_call_github(app) {
         return;
     }
-    let snapshot = app.state::<ProjectsState>().snapshot();
+    let state = app.state::<ProjectsState>();
+    let snapshot = state.snapshot();
+    let full_attempt = state.full_attempt.lock().ok().and_then(|at| *at);
     let now = Utc::now();
-    let older = |at: Option<DateTime<Utc>>, age| at.is_none_or(|at| now - at >= age);
     let app = app.clone();
     let (_, mut full_age) = cadence(&snapshot, now);
     // Only a full sync finds a repo accepted elsewhere (the web page, the CLI), so while an
@@ -700,16 +705,32 @@ fn refresh_due(app: &AppHandle, min_status_age: chrono::TimeDelta, on_open: bool
     if on_open && awaiting_accept(&snapshot, &app.state::<SettingsStore>().get(), now) {
         full_age = full_age.min(MIN_FULL_ON_OPEN);
     }
-    let mode = if older(snapshot.synced_at, full_age) {
-        Mode::Full
-    } else if older(snapshot.checked_at, min_status_age) {
-        Mode::Status
-    } else {
+    let Some(mode) = due_mode(&snapshot, full_attempt, now, full_age, min_status_age) else {
         return;
     };
     tauri::async_runtime::spawn(async move {
         refresh_in_background(&app, mode).await;
     });
+}
+
+/// What is due: a full sync once the last one that worked is `full_age` old, retried after a
+/// failure no more often than status checks run; else a status check once the last GitHub
+/// read is `min_status_age` old.
+fn due_mode(
+    snapshot: &Snapshot,
+    full_attempt: Option<DateTime<Utc>>,
+    now: DateTime<Utc>,
+    full_age: chrono::TimeDelta,
+    min_status_age: chrono::TimeDelta,
+) -> Option<Mode> {
+    let older = |at: Option<DateTime<Utc>>, age| at.is_none_or(|at| now - at >= age);
+    if older(snapshot.synced_at, full_age) && older(full_attempt, min_status_age) {
+        Some(Mode::Full)
+    } else if older(snapshot.checked_at, min_status_age) {
+        Some(Mode::Status)
+    } else {
+        None
+    }
 }
 
 /// Background requests wait while GitHub asks to back off, and keep a reserve of the
@@ -1074,6 +1095,17 @@ async fn full_snapshot(
         progress.skip(Phase::Listing);
         progress.skip(Phase::Details);
     }
+    if let Ok(mut at) = state.full_attempt.lock() {
+        *at = Some(now);
+    }
+    // A failed sync doesn't count as one, so the next is due soon. The very first keeps a
+    // time anyway: the list waits for one before showing.
+    let previous = state.snapshot();
+    let (synced_at, checked_at) = if remote.is_ok() {
+        (Some(now), Some(now))
+    } else {
+        (previous.synced_at.or(Some(now)), previous.checked_at)
+    };
     let discovered = !matches!(remote, Err(Error::NotSignedIn | Error::NotInstalled { .. }))
         && state.remote().complete();
     let (repos, classrooms, issue) = match remote {
@@ -1113,8 +1145,8 @@ async fn full_snapshot(
     Snapshot {
         projects,
         unaccepted,
-        synced_at: Some(now),
-        checked_at: Some(now),
+        synced_at,
+        checked_at,
         issue: issue.or_else(|| state.take_status_issue()),
         login: None,
     }
@@ -2737,6 +2769,49 @@ mod tests {
             names(last_discovery(&previous, &cache)),
             ["fall-hello-alice"]
         );
+    }
+
+    #[test]
+    fn retries_a_failed_full_sync_at_the_status_pace() {
+        use chrono::TimeDelta as T;
+        let now = Utc::now();
+        let (full_age, status_age) = (T::hours(1), T::minutes(5));
+        // The last full sync that worked is 50 min old, a failed one ran 10 min ago.
+        let snapshot = Snapshot {
+            synced_at: Some(now - T::minutes(50)),
+            checked_at: Some(now - T::minutes(50)),
+            ..Snapshot::default()
+        };
+        let attempt = Some(now - T::minutes(10));
+        assert_eq!(
+            due_mode(&snapshot, attempt, now, full_age, status_age),
+            Some(Mode::Status)
+        );
+        // Due by age: retried, but not on every tick after a failure.
+        let old = Snapshot {
+            synced_at: Some(now - T::hours(2)),
+            ..snapshot.clone()
+        };
+        assert_eq!(
+            due_mode(&old, attempt, now, full_age, status_age),
+            Some(Mode::Full)
+        );
+        let just_failed = Some(now - T::minutes(1));
+        assert_eq!(
+            due_mode(&old, just_failed, now, full_age, status_age),
+            Some(Mode::Status)
+        );
+        // Network back or waking up asks with no minimum age: right away.
+        assert_eq!(
+            due_mode(&old, just_failed, now, full_age, T::zero()),
+            Some(Mode::Full)
+        );
+        let fresh = Snapshot {
+            synced_at: Some(now),
+            checked_at: Some(now),
+            ..Snapshot::default()
+        };
+        assert_eq!(due_mode(&fresh, Some(now), now, full_age, status_age), None);
     }
 
     #[test]
