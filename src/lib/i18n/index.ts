@@ -59,6 +59,12 @@ function lookup(code: string, key: string, count: number | undefined): string | 
   return catalog[key];
 }
 
+/** Whether `key` is worded (in English, which every catalog matches), plural or not. */
+export function hasKey(key: string): boolean {
+  const reference = catalogs[fallback];
+  return key in reference || `${key}.other` in reference;
+}
+
 /**
  * `params.count`, when a number, picks the plural form. `fallbackKey` is used when `key` is
  * missing, e.g. for keys built from an error kind. A key the active catalog lacks comes

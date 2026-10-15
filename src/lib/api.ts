@@ -1,6 +1,7 @@
 // Typed wrappers for the Rust commands in src-tauri/src/commands.rs. Keep the two in sync:
 // Rust serializes with camelCase field names.
 import { invoke } from "@tauri-apps/api/core";
+import { hasKey, t } from "$lib/i18n";
 
 export type Os = "macos" | "windows" | "linux";
 export type Tool = "git" | "gh" | "gh-student";
@@ -411,6 +412,8 @@ export interface CommandError {
   url?: string;
   /** `manualInstall`: the command to run in a terminal. */
   command?: string;
+  /** What the UI's wording of this kind (`error.<kind>`) fills in. */
+  params?: Record<string, string>;
 }
 
 export const api = {
@@ -483,9 +486,12 @@ export function errorKind(err: unknown): string | null {
     : null;
 }
 
+/** The error in the UI's language when `en.json` words its kind, else Rust's message. */
 export function errorMessage(err: unknown): string {
   if (typeof err === "object" && err !== null && "message" in err) {
-    return String((err as CommandError).message);
+    const { kind, message, params } = err as CommandError;
+    const key = `error.${kind}`;
+    return hasKey(key) ? t(key, params ?? {}) : String(message);
   }
   return String(err);
 }
