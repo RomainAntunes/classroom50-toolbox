@@ -1,9 +1,11 @@
 //! Everything that differs per OS. Each submodule exposes the same functions; the rest of
 //! the app calls `platform::*` and never branches on the OS itself.
 
+use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
 
-use serde::Serialize;
+use chrono::{DateTime, Utc};
+use serde::{Deserialize, Serialize};
 
 use crate::error::Result;
 use crate::tools::Tool;
@@ -137,4 +139,66 @@ mod tests {
             assert_eq!(!names.is_empty(), expected, "{}", editor.id);
         }
     }
+}
+
+/// A deadline written into the user's own calendar app.
+#[derive(Debug, Clone)]
+pub struct CalendarEvent {
+    /// The list id; the key in `WrittenEvents`.
+    pub uid: String,
+    pub title: String,
+    pub notes: Option<String>,
+    pub url: Option<String>,
+    pub due: DateTime<Utc>,
+    pub alarm_hours: Vec<u32>,
+    /// Changes when any field above does, so unchanged events are left alone.
+    pub fingerprint: u64,
+}
+
+/// A calendar of the OS's calendar app the user can write to.
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct NativeCalendar {
+    pub id: String,
+    pub title: String,
+    /// The account holding it (iCloud, Google, On My Mac...).
+    pub account: String,
+}
+
+/// An event the app wrote, by `CalendarEvent::uid`.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct Written {
+    pub event_id: String,
+    pub calendar_id: String,
+    pub fingerprint: u64,
+}
+
+pub type WrittenEvents = BTreeMap<String, Written>;
+
+/// Whether this OS has a calendar store the app can write to (else: the `.ics` file only).
+pub fn has_native_calendar() -> bool {
+    imp::NATIVE_CALENDAR
+}
+
+/// The writable calendars. With `ask`, asks for access first when it was never asked;
+/// without, fails rather than prompting (background syncs).
+pub fn native_calendars(ask: bool) -> Result<Vec<NativeCalendar>> {
+    imp::native_calendars(ask)
+}
+
+/// Makes `calendar_id` hold exactly `events`: adds and updates what changed, removes events
+/// the app wrote earlier that are gone (or sit in another calendar). `written` is updated
+/// as it goes, so a failure halfway loses nothing.
+pub fn write_calendar(
+    calendar_id: &str,
+    events: &[CalendarEvent],
+    written: &mut WrittenEvents,
+) -> Result<()> {
+    imp::write_calendar(calendar_id, events, written)
+}
+
+/// Removes every event the app wrote (the user turned the sync off).
+pub fn clear_calendar(written: &mut WrittenEvents) -> Result<()> {
+    imp::write_calendar("", &[], written)
 }

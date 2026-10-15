@@ -25,6 +25,8 @@ use crate::updater::{self, UpdateInfo};
 pub struct AppInfo {
     os: Os,
     version: String,
+    /// The OS has a calendar store the app can write into (macOS).
+    native_calendar: bool,
 }
 
 #[tauri::command]
@@ -32,6 +34,7 @@ pub fn app_info(app: AppHandle) -> AppInfo {
     AppInfo {
         os: platform::os(),
         version: app.package_info().version.to_string(),
+        native_calendar: platform::has_native_calendar(),
     }
 }
 
@@ -109,24 +112,48 @@ pub struct SyncDetails {
     clones: usize,
 }
 
-/// Writes the due dates as an `.ics` file at `path` (chosen in a save dialog) and returns
-/// how many events it holds.
+/// Writes the due dates as an `.ics` file at `path` (chosen in a save dialog), keeps it
+/// updated after each sync from now on, and returns how many events it holds.
 #[tauri::command]
 pub fn export_calendar(
     path: PathBuf,
     state: State<'_, ProjectsState>,
     settings: State<'_, SettingsStore>,
 ) -> Result<usize> {
-    let settings = settings.get();
-    let (ics, count) = crate::calendar::ics(
-        &state.snapshot(),
-        &settings.hidden,
-        &settings.hidden_classes,
-        &settings.notify_hours_before,
-        chrono::Utc::now(),
-    );
-    crate::github::write_atomic(&path, ics.as_bytes())?;
+    let current = settings.get();
+    let count = crate::calendar::export(&path, &state.snapshot(), &current)?;
+    settings.set(Settings {
+        calendar_file: Some(path),
+        ..current
+    })?;
     Ok(count)
+}
+
+/// The OS calendars the user can write to; asks for access the first time.
+#[tauri::command]
+pub async fn native_calendars() -> Result<Vec<platform::NativeCalendar>> {
+    tauri::async_runtime::spawn_blocking(|| platform::native_calendars(true))
+        .await
+        .map_err(|err| Error::Unsupported(err.to_string()))?
+}
+
+/// Picks the OS calendar to keep the due dates in (writing them now), or with `None` stops
+/// and removes the events the app wrote.
+#[tauri::command]
+pub async fn set_native_calendar(
+    app: AppHandle,
+    settings: State<'_, SettingsStore>,
+    id: Option<String>,
+) -> Result<Settings> {
+    let current = settings.get();
+    // Writing to a new calendar also removes what sits in the old one.
+    if id.is_some() || current.native_calendar.is_some() {
+        crate::calendar::write_native(&app, id.clone()).await?;
+    }
+    settings.set(Settings {
+        native_calendar: id,
+        ..current
+    })
 }
 
 #[tauri::command]
@@ -189,6 +216,13 @@ pub fn update_settings(
         apply_launch_at_login(&app, next.launch_at_login)?;
     }
     let saved = settings.set(next)?;
+    // What the calendar holds depends on these.
+    if saved.hidden != previous.hidden
+        || saved.hidden_classes != previous.hidden_classes
+        || saved.notify_hours_before != previous.notify_hours_before
+    {
+        crate::calendar::sync(&app);
+    }
     if saved.appearance != previous.appearance {
         popover::apply_appearance(&app, saved.appearance);
     }

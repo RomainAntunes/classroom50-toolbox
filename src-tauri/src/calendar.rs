@@ -3,30 +3,31 @@
 //! user picked. UIDs are the list's ids, so importing again updates events rather than
 //! duplicating them.
 
-use chrono::{DateTime, Utc};
+use std::hash::{Hash, Hasher};
+use std::path::{Path, PathBuf};
+use std::sync::Mutex;
 
-use crate::classroom50::{Assignment, Classroom};
-use crate::projects::Snapshot;
+use chrono::{DateTime, Utc};
+use tauri::{AppHandle, Manager};
+
+use crate::error::Result;
+use crate::platform::{self, CalendarEvent, WrittenEvents};
+use crate::projects::{ProjectsState, Snapshot};
+use crate::settings::{Settings, SettingsStore};
 
 const PRODID: &str = "-//classroom50-toolbox//EN";
+/// What the app wrote into the OS calendar, by list id (app config dir: clearing the cache
+/// must not orphan events).
+const WRITTEN_FILE: &str = "calendar-events.json";
 
-struct Event<'a> {
-    uid: &'a str,
-    assignment: &'a Assignment,
-    classroom: Option<&'a Classroom>,
-    class_slug: &'a str,
-    url: Option<&'a str>,
-}
-
-/// The calendar of every assignment with a due date, accepted or not, minus those the user
-/// hid (one by one or by class, keyed like `filter::classKey`).
-pub fn ics(
+/// Every assignment with a due date, accepted or not, minus those the user hid (one by one
+/// or by class, keyed like `filter::classKey`).
+pub fn events(
     snapshot: &Snapshot,
     hidden: &[String],
     hidden_classes: &[String],
     reminder_hours: &[u32],
-    now: DateTime<Utc>,
-) -> (String, usize) {
+) -> Vec<CalendarEvent> {
     let class_hidden = |owner: &str, classroom: &str| {
         hidden_classes.contains(&format!("{owner}/{classroom}").to_lowercase())
     };
@@ -38,26 +39,68 @@ pub fn ics(
                 && !class_hidden(p.owner.as_deref().unwrap_or(""), &p.config.classroom)
         })
         .filter_map(|p| {
-            Some(Event {
-                uid: &p.id,
-                assignment: p.assignment.as_ref()?,
-                classroom: p.classroom.as_ref(),
-                class_slug: &p.config.classroom,
-                url: p.web_url.as_deref(),
-            })
+            Some((
+                &p.id,
+                p.assignment.as_ref()?,
+                p.classroom.as_ref(),
+                &p.config.classroom,
+                p.web_url.as_deref(),
+            ))
         });
     let unaccepted = snapshot
         .unaccepted
         .iter()
         .filter(|u| !hidden.contains(&u.id) && !class_hidden(&u.classroom.org, &u.classroom.slug))
-        .map(|u| Event {
-            uid: &u.id,
-            assignment: &u.assignment,
-            classroom: Some(&u.classroom),
-            class_slug: &u.classroom.slug,
-            url: Some(&u.accept_url),
+        .map(|u| {
+            (
+                &u.id,
+                &u.assignment,
+                Some(&u.classroom),
+                &u.classroom.slug,
+                Some(u.accept_url.as_str()),
+            )
         });
+    projects
+        .chain(unaccepted)
+        .filter_map(|(uid, assignment, classroom, slug, url)| {
+            let due = assignment.due?.with_timezone(&Utc);
+            let class = classroom.and_then(|c| c.name.as_deref()).unwrap_or(slug);
+            let mut event = CalendarEvent {
+                uid: uid.clone(),
+                title: format!("{} · {class}", assignment.name),
+                notes: assignment.description.clone(),
+                url: url.map(str::to_owned),
+                due,
+                alarm_hours: reminder_hours.to_vec(),
+                fingerprint: 0,
+            };
+            event.fingerprint = fingerprint(&event);
+            Some(event)
+        })
+        .collect()
+}
 
+fn fingerprint(event: &CalendarEvent) -> u64 {
+    let mut hasher = std::collections::hash_map::DefaultHasher::new();
+    (
+        &event.title,
+        &event.notes,
+        &event.url,
+        event.due,
+        &event.alarm_hours,
+    )
+        .hash(&mut hasher);
+    hasher.finish()
+}
+
+pub fn ics(
+    snapshot: &Snapshot,
+    hidden: &[String],
+    hidden_classes: &[String],
+    reminder_hours: &[u32],
+    now: DateTime<Utc>,
+) -> (String, usize) {
+    let events = events(snapshot, hidden, hidden_classes, reminder_hours);
     let mut out = String::new();
     line(&mut out, "BEGIN:VCALENDAR");
     line(&mut out, "VERSION:2.0");
@@ -65,46 +108,148 @@ pub fn ics(
     line(&mut out, "CALSCALE:GREGORIAN");
     line(&mut out, "METHOD:PUBLISH");
     let stamp = utc(now);
-    let mut count = 0;
-    for event in projects.chain(unaccepted) {
-        let Some(due) = event.assignment.due else {
-            continue;
-        };
-        let due = utc(due.with_timezone(&Utc));
-        let class = event
-            .classroom
-            .and_then(|c| c.name.as_deref())
-            .unwrap_or(event.class_slug);
-        let summary = format!("{} · {class}", event.assignment.name);
+    for event in &events {
+        let due = utc(event.due);
         line(&mut out, "BEGIN:VEVENT");
         line(
             &mut out,
-            &format!("UID:{}@classroom50-toolbox", escape(event.uid)),
+            &format!("UID:{}@classroom50-toolbox", escape(&event.uid)),
         );
         line(&mut out, &format!("DTSTAMP:{stamp}"));
         line(&mut out, &format!("DTSTART:{due}"));
         line(&mut out, &format!("DTEND:{due}"));
-        line(&mut out, &format!("SUMMARY:{}", escape(&summary)));
-        if let Some(text) = event.assignment.description.as_deref() {
+        line(&mut out, &format!("SUMMARY:{}", escape(&event.title)));
+        if let Some(text) = event.notes.as_deref() {
             line(&mut out, &format!("DESCRIPTION:{}", escape(text)));
         }
-        if let Some(url) = event.url {
+        if let Some(url) = event.url.as_deref() {
             line(&mut out, &format!("URL:{url}"));
         }
         // Free time: a deadline isn't a meeting.
         line(&mut out, "TRANSP:TRANSPARENT");
-        for hours in reminder_hours {
+        for hours in &event.alarm_hours {
             line(&mut out, "BEGIN:VALARM");
             line(&mut out, "ACTION:DISPLAY");
-            line(&mut out, &format!("DESCRIPTION:{}", escape(&summary)));
+            line(&mut out, &format!("DESCRIPTION:{}", escape(&event.title)));
             line(&mut out, &format!("TRIGGER:-PT{hours}H"));
             line(&mut out, "END:VALARM");
         }
         line(&mut out, "END:VEVENT");
-        count += 1;
     }
     line(&mut out, "END:VCALENDAR");
-    (out, count)
+    (out, events.len())
+}
+
+/// Writes the calendar of `snapshot` to `path`; returns the number of events.
+pub fn export(path: &Path, snapshot: &Snapshot, settings: &Settings) -> Result<usize> {
+    let (ics, count) = for_settings(snapshot, settings);
+    crate::github::write_atomic(path, ics.as_bytes())?;
+    Ok(count)
+}
+
+fn for_settings(snapshot: &Snapshot, settings: &Settings) -> (String, usize) {
+    ics(
+        snapshot,
+        &settings.hidden,
+        &settings.hidden_classes,
+        &settings.notify_hours_before,
+        Utc::now(),
+    )
+}
+
+/// The events written into the OS calendar, persisted so later syncs update them in place.
+pub struct CalendarState {
+    path: PathBuf,
+    written: Mutex<WrittenEvents>,
+}
+
+impl CalendarState {
+    pub fn load(config_dir: &Path) -> Self {
+        let path = config_dir.join(WRITTEN_FILE);
+        let written = std::fs::read_to_string(&path)
+            .ok()
+            .and_then(|json| serde_json::from_str(&json).ok())
+            .unwrap_or_default();
+        Self {
+            path,
+            written: Mutex::new(written),
+        }
+    }
+
+    fn save(&self, written: &WrittenEvents) {
+        match serde_json::to_vec(written) {
+            Ok(json) => {
+                if let Err(err) = crate::github::write_atomic(&self.path, &json) {
+                    log::warn!("could not save {}: {err}", self.path.display());
+                }
+            }
+            Err(err) => log::warn!("could not encode calendar events: {err}"),
+        }
+    }
+}
+
+/// Writes the due dates into `calendar_id` of the OS calendar now, or with `None` removes
+/// every event the app wrote. Runs on a blocking thread: EventKit calls are synchronous.
+pub async fn write_native(app: &AppHandle, calendar_id: Option<String>) -> Result<()> {
+    let app = app.clone();
+    tauri::async_runtime::spawn_blocking(move || {
+        let state = app.state::<CalendarState>();
+        let Ok(mut written) = state.written.lock() else {
+            return Ok(());
+        };
+        let result = match calendar_id {
+            Some(id) => {
+                let settings = app.state::<SettingsStore>().get();
+                let snapshot = app.state::<ProjectsState>().snapshot();
+                let events = events(
+                    &snapshot,
+                    &settings.hidden,
+                    &settings.hidden_classes,
+                    &settings.notify_hours_before,
+                );
+                platform::write_calendar(&id, &events, &mut written)
+            }
+            None => platform::clear_calendar(&mut written),
+        };
+        state.save(&written);
+        result
+    })
+    .await
+    .unwrap_or(Ok(()))
+}
+
+/// After a sync or a settings change: rewrites the exported file when its events changed,
+/// so a calendar subscribed to it, or the next import, gets the new dates, and updates the
+/// OS calendar the user picked.
+pub fn sync(app: &AppHandle) {
+    let settings = app.state::<SettingsStore>().get();
+    let snapshot = app.state::<ProjectsState>().snapshot();
+    if let Some(id) = settings.native_calendar.clone() {
+        let app = app.clone();
+        tauri::async_runtime::spawn(async move {
+            if let Err(err) = write_native(&app, Some(id)).await {
+                log::warn!("could not update the calendar: {err}");
+            }
+        });
+    }
+    if let Some(path) = &settings.calendar_file {
+        let (ics, _) = for_settings(&snapshot, &settings);
+        let current = std::fs::read_to_string(path).unwrap_or_default();
+        if without_stamps(&current) != without_stamps(&ics)
+            && path.parent().is_some_and(Path::is_dir)
+            && let Err(err) = crate::github::write_atomic(path, ics.as_bytes())
+        {
+            log::warn!("could not update {}: {err}", path.display());
+        }
+    }
+}
+
+/// The calendar minus its `DTSTAMP` lines, which change on every write.
+fn without_stamps(ics: &str) -> String {
+    ics.lines()
+        .filter(|line| !line.starts_with("DTSTAMP:"))
+        .collect::<Vec<_>>()
+        .join("\n")
 }
 
 fn utc(at: DateTime<Utc>) -> String {
@@ -145,6 +290,7 @@ fn line(out: &mut String, content: &str) {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::classroom50::{Assignment, Classroom};
     use crate::projects::Unaccepted;
 
     fn assignment(name: &str, due: Option<&str>) -> Assignment {
@@ -213,6 +359,25 @@ mod tests {
         assert_eq!(ics(&snapshot, &hidden, &[], &[], Utc::now()).1, 0);
         let classes = ["org/poo".to_owned()];
         assert_eq!(ics(&snapshot, &[], &classes, &[], Utc::now()).1, 0);
+    }
+
+    #[test]
+    fn ignores_stamps_when_comparing() {
+        let snapshot = Snapshot {
+            unaccepted: vec![unaccepted("a", "Lab 1", Some("2026-11-02T23:59:00Z"))],
+            ..Snapshot::default()
+        };
+        let earlier = ics(
+            &snapshot,
+            &[],
+            &[],
+            &[],
+            Utc::now() - chrono::TimeDelta::hours(1),
+        )
+        .0;
+        let later = ics(&snapshot, &[], &[], &[], Utc::now()).0;
+        assert_ne!(earlier, later);
+        assert_eq!(without_stamps(&earlier), without_stamps(&later));
     }
 
     #[test]

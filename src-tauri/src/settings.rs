@@ -40,6 +40,10 @@ pub struct Settings {
     pub collapsed_classes: Vec<String>,
     /// Light or dark, or following the system.
     pub appearance: Appearance,
+    /// The last exported `.ics`, rewritten after each sync while set.
+    pub calendar_file: Option<PathBuf>,
+    /// The OS calendar (EventKit identifier) the due dates are written into, kept in sync.
+    pub native_calendar: Option<String>,
     /// The first-run guide was finished or skipped.
     pub onboarded: bool,
 }
@@ -81,6 +85,8 @@ impl Default for Settings {
             hidden_classes: Vec::new(),
             collapsed_classes: Vec::new(),
             appearance: Appearance::System,
+            calendar_file: None,
+            native_calendar: None,
             onboarded: false,
         }
     }
@@ -193,6 +199,8 @@ mod tests {
             hidden_classes: vec!["o/c".into(), "o/c".into()],
             collapsed_classes: Vec::new(),
             appearance: Appearance::Dark,
+            calendar_file: None,
+            native_calendar: None,
             onboarded: true,
         }
         .normalized();
