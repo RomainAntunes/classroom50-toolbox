@@ -408,8 +408,13 @@
     padding: 0 8px;
     border: 1px solid var(--border);
     border-radius: var(--radius-control);
-    background: var(--bg-control);
+    /* A field, not a button: the card fill keeps it apart from the backdrop. */
+    background: var(--bg-card);
     outline: none;
+  }
+
+  .search::placeholder {
+    color: var(--fg-muted);
   }
 
   .search:focus-visible {
