@@ -17,6 +17,7 @@
   import { formatDate, fromNow, hoursLabel, t } from "$lib/i18n";
   import { sampleNotices, showNotice } from "$lib/notices";
   import { loadSettings, pickWatchedFolder, saveSettings, settings } from "$lib/settings.svelte";
+  import { pickCloneFolder } from "$lib/clone";
   import Section from "$lib/components/Section.svelte";
   import Toggle from "$lib/components/Toggle.svelte";
   import { session } from "$lib/session.svelte";
@@ -144,6 +145,13 @@
         onchange={(on) => save({ scanEditorProjects: on })}
       />
       <p class="hint">{t("settings.folders.editorsHint")}</p>
+      <div class="row clone-into">
+        <span>{t("settings.folders.cloneInto")}</span>
+        <span class="path" title={current.cloneFolder ?? undefined}
+          >{current.cloneFolder ?? t("settings.folders.cloneUnset")}</span
+        >
+        <button onclick={pickCloneFolder}>{t("settings.folders.change")}</button>
+      </div>
       {#each current.watchedFolders as folder (folder)}
         <div class="row">
           <span class="path" title={folder}>{folder}</span>
@@ -364,6 +372,11 @@
     justify-content: space-between;
     gap: var(--space);
     padding: 8px 12px;
+  }
+
+  .clone-into .path {
+    flex: 1;
+    color: var(--fg-muted);
   }
 
   .path {

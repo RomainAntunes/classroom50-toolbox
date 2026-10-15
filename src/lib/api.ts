@@ -170,6 +170,8 @@ export interface Snapshot {
 export interface Settings {
   watchedFolders: string[];
   scanEditorProjects: boolean;
+  /** Where the app clones assignments; asked the first time. */
+  cloneFolder: string | null;
   launchAtLogin: boolean;
   listFilter: ListFilter;
   notifyHoursBefore: number[];
@@ -280,6 +282,8 @@ export const api = {
   login: () => invoke<AuthStatus>("login"),
   cancelLogin: () => invoke<void>("cancel_login"),
   openTerminal: (path: string) => invoke<void>("open_terminal", { path }),
+  /** Clones into `parent/<repo>` and returns the new folder; `projects-updated` follows. */
+  cloneProject: (id: string, parent: string) => invoke<string>("clone_project", { id, parent }),
   checkUpdate: () => invoke<UpdateInfo | null>("check_update"),
   installUpdate: () => invoke<void>("install_update"),
 };
