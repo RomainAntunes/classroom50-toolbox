@@ -55,14 +55,22 @@ async function setIdentity(project: Project, name: string): Promise<boolean> {
 }
 
 /** Commit & push (row button, menu): pushing is the main action, "Commit only" the second. */
-export function commitPush(project: Project, name: string): Promise<boolean> {
-  return commitWork(project, name, true);
+export function commitPush(
+  project: Project,
+  name: string,
+  onChoice?: (push: boolean) => void,
+): Promise<boolean> {
+  return commitWork(project, name, true, onChoice);
 }
 
 /** Commit (menu, any clone): committing is the main action, Commit & push the second when it
  *  applies. */
-export function commitLocal(project: Project, name: string): Promise<boolean> {
-  return commitWork(project, name, false);
+export function commitLocal(
+  project: Project,
+  name: string,
+  onChoice?: (push: boolean) => void,
+): Promise<boolean> {
+  return commitWork(project, name, false, onChoice);
 }
 
 /** Why push isn't offered next to Commit, in one line. */
@@ -71,9 +79,14 @@ function noPushLine(reason: string, branch: string): string {
   return t(`commit.noPush.${known.includes(reason) ? reason : "other"}`, { branch });
 }
 
-/** Asks for the message, then commits, and pushes when chosen. Returns true when it went
- *  through. */
-async function commitWork(project: Project, name: string, preferPush: boolean): Promise<boolean> {
+/** Asks for the message, then commits, and pushes when chosen. `onChoice` hears which right
+ *  before the write, for the row's status. Returns true when it went through. */
+async function commitWork(
+  project: Project,
+  name: string,
+  preferPush: boolean,
+  onChoice?: (push: boolean) => void,
+): Promise<boolean> {
   const branch = project.remote?.defaultBranch ?? project.local?.branch ?? "main";
   let pushing = preferPush;
   try {
@@ -83,7 +96,7 @@ async function commitWork(project: Project, name: string, preferPush: boolean): 
     } catch (err) {
       // Nothing to commit: Commit & push may still have commits to push.
       if (preferPush && errorKind(err) === "nothingToCommit") {
-        return await pushOnly(project, name, branch);
+        return await pushOnly(project, name, branch, onChoice);
       }
       throw err;
     }
@@ -114,8 +127,10 @@ async function commitWork(project: Project, name: string, preferPush: boolean): 
       if (late(project) && !(await confirm(t("push.lateConfirm"), name, t("push.continue")))) {
         return false;
       }
+      onChoice?.(true);
       await api.commitPush(project.id, answer.text);
     } else {
+      onChoice?.(false);
       await api.commitOnly(project.id, answer.text);
     }
     return true;
@@ -131,11 +146,17 @@ function late(project: Project): boolean {
 }
 
 /** No changes, only local commits GitHub lacks: one confirm, then the push. */
-async function pushOnly(project: Project, name: string, branch: string): Promise<boolean> {
+async function pushOnly(
+  project: Project,
+  name: string,
+  branch: string,
+  onChoice?: (push: boolean) => void,
+): Promise<boolean> {
   const check = await api.pushCheck(project.id);
   const lines = [t("push.pushOnly", { count: check.ahead, branch })];
   if (late(project)) lines.push(t("push.late"));
   if (!(await confirm(lines.join("\n\n"), name, t("push.pushOk")))) return false;
+  onChoice?.(true);
   await api.commitPush(project.id, null);
   return true;
 }

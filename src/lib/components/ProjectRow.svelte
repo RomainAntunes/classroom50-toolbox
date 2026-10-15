@@ -148,27 +148,26 @@
     }
   }
 
+  // Set once the student picks an action in the prompt, so the status names what runs.
   let pushing = $state(false);
-  async function push() {
-    pushing = true;
+  let committing = $state(false);
+  let busy = $state(false);
+  async function runCommit(run: typeof commitPush) {
+    busy = true;
     try {
-      await commitPush(project, name);
+      await run(project, name, (push) => {
+        pushing = push;
+        committing = !push;
+      });
     } finally {
-      pushing = false;
+      busy = pushing = committing = false;
     }
   }
+  const push = () => runCommit(commitPush);
+  const commit = () => runCommit(commitLocal);
 
   // A local commit works on any clone with changes, whatever the branch or submission mode.
   const committable = $derived(Boolean(path) && (project.local?.changedFiles ?? 0) > 0);
-  let committing = $state(false);
-  async function commit() {
-    committing = true;
-    try {
-      await commitLocal(project, name);
-    } finally {
-      committing = false;
-    }
-  }
 
   let submitting = $state(false);
   async function submit() {
@@ -290,14 +289,14 @@
       }),
       MenuItem.new({
         text: t("commit.menu"),
-        enabled: committable && !committing && !pushing,
+        enabled: committable && !busy,
         action: () => commit(),
       }),
       ...(everyPush
         ? [
             MenuItem.new({
               text: t("push.menu"),
-              enabled: pushable && !pushing && !committing,
+              enabled: pushable && !busy,
               action: () => push(),
             }),
           ]
@@ -441,7 +440,7 @@
       <button
         class="primary"
         title={t("push.hint")}
-        disabled={pushing || committing}
+        disabled={busy}
         onclick={(event) => {
           event.stopPropagation();
           push();

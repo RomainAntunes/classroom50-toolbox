@@ -75,7 +75,9 @@
 
   .card {
     width: 100%;
-    max-width: 320px;
+    /* Three buttons (Cancel, Commit only, Commit & push) fit on one line at 14px; the
+       380px popover minus the scrim's padding leaves 348px. */
+    max-width: 340px;
     padding: 14px;
     border: 1px solid var(--border);
     border-radius: var(--radius-card);

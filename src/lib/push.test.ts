@@ -91,12 +91,15 @@ describe("commitPush", () => {
 
   it("commits only with the second action, late or not, without a confirm", async () => {
     api.commitCheck.mockResolvedValue(check());
-    const done = commitPush(project({ due: "2000-01-01T00:00:00Z" }), "Lab");
+    const onChoice = vi.fn();
+    const done = commitPush(project({ due: "2000-01-01T00:00:00Z" }), "Lab", onChoice);
     await vi.waitFor(() => expect(prompt.current).not.toBeNull());
+    expect(onChoice).not.toHaveBeenCalled();
     expect(prompt.current?.okLabel).toBe("Commit & push");
     expect(prompt.current?.altLabel).toBe("Commit only");
     await answer("WIP", true);
     expect(await done).toBe(true);
+    expect(onChoice).toHaveBeenCalledExactlyOnceWith(false);
     expect(api.commitOnly).toHaveBeenCalledWith("o/r", "WIP");
     expect(api.commitPush).not.toHaveBeenCalled();
     expect(dialog.ask).not.toHaveBeenCalled();
