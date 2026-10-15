@@ -166,6 +166,21 @@ export interface Accepted {
   projectId: string | null;
 }
 
+/** What a submit would send (`submit_check`). */
+export interface SubmitCheck {
+  /** Submit needs `.classroom50.yaml`; empty-repo assignments are pushed by hand. */
+  hasMarker: boolean;
+  /** New files that will be included. */
+  untracked: string[];
+  /** Tracked files deleted without `git rm`: submit would fail. */
+  deleted: string[];
+}
+
+export interface Submitted {
+  /** The submission commit on GitHub. */
+  url: string | null;
+}
+
 export interface Snapshot {
   projects: Project[];
   unaccepted: Unaccepted[];
@@ -297,6 +312,9 @@ export const api = {
   /** Runs `gh student accept`, then syncs; rejects with `needsTeam` when a group is needed. */
   acceptAssignment: (id: string, newTeam: boolean) =>
     invoke<Accepted>("accept_assignment", { id, newTeam }),
+  submitCheck: (id: string) => invoke<SubmitCheck>("submit_check", { id }),
+  /** Runs `gh student submit` in the clone, then re-reads the status while it's graded. */
+  submitProject: (id: string) => invoke<Submitted>("submit_project", { id }),
   /** Clones into `parent/<repo>` and returns the new folder; `projects-updated` follows. */
   cloneProject: (id: string, parent: string) => invoke<string>("clone_project", { id, parent }),
   checkUpdate: () => invoke<UpdateInfo | null>("check_update"),

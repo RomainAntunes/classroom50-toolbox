@@ -115,6 +115,8 @@ pub fn run() {
             commands::open_terminal,
             commands::clone_project,
             commands::accept_assignment,
+            commands::submit_check,
+            commands::submit_project,
             commands::check_update,
             commands::install_update,
         ])
