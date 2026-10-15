@@ -3,12 +3,15 @@
 // A string with a count is stored per CLDR plural category (`foo.one`, `foo.other`, plus
 // `few`/`many`/... where the language has them) and called as `t("foo", { count })`.
 import en from "./en.json";
+import fr from "./fr.json";
+import es from "./es.json";
+import de from "./de.json";
 import { locale } from "./locale.svelte";
 
 type Catalog = Record<string, string>;
 
 /** Every catalog, by BCP 47 code. Adding a language: import its JSON and list it here. */
-export const catalogs: Record<string, Catalog> = { en };
+export const catalogs: Record<string, Catalog> = { en, fr, es, de };
 const fallback = "en";
 
 /** The language each catalog is written in, named in itself ("English", "Français"). */

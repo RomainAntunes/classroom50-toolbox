@@ -1,15 +1,13 @@
 import { afterEach, describe, expect, it } from "vitest";
 import { errorMessage } from "$lib/api";
-import { catalogs, setLocale } from "$lib/i18n";
+import { setLocale } from "$lib/i18n";
 
 afterEach(() => {
   setLocale("en");
-  delete catalogs.fr;
 });
 
 describe("errorMessage", () => {
   it("words a known kind in the UI's language, filling in its params", () => {
-    catalogs.fr = { ...catalogs.en, "error.otherBranch": "le clone n'est pas sur {branch}" };
     setLocale("fr");
     const err = {
       kind: "otherBranch",

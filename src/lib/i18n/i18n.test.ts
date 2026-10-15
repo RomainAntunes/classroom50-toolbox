@@ -71,17 +71,15 @@ describe("plurals", () => {
 
 describe("locales", () => {
   afterEach(() => {
-    delete catalogs.fr;
     delete catalogs["pt-BR"];
   });
 
   it("resolves the system language to the best catalog, else English", () => {
-    catalogs.fr = { "language.name": "Français" };
     catalogs["pt-BR"] = { "language.name": "Português (Brasil)" };
     expect(resolveLocale("system", ["fr-CH", "en"])).toBe("fr");
-    expect(resolveLocale("system", ["de-DE", "FR"])).toBe("fr");
+    expect(resolveLocale("system", ["it-IT", "FR"])).toBe("fr");
     expect(resolveLocale("system", ["pt-br"])).toBe("pt-BR");
-    expect(resolveLocale("system", ["de", "ja"])).toBe("en");
+    expect(resolveLocale("system", ["it", "ja"])).toBe("en");
     expect(resolveLocale("system", [])).toBe("en");
     expect(resolveLocale("fr", ["en"])).toBe("fr");
     expect(resolveLocale("xx", ["fr"])).toBe("en");
@@ -104,14 +102,15 @@ describe("locales", () => {
   });
 
   it("only offers registered catalogs", () => {
-    expect(resolveLocale("system", ["fr-FR"])).toBe("en");
-    expect(resolveLocale("de")).toBe("en");
+    expect(resolveLocale("system", ["pt-PT", "it"])).toBe("en");
+    expect(resolveLocale("ja")).toBe("en");
   });
 
   it("names each language in itself", () => {
-    catalogs.fr = { "language.name": "Français" };
     expect(languageName("en")).toBe("English");
     expect(languageName("fr")).toBe("Français");
+    expect(languageName("es")).toBe("Español");
+    expect(languageName("de")).toBe("Deutsch");
   });
 });
 
