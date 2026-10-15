@@ -150,7 +150,19 @@ pub fn process(app: &AppHandle, snapshot: &Snapshot) {
     if snapshot.checked_at.is_none() {
         return;
     }
-    let hours = app.state::<SettingsStore>().get().notify_hours_before;
+    let settings = app.state::<SettingsStore>().get();
+    let hours = settings.notify_hours_before;
+    // Hidden assignments stay quiet; what changed meanwhile is told once they're shown.
+    let visible;
+    let snapshot = if settings.hidden.is_empty() {
+        snapshot
+    } else {
+        let mut copy = snapshot.clone();
+        copy.projects.retain(|p| !settings.hidden.contains(&p.id));
+        copy.unaccepted.retain(|u| !settings.hidden.contains(&u.id));
+        visible = copy;
+        &visible
+    };
     let state = app.state::<AlertsState>();
     let Ok(mut memory) = state.memory.lock() else {
         return;

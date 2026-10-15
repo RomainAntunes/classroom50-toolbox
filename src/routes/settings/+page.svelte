@@ -212,6 +212,15 @@
           <button onclick={chooseEditor}>{editor.name}</button>
         {/if}
       </div>
+      {#if current.hidden.length}
+        <div class="row">
+          <span class="text">
+            <span>{t("settings.hidden.label")}</span>
+            <span class="sub">{t("settings.hidden.hint", { count: current.hidden.length })}</span>
+          </span>
+          <button onclick={() => save({ hidden: [] })}>{t("settings.hidden.showAll")}</button>
+        </div>
+      {/if}
       <Toggle
         label={t("settings.launchAtLogin")}
         checked={current.launchAtLogin}

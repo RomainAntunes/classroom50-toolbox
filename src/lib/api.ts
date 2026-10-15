@@ -248,6 +248,8 @@ export interface Settings {
   notifyHoursBefore: number[];
   /** Editor for clones no editor has opened yet; `null` picks the first one installed. */
   defaultEditor: string | null;
+  /** Hidden project and unaccepted-assignment ids: listed only when a search matches. */
+  hidden: string[];
 }
 
 /** An editor installed here that can open a folder. */

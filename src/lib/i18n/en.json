@@ -254,5 +254,11 @@
   "projects.inGroup": "In {group}",
   "details.earlierGrades": "Earlier grades",
   "details.gradeAt": "{score}, {when}",
-  "projects.earlierGrades": "Earlier grades"
+  "projects.earlierGrades": "Earlier grades",
+  "projects.hide": "Hide",
+  "projects.unhide": "Show in the list",
+  "projects.hidden": "Hidden",
+  "settings.hidden.label": "Hidden assignments",
+  "settings.hidden.hint": "Hidden: {count}. Left out of the list and never notified about; search still finds them.",
+  "settings.hidden.showAll": "Show all"
 }

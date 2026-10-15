@@ -24,6 +24,7 @@
   import Section from "$lib/components/Section.svelte";
   import ToolRow from "$lib/components/ToolRow.svelte";
   import ProjectRow from "$lib/components/ProjectRow.svelte";
+  import { isHidden } from "$lib/hidden";
   import UnacceptedRow from "$lib/components/UnacceptedRow.svelte";
   import LoginStatus from "$lib/components/LoginStatus.svelte";
 
@@ -93,11 +94,13 @@
     groupByClass(
       allProjects.filter(
         (p) =>
+          (!isHidden(p.id) || query) &&
           matches(q(p), query) &&
           inRange(p.assignment?.due ?? null, Boolean(p.assignment?.closed || p.remote?.archived)),
       ),
       (session.snapshot?.unaccepted ?? []).filter(
         (u) =>
+          (!isHidden(u.id) || query) &&
           inRange(u.assignment.due, u.assignment.closed) &&
           matches(
             [

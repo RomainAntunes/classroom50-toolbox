@@ -30,6 +30,9 @@ pub struct Settings {
     /// Editor for clones no editor has opened yet (`editors::Editor::id`); `None` picks the
     /// first one installed.
     pub default_editor: Option<String>,
+    /// Project and unaccepted-assignment ids the user hid: left out of the list unless a
+    /// search matches them, and never notified about.
+    pub hidden: Vec<String>,
 }
 
 /// The date filter above the project list.
@@ -56,6 +59,7 @@ impl Default for Settings {
             list_filter: ListFilter::All,
             notify_hours_before: vec![24, 1],
             default_editor: None,
+            hidden: Vec::new(),
         }
     }
 }
@@ -66,6 +70,8 @@ impl Settings {
         let mut seen = BTreeSet::new();
         self.watched_folders
             .retain(|path| seen.insert(path.clone()));
+        let mut seen = BTreeSet::new();
+        self.hidden.retain(|id| seen.insert(id.clone()));
 
         let hours: BTreeSet<u32> = self
             .notify_hours_before
@@ -149,6 +155,7 @@ mod tests {
             list_filter: ListFilter::All,
             notify_hours_before: vec![1, 24, 0, 1, 1000, 6],
             default_editor: None,
+            hidden: vec!["a".into(), "a".into()],
         }
         .normalized();
         assert_eq!(
