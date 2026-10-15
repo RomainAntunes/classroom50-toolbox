@@ -200,14 +200,14 @@ fn submission_url(stdout: &str) -> Option<String> {
     })
 }
 
+/// Runs `gh student`; past `timeout`, gh and the extension it started are both killed.
 async fn run(args: Vec<OsString>, cwd: &Path, timeout: Duration) -> Result<process::Output> {
-    match tokio::time::timeout(timeout, process::run("gh", args, Some(cwd))).await {
-        Err(_) => Err(Error::Student(format!(
-            "gh student didn't finish within {} minutes",
-            timeout.as_secs() / 60
+    match process::run_with_timeout("gh", args, Some(cwd), timeout).await {
+        Err(Error::TimedOut { minutes, .. }) => Err(Error::Student(format!(
+            "gh student didn't finish within {minutes} minutes"
         ))),
-        Ok(Err(Error::CommandFailed { stderr, .. })) => Err(failure(&stderr)),
-        Ok(result) => result,
+        Err(Error::CommandFailed { stderr, .. }) => Err(failure(&stderr)),
+        result => result,
     }
 }
 
