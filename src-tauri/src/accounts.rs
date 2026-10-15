@@ -87,6 +87,7 @@ pub async fn avatar(http: &reqwest::Client, cache_dir: &Path, login: &str) -> Re
 }
 
 async fn download(http: &reqwest::Client, login: &str, path: &Path) -> Result<Vec<u8>> {
+    crate::simulate::check()?;
     let url = format!("https://github.com/{login}.png?size=64");
     let response = http.get(url).send().await?.error_for_status()?;
     let bytes = response.bytes().await?.to_vec();

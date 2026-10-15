@@ -44,6 +44,7 @@ pub async fn graphql<T: DeserializeOwned>(
     query: &str,
     variables: Value,
 ) -> Result<T> {
+    crate::simulate::check()?;
     let request = http
         .post(GRAPHQL_URL)
         .bearer_auth(token)
@@ -182,6 +183,7 @@ impl HttpCache {
         {
             return Ok(entry.body.clone());
         }
+        crate::simulate::check()?;
         let request = http.get(url);
         let request = match &cached {
             Some(entry) => request.header(header::IF_NONE_MATCH, &entry.etag),
@@ -212,6 +214,12 @@ impl HttpCache {
             );
         }
         Ok(body)
+    }
+
+    /// The last body downloaded from `url`, without any request.
+    pub fn cached_text(&self, url: &str) -> Option<String> {
+        let entries = self.entries.lock().ok()?;
+        entries.get(url).map(|e| e.body.clone())
     }
 
     /// Forgets every cached body, so the next GETs download in full.

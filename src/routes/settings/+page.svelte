@@ -9,9 +9,11 @@
     api,
     errorMessage,
     PROJECTS_UPDATED_EVENT,
+    SIMULATED_NETWORKS,
     withDialog,
     type AppInfo,
     type LastRun,
+    type SimulatedNetwork,
     type SyncDetails,
     type ToolStatus,
   } from "$lib/api";
@@ -46,6 +48,12 @@
   let showSync = $state(false);
   let showDev = $state(false);
   let badgeQueued = $state(false);
+  let network = $state<SimulatedNetwork>("normal");
+
+  async function simulateNetwork(next: SimulatedNetwork) {
+    await api.simulateNetwork(next);
+    network = next;
+  }
 
   async function previewBadge() {
     badgeQueued = true;
@@ -128,6 +136,7 @@
     if (!session.tools.length) void checkTools();
     // An editor installed since the app started shows up here.
     void loadEditors(true);
+    if (import.meta.env.DEV) void api.simulatedNetwork().then((n) => (network = n));
     void Promise.all([api.appInfo(), loadSettings(), api.syncDetails()]).then(
       ([appInfo, , details]) => {
         info = appInfo;
@@ -300,6 +309,16 @@
             {#each THEME_CHOICES as theme (theme)}
               <button aria-pressed={preview.theme === theme} onclick={() => setPreviewTheme(theme)}
                 >{t(`settings.dev.theme.${theme}`)}</button
+              >
+            {/each}
+          </div>
+        </div>
+        <div class="row">
+          <span title={t("settings.dev.networkHint")}>{t("settings.dev.network")}</span>
+          <div class="segmented">
+            {#each SIMULATED_NETWORKS as choice (choice)}
+              <button aria-pressed={network === choice} onclick={() => simulateNetwork(choice)}
+                >{t(`settings.dev.network.${choice}`)}</button
               >
             {/each}
           </div>

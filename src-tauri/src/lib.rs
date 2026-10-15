@@ -15,6 +15,7 @@ pub mod process;
 pub mod projects;
 pub mod pull;
 pub mod settings;
+mod simulate;
 pub mod status;
 pub mod student;
 mod sync_progress;
@@ -113,6 +114,8 @@ pub fn run() {
             commands::switch_account,
             commands::account_avatar,
             commands::preview_badge,
+            commands::simulate_network,
+            commands::simulated_network,
             commands::get_settings,
             commands::update_settings,
             commands::login,

@@ -15,6 +15,7 @@ use crate::popover::PopoverState;
 use crate::projects::{self, ProjectsState, Snapshot, SyncProgress};
 use crate::pull;
 use crate::settings::{Settings, SettingsStore};
+use crate::simulate;
 use crate::student;
 use crate::tools::{self, AuthStatus, Tool, ToolStatus};
 use crate::updater::{self, UpdateInfo};
@@ -475,4 +476,15 @@ pub async fn preview_badge(app: AppHandle) -> Result<()> {
     tokio::time::sleep(std::time::Duration::from_secs(3)).await;
     crate::tray::set_badge(&app, true);
     Ok(())
+}
+
+/// Dev builds only: pretends GitHub is down or the device is offline, until set back.
+#[tauri::command]
+pub fn simulate_network(network: simulate::Network) -> Result<()> {
+    simulate::set_network(network)
+}
+
+#[tauri::command]
+pub fn simulated_network() -> simulate::Network {
+    simulate::network()
 }
