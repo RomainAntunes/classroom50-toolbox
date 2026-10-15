@@ -1,18 +1,67 @@
 <script lang="ts">
   import type { Snippet } from "svelte";
+  import { t } from "$lib/i18n";
 
-  let { title, actions, children }: { title: string; actions?: Snippet; children: Snippet } =
-    $props();
+  let {
+    title,
+    actions,
+    children,
+    collapsed = false,
+    ontoggle,
+    onmenu,
+    note,
+  }: {
+    title: string;
+    actions?: Snippet;
+    children: Snippet;
+    collapsed?: boolean;
+    /** Makes the title fold and unfold the section. */
+    ontoggle?: () => void;
+    /** Adds a "..." button (and the title's context menu) opening a menu. */
+    onmenu?: (event: MouseEvent) => void;
+    /** Shown after the title, muted (a count while folded, "Hidden"). */
+    note?: string;
+  } = $props();
 </script>
 
 <section>
   <header>
-    <h2>{title}</h2>
+    {#if ontoggle}
+      <button class="title" aria-expanded={!collapsed} onclick={ontoggle} oncontextmenu={onmenu}>
+        <svg class:open={!collapsed} viewBox="0 0 24 24" aria-hidden="true"
+          ><path d="m9 18 6-6-6-6" /></svg
+        >
+        <h2>{title}</h2>
+        {#if note}<span class="note">{note}</span>{/if}
+      </button>
+    {:else}
+      <h2>
+        {title}{#if note}<span class="note">{note}</span>{/if}
+      </h2>
+    {/if}
     {@render actions?.()}
+    {#if onmenu}
+      <button
+        class="more"
+        aria-label={t("section.more")}
+        title={t("section.more")}
+        onclick={onmenu}
+      >
+        <svg viewBox="0 0 24 24" aria-hidden="true">
+          <circle cx="5" cy="12" r="1.6" /><circle cx="12" cy="12" r="1.6" /><circle
+            cx="19"
+            cy="12"
+            r="1.6"
+          />
+        </svg>
+      </button>
+    {/if}
   </header>
-  <div class="card">
-    {@render children()}
-  </div>
+  {#if !collapsed}
+    <div class="card">
+      {@render children()}
+    </div>
+  {/if}
 </section>
 
 <style>
@@ -26,6 +75,7 @@
     display: flex;
     align-items: center;
     justify-content: space-between;
+    gap: 6px;
     padding: 0 4px;
   }
 
@@ -34,6 +84,75 @@
     font-size: 0.85em;
     font-weight: 600;
     color: var(--fg-muted);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .note {
+    margin-left: 6px;
+    font-size: 0.85em;
+    font-weight: 400;
+    color: var(--fg-muted);
+    white-space: nowrap;
+  }
+
+  .title {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    min-width: 0;
+    flex: 1;
+    padding: 3px 8px 3px 6px;
+    border: 0;
+    border-radius: var(--radius-control);
+    background: none;
+    color: inherit;
+    font: inherit;
+    text-align: left;
+    cursor: default;
+  }
+
+  .title svg {
+    flex: none;
+    width: 10px;
+    height: 10px;
+    fill: none;
+    stroke: var(--fg-muted);
+    stroke-width: 3;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+    transition: transform 0.15s ease-out;
+  }
+
+  .title svg.open {
+    transform: rotate(90deg);
+  }
+
+  .more {
+    flex: none;
+    display: grid;
+    place-items: center;
+    width: 22px;
+    height: 18px;
+    padding: 0;
+    border: 0;
+    border-radius: var(--radius-control);
+    background: none;
+    opacity: 0.55;
+    cursor: default;
+  }
+
+  .more:hover,
+  .more:focus-visible {
+    opacity: 1;
+    background: var(--bg-control-hover);
+  }
+
+  .more svg {
+    width: 14px;
+    height: 14px;
+    fill: var(--fg-muted);
   }
 
   .card {

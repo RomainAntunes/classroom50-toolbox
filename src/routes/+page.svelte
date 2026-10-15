@@ -25,7 +25,8 @@
   import Section from "$lib/components/Section.svelte";
   import ToolRow from "$lib/components/ToolRow.svelte";
   import ProjectRow from "$lib/components/ProjectRow.svelte";
-  import { showsProject, showsUnaccepted } from "$lib/filter";
+  import { classKey, showsProject, showsUnaccepted } from "$lib/filter";
+  import { isClassHidden, isCollapsed, setClassHidden, setCollapsed } from "$lib/hidden";
   import UnacceptedRow from "$lib/components/UnacceptedRow.svelte";
   import LoginStatus from "$lib/components/LoginStatus.svelte";
 
@@ -73,7 +74,13 @@
   const FILTERS: ListFilter[] = ["all", "open", "week", "past"];
   const filter = $derived(settings.current?.listFilter ?? "all");
   const groups = $derived.by(() => {
-    const list = { filter, query, hidden: settings.current?.hidden ?? [], now };
+    const list = {
+      filter,
+      query,
+      hidden: settings.current?.hidden ?? [],
+      hiddenClasses: settings.current?.hiddenClasses ?? [],
+      now,
+    };
     return groupByClass(
       allProjects.filter((p) => showsProject(p, list)),
       (session.snapshot?.unaccepted ?? []).filter((u) => showsUnaccepted(u, list)),
@@ -84,7 +91,7 @@
   function groupByClass(projects: Project[], unaccepted: Unaccepted[]): ClassGroup[] {
     const groups = new Map<string, ClassGroup>();
     const group = (owner: string, slug: string, title: string) => {
-      const key = `${owner}/${slug}`.toLowerCase();
+      const key = classKey(owner, slug);
       let found = groups.get(key);
       if (!found) {
         found = { key, title, owner, projects: [], unaccepted: [] };
@@ -167,6 +174,33 @@
     const items = await Promise.all([
       MenuItem.new({ text: t("app.refresh"), enabled: !loading, action: refresh }),
       MenuItem.new({ text: t("projects.rescan"), enabled: !loading, action: rescan }),
+    ]);
+    const menu = await Menu.new({ items });
+    await withDialog(() => menu.popup());
+  }
+
+  // A search unfolds every class, so matches are never out of sight.
+  const folded = (key: string) => !query && isCollapsed(key);
+
+  function classNote(group: ClassGroup): string | undefined {
+    if (isClassHidden(group.key)) return t("projects.hidden");
+    if (folded(group.key)) return String(group.projects.length + group.unaccepted.length);
+    return undefined;
+  }
+
+  async function classMenu(event: MouseEvent, key: string) {
+    event.preventDefault();
+    const collapsed = isCollapsed(key);
+    const hidden = isClassHidden(key);
+    const items = await Promise.all([
+      MenuItem.new({
+        text: t(collapsed ? "projects.class.expand" : "projects.class.collapse"),
+        action: () => setCollapsed(key, !collapsed),
+      }),
+      MenuItem.new({
+        text: t(hidden ? "projects.class.unhide" : "projects.class.hide"),
+        action: () => setClassHidden(key, !hidden),
+      }),
     ]);
     const menu = await Menu.new({ items });
     await withDialog(() => menu.popup());
@@ -299,7 +333,13 @@
   {/if}
 
   {#each groups as group (group.key)}
-    <Section title={group.title}>
+    <Section
+      title={group.title}
+      collapsed={folded(group.key)}
+      note={classNote(group)}
+      ontoggle={() => setCollapsed(group.key, !isCollapsed(group.key))}
+      onmenu={(event) => classMenu(event, group.key)}
+    >
       {#each group.projects as project (project.id)}
         <ProjectRow {project} {now} unseen={unseen.has(project.id)} />
       {/each}

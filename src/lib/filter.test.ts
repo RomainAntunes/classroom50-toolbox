@@ -32,6 +32,7 @@ const list = (patch: Partial<ListQuery> = {}): ListQuery => ({
   filter: "all",
   query: "",
   hidden: [],
+  hiddenClasses: [],
   now,
   ...patch,
 });
@@ -64,6 +65,13 @@ describe("search and hidden assignments", () => {
     expect(showsProject(hidden, list({ hidden: ["lab1"], query: "other" }))).toBe(false);
   });
 
+  it("leaves a hidden class out unless a search matches", () => {
+    const lab = project("lab1", null);
+    expect(showsProject(lab, list({ hiddenClasses: ["o/poo"] }))).toBe(false);
+    expect(showsProject(lab, list({ hiddenClasses: ["o/other"] }))).toBe(true);
+    expect(showsProject(lab, list({ hiddenClasses: ["o/poo"], query: "lab" }))).toBe(true);
+  });
+
   it("applies the same rules to assignments not accepted yet", () => {
     const item = {
       id: "o/poo/lab4",
@@ -74,5 +82,6 @@ describe("search and hidden assignments", () => {
     expect(showsUnaccepted(item, list())).toBe(true);
     expect(showsUnaccepted(item, list({ hidden: [item.id] }))).toBe(false);
     expect(showsUnaccepted(item, list({ hidden: [item.id], query: "julie" }))).toBe(true);
+    expect(showsUnaccepted(item, list({ hiddenClasses: ["o/poo"] }))).toBe(false);
   });
 });

@@ -212,13 +212,20 @@
           <button onclick={chooseDefaultEditor}>{editor.name}</button>
         {/if}
       </div>
-      {#if current.hidden.length}
+      {#if current.hidden.length || current.hiddenClasses.length}
         <div class="row">
           <span class="text">
             <span>{t("settings.hidden.label")}</span>
-            <span class="sub">{t("settings.hidden.hint", { count: current.hidden.length })}</span>
+            <span class="sub"
+              >{t("settings.hidden.hint", {
+                count: current.hidden.length,
+                classes: current.hiddenClasses.length,
+              })}</span
+            >
           </span>
-          <button onclick={() => save({ hidden: [] })}>{t("settings.hidden.showAll")}</button>
+          <button onclick={() => save({ hidden: [], hiddenClasses: [] })}
+            >{t("settings.hidden.showAll")}</button
+          >
         </div>
       {/if}
       <Toggle
