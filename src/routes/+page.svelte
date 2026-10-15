@@ -180,6 +180,12 @@
     await withDialog(() => menu.popup());
   }
 
+  // The very first sync: nothing to show yet but what is happening. Local results and
+  // previews stay hidden until GitHub has been read once, so the list appears whole.
+  const firstSync = $derived(
+    Boolean(session.auth?.loggedIn) && session.snapshot != null && !session.snapshot.syncedAt,
+  );
+
   // A search unfolds every class, so matches are never out of sight.
   const folded = (key: string) => !query && isCollapsed(key);
 
@@ -285,7 +291,7 @@
       </svg>
     </button>
   </div>
-  {#if syncing}
+  {#if syncing && !firstSync}
     <div
       class="progress"
       class:indeterminate={fraction === null}
@@ -333,33 +339,52 @@
     </p>
   {/if}
 
-  {#each groups as group (group.key)}
-    <Section
-      title={group.title}
-      collapsed={folded(group.key)}
-      note={classNote(group)}
-      ontoggle={() => setCollapsed(group.key, !isCollapsed(group.key))}
-      onmenu={(event) => classMenu(event, group.key)}
-    >
-      {#each group.projects as project (project.id)}
-        <ProjectRow {project} {now} unseen={unseen.has(project.id)} />
-      {/each}
-      {#each group.unaccepted as item (item.id)}
-        <UnacceptedRow {item} {now} unseen={unseen.has(item.id)} />
-      {/each}
-    </Section>
+  {#if firstSync}
+    <div class="first-sync" role="status">
+      <img class="first-logo" src={logo} alt="" />
+      <p class="first-title">{t("projects.firstSync.title")}</p>
+      <p class="first-hint">{t("projects.firstSync.hint")}</p>
+      <div
+        class="first-bar"
+        class:indeterminate={fraction === null}
+        role="progressbar"
+        aria-label={t("projects.syncing")}
+        aria-valuemin="0"
+        aria-valuemax="100"
+        aria-valuenow={fraction === null ? undefined : Math.round(fraction * 100)}
+      >
+        <div style:width={fraction === null ? undefined : `${fraction * 100}%`}></div>
+      </div>
+    </div>
   {:else}
-    <p class="empty">
-      {#if (query || filter !== "all") && (allProjects.length > 0 || session.snapshot?.unaccepted.length)}
-        {t("projects.noMatch")}
-      {:else if syncing}
-        {t("projects.loading")}
-      {:else}
-        {t("projects.empty")}
-        <button onclick={() => goto("/settings")}>{t("app.settings")}</button>
-      {/if}
-    </p>
-  {/each}
+    {#each groups as group (group.key)}
+      <Section
+        title={group.title}
+        collapsed={folded(group.key)}
+        note={classNote(group)}
+        ontoggle={() => setCollapsed(group.key, !isCollapsed(group.key))}
+        onmenu={(event) => classMenu(event, group.key)}
+      >
+        {#each group.projects as project (project.id)}
+          <ProjectRow {project} {now} unseen={unseen.has(project.id)} />
+        {/each}
+        {#each group.unaccepted as item (item.id)}
+          <UnacceptedRow {item} {now} unseen={unseen.has(item.id)} />
+        {/each}
+      </Section>
+    {:else}
+      <p class="empty">
+        {#if (query || filter !== "all") && (allProjects.length > 0 || session.snapshot?.unaccepted.length)}
+          {t("projects.noMatch")}
+        {:else if syncing}
+          {t("projects.loading")}
+        {:else}
+          {t("projects.empty")}
+          <button onclick={() => goto("/settings")}>{t("app.settings")}</button>
+        {/if}
+      </p>
+    {/each}
+  {/if}
 </main>
 
 <footer>
@@ -512,6 +537,58 @@
     padding: 0 4px;
     font-size: 0.85em;
     color: var(--warning);
+  }
+
+  .first-sync {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    padding: 24px;
+    text-align: center;
+  }
+
+  .first-logo {
+    width: 48px;
+    height: 48px;
+    margin-bottom: 6px;
+  }
+
+  .first-title {
+    margin: 0;
+    font-weight: 600;
+  }
+
+  .first-hint {
+    margin: 0;
+    max-width: 260px;
+    color: var(--fg-muted);
+    font-size: 0.9em;
+  }
+
+  .first-bar {
+    position: relative;
+    width: 160px;
+    height: 4px;
+    margin-top: 10px;
+    border-radius: 2px;
+    background: var(--bg-control);
+    overflow: hidden;
+  }
+
+  .first-bar > div {
+    height: 100%;
+    border-radius: 2px;
+    background: var(--accent);
+    transition: width 0.3s ease-out;
+  }
+
+  .first-bar.indeterminate > div {
+    position: absolute;
+    width: 30%;
+    animation: slide 1.2s ease-in-out infinite;
   }
 
   .empty {

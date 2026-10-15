@@ -1,4 +1,5 @@
 <script lang="ts">
+  import logo from "$lib/assets/logo.png";
   import { onMount } from "svelte";
   import { goto } from "$app/navigation";
   import { api, type AuthStatus, type ToolStatus } from "$lib/api";
@@ -47,32 +48,49 @@
 </script>
 
 <header class="titlebar">
-  <h1>{t("welcome.title")}</h1>
+  {#if step > 0}<h1>{t("welcome.title")}</h1>{:else}<span></span>{/if}
   <button class="skip" onclick={finish}>{t("welcome.skip")}</button>
 </header>
 
 <main>
   {#if STEPS[step] === "welcome"}
-    <section class="intro">
+    <section class="hero">
+      <img class="hero-logo" src={logo} alt="" />
+      <h2>{t("welcome.title")}</h2>
       <p class="lead">{t("welcome.lead")}</p>
-      <ul>
-        <li>{t("welcome.point.list")}</li>
-        <li>{t("welcome.point.actions")}</li>
-        <li>{t("welcome.point.notify")}</li>
-      </ul>
     </section>
+    <ul class="points">
+      <li>
+        <svg viewBox="0 0 24 24" aria-hidden="true"
+          ><path d="M8 6h13M8 12h13M8 18h13M3.5 6h.01M3.5 12h.01M3.5 18h.01" /></svg
+        >
+        <span>{t("welcome.point.list")}</span>
+      </li>
+      <li>
+        <svg viewBox="0 0 24 24" aria-hidden="true"
+          ><path d="M12 3v12m0 0-4-4m4 4 4-4M5 21h14" /></svg
+        >
+        <span>{t("welcome.point.actions")}</span>
+      </li>
+      <li>
+        <svg viewBox="0 0 24 24" aria-hidden="true"
+          ><path d="M6 8a6 6 0 1 1 12 0c0 7 3 9 3 9H3s3-2 3-9M10.3 21a1.94 1.94 0 0 0 3.4 0" /></svg
+        >
+        <span>{t("welcome.point.notify")}</span>
+      </li>
+    </ul>
   {:else if STEPS[step] === "tools"}
+    <p class="hint">
+      {missing ? t("welcome.tools.missing") : t("welcome.tools.ready")}
+    </p>
     <Section title={t("welcome.tools.title")}>
-      <p class="hint">
-        {missing ? t("welcome.tools.missing") : t("welcome.tools.ready")}
-      </p>
       {#each session.tools as status (status.tool)}
         <ToolRow {status} onchange={replaceTool} />
       {/each}
     </Section>
   {:else if STEPS[step] === "account"}
+    <p class="hint">{t("welcome.account.hint")}</p>
     <Section title={t("welcome.account.title")}>
-      <p class="hint">{t("welcome.account.hint")}</p>
       <div class="login">
         <LoginStatus auth={session.auth} {ghInstalled} onchange={signedIn} />
       </div>
@@ -160,32 +178,71 @@
     padding: var(--space) 12px;
   }
 
-  .intro {
-    padding: 4px 2px;
+  .hero {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 6px;
+    padding: 8px 12px 0;
+    text-align: center;
+  }
+
+  .hero-logo {
+    width: 64px;
+    height: 64px;
+    margin-bottom: 4px;
+  }
+
+  h2 {
+    margin: 0;
+    font-size: 1.2em;
+    font-weight: 600;
   }
 
   .lead {
-    margin: 0 0 var(--space);
-    font-size: 1.05em;
+    margin: 0;
+    color: var(--fg-muted);
   }
 
-  ul {
+  .points {
     margin: 0;
-    padding-left: 18px;
+    padding: 4px 0;
+    list-style: none;
     display: flex;
     flex-direction: column;
-    gap: 6px;
-    color: var(--fg-muted);
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-card);
+  }
+
+  .points li {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    padding: 8px 12px;
+  }
+
+  .points svg {
+    flex-shrink: 0;
+    width: 18px;
+    height: 18px;
+    margin-top: 1px;
+    fill: none;
+    stroke: var(--accent);
+    stroke-width: 2;
+    stroke-linecap: round;
+    stroke-linejoin: round;
   }
 
   .hint {
-    margin: 0;
-    padding: 12px;
+    margin: 0 4px calc(var(--space) * -1);
     color: var(--fg-muted);
+    font-size: 0.9em;
   }
 
+  /* Same inset on every side, like the other rows. */
   .login {
-    padding: 4px 12px 12px;
+    padding: 10px 12px;
   }
 
   .row {
