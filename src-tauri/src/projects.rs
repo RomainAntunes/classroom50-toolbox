@@ -30,6 +30,7 @@ use crate::groups::{self, Group, GroupTeam};
 use crate::process;
 use crate::settings::{Settings, SettingsStore};
 use crate::status::{self, Branch, Feedback, Grade, GradeSummary, Grading, StatusFields};
+use crate::sync_progress::{Costs, Phase, Tracker};
 use crate::tools;
 use crate::watch::{self, WatchTarget};
 
@@ -240,8 +241,7 @@ struct RemoteCache {
     groups: Vec<Group>,
 }
 
-/// How far the sync in flight is. `total` grows as the work is discovered (repo batches,
-/// scan roots, clones), so the fraction can step back a little.
+/// How far the sync in flight is (see `sync_progress`).
 #[derive(Debug, Clone, Copy, Default, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct SyncProgress {
@@ -249,8 +249,8 @@ pub struct SyncProgress {
     /// Started by the user (refresh button, rescan, sign-in). Background checks run
     /// without a spinner.
     pub foreground: bool,
-    pub done: usize,
-    pub total: usize,
+    /// From 0 to 1, never lower than the last report of the same sync.
+    pub fraction: f32,
 }
 
 /// How the last sync of a kind went, for the sync details in Settings.
@@ -273,6 +273,9 @@ pub struct SyncStats {
     pub repos_seen: usize,
     pub scan_roots: usize,
     pub watch_targets: usize,
+    /// What each phase cost in the last sync of each mode, to size the progress bar.
+    #[serde(default)]
+    pub phases: BTreeMap<String, Costs>,
 }
 
 #[derive(Default, Serialize, Deserialize)]
@@ -485,6 +488,25 @@ enum Mode {
     Local,
 }
 
+impl Mode {
+    fn key(self) -> &'static str {
+        match self {
+            Mode::Full => "full",
+            Mode::Status => "status",
+            Mode::Local => "local",
+        }
+    }
+
+    fn phases(self) -> &'static [Phase] {
+        use Phase::*;
+        match self {
+            Mode::Full => &[Listing, Details, Scan, Manifests, Statuses, Clones],
+            Mode::Status => &[Scan, Manifests, Statuses, Clones],
+            Mode::Local => &[Scan, Manifests, Clones],
+        }
+    }
+}
+
 async fn publish(
     app: &AppHandle,
     mode: Mode,
@@ -502,11 +524,11 @@ async fn publish(
         mode = Mode::Full;
     }
 
-    let progress = Progress::start(app, foreground);
+    let progress = Progress::start(app, mode, foreground);
     let started = std::time::Instant::now();
     let clones = app.state::<CloneStore>().list();
     let (snapshot, targets) = sync(&state, http, &settings, clones, mode, &progress).await;
-    progress.finish();
+    progress.finish(mode);
     let run = LastRun {
         at: Utc::now(),
         seconds: started.elapsed().as_secs_f32(),
@@ -541,47 +563,81 @@ async fn publish(
 
 /// Reports sync progress to the UI as `sync-progress`.
 #[derive(Clone)]
-struct Progress(AppHandle);
+struct Progress {
+    app: AppHandle,
+    tracker: std::sync::Arc<Mutex<Tracker>>,
+}
 
 impl Progress {
-    fn start(app: &AppHandle, foreground: bool) -> Self {
-        let progress = Self(app.clone());
-        progress.update(|p| {
+    fn start(app: &AppHandle, mode: Mode, foreground: bool) -> Self {
+        let last = app
+            .state::<ProjectsState>()
+            .stats()
+            .phases
+            .remove(mode.key())
+            .unwrap_or_default();
+        let progress = Self {
+            app: app.clone(),
+            tracker: std::sync::Arc::new(Mutex::new(Tracker::new(mode.phases(), &last))),
+        };
+        progress.emit(|p| {
             *p = SyncProgress {
                 running: true,
                 foreground,
-                done: 0,
-                total: 0,
+                fraction: 0.0,
             }
         });
         progress
     }
 
-    fn add(&self, steps: usize) {
-        if steps > 0 {
-            self.update(|p| p.total += steps);
+    fn set_total(&self, phase: Phase, total: usize) {
+        self.track(|t| t.set_total(phase, total));
+    }
+
+    fn advance(&self, phase: Phase) {
+        self.track(|t| t.advance(phase));
+    }
+
+    fn finish_phase(&self, phase: Phase) {
+        self.track(|t| t.finish(phase));
+    }
+
+    fn skip(&self, phase: Phase) {
+        self.track(|t| t.skip(phase));
+    }
+
+    /// Ends the run and keeps what each phase cost for the next one of this mode.
+    fn finish(&self, mode: Mode) {
+        let state = self.app.state::<ProjectsState>();
+        if let (Ok(tracker), Ok(mut stats)) = (self.tracker.lock(), state.stats.lock()) {
+            let last = stats.phases.get(mode.key()).cloned().unwrap_or_default();
+            stats
+                .phases
+                .insert(mode.key().to_owned(), tracker.costs(&last));
         }
+        self.emit(|p| {
+            p.running = false;
+            p.fraction = 1.0;
+        });
     }
 
-    fn add_done(&self, steps: usize) {
-        self.update(|p| p.done = (p.done + steps).min(p.total));
+    fn track(&self, change: impl FnOnce(&mut Tracker)) {
+        let Ok(fraction) = self.tracker.lock().map(|mut tracker| {
+            change(&mut tracker);
+            tracker.fraction()
+        }) else {
+            return;
+        };
+        self.emit(|p| p.fraction = fraction);
     }
 
-    fn advance(&self) {
-        self.update(|p| p.done = (p.done + 1).min(p.total));
-    }
-
-    fn finish(&self) {
-        self.update(|p| p.running = false);
-    }
-
-    fn update(&self, change: impl FnOnce(&mut SyncProgress)) {
-        let state = self.0.state::<ProjectsState>();
+    fn emit(&self, change: impl FnOnce(&mut SyncProgress)) {
+        let state = self.app.state::<ProjectsState>();
         let Ok(mut progress) = state.progress.lock() else {
             return;
         };
         change(&mut progress);
-        if let Err(err) = self.0.emit(PROGRESS_EVENT, *progress) {
+        if let Err(err) = self.app.emit(PROGRESS_EVENT, *progress) {
             log::debug!("could not emit {PROGRESS_EVENT}: {err}");
         }
     }
@@ -859,6 +915,10 @@ async fn full_snapshot(
     now: DateTime<Utc>,
     progress: &Progress,
 ) -> Snapshot {
+    if remote.is_err() {
+        progress.skip(Phase::Listing);
+        progress.skip(Phase::Details);
+    }
     let (repos, classrooms, issue) = match remote {
         Ok(()) => {
             let cache = state.remote();
@@ -953,8 +1013,15 @@ async fn build(
         })
         .collect();
     let remote = match status {
-        Some(auth) => refresh_statuses(state, http, auth, remote, progress).await,
-        None => remote,
+        Some(auth) => {
+            let remote = refresh_statuses(state, http, auth, remote, progress).await;
+            progress.finish_phase(Phase::Statuses);
+            remote
+        }
+        None => {
+            progress.skip(Phase::Statuses);
+            remote
+        }
     };
     let locals: Vec<(LocalProject, RepoConfig)> = locals
         .into_iter()
@@ -999,6 +1066,7 @@ async fn build(
         });
     }
     check_clones(&mut projects).await;
+    progress.finish_phase(Phase::Clones);
     for project in &mut projects {
         project.pending = pending(project);
         project.late_seconds = late_seconds(project);
@@ -1087,7 +1155,7 @@ async fn fetch_manifests(
     http: &reqwest::Client,
     progress: &Progress,
 ) -> HashMap<ClassroomKey, Vec<Assignment>> {
-    progress.add(classrooms.len());
+    progress.set_total(Phase::Manifests, classrooms.len());
     let fetches = classrooms.iter().map(|(key, classroom)| async move {
         let url = classroom.assignments_url();
         let manifest = match cache.get_text(http, &url, MANIFEST_MAX_AGE).await {
@@ -1099,10 +1167,12 @@ async fn fetch_manifests(
                 None
             }
         };
-        progress.advance();
+        progress.advance(Phase::Manifests);
         manifest.map(|m| (key.clone(), m))
     });
-    join_all(fetches).await.into_iter().flatten().collect()
+    let manifests = join_all(fetches).await.into_iter().flatten().collect();
+    progress.finish_phase(Phase::Manifests);
+    manifests
 }
 
 // ---- Remote discovery ----------------------------------------------------------------
@@ -1293,26 +1363,24 @@ async fn sync_remote(
     http: &reqwest::Client,
     progress: &Progress,
 ) -> Result<()> {
-    // Listing repos and reading teams; the detail batches are added once known.
-    progress.add(2);
     let token = tools::gh_token().await?;
     // The teams query needs the login; gh knows it locally, so both run at once.
     let (login, listed, classrooms) = match tools::active_login().await {
         Some(active) => {
             let (repos, classrooms) = tokio::join!(
-                list_repos(http, &token),
+                list_repos(http, &token, progress),
                 list_classrooms(http, &token, &active)
             );
             let (login, listed) = repos?;
             (login, listed, classrooms)
         }
         None => {
-            let (login, listed) = list_repos(http, &token).await?;
+            let (login, listed) = list_repos(http, &token, progress).await?;
             let classrooms = list_classrooms(http, &token, &login).await;
             (login, listed, classrooms)
         }
     };
-    progress.add_done(2);
+    progress.finish_phase(Phase::Listing);
     if let Ok(mut stats) = state.stats.lock() {
         stats.repos_seen = listed.len();
     }
@@ -1332,7 +1400,8 @@ async fn sync_remote(
         .iter()
         .filter(|r| cache.checked.get(&key(&r.name_with_owner)) != Some(&r.pushed_at))
         .collect();
-    progress.add(stale.len().div_ceil(DETAIL_BATCH));
+    // Group members are read last, as one more step.
+    progress.set_total(Phase::Details, stale.len().div_ceil(DETAIL_BATCH) + 1);
     let mut result = Ok(());
     'requests: for group in stale.chunks(DETAIL_BATCH * PARALLEL_BATCHES) {
         let batches: Vec<_> = group.chunks(DETAIL_BATCH).collect();
@@ -1347,7 +1416,7 @@ async fn sync_remote(
         )
         .await;
         for (batch, response) in batches.into_iter().zip(responses) {
-            progress.advance();
+            progress.advance(Phase::Details);
             let mut nodes = match response {
                 Ok(nodes) => nodes,
                 Err(err) => {
@@ -1387,6 +1456,7 @@ async fn sync_remote(
         Err(err) => log::warn!("could not read classroom teams: {err}"),
     }
     state.store_remote(cache);
+    progress.finish_phase(Phase::Details);
     result
 }
 
@@ -1469,7 +1539,11 @@ async fn list_classrooms(
     Ok((classrooms, group_teams))
 }
 
-async fn list_repos(http: &reqwest::Client, token: &str) -> Result<(String, Vec<ListedRepo>)> {
+async fn list_repos(
+    http: &reqwest::Client,
+    token: &str,
+    progress: &Progress,
+) -> Result<(String, Vec<ListedRepo>)> {
     let mut repos = Vec::new();
     let mut cursor: Option<String> = None;
     let mut login = String::new();
@@ -1479,6 +1553,8 @@ async fn list_repos(http: &reqwest::Client, token: &str) -> Result<(String, Vec<
         login = data.viewer.login;
         let page = data.viewer.repositories;
         repos.extend(page.nodes.into_iter().flatten());
+        // The page count is only known at the end; the last run's stands in until then.
+        progress.advance(Phase::Listing);
         match page.page_info.end_cursor {
             Some(next) if page.page_info.has_next_page => cursor = Some(next),
             _ => break,
@@ -1563,7 +1639,7 @@ async fn refresh_statuses(
         .chunks(STATUS_BATCH)
         .map(|batch| batch.iter().map(String::as_str).collect())
         .collect();
-    progress.add(batches.len());
+    progress.set_total(Phase::Statuses, batches.len());
     let mut responses = Vec::with_capacity(batches.len());
     for group in batches.chunks(MAX_STATUS_REQUESTS) {
         // GitHub asked to slow down: no more requests this round.
@@ -1577,7 +1653,7 @@ async fn refresh_statuses(
             join_all(group.iter().map(|batch| async {
                 let response =
                     fetch_nodes::<StatusNode>(http, &auth.token, batch, "Status", &fragments).await;
-                progress.advance();
+                progress.advance(Phase::Statuses);
                 response
             }))
             .await,
@@ -1705,8 +1781,8 @@ async fn scan_local(
 ) -> (Vec<LocalProject>, Vec<WatchTarget>, Vec<editors::Recent>) {
     tauri::async_runtime::spawn_blocking(move || {
         let (roots, targets, recents) = scan_roots(folders, clones, editors);
-        progress.add(roots.len());
-        if let Ok(mut stats) = progress.0.state::<ProjectsState>().stats.lock() {
+        progress.set_total(Phase::Scan, roots.len());
+        if let Ok(mut stats) = progress.app.state::<ProjectsState>().stats.lock() {
             stats.scan_roots = roots.len();
         }
         let mut seen = HashSet::new();
@@ -1714,8 +1790,9 @@ async fn scan_local(
         for (root, depth) in &roots {
             let found = discovery::scan(root, *depth);
             locals.extend(found.into_iter().filter(|l| seen.insert(l.path.clone())));
-            progress.advance();
+            progress.advance(Phase::Scan);
         }
+        progress.finish_phase(Phase::Scan);
         (locals, targets, recents)
     })
     .await
@@ -1813,10 +1890,10 @@ async fn local_states(
         tasks.spawn(async move { (i, local_state(&path).await) });
         count += 1;
     }
-    progress.add(count);
+    progress.set_total(Phase::Clones, count);
     let mut states = vec![None; count];
     while let Some(Ok((i, state))) = tasks.join_next().await {
-        progress.advance();
+        progress.advance(Phase::Clones);
         states[i] = state;
     }
     states

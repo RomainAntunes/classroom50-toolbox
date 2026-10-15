@@ -17,6 +17,7 @@ pub mod pull;
 pub mod settings;
 pub mod status;
 pub mod student;
+mod sync_progress;
 pub mod tools;
 mod tray;
 mod updater;

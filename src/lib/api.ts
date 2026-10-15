@@ -291,13 +291,13 @@ export type Notice =
   | { kind: "deadlineChanged"; assignment: string; due: string | null }
   | { kind: "closed"; assignment: string };
 
-/** Payload of `sync-progress`. `total` grows as work is found; 0 means not known yet. */
+/** Payload of `sync-progress`. */
 export interface SyncProgress {
   running: boolean;
   /** Started by the user; background checks show no spinner. */
   foreground: boolean;
-  done: number;
-  total: number;
+  /** From 0 to 1, each phase weighted by how long it took last time; never steps back. */
+  fraction: number;
 }
 
 export interface LastRun {

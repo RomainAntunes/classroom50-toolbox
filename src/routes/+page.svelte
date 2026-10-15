@@ -52,10 +52,8 @@
       (session.progress?.running && session.progress.foreground) ||
       session.snapshot?.syncedAt == null,
   );
-  // Indeterminate until the sync knows how much work it has.
-  const fraction = $derived(
-    session.progress?.total ? session.progress.done / session.progress.total : null,
-  );
+  // Indeterminate until the first step lands, then one bar from start to end.
+  const fraction = $derived(session.progress?.fraction || null);
   // A status check also counts: it is the last time GitHub was read.
   const syncedAt = $derived.by(() => {
     const at = session.snapshot?.checkedAt ?? session.snapshot?.syncedAt;
