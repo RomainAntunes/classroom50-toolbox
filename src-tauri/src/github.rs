@@ -176,6 +176,31 @@ impl HttpCache {
         url: &str,
         max_age: chrono::TimeDelta,
     ) -> Result<String> {
+        self.get(http, url, max_age, None).await
+    }
+
+    /// `get_text` for a GitHub REST URL, sent with the token: authenticated requests get
+    /// the 5000/hour budget instead of 60 per IP.
+    pub async fn get_api_text_or_cached(
+        &self,
+        http: &reqwest::Client,
+        token: &str,
+        url: &str,
+        max_age: chrono::TimeDelta,
+    ) -> Result<String> {
+        match self.get(http, url, max_age, Some(token)).await {
+            Err(err) => self.cached_text(url).ok_or(err),
+            fetched => fetched,
+        }
+    }
+
+    async fn get(
+        &self,
+        http: &reqwest::Client,
+        url: &str,
+        max_age: chrono::TimeDelta,
+        token: Option<&str>,
+    ) -> Result<String> {
         let now = Utc::now();
         let cached = self.entries.lock().ok().and_then(|e| e.get(url).cloned());
         if let Some(entry) = &cached
@@ -184,7 +209,10 @@ impl HttpCache {
             return Ok(entry.body.clone());
         }
         crate::simulate::check()?;
-        let request = http.get(url);
+        let request = match token {
+            Some(token) => http.get(url).bearer_auth(token),
+            None => http.get(url),
+        };
         let request = match &cached {
             Some(entry) => request.header(header::IF_NONE_MATCH, &entry.etag),
             None => request,

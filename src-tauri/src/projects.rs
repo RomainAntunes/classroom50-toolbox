@@ -1551,7 +1551,7 @@ async fn sync_remote(
     match classrooms {
         Ok((classrooms, group_teams)) => {
             cache.classrooms = classrooms;
-            match groups::load(http, &token, &group_teams).await {
+            match groups::load(http, &token, &state.http_cache, &group_teams).await {
                 Ok(groups) => cache.groups = groups,
                 Err(err) => log::warn!("could not read group members: {err}"),
             }
