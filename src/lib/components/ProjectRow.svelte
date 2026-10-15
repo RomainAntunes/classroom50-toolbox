@@ -6,6 +6,7 @@
   import { editorFor, editors, openInEditor } from "$lib/editor.svelte";
   import { pullProject } from "$lib/pull";
   import { submitProject } from "$lib/submit";
+  import { addTeammate, joinsGroup } from "$lib/teammate";
   import { durationLabel, formatDate, fromNow, t } from "$lib/i18n";
   import { tildify } from "$lib/paths.svelte";
   import { session } from "$lib/session.svelte";
@@ -243,6 +244,11 @@
         text: t("projects.submit"),
         enabled: submittable && !submitting,
         action: () => submit(),
+      }),
+      MenuItem.new({
+        text: t(joinsGroup(project) ? "teammate.teamMenu" : "teammate.inviteMenu"),
+        enabled: Boolean(project.owner && project.repo) && !closed,
+        action: () => addTeammate(project, name),
       }),
       MenuItem.new({
         text: t("projects.clone"),

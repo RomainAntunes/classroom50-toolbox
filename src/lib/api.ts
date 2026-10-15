@@ -361,6 +361,7 @@ export const api = {
   cancelLogin: () => invoke<void>("cancel_login"),
   openTerminal: (path: string) => invoke<void>("open_terminal", { path }),
   installedEditors: () => invoke<EditorInfo[]>("installed_editors"),
+  addTeammate: (id: string, username: string) => invoke<void>("add_teammate", { id, username }),
   openInEditor: (path: string, editor: string) => invoke<void>("open_in_editor", { path, editor }),
   /** Runs `gh student accept`, then syncs; rejects with `needsTeam` when a group is needed. */
   acceptAssignment: (id: string, newTeam: boolean) =>

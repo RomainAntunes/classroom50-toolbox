@@ -119,6 +119,7 @@ pub fn run() {
             commands::open_terminal,
             commands::installed_editors,
             commands::open_in_editor,
+            commands::add_teammate,
             commands::clone_project,
             commands::accept_assignment,
             commands::submit_check,

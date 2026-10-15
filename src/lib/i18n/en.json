@@ -237,5 +237,18 @@
   "details.groupNumber": "Group {number}",
   "details.members": "Members",
   "details.you": "{name} (you)",
-  "projects.openGroup": "Open group on GitHub"
+  "projects.openGroup": "Open group on GitHub",
+  "prompt.cancel": "Cancel",
+  "teammate.teamMenu": "Add to my group…",
+  "teammate.inviteMenu": "Invite a classmate…",
+  "teammate.teamTitle": "Add to my group",
+  "teammate.inviteTitle": "Invite a classmate",
+  "teammate.teamHint": "They get push access to {assignment} through your group. Only the group's founder can add members.",
+  "teammate.inviteHint": "They get a GitHub invitation to push to {repo}.",
+  "teammate.placeholder": "GitHub username",
+  "teammate.teamOk": "Add",
+  "teammate.inviteOk": "Invite",
+  "teammate.teamDone": "{user} is in your group now. They should accept {assignment} next.",
+  "teammate.inviteDone": "{user} got an invitation to push to {repo}.",
+  "teammate.failed": "Couldn't add {user}: {error}"
 }

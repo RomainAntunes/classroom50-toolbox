@@ -16,6 +16,78 @@ use crate::process;
 const ACCEPT_TIMEOUT: Duration = Duration::from_secs(180);
 /// Submit clones the repo and pushes; gh student gives up on git after 10 minutes.
 const SUBMIT_TIMEOUT: Duration = Duration::from_secs(11 * 60);
+/// Adding someone is one or two API calls.
+const ADD_TIMEOUT: Duration = Duration::from_secs(60);
+
+/// How a classmate gets push access, which depends on the assignment.
+pub enum Addition<'a> {
+    /// `gh student team add`: joins the group of a team assignment (founders only).
+    Team {
+        org: &'a str,
+        classroom: &'a str,
+        assignment: &'a str,
+        /// The unlisted classroom's key.
+        key: Option<&'a str>,
+    },
+    /// `gh student invite`: a collaborator on the student's own repo. Run inside the clone
+    /// when there is one, where it also checks a group assignment's size limit.
+    Invite {
+        repo: &'a str,
+        clone: Option<&'a Path>,
+    },
+}
+
+/// A GitHub login: letters, digits and single inner hyphens, at most 39 characters. Checked
+/// before it reaches gh, so it can never be read as a flag.
+pub fn valid_login(login: &str) -> bool {
+    let bytes = login.as_bytes();
+    !bytes.is_empty()
+        && bytes.len() <= 39
+        && bytes
+            .iter()
+            .all(|b| b.is_ascii_alphanumeric() || *b == b'-')
+        && bytes[0] != b'-'
+        && bytes[bytes.len() - 1] != b'-'
+        && !login.contains("--")
+}
+
+/// Gives `username` push access, with `team add` or `invite`.
+pub async fn add(addition: &Addition<'_>, username: &str) -> Result<()> {
+    let username = username.trim().trim_start_matches('@');
+    if !valid_login(username) {
+        return Err(Error::Student(format!(
+            "\"{username}\" isn't a GitHub username"
+        )));
+    }
+    let temp = std::env::temp_dir();
+    let (mut args, cwd): (Vec<&str>, &Path) = match addition {
+        Addition::Team {
+            org,
+            classroom,
+            assignment,
+            ..
+        } => (
+            vec![
+                "student", "team", "add", org, classroom, assignment, username,
+            ],
+            &temp,
+        ),
+        Addition::Invite { repo, clone } => (
+            vec!["student", "invite", repo, username],
+            clone.unwrap_or(&temp),
+        ),
+    };
+    if let Addition::Team { key: Some(key), .. } = addition {
+        args.extend(["--key", key]);
+    }
+    run(
+        args.into_iter().map(OsString::from).collect(),
+        cwd,
+        ADD_TIMEOUT,
+    )
+    .await?;
+    Ok(())
+}
 
 /// What accept needs to know about an assignment.
 pub struct AcceptRequest<'a> {
@@ -190,6 +262,18 @@ mod tests {
             Some("https://github.com/o/r/commit/abc123")
         );
         assert_eq!(submission_url("Submission pushed"), None);
+    }
+
+    #[test]
+    fn accepts_only_github_logins() {
+        assert!(valid_login("cs50-duck"));
+        assert!(valid_login("A1"));
+        assert!(!valid_login(""));
+        assert!(!valid_login("--team"));
+        assert!(!valid_login("a--b"));
+        assert!(!valid_login("trailing-"));
+        assert!(!valid_login("two words"));
+        assert!(!valid_login(&"a".repeat(40)));
     }
 
     #[test]

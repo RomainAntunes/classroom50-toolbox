@@ -6,6 +6,7 @@
   import { setLocale } from "$lib/i18n";
   import { showNotice } from "$lib/notices";
   import { loadEditors } from "$lib/editor.svelte";
+  import Prompt from "$lib/components/Prompt.svelte";
   import { session } from "$lib/session.svelte";
 
   let { children } = $props();
@@ -43,6 +44,7 @@
 
 <div class="popover">
   {@render children()}
+  <Prompt />
 </div>
 
 <style>
