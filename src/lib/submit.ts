@@ -2,6 +2,7 @@
 // are (not its commits) on top of GitHub's head and asks nothing, so everything that could
 // surprise the student is said before it runs.
 import { ask, message } from "@tauri-apps/plugin-dialog";
+import { openUrl } from "@tauri-apps/plugin-opener";
 import { api, errorMessage, withDialog, type Project } from "$lib/api";
 import { t } from "$lib/i18n";
 
@@ -65,8 +66,20 @@ export async function submitProject(project: Project, name: string): Promise<boo
       }),
     );
     if (!confirmed) return false;
-    await api.submitProject(project.id);
-    await show(t("submit.done"), name);
+    const { url } = await api.submitProject(project.id);
+    if (!url) {
+      await show(t("submit.done"), name);
+      return true;
+    }
+    const view = await withDialog(() =>
+      ask(t("submit.done"), {
+        title: name,
+        kind: "info",
+        okLabel: t("submit.view"),
+        cancelLabel: t("submit.close"),
+      }),
+    );
+    if (view) await openUrl(url);
     return true;
   } catch (err) {
     await show(t("submit.failed", { error: errorMessage(err) }), name, "error");

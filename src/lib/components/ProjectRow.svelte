@@ -33,8 +33,17 @@
     ]),
   ]);
   // One status at most, most important first; `warn` ones need the student's action.
+  const grading = $derived(project.remote?.grading ?? null);
   const status = $derived.by(() => {
     if (closed) return { label: t("projects.closed"), warn: false, hint: undefined };
+    // The last push isn't graded and won't be until it's pushed again or the teacher regrades.
+    if (grading?.state === "failed") {
+      return {
+        label: t("projects.gradingFailed"),
+        warn: true,
+        hint: grading.message ?? t("projects.gradingFailedHint"),
+      };
+    }
     if (project.pending === "unmerged") {
       return {
         label: t("projects.pending.unmerged", { branch: defaultBranch }),
@@ -125,7 +134,8 @@
     if (a?.submissionMode === "tag" && remote?.lastSubmission?.at) {
       add("lastSubmission", fromNow(new Date(remote.lastSubmission.at), now));
     }
-    if (grade) {
+    if (grading?.state === "running") add("grade", t("projects.grading"));
+    else if (grade) {
       add(
         "grade",
         `${grade.score}/${grade.maxScore} · ${t("projects.gradeTests", { passed: grade.testsPassed, total: grade.testsTotal })}`,
@@ -168,6 +178,11 @@
         text: t("projects.openGrade"),
         enabled: Boolean(grade),
         action: () => grade && openUrl(grade.url),
+      }),
+      MenuItem.new({
+        text: t("projects.openGradingRun"),
+        enabled: Boolean(grading?.url),
+        action: () => grading?.url && openUrl(grading.url),
       }),
       separator(),
       MenuItem.new({
@@ -244,7 +259,9 @@
           : t(cloning ? "projects.cloning" : "projects.notCloned")}
       </span>
     </div>
-    {#if grade}
+    {#if grading?.state === "running"}
+      <span class="grade grading" title={t("projects.gradingHint")}>{t("projects.grading")}</span>
+    {:else if grade}
       <span
         class="grade"
         class:full={grade.score === grade.maxScore}
@@ -358,6 +375,17 @@
 
   .grade.full {
     color: var(--success);
+  }
+
+  .grade.grading {
+    font-weight: 500;
+    animation: pulse 1.6s ease-in-out infinite;
+  }
+
+  @keyframes pulse {
+    50% {
+      opacity: 0.45;
+    }
   }
 
   /* News since the popover was last open: a new grade, comment or assignment. */

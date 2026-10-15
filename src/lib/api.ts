@@ -64,8 +64,14 @@ export interface RemoteRepo {
   /** Branches with commits missing from the default branch. */
   unmerged: Branch[];
   grade: Grade | null;
+  /** The autograder's run on the head commit, while running or when it broke. */
+  grading: Grading | null;
   feedback: Feedback | null;
 }
+
+export type Grading =
+  | { state: "running"; url: string | null }
+  | { state: "failed"; url: string | null; message: string | null };
 
 export interface Branch {
   name: string;
@@ -227,6 +233,7 @@ export const UNSEEN_EVENT = "unseen-updated";
 export type Notice =
   | { kind: "due"; assignment: string; due: string }
   | { kind: "grade"; assignment: string; score: number; maxScore: number }
+  | { kind: "gradingFailed"; assignment: string }
   | { kind: "feedback"; assignment: string; count: number }
   | { kind: "newAssignment"; assignment: string; classroom: string }
   | { kind: "teammatePush"; assignment: string; author: string }

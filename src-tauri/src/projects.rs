@@ -28,7 +28,7 @@ use crate::error::{Error, Result};
 use crate::github::{self, Http, HttpCache};
 use crate::process;
 use crate::settings::{Settings, SettingsStore};
-use crate::status::{self, Branch, Feedback, Grade, StatusFields};
+use crate::status::{self, Branch, Feedback, Grade, Grading, StatusFields};
 use crate::tools;
 use crate::watch::{self, WatchTarget};
 
@@ -99,6 +99,9 @@ pub struct RemoteRepo {
     pub unmerged: Vec<Branch>,
     #[serde(default)]
     pub grade: Option<Grade>,
+    /// The autograder's run on the head commit, while running or when it broke.
+    #[serde(default)]
+    pub grading: Option<Grading>,
     #[serde(default)]
     pub feedback: Option<Feedback>,
 }
@@ -401,7 +404,8 @@ async fn refresh_in_background(app: &AppHandle, mode: Mode) {
 }
 
 /// A push or pull just changed a clone's remote refs: re-read the status now, then twice
-/// more while the autograder runs, so the new state and grade show up quickly.
+/// more while the autograder runs, then every minute while a run is still going, so the
+/// new state and grade show up quickly.
 pub async fn refresh_after_push(app: &AppHandle) {
     let state = app.state::<ProjectsState>();
     // An editor's auto-fetch can fire this often; one round of checks at a time.
@@ -411,7 +415,18 @@ pub async fn refresh_after_push(app: &AppHandle) {
     {
         return;
     }
-    for delay in AFTER_PUSH_CHECKS {
+    let started = tokio::time::Instant::now();
+    let mut delays = AFTER_PUSH_CHECKS.into_iter();
+    loop {
+        let delay = match delays.next() {
+            Some(delay) => delay,
+            None if grading_running(&state.snapshot())
+                && started.elapsed() < AFTER_PUSH_GRADING_LIMIT =>
+            {
+                AFTER_PUSH_GRADING_INTERVAL
+            }
+            None => break,
+        };
         tokio::time::sleep(delay).await;
         if !may_call_github(app) {
             break;
@@ -430,6 +445,19 @@ const AFTER_PUSH_CHECKS: [Duration; 3] = [
     Duration::from_secs(60),
     Duration::from_secs(120),
 ];
+
+/// Past the checks above, how often to look again while an autograder is still running,
+/// and for how long at most (a stuck run is left to the regular cadence).
+const AFTER_PUSH_GRADING_INTERVAL: Duration = Duration::from_secs(60);
+const AFTER_PUSH_GRADING_LIMIT: Duration = Duration::from_secs(15 * 60);
+
+fn grading_running(snapshot: &Snapshot) -> bool {
+    snapshot.projects.iter().any(|p| {
+        p.remote
+            .as_ref()
+            .is_some_and(|r| matches!(r.grading, Some(Grading::Running { .. })))
+    })
+}
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum Mode {
@@ -1193,6 +1221,7 @@ impl RepoNode {
             config,
             unmerged: Vec::new(),
             grade: None,
+            grading: None,
             feedback: None,
         }
     }
@@ -1443,6 +1472,7 @@ struct StatusNode {
 fn keep_status(repo: &mut RemoteRepo, old: &RemoteRepo) {
     repo.unmerged.clone_from(&old.unmerged);
     repo.grade.clone_from(&old.grade);
+    repo.grading.clone_from(&old.grading);
     repo.feedback.clone_from(&old.feedback);
 }
 
@@ -1519,6 +1549,7 @@ async fn refresh_statuses(
         let mut repo = repo.into_remote();
         repo.unmerged = status.unmerged(repo.default_branch.as_deref());
         repo.feedback = status.feedback(&auth.login);
+        repo.grading = status.grading();
         repo.grade = match status.graded_release() {
             Some(release) if old.grade.as_ref().is_some_and(|g| g.tag == release.tag) => old.grade,
             Some(release) => match status::download_grade(http, &release).await {
@@ -1956,6 +1987,7 @@ mod tests {
             config: Some(config("hello")),
             unmerged: Vec::new(),
             grade: None,
+            grading: None,
             feedback: None,
         }
     }

@@ -1,6 +1,6 @@
 //! What GitHub says about an assignment repo beyond discovery: branches holding work that
-//! isn't on the default branch, the newest grade (`result.json` on the `submit/*` release)
-//! and the teacher's activity on the Feedback PR. Read only for assignment repos, by a
+//! isn't on the default branch, the newest grade (`result.json` on the `submit/*` release),
+//! whether the head commit is being graded, and the teacher's activity on the Feedback PR. Read only for assignment repos, by a
 //! cheap query that also runs between full syncs.
 
 use chrono::{DateTime, Utc};
@@ -23,6 +23,16 @@ fragment Status on Repository {
       result: releaseAssets(first: 1, name: "result.json") { nodes { url } }
     }
   }
+  grading: defaultBranchRef {
+    target {
+      ... on Commit {
+        autograde: status { context(name: "classroom50/autograde") { state description targetUrl } }
+        checkSuites(last: 5, filterBy: {appId: 15368}) {
+          nodes { status conclusion workflowRun { url workflow { name } } }
+        }
+      }
+    }
+  }
   feedback: pullRequests(baseRefName: "feedback", first: 1,
                          orderBy: {field: CREATED_AT, direction: DESC}) {
     nodes {
@@ -37,6 +47,10 @@ fragment Status on Repository {
 /// trails the default branch, so it never counts as unmerged work.
 const FEEDBACK_BRANCH: &str = "feedback";
 const SUBMIT_PREFIX: &str = "submit/";
+/// The workflow every autograded repo runs (`.github/workflows/autograde.yaml`, a shim that
+/// calls the teacher's runner). It reports through the `classroom50/autograde` commit status.
+const AUTOGRADE_WORKFLOW: &str = "Autograde";
+const STATUS_PREFIX: &str = "classroom50 autograde: ";
 
 /// A branch with commits that aren't on the default branch.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -60,6 +74,20 @@ pub struct Grade {
     pub url: String,
 }
 
+/// The autograder's run on the head commit, while it says something the grade doesn't.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", tag = "state")]
+pub enum Grading {
+    /// Queued or running; the grade is published at the end.
+    Running { url: Option<String> },
+    /// Grading itself broke (failing tests are a grade, not this): the runner reported an
+    /// error, or the workflow failed before reporting anything.
+    Failed {
+        url: Option<String>,
+        message: Option<String>,
+    },
+}
+
 /// Teacher activity on the Feedback PR: comments and reviews not written by the student.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -73,6 +101,7 @@ pub struct Feedback {
 pub struct StatusFields {
     branches: Option<Nodes<BranchNode>>,
     releases: Option<Nodes<ReleaseNode>>,
+    grading: Option<GradingRef>,
     feedback: Option<Nodes<PullNode>>,
 }
 
@@ -114,6 +143,50 @@ struct ReleaseNode {
 struct AssetNode {
     /// A pre-signed download URL, valid for about an hour; needs no token.
     url: String,
+}
+
+#[derive(Debug, Deserialize)]
+struct GradingRef {
+    target: Option<GradingCommit>,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct GradingCommit {
+    autograde: Option<CommitStatus>,
+    check_suites: Option<Nodes<CheckSuite>>,
+}
+
+#[derive(Debug, Deserialize)]
+struct CommitStatus {
+    context: Option<StatusContext>,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct StatusContext {
+    state: String,
+    description: Option<String>,
+    target_url: Option<String>,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct CheckSuite {
+    status: String,
+    conclusion: Option<String>,
+    workflow_run: Option<WorkflowRun>,
+}
+
+#[derive(Debug, Deserialize)]
+struct WorkflowRun {
+    url: String,
+    workflow: Workflow,
+}
+
+#[derive(Debug, Deserialize)]
+struct Workflow {
+    name: String,
 }
 
 #[derive(Debug, Deserialize)]
@@ -181,6 +254,46 @@ impl StatusFields {
                     result_url,
                 })
             })
+    }
+
+    /// The Autograde run on the head commit, when it's still going or broke. The runner
+    /// posts its commit status before publishing the release, so the run being done is
+    /// what says the grade is in.
+    pub fn grading(&mut self) -> Option<Grading> {
+        let commit = self.grading.take()?.target?;
+        let run = commit.check_suites.and_then(|suites| {
+            suites
+                .into_iter()
+                .filter(|s| {
+                    s.workflow_run
+                        .as_ref()
+                        .is_some_and(|r| r.workflow.name == AUTOGRADE_WORKFLOW)
+                })
+                .last()
+        });
+        let run_url = |suite: &CheckSuite| suite.workflow_run.as_ref().map(|r| r.url.clone());
+        if let Some(suite) = run.as_ref().filter(|s| s.status != "COMPLETED") {
+            return Some(Grading::Running {
+                url: run_url(suite),
+            });
+        }
+        if let Some(context) = commit.autograde.and_then(|s| s.context) {
+            return (context.state == "ERROR").then(|| Grading::Failed {
+                url: context.target_url,
+                message: context
+                    .description
+                    .map(|d| d.strip_prefix(STATUS_PREFIX).unwrap_or(&d).to_owned()),
+            });
+        }
+        let suite = run?;
+        matches!(
+            suite.conclusion.as_deref(),
+            Some("FAILURE" | "TIMED_OUT" | "STARTUP_FAILURE")
+        )
+        .then(|| Grading::Failed {
+            url: run_url(&suite),
+            message: None,
+        })
     }
 
     /// Comments and reviews on the Feedback PR by anyone but `login` (the student).
@@ -292,6 +405,74 @@ mod tests {
             feedback.latest_at,
             Some("2026-10-14T10:00:00Z".parse().unwrap())
         );
+    }
+
+    fn grading(json: &str) -> Option<Grading> {
+        let mut fields: StatusFields =
+            serde_json::from_str(&format!(r#"{{"grading": {{"target": {json}}}}}"#)).unwrap();
+        fields.grading()
+    }
+
+    fn suite(name: &str, status: &str, conclusion: &str) -> String {
+        format!(
+            r#"{{"status": "{status}", "conclusion": {conclusion},
+                "workflowRun": {{"url": "run-{name}", "workflow": {{"name": "{name}"}}}}}}"#
+        )
+    }
+
+    #[test]
+    fn reads_the_autograde_run() {
+        let running = suite("Autograde", "IN_PROGRESS", "null");
+        let pages = suite("pages-build-deployment", "COMPLETED", r#""SUCCESS""#);
+        assert_eq!(
+            grading(&format!(
+                r#"{{"autograde": null, "checkSuites": {{"nodes": [{running}, {pages}]}}}}"#
+            )),
+            Some(Grading::Running {
+                url: Some("run-Autograde".into())
+            })
+        );
+
+        // Graded, tests failing or not: the grade says it all.
+        let done = suite("Autograde", "COMPLETED", r#""SUCCESS""#);
+        let failing = format!(
+            r#"{{"autograde": {{"context": {{"state": "FAILURE",
+                "description": "classroom50 autograde: 3/10 (1/4 tests passed)",
+                "targetUrl": "t"}}}}, "checkSuites": {{"nodes": [{done}]}}}}"#
+        );
+        assert_eq!(grading(&failing), None);
+
+        let error = format!(
+            r#"{{"autograde": {{"context": {{"state": "ERROR",
+                "description": "classroom50 autograde: grading error: timed out",
+                "targetUrl": "t"}}}}, "checkSuites": {{"nodes": [{done}]}}}}"#
+        );
+        assert_eq!(
+            grading(&error),
+            Some(Grading::Failed {
+                url: Some("t".into()),
+                message: Some("grading error: timed out".into())
+            })
+        );
+
+        // The workflow broke before posting a status.
+        let crashed = suite("Autograde", "COMPLETED", r#""STARTUP_FAILURE""#);
+        assert_eq!(
+            grading(&format!(
+                r#"{{"autograde": null, "checkSuites": {{"nodes": [{crashed}]}}}}"#
+            )),
+            Some(Grading::Failed {
+                url: Some("run-Autograde".into()),
+                message: None
+            })
+        );
+
+        // No autograder: nothing to say.
+        assert_eq!(
+            grading(r#"{"autograde": null, "checkSuites": {"nodes": []}}"#),
+            None
+        );
+        assert_eq!(grading("{}"), None);
     }
 
     #[test]
