@@ -14,6 +14,7 @@ use crate::platform::{self, CommandSpec, Os};
 use crate::popover::PopoverState;
 use crate::projects::{self, ProjectsState, Snapshot, SyncProgress};
 use crate::settings::{Settings, SettingsStore};
+use crate::student;
 use crate::tools::{self, AuthStatus, Tool, ToolStatus};
 use crate::updater::{self, UpdateInfo};
 
@@ -245,6 +246,49 @@ pub async fn clone_project(
     app.state::<CloneStore>().add(path.clone())?;
     projects::refresh_local(&app, false).await;
     Ok(path)
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct Accepted {
+    /// `owner/name` as GitHub spells it.
+    repo: String,
+    /// The new project's id, once the sync that follows the accept has found it.
+    project_id: Option<String>,
+}
+
+/// Accepts an unaccepted assignment with `gh student accept`, then syncs so the new repo
+/// shows up. `new_team` founds a group for a team assignment formed by students; without
+/// it such an assignment fails with `needsTeam`.
+#[tauri::command]
+pub async fn accept_assignment(
+    app: AppHandle,
+    state: State<'_, ProjectsState>,
+    id: String,
+    new_team: bool,
+) -> Result<Accepted> {
+    let item = state
+        .snapshot()
+        .unaccepted
+        .into_iter()
+        .find(|u| u.id == id)
+        .ok_or_else(|| Error::Unsupported(format!("unknown assignment {id}")))?;
+    let repo = student::accept(&student::AcceptRequest {
+        org: &item.classroom.org,
+        classroom: &item.classroom.slug,
+        assignment: &item.assignment.slug,
+        key: item.classroom.secret.as_deref(),
+        new_team,
+    })
+    .await?;
+    let snapshot = projects::refresh(&app).await;
+    let key = repo.to_ascii_lowercase();
+    let project_id = snapshot
+        .projects
+        .iter()
+        .find(|p| p.id == key)
+        .map(|p| p.id.clone());
+    Ok(Accepted { repo, project_id })
 }
 
 #[tauri::command]

@@ -14,6 +14,7 @@ pub mod process;
 pub mod projects;
 pub mod settings;
 pub mod status;
+pub mod student;
 pub mod tools;
 mod tray;
 mod updater;
@@ -113,6 +114,7 @@ pub fn run() {
             commands::cancel_login,
             commands::open_terminal,
             commands::clone_project,
+            commands::accept_assignment,
             commands::check_update,
             commands::install_update,
         ])

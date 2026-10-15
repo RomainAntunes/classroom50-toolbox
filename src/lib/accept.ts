@@ -1,0 +1,64 @@
+// Accepting an assignment from the list. `gh student accept` never asks anything, so the
+// confirmations it would need (public repo, groups) are asked here first.
+import { ask, message } from "@tauri-apps/plugin-dialog";
+import { api, errorKind, errorMessage, withDialog, type Accepted, type Unaccepted } from "$lib/api";
+import { cloneProject } from "$lib/clone";
+import { t } from "$lib/i18n";
+
+function confirm(text: string, title: string, okLabel: string): Promise<boolean> {
+  return withDialog(() =>
+    ask(text, { title, kind: "info", okLabel, cancelLabel: t("accept.cancel") }),
+  );
+}
+
+function notes(item: Unaccepted): string {
+  const a = item.assignment;
+  const lines = [t("accept.confirm", { classroom: item.classroom.name ?? item.classroom.slug })];
+  if (a.repoVisibility === "public") lines.push(t("accept.public"));
+  if (a.mode === "group") lines.push(t("accept.group"));
+  if (a.mode === "team") {
+    lines.push(t(a.teamFormation === "teacher" ? "accept.teamTeacher" : "accept.teamStudent"));
+  }
+  return lines.join("\n\n");
+}
+
+/** Runs the accept, founding a group when the student agrees. Null when cancelled. */
+async function run(item: Unaccepted): Promise<Accepted | null> {
+  try {
+    return await api.acceptAssignment(item.id, false);
+  } catch (err) {
+    if (errorKind(err) !== "needsTeam") throw err;
+  }
+  const found = await confirm(t("accept.needsTeam"), item.assignment.name, t("accept.newTeam"));
+  return found ? api.acceptAssignment(item.id, true) : null;
+}
+
+/** Asks, accepts, then offers to clone the new repo. */
+export async function acceptAssignment(item: Unaccepted): Promise<void> {
+  const name = item.assignment.name;
+  if (!(await confirm(notes(item), name, t("accept.ok")))) return;
+  let accepted: Accepted | null;
+  try {
+    accepted = await run(item);
+  } catch (err) {
+    await withDialog(() =>
+      message(t("accept.failed", { error: errorMessage(err) }), { title: name, kind: "error" }),
+    );
+    return;
+  }
+  if (!accepted) return;
+  const { repo, projectId } = accepted;
+  if (!projectId) {
+    await withDialog(() => message(t("accept.done", { repo }), { title: name }));
+    return;
+  }
+  const clone = await withDialog(() =>
+    ask(t("accept.cloneNow", { repo }), {
+      title: name,
+      kind: "info",
+      okLabel: t("projects.clone"),
+      cancelLabel: t("accept.later"),
+    }),
+  );
+  if (clone) await cloneProject(projectId);
+}

@@ -53,6 +53,14 @@ pub enum AssignmentMode {
     Team,
 }
 
+/// Who forms the groups of a `team` assignment.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum TeamFormation {
+    Teacher,
+    Student,
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "kebab-case")]
 pub enum SubmissionMode {
@@ -87,6 +95,12 @@ pub struct Assignment {
     pub feedback_pr: bool,
     #[serde(default, alias = "passThreshold")]
     pub pass_threshold: Option<u8>,
+    /// `team` mode only. `gh student accept` doesn't ask, so the UI explains it first.
+    #[serde(default, alias = "teamFormation")]
+    pub team_formation: Option<TeamFormation>,
+    /// `"public"` when accepting creates a public repo; `gh student accept` only warns.
+    #[serde(default, alias = "repoVisibility")]
+    pub repo_visibility: Option<String>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -440,7 +454,7 @@ mod tests {
         let upstream: Assignment = serde_json::from_value(serde_json::json!({
             "slug": "lab", "name": "Lab", "mode": "team",
             "available_from": "2026-10-01T08:00:00Z", "submission_mode": "tag",
-            "feedback_pr": true
+            "feedback_pr": true, "team_formation": "student", "repo_visibility": "public"
         }))
         .unwrap();
         let saved = serde_json::to_value(&upstream).unwrap();
@@ -448,6 +462,8 @@ mod tests {
         let restored: Assignment = serde_json::from_value(saved).unwrap();
         assert!(restored.feedback_pr);
         assert_eq!(restored.submission_mode, Some(SubmissionMode::Tag));
+        assert_eq!(restored.team_formation, Some(TeamFormation::Student));
         assert_eq!(restored.available_from, upstream.available_from);
+        assert_eq!(restored.repo_visibility.as_deref(), Some("public"));
     }
 }

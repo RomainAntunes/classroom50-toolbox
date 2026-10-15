@@ -1,6 +1,7 @@
 <script lang="ts">
   import { openUrl } from "@tauri-apps/plugin-opener";
   import type { Unaccepted } from "$lib/api";
+  import { acceptAssignment } from "$lib/accept";
   import { formatDate, fromNow, t } from "$lib/i18n";
   import Details from "./Details.svelte";
 
@@ -17,6 +18,24 @@
   );
   const upcoming = $derived(opens !== null && opens > now);
 
+  const blocked = $derived(
+    item.assignment.locked
+      ? t("projects.lockedHint")
+      : upcoming
+        ? t("projects.upcomingHint")
+        : null,
+  );
+
+  let accepting = $state(false);
+  async function accept() {
+    accepting = true;
+    try {
+      await acceptAssignment(item);
+    } finally {
+      accepting = false;
+    }
+  }
+
   let open = $state(false);
   const details = $derived.by(() => {
     const a = item.assignment;
@@ -31,7 +50,7 @@
   });
 </script>
 
-<!-- An assignment with no repo yet, published or upcoming; accepting happens on Classroom 50. -->
+<!-- An assignment with no repo yet, published or upcoming. -->
 <div class="item">
   <div
     class="row"
@@ -54,9 +73,11 @@
       </span>
       <span class="meta">
         <span class="status" class:upcoming
-          >{upcoming && opens
-            ? t("projects.opens", { when: fromNow(opens, now) })
-            : t("projects.notAccepted")}</span
+          >{accepting
+            ? t("projects.accepting")
+            : upcoming && opens
+              ? t("projects.opens", { when: fromNow(opens, now) })
+              : t("projects.notAccepted")}</span
         >
         {#if dueLabel}
           · {dueLabel}
@@ -64,7 +85,16 @@
       </span>
     </div>
     <button
-      title={t("projects.accept")}
+      class="primary"
+      title={blocked ?? undefined}
+      disabled={accepting || blocked !== null}
+      onclick={(event) => {
+        event.stopPropagation();
+        accept();
+      }}>{t("projects.accept")}</button
+    >
+    <button
+      title={t("projects.openAcceptPage")}
       onclick={(event) => {
         event.stopPropagation();
         openUrl(item.acceptUrl);
