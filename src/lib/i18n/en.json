@@ -251,5 +251,8 @@
   "teammate.teamDone": "{user} is in your group now. They should accept {assignment} next.",
   "teammate.inviteDone": "{user} got an invitation to push to {repo}.",
   "teammate.failed": "Couldn't add {user}: {error}",
-  "projects.inGroup": "In {group}"
+  "projects.inGroup": "In {group}",
+  "details.earlierGrades": "Earlier grades",
+  "details.gradeAt": "{score}, {when}",
+  "projects.earlierGrades": "Earlier grades"
 }

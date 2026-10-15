@@ -64,6 +64,8 @@ export interface RemoteRepo {
   /** Branches with commits missing from the default branch. */
   unmerged: Branch[];
   grade: Grade | null;
+  /** Every graded submission still listed (the last 10 releases), newest first. */
+  history: GradeSummary[];
   /** The autograder's run on the head commit, while running or when it broke. */
   grading: Grading | null;
   feedback: Feedback | null;
@@ -90,6 +92,9 @@ export interface Grade {
   publishedAt: string | null;
   url: string;
 }
+
+/** A past grade: the score without the test list. */
+export type GradeSummary = Omit<Grade, "tests">;
 
 export interface GradeTest {
   name: string;

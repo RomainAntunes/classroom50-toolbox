@@ -79,6 +79,15 @@
     grading?.state === "running" ? [] : (grade?.tests.filter((test) => !test.passed) ?? []),
   );
   const feedback = $derived(project.remote?.feedback ?? null);
+  // Grades before the current one, newest first.
+  const earlier = $derived((project.remote?.history ?? []).filter((g) => g.tag !== grade?.tag));
+  const gradeLine = (g: { score: number; maxScore: number; publishedAt: string | null }) =>
+    g.publishedAt
+      ? t("details.gradeAt", {
+          score: `${g.score}/${g.maxScore}`,
+          when: fromNow(new Date(g.publishedAt), now),
+        })
+      : `${g.score}/${g.maxScore}`;
   const path = $derived(project.path);
   const githubUrl = $derived(
     project.remote?.url ??
@@ -171,6 +180,7 @@
         `${grade.score}/${grade.maxScore} · ${t("projects.gradeTests", { passed: grade.testsPassed, total: grade.testsTotal })}`,
       );
     }
+    if (earlier.length) add("earlierGrades", earlier.map(gradeLine).join("\n"));
     if (feedback?.comments) add("feedback", String(feedback.comments));
     if (project.group) items.push(...groupDetails(project.group));
     if (unmerged.length) add("unmerged", unmerged.join(", "));
@@ -214,6 +224,13 @@
         text: t("projects.openGrade"),
         enabled: Boolean(grade),
         action: () => grade && openUrl(grade.url),
+      }),
+      Submenu.new({
+        text: t("projects.earlierGrades"),
+        enabled: earlier.length > 0,
+        items: await Promise.all(
+          earlier.map((g) => MenuItem.new({ text: gradeLine(g), action: () => openUrl(g.url) })),
+        ),
       }),
       MenuItem.new({
         text: t("projects.openGradingRun"),
