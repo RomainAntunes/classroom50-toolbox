@@ -83,9 +83,13 @@
       hiddenClasses: settings.current?.hiddenClasses ?? [],
       now,
     };
+    // The row a link pointed to shows whatever the filters say.
+    const focused = session.focus?.id;
     return groupByClass(
-      allProjects.filter((p) => showsProject(p, list)),
-      (session.snapshot?.unaccepted ?? []).filter((u) => showsUnaccepted(u, list)),
+      allProjects.filter((p) => p.id === focused || showsProject(p, list)),
+      (session.snapshot?.unaccepted ?? []).filter(
+        (u) => u.id === focused || showsUnaccepted(u, list),
+      ),
     );
   });
 
@@ -187,12 +191,20 @@
     Boolean(session.auth?.loggedIn) && session.snapshot != null && !session.snapshot.syncedAt,
   );
 
-  // A search unfolds every class, so matches are never out of sight.
-  const folded = (key: string) => !query && isCollapsed(key);
+  // A search unfolds every class, so matches are never out of sight, and so does a link
+  // to one of its rows.
+  function folded(group: ClassGroup): boolean {
+    const focused = session.focus?.id;
+    const holdsFocus =
+      focused !== undefined &&
+      (group.projects.some((p) => p.id === focused) ||
+        group.unaccepted.some((u) => u.id === focused));
+    return !query && !holdsFocus && isCollapsed(group.key);
+  }
 
   function classNote(group: ClassGroup): string | undefined {
     if (isClassHidden(group.key)) return t("projects.hidden");
-    if (folded(group.key)) return String(group.projects.length + group.unaccepted.length);
+    if (folded(group)) return String(group.projects.length + group.unaccepted.length);
     return undefined;
   }
 
@@ -361,7 +373,7 @@
     {#each groups as group (group.key)}
       <Section
         title={group.title}
-        collapsed={folded(group.key)}
+        collapsed={folded(group)}
         note={classNote(group)}
         ontoggle={() => setCollapsed(group.key, !isCollapsed(group.key))}
         onmenu={(event) => classMenu(event, group.key)}

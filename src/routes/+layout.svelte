@@ -2,7 +2,15 @@
   import "$lib/theme/theme.css";
   import { onMount } from "svelte";
   import { listen } from "@tauri-apps/api/event";
-  import { api, NOTIFY_EVENT, UNSEEN_EVENT, type Notice } from "$lib/api";
+  import {
+    api,
+    DEEP_LINK_EVENT,
+    NOTIFY_EVENT,
+    POPOVER_HIDDEN_EVENT,
+    UNSEEN_EVENT,
+    type Notice,
+  } from "$lib/api";
+  import { handleDeepLink } from "$lib/deeplink";
   import { currentLocale, setLocale, t } from "$lib/i18n";
   import { showNotice } from "$lib/notices";
   import { loadEditors } from "$lib/editor.svelte";
@@ -62,7 +70,13 @@
       listen<string[]>(UNSEEN_EVENT, (event) => {
         session.unseen = event.payload;
       }),
+      listen(DEEP_LINK_EVENT, () => void handleDeepLink()),
+      listen(POPOVER_HIDDEN_EVENT, () => {
+        session.focus = null;
+      }),
     ];
+    // A link that started the app came before this page could hear about it.
+    void handleDeepLink();
     return () => {
       for (const unlisten of unlisteners) void unlisten.then((stop) => stop());
     };

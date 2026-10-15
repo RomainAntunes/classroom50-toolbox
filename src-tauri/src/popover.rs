@@ -5,12 +5,14 @@ use std::sync::Mutex;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::time::{Duration, Instant};
 
-use tauri::{AppHandle, Manager, WebviewWindow, WindowEvent};
+use tauri::{AppHandle, Emitter, Manager, WebviewWindow, WindowEvent};
 use tauri_plugin_positioner::{Position, WindowExt};
 
 use crate::settings::{Appearance, SettingsStore};
 
 pub const LABEL: &str = "main";
+/// Sent when the popover hides, so the UI drops what it only showed for the moment.
+pub const HIDDEN_EVENT: &str = "popover-hidden";
 
 /// Clicking the tray icon while the popover is open first blurs (hides) it, then delivers
 /// the click; without this guard that click would immediately reopen it.
@@ -104,6 +106,7 @@ pub fn show(app: &AppHandle) {
 pub fn hide(app: &AppHandle) {
     if let Some(window) = app.get_webview_window(LABEL) {
         let _ = window.hide();
+        let _ = app.emit(HIDDEN_EVENT, ());
         crate::alerts::mark_seen(app);
         if let Ok(mut at) = app.state::<PopoverState>().hidden_at.lock() {
             *at = Some(Instant::now());

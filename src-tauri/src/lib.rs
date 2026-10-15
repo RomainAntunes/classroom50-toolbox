@@ -4,6 +4,7 @@ mod calendar;
 pub mod classroom50;
 pub mod clones;
 mod commands;
+mod deeplink;
 pub mod discovery;
 pub mod editors;
 pub mod error;
@@ -35,9 +36,14 @@ const USER_AGENT: &str = concat!("classroom50-toolbox/", env!("CARGO_PKG_VERSION
 pub fn run() {
     tauri::Builder::default()
         // Must be registered first: a second launch just reopens the running instance.
-        .plugin(tauri_plugin_single_instance::init(|app, _args, _cwd| {
-            popover::show(app);
+        // With its `deep-link` feature, a link's arguments reach the deep-link plugin first;
+        // `deeplink::handle` shows the popover for a valid one and ignores the rest.
+        .plugin(tauri_plugin_single_instance::init(|app, args, _cwd| {
+            if !deeplink::is_link_launch(&args) {
+                popover::show(app);
+            }
         }))
+        .plugin(tauri_plugin_deep_link::init())
         .plugin(
             tauri_plugin_log::Builder::new()
                 .level(log::LevelFilter::Info)
@@ -54,6 +60,7 @@ pub fn run() {
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_opener::init())
         .manage(popover::PopoverState::default())
+        .manage(deeplink::DeepLinkState::default())
         .manage(login::LoginState::default())
         .manage(tools::ToolJobs::default())
         .manage(watch::FolderWatcher::default())
@@ -93,6 +100,7 @@ pub fn run() {
             tray::setup(handle)?;
             alerts::restore_badge(handle);
             projects::start_background_sync(handle.clone());
+            deeplink::setup(handle);
             if !cfg!(debug_assertions) {
                 updater::check_in_background(handle.clone());
             }
@@ -128,6 +136,8 @@ pub fn run() {
             commands::set_native_calendar,
             commands::simulate_network,
             commands::simulated_network,
+            commands::take_deep_link,
+            commands::simulate_deep_link,
             commands::get_settings,
             commands::update_settings,
             commands::login,

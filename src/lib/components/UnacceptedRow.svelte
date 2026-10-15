@@ -54,6 +54,15 @@
   }
 
   let open = $state(false);
+
+  // A link pointed here: open the details and bring the row into view.
+  let element: HTMLElement | undefined = $state();
+  const linked = $derived(session.focus?.id === item.id ? session.focus.seq : null);
+  $effect(() => {
+    if (linked === null) return;
+    open = true;
+    element?.scrollIntoView({ block: "nearest", behavior: "smooth" });
+  });
   const details = $derived.by(() => {
     const a = item.assignment;
     const items: [string, string][] = [
@@ -68,7 +77,7 @@
 </script>
 
 <!-- An assignment with no repo yet, published or upcoming. -->
-<div class="item">
+<div class="item" class:linked={linked !== null} bind:this={element}>
   <div
     class="row"
     role="button"
@@ -131,6 +140,12 @@
 </div>
 
 <style>
+  /* The row a link pointed to. */
+  .item.linked {
+    background: color-mix(in srgb, var(--accent) 12%, transparent);
+    box-shadow: inset 3px 0 0 var(--accent);
+  }
+
   .hidden-tag {
     font-style: italic;
   }

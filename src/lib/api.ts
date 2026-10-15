@@ -263,6 +263,20 @@ export interface Unaccepted {
   group: Group | null;
 }
 
+/** A `classroom50-toolbox://` link, validated by Rust. */
+export type DeepLink =
+  | { kind: "accept"; org: string; classroom: string; assignment: string; key: string | null }
+  | { kind: "open"; owner: string; repo: string };
+
+/** Where a link leads (`take_deep_link`). */
+export type DeepLinkTarget =
+  /** A project: an open link, or an accept link to an assignment already accepted. */
+  | { kind: "project"; id: string; link: DeepLink }
+  /** An assignment to accept; `listed` is false when the list doesn't show it. */
+  | { kind: "accept"; item: Unaccepted; listed: boolean }
+  /** Not in the list (open), or not published in that class (accept). */
+  | { kind: "missing"; link: DeepLink };
+
 /** Result of `accept_assignment`. */
 export interface Accepted {
   /** `owner/name` as GitHub spells it. */
@@ -356,6 +370,10 @@ export const SYNC_PROGRESS_EVENT = "sync-progress";
 export const NOTIFY_EVENT = "notify";
 /** Payload: ids of projects and unaccepted assignments with unseen news. */
 export const UNSEEN_EVENT = "unseen-updated";
+/** A `classroom50-toolbox://` link is waiting; `takeDeepLink` reads it. */
+export const DEEP_LINK_EVENT = "deep-link";
+/** The popover hid. */
+export const POPOVER_HIDDEN_EVENT = "popover-hidden";
 
 export type Notice =
   | { kind: "due"; assignment: string; due: string }
@@ -445,6 +463,10 @@ export const api = {
   /** Dev builds only: pretends GitHub is down or the device is offline. */
   simulateNetwork: (network: SimulatedNetwork) => invoke<void>("simulate_network", { network }),
   simulatedNetwork: () => invoke<SimulatedNetwork>("simulated_network"),
+  /** The link the app was opened with, once, and where it leads. */
+  takeDeepLink: () => invoke<DeepLinkTarget | null>("take_deep_link"),
+  /** Dev builds only: handles `url` as if the OS had opened it. */
+  simulateDeepLink: (url: string) => invoke<void>("simulate_deep_link", { url }),
   setPopoverPinned: (pinned: boolean) => invoke<void>("set_popover_pinned", { pinned }),
   toolStatuses: () => invoke<ToolStatus[]>("tool_statuses"),
   installCommand: (tool: Tool) => invoke<InstallPlan>("install_command", { tool }),
