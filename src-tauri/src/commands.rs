@@ -11,7 +11,7 @@ use crate::clones::{self, CloneStore};
 use crate::error::{Error, Result};
 use crate::login::{self, LoginState};
 use crate::platform::{self, CommandSpec, Os};
-use crate::popover::PopoverState;
+use crate::popover::{self, PopoverState};
 use crate::projects::{self, ProjectsState, Snapshot, SyncProgress};
 use crate::pull;
 use crate::settings::{Settings, SettingsStore};
@@ -189,6 +189,9 @@ pub fn update_settings(
         apply_launch_at_login(&app, next.launch_at_login)?;
     }
     let saved = settings.set(next)?;
+    if saved.appearance != previous.appearance {
+        popover::apply_appearance(&app, saved.appearance);
+    }
     if saved.watched_folders != previous.watched_folders
         || saved.scan_editor_projects != previous.scan_editor_projects
     {

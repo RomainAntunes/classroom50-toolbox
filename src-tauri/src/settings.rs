@@ -38,8 +38,19 @@ pub struct Settings {
     pub hidden_classes: Vec<String>,
     /// Classes whose section is folded in the list.
     pub collapsed_classes: Vec<String>,
+    /// Light or dark, or following the system.
+    pub appearance: Appearance,
     /// The first-run guide was finished or skipped.
     pub onboarded: bool,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub enum Appearance {
+    #[default]
+    System,
+    Light,
+    Dark,
 }
 
 /// The date filter above the project list.
@@ -69,6 +80,7 @@ impl Default for Settings {
             hidden: Vec::new(),
             hidden_classes: Vec::new(),
             collapsed_classes: Vec::new(),
+            appearance: Appearance::System,
             onboarded: false,
         }
     }
@@ -180,6 +192,7 @@ mod tests {
             hidden: vec!["a".into(), "a".into()],
             hidden_classes: vec!["o/c".into(), "o/c".into()],
             collapsed_classes: Vec::new(),
+            appearance: Appearance::Dark,
             onboarded: true,
         }
         .normalized();

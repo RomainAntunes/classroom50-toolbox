@@ -238,6 +238,9 @@ export interface Snapshot {
   issue: CommandError | null;
 }
 
+export const APPEARANCES = ["system", "light", "dark"] as const;
+export type Appearance = (typeof APPEARANCES)[number];
+
 export interface Settings {
   watchedFolders: string[];
   scanEditorProjects: boolean;
@@ -254,6 +257,7 @@ export interface Settings {
   hiddenClasses: string[];
   /** Classes whose section is folded in the list. */
   collapsedClasses: string[];
+  appearance: Appearance;
   /** The first-run guide was finished or skipped. */
   onboarded: boolean;
 }

@@ -8,6 +8,8 @@ use std::time::{Duration, Instant};
 use tauri::{AppHandle, Manager, WebviewWindow, WindowEvent};
 use tauri_plugin_positioner::{Position, WindowExt};
 
+use crate::settings::{Appearance, SettingsStore};
+
 pub const LABEL: &str = "main";
 
 /// Clicking the tray icon while the popover is open first blurs (hides) it, then delivers
@@ -28,11 +30,28 @@ impl PopoverState {
     }
 }
 
+/// Light or dark for the window, its material and the webview's `prefers-color-scheme`;
+/// `System` follows the OS setting.
+pub fn apply_appearance(app: &AppHandle, appearance: Appearance) {
+    let Some(window) = app.get_webview_window(LABEL) else {
+        return;
+    };
+    let theme = match appearance {
+        Appearance::System => None,
+        Appearance::Light => Some(tauri::Theme::Light),
+        Appearance::Dark => Some(tauri::Theme::Dark),
+    };
+    if let Err(err) = window.set_theme(theme) {
+        log::warn!("could not set the window theme: {err}");
+    }
+}
+
 pub fn setup(app: &AppHandle) -> tauri::Result<()> {
     let Some(window) = app.get_webview_window(LABEL) else {
         return Ok(());
     };
     apply_material(&window);
+    apply_appearance(app, app.state::<SettingsStore>().get().appearance);
 
     let handle = app.clone();
     window.on_window_event(move |event| {
