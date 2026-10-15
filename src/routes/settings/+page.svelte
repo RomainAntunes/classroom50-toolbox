@@ -1,7 +1,7 @@
 <script lang="ts">
   import { onMount } from "svelte";
   import { goto } from "$app/navigation";
-  import { message } from "@tauri-apps/plugin-dialog";
+  import { message, save as saveDialog } from "@tauri-apps/plugin-dialog";
   import { exit } from "@tauri-apps/plugin-process";
   import { openUrl } from "@tauri-apps/plugin-opener";
   import { listen } from "@tauri-apps/api/event";
@@ -61,6 +61,22 @@
       await api.previewBadge();
     } finally {
       badgeQueued = false;
+    }
+  }
+
+  let exported = $state<number | null>(null);
+  async function exportCalendar() {
+    const path = await withDialog(() =>
+      saveDialog({
+        defaultPath: "classroom50.ics",
+        filters: [{ name: t("settings.calendar.fileType"), extensions: ["ics"] }],
+      }),
+    );
+    if (!path) return;
+    try {
+      exported = await api.exportCalendar(path);
+    } catch (err) {
+      await withDialog(() => message(errorMessage(err), { kind: "error" }));
     }
   }
 
@@ -243,6 +259,20 @@
           onchange={(on) => toggleReminder(hours, on)}
         />
       {/each}
+    </Section>
+
+    <Section title={t("settings.calendar.title")}>
+      <div class="row">
+        <span class="text">
+          <span>{t("settings.calendar.label")}</span>
+          <span class="sub"
+            >{exported === null
+              ? t("settings.calendar.hint")
+              : t("settings.calendar.done", { count: exported })}</span
+          >
+        </span>
+        <button onclick={exportCalendar}>{t("settings.calendar.export")}</button>
+      </div>
     </Section>
 
     {#if sync}

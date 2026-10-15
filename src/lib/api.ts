@@ -353,6 +353,8 @@ export const api = {
   appInfo: () => invoke<AppInfo>("app_info"),
   /** Dev builds only: lights the tray badge 3 s from now. */
   previewBadge: () => invoke<void>("preview_badge"),
+  /** Writes the due dates as an `.ics` file; returns the number of events. */
+  exportCalendar: (path: string) => invoke<number>("export_calendar", { path }),
   /** Dev builds only: pretends GitHub is down or the device is offline. */
   simulateNetwork: (network: SimulatedNetwork) => invoke<void>("simulate_network", { network }),
   simulatedNetwork: () => invoke<SimulatedNetwork>("simulated_network"),

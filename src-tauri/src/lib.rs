@@ -1,5 +1,6 @@
 pub mod accounts;
 pub mod alerts;
+mod calendar;
 pub mod classroom50;
 pub mod clones;
 mod commands;
@@ -114,6 +115,7 @@ pub fn run() {
             commands::switch_account,
             commands::account_avatar,
             commands::preview_badge,
+            commands::export_calendar,
             commands::simulate_network,
             commands::simulated_network,
             commands::get_settings,
