@@ -408,8 +408,13 @@
     padding: 0 8px;
     border: 1px solid var(--border);
     border-radius: var(--radius-control);
-    background: var(--bg-control);
+    /* A field, not a button: the card fill keeps it apart from the backdrop. */
+    background: var(--bg-card);
     outline: none;
+  }
+
+  .search::placeholder {
+    color: var(--fg-muted);
   }
 
   .search:focus-visible {
@@ -437,10 +442,10 @@
     flex-shrink: 0;
   }
 
-  /* The app icon stands in for the title, as tall as the title's line was. */
+  /* The app icon stands in for the title, as tall as the search field beside it. */
   .logo {
-    height: 20px;
-    width: 20px;
+    height: 26px;
+    width: 26px;
   }
 
   main {
