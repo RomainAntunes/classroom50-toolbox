@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { ask, message } from "@tauri-apps/plugin-dialog";
+  import { message } from "@tauri-apps/plugin-dialog";
   import { api, errorKind, errorMessage, withDialog, type ToolStatus } from "$lib/api";
   import { t } from "$lib/i18n";
   import { session } from "$lib/session.svelte";
@@ -73,22 +73,17 @@
     }
   }
 
+  // No confirmation: the click is the user's go-ahead, and the OS asks for a password itself
+  // when the package manager needs one.
   async function install() {
     if (busy) return;
-    let command: string | null = null;
+    starting = "install";
     try {
-      const spec = await api.installCommand(status.tool);
-      command = [spec.program, ...spec.args].join(" ");
-      const shown = command;
-      const confirmed = await withDialog(() =>
-        ask(t("setup.installConfirm", { command: shown }), { kind: "info" }),
-      );
-      if (!confirmed) return;
-      starting = "install";
       // gh-student depends on gh, so every row gets its fresh status.
       for (const next of await api.installTool(status.tool)) onchange(next);
     } catch (err) {
-      await failed(err, "setup.installFailed", command);
+      const spec = await api.installCommand(status.tool).catch(() => null);
+      await failed(err, "setup.installFailed", spec && [spec.program, ...spec.args].join(" "));
     } finally {
       starting = null;
     }
@@ -109,35 +104,33 @@
           ? t("setup.newVersion", { current: status.version ?? "", latest })
           : status.version}</span
       >
-      {#if latest}
-        <button class="primary" disabled={busy} onclick={upgrade}>
-          {upgrading ? t("setup.updating") : t("setup.update")}
-        </button>
+      {#if upgrading}
+        <button onclick={cancel} disabled={!job}>{t("setup.cancel")}</button>
+      {:else if latest}
+        <button class="primary" onclick={upgrade}>{t("setup.update")}</button>
       {/if}
+    {:else if installing}
+      <span class="meta">{t("setup.installing")}</span>
+      <button onclick={cancel} disabled={!job}>{t("setup.cancel")}</button>
     {:else}
       {#if needsGh}
         <span class="meta">{t("setup.needsGh")}</span>
       {/if}
-      <button class="primary" disabled={busy || needsGh} onclick={install}>
-        {installing ? t("setup.installing") : t("setup.install")}
-      </button>
+      <button class="primary" disabled={needsGh} onclick={install}>{t("setup.install")}</button>
     {/if}
   </div>
   {#if busy}
-    <!-- No percentage is reported, so the bar only shows it's working; the last line says what. -->
+    <!-- A real bar once the package manager prints a known step; until then it only shows
+         it's working (gh prints nothing while it installs an extension). -->
     <div
       class="progress"
+      class:known={job?.progress != null}
       role="progressbar"
       aria-label={t(upgrading ? "setup.updating" : "setup.installing")}
+      aria-valuenow={job?.progress != null ? Math.round(job.progress * 100) : undefined}
     >
-      <div></div>
+      <div style:width={job?.progress != null ? `${job.progress * 100}%` : undefined}></div>
     </div>
-    {#if job}
-      <div class="output">
-        <span class="line" title={job.line ?? job.command}>{job.line ?? job.command}</span>
-        <button onclick={cancel}>{t("setup.cancel")}</button>
-      </div>
-    {/if}
   {/if}
 </div>
 
@@ -188,21 +181,9 @@
     animation: slide 1.2s ease-in-out infinite;
   }
 
-  .output {
-    display: flex;
-    align-items: center;
-    gap: var(--space);
-    padding: 0 12px 8px;
-  }
-
-  .line {
-    flex: 1;
-    min-width: 0;
-    overflow: hidden;
-    white-space: nowrap;
-    text-overflow: ellipsis;
-    color: var(--fg-muted);
-    font-size: 0.9em;
+  .progress.known > div {
+    animation: none;
+    transition: width 0.4s ease;
   }
 
   @keyframes slide {

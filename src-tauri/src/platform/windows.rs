@@ -25,6 +25,15 @@ pub fn extra_path_dirs() -> Vec<PathBuf> {
 
 pub const INSTALL_ENV: &[(&str, &str)] = &[];
 
+/// Lines `winget install` prints at each step.
+pub const INSTALL_STEPS: &[(&str, f32)] = &[
+    ("Found ", 0.1),
+    ("Downloading", 0.15),
+    ("Successfully verified installer hash", 0.65),
+    ("Starting package install", 0.7),
+    ("Successfully installed", 0.95),
+];
+
 pub fn install_command(tool: Tool) -> Result<CommandSpec> {
     let id = match tool {
         Tool::Git => "Git.Git",

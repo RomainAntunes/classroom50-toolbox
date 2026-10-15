@@ -13,7 +13,6 @@
   "settings.tools.hint": "The toolbox works through git, the GitHub CLI and its Classroom 50 extension. Missing ones install through your package manager (Homebrew, winget, apt, dnf or pacman); git and the GitHub CLI are updated by it too.",
   "setup.notInstalled": "Not installed",
   "setup.needsGh": "Install the GitHub CLI first",
-  "setup.installConfirm": "This will run:\n\n{command}\n\nContinue?",
   "setup.cancel": "Cancel",
   "setup.installFailed": "Couldn't install {tool}.\n\n{error}",
   "setup.updateFailed": "Couldn't update {tool}.\n\n{error}",

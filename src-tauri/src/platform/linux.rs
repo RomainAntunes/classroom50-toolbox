@@ -21,6 +21,22 @@ pub fn extra_path_dirs() -> Vec<PathBuf> {
 /// `pkexec` doesn't pass the environment on.
 pub const INSTALL_ENV: &[(&str, &str)] = &[];
 
+/// Lines apt, dnf, pacman and zypper print at each step.
+pub const INSTALL_STEPS: &[(&str, f32)] = &[
+    ("Reading package lists", 0.05),
+    ("Get:", 0.2),
+    ("Downloading Packages", 0.2),
+    ("downloading ", 0.2),
+    ("Retrieving: ", 0.2),
+    ("Unpacking", 0.6),
+    ("Running transaction", 0.6),
+    ("installing ", 0.7),
+    ("Installing", 0.7),
+    ("Setting up", 0.8),
+    ("Processing triggers", 0.9),
+    ("Complete!", 0.95),
+];
+
 /// Package-manager installs need root; `pkexec` shows the desktop's own polkit prompt.
 /// Without a desktop agent it would ask on a terminal the app doesn't have, so it is told
 /// to fail instead (`--disable-internal-agent`).

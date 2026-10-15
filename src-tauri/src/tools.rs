@@ -99,10 +99,9 @@ pub enum JobKind {
 pub struct ToolJob {
     pub tool: Tool,
     pub kind: JobKind,
-    /// The command line, shown until it prints something.
-    pub command: String,
-    /// The last line the command printed.
-    pub line: Option<String>,
+    /// How far along it is (0 to 1), guessed from what the command printed; `None` until
+    /// a known step shows up (gh prints nothing while it installs an extension).
+    pub progress: Option<f32>,
 }
 
 struct Running {
@@ -136,7 +135,7 @@ impl ToolJobs {
         }
     }
 
-    fn start(&self, tool: Tool, kind: JobKind, command: String) -> Result<oneshot::Receiver<()>> {
+    fn start(&self, tool: Tool, kind: JobKind) -> Result<oneshot::Receiver<()>> {
         let mut running = self
             .running
             .lock()
@@ -151,8 +150,7 @@ impl ToolJobs {
                 job: ToolJob {
                     tool,
                     kind,
-                    command,
-                    line: None,
+                    progress: None,
                 },
                 cancel: Some(tx),
             },
@@ -160,12 +158,20 @@ impl ToolJobs {
         Ok(rx)
     }
 
-    fn set_line(&self, tool: Tool, line: &str) {
+    /// Moves the bar forward when `line` marks a later step; it never steps back. Returns
+    /// whether it moved.
+    fn advance(&self, tool: Tool, line: &str) -> bool {
+        let Some(next) = progress_of(line) else {
+            return false;
+        };
         if let Ok(mut running) = self.running.lock()
             && let Some(r) = running.get_mut(&tool)
+            && r.job.progress.is_none_or(|current| next > current)
         {
-            r.job.line = Some(line.to_owned());
+            r.job.progress = Some(next);
+            return true;
         }
+        false
     }
 
     fn finish(&self, tool: Tool) {
@@ -201,7 +207,7 @@ pub async fn upgrade(app: &AppHandle, tool: Tool) -> Result<()> {
     run_job(app, tool, JobKind::Upgrade, &spec, &[], EXTENSION_TIMEOUT).await
 }
 
-/// Runs `spec` as the one job of `tool`, telling the UI about each line it prints.
+/// Runs `spec` as the one job of `tool`, telling the UI how far along it is.
 async fn run_job(
     app: &AppHandle,
     tool: Tool,
@@ -211,11 +217,7 @@ async fn run_job(
     timeout: Duration,
 ) -> Result<()> {
     let jobs = app.state::<ToolJobs>();
-    let command = std::iter::once(spec.program.as_str())
-        .chain(spec.args.iter().map(String::as_str))
-        .collect::<Vec<_>>()
-        .join(" ");
-    let cancel = jobs.start(tool, kind, command)?;
+    let cancel = jobs.start(tool, kind)?;
     let emit = |jobs: &ToolJobs| {
         let _ = app.emit(JOBS_EVENT, jobs.list());
     };
@@ -231,8 +233,9 @@ async fn run_job(
             }
         },
         |line| {
-            jobs.set_line(tool, line);
-            emit(&jobs);
+            if jobs.advance(tool, line) {
+                emit(&jobs);
+            }
         },
     )
     .await;
@@ -242,6 +245,20 @@ async fn run_job(
         log::warn!("{} {tool:?} failed: {err}", spec.program);
     }
     result
+}
+
+/// The progress a line of install output stands for: a download percentage (`45.0%`,
+/// Homebrew and winget print one on big downloads) as part of the download share, else the
+/// package manager's own step markers (`platform::install_progress`).
+fn progress_of(line: &str) -> Option<f32> {
+    let percent = line
+        .split_whitespace()
+        .filter_map(|word| word.strip_suffix('%')?.parse::<f32>().ok())
+        .rfind(|p| (0.0..=100.0).contains(p));
+    match percent {
+        Some(p) => Some(0.15 + 0.5 * p / 100.0),
+        None => platform::install_progress(line),
+    }
 }
 
 /// The newer gh-student version `upgrade` would install, if any (asks GitHub through
@@ -336,26 +353,28 @@ mod tests {
     #[test]
     fn one_job_per_tool_and_cancel_reaches_it() {
         let jobs = ToolJobs::default();
-        let mut cancel = jobs
-            .start(Tool::Gh, JobKind::Install, "brew install gh".into())
-            .unwrap();
+        let mut cancel = jobs.start(Tool::Gh, JobKind::Install).unwrap();
         assert!(matches!(
-            jobs.start(Tool::Gh, JobKind::Install, "brew install gh".into()),
+            jobs.start(Tool::Gh, JobKind::Install),
             Err(Error::Busy)
         ));
         // Another tool may run at the same time.
-        let _other = jobs
-            .start(Tool::GhStudent, JobKind::Upgrade, "gh".into())
-            .unwrap();
+        let _other = jobs.start(Tool::GhStudent, JobKind::Upgrade).unwrap();
 
-        jobs.set_line(Tool::Gh, "==> Pouring gh");
-        let gh = jobs
-            .list()
-            .into_iter()
-            .find(|j| j.tool == Tool::Gh)
-            .unwrap();
-        assert_eq!(gh.line.as_deref(), Some("==> Pouring gh"));
-        assert_eq!(gh.command, "brew install gh");
+        let progress = |jobs: &ToolJobs| {
+            jobs.list()
+                .into_iter()
+                .find(|j| j.tool == Tool::Gh)
+                .unwrap()
+                .progress
+        };
+        assert!(!jobs.advance(Tool::Gh, "nothing known"));
+        assert_eq!(progress(&jobs), None);
+        assert!(jobs.advance(Tool::Gh, "###################### 50.0%"));
+        assert_eq!(progress(&jobs), Some(0.4));
+        // An earlier step printed late doesn't move the bar back.
+        assert!(!jobs.advance(Tool::Gh, "  10%"));
+        assert_eq!(progress(&jobs), Some(0.4));
 
         assert!(cancel.try_recv().is_err());
         jobs.cancel(Tool::Gh);
@@ -363,9 +382,16 @@ mod tests {
 
         jobs.finish(Tool::Gh);
         assert_eq!(jobs.list().len(), 1);
-        assert!(
-            jobs.start(Tool::Gh, JobKind::Install, "brew install gh".into())
-                .is_ok()
+        assert!(jobs.start(Tool::Gh, JobKind::Install).is_ok());
+    }
+
+    #[test]
+    fn reads_download_percentages() {
+        assert_eq!(progress_of("######## 100.0%"), Some(0.65));
+        assert_eq!(progress_of("  0%"), Some(0.15));
+        assert_eq!(
+            progress_of("disk 250%"),
+            platform::install_progress("disk 250%")
         );
     }
 

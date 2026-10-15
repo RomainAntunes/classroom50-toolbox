@@ -30,10 +30,8 @@ export interface ToolStatus {
 export interface ToolJob {
   tool: Tool;
   kind: "install" | "upgrade";
-  /** The command line, shown until it prints something. */
-  command: string;
-  /** The last line the command printed. */
-  line: string | null;
+  /** How far along it is (0 to 1); null until a known step shows up. */
+  progress: number | null;
 }
 
 export interface AuthStatus {
