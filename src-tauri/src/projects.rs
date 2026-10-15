@@ -1951,6 +1951,13 @@ async fn refresh_statuses(
             },
             None => None,
         };
+        if let Some(grade) = repo.grade.as_mut().filter(|g| g.needs_release_notes()) {
+            match status::release_body(http, &auth.token, &repo.owner, &repo.name, &grade.tag).await
+            {
+                Ok(body) => grade.apply_release_body(body.as_deref()),
+                Err(err) => log::warn!("release body of {}: {err}", grade.tag),
+            }
+        }
         repo.history = grade_history(&releases, repo.grade.as_ref(), &old, |release| {
             status::download_grade(http, release)
         })
@@ -2513,6 +2520,7 @@ mod tests {
             tests: Vec::new(),
             published_at: None,
             url: format!("page-{tag}"),
+            release_notes: None,
         };
         let releases = [release("c"), release("b"), release("a"), release("broken")];
         let newest = grade("c", 9);

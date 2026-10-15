@@ -568,6 +568,7 @@ mod tests {
             tests: Vec::new(),
             published_at: Some(now - TimeDelta::days(30)),
             url: "u".into(),
+            release_notes: None,
         });
         let notices = diff(&mut memory, &snapshot(vec![graded]), &[24, 1], now);
         assert!(notices.is_empty());
@@ -596,6 +597,7 @@ mod tests {
             tests: Vec::new(),
             published_at: Some(now),
             url: "u".into(),
+            release_notes: None,
         });
         remote.feedback = Some(Feedback {
             url: "u".into(),
