@@ -424,6 +424,8 @@ export const api = {
   exportCalendar: (path: string) => invoke<number>("export_calendar", { path }),
   setCalendarLabels: (labels: CalendarLabels) => invoke<void>("set_calendar_labels", { labels }),
   setTrayLabels: (labels: TrayLabels) => invoke<void>("set_tray_labels", { labels }),
+  /** The OS's preferred languages, most wanted first (BCP 47). */
+  systemLanguages: () => invoke<string[]>("system_languages"),
   /** Asks for calendar access the first time. */
   nativeCalendars: () => invoke<NativeCalendar[]>("native_calendars"),
   /** Writes the due dates into that calendar from now on; `null` removes them. */

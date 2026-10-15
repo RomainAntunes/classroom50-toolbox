@@ -23,9 +23,12 @@
   }
 
   // The `language` setting, live: `t` is reactive, so the whole UI follows at once.
+  // "System" reads the OS's languages from Rust: WKWebView's `navigator.languages` holds
+  // the app bundle's localizations, not the user's. They stand in until Rust answers.
   const language = $derived(settings.current?.language ?? "system");
+  let systemLanguages = $state<readonly string[]>(navigator.languages);
   $effect(() => {
-    setLocale(language, navigator.languages);
+    setLocale(language, systemLanguages);
     document.documentElement.lang = currentLocale();
   });
 
@@ -46,6 +49,9 @@
   // Lives in the layout so notices arrive whichever page is shown, and while hidden.
   onMount(() => {
     void loadSettings();
+    void api.systemLanguages().then((languages) => {
+      if (languages.length) systemLanguages = languages;
+    });
     void loadEditors();
     void api.appInfo().then((info) => initTheme(info.os));
     void api.unseen().then((ids) => {

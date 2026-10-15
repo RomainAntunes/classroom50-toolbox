@@ -160,6 +160,14 @@ pub fn set_calendar_labels(
     }
 }
 
+/// The OS's preferred languages, most wanted first, as BCP 47 tags (`fr-CH`). The UI's
+/// `navigator.languages` can't stand in: WKWebView reports the bundle's localizations
+/// there, not the user's.
+#[tauri::command]
+pub fn system_languages() -> Vec<String> {
+    sys_locale::get_locales().collect()
+}
+
 /// The words of the tray menu, from the UI's i18n.
 #[tauri::command]
 pub fn set_tray_labels(app: AppHandle, labels: crate::tray::Labels) {
@@ -658,6 +666,16 @@ mod tests {
     use super::*;
     use crate::classroom50::RepoConfig;
     use crate::projects::Project;
+
+    /// Whatever this machine prefers comes out as BCP 47 tags, ready for `resolveLocale`.
+    #[test]
+    fn system_languages_are_language_tags() {
+        let languages = system_languages();
+        println!("system languages: {languages:?}");
+        for tag in languages {
+            assert!(!tag.is_empty() && !tag.contains('_'), "{tag:?}");
+        }
+    }
 
     fn project(owner: Option<&str>, repo: &str, classroom: &str, assignment: &str) -> Project {
         Project {

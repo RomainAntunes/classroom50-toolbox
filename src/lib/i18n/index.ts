@@ -18,13 +18,20 @@ export function languageName(code: string): string {
 
 /**
  * The catalog for a `language` setting: a code, or "system" for the best match among
- * `preferred` (the OS's languages, most wanted first), else English.
+ * `preferred` (the OS's languages, most wanted first), else English. Each language is
+ * tried by its full tag, then its base language (`fr-CH` -> `fr`, `es-419` -> `es`); the
+ * first one with a catalog wins.
  */
-export function resolveLocale(language: string, preferred: readonly string[] = []): string {
+export function resolveLocale(
+  language: string,
+  preferred: readonly string[] = [],
+  available: readonly string[] = Object.keys(catalogs),
+): string {
   const wanted = language === "system" ? preferred : [language];
-  const codes = Object.keys(catalogs);
-  const find = (tag: string) => codes.find((code) => code.toLowerCase() === tag.toLowerCase());
-  for (const tag of wanted) {
+  const find = (tag: string) => available.find((code) => code.toLowerCase() === tag);
+  for (const raw of wanted) {
+    // POSIX spellings too: `fr_CH.UTF-8@euro`.
+    const tag = raw.split(/[.@]/)[0].replace(/_/g, "-").toLowerCase();
     const match = find(tag) ?? find(tag.split("-")[0]);
     if (match) return match;
   }

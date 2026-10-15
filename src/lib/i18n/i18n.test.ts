@@ -87,6 +87,27 @@ describe("locales", () => {
     expect(resolveLocale("xx", ["fr"])).toBe("en");
   });
 
+  it("tries each OS language by full tag, then by base language", () => {
+    const shipped = ["en", "fr", "es", "de"];
+    const pick = (...preferred: string[]) => resolveLocale("system", preferred, shipped);
+    expect(pick("fr-CH", "en-US")).toBe("fr");
+    expect(pick("es-419")).toBe("es");
+    expect(pick("de-AT", "fr")).toBe("de");
+    expect(pick("zh-Hans-CN", "it-IT", "es-ES")).toBe("es");
+    expect(pick("en-GB", "fr-FR")).toBe("en");
+    expect(pick("fr_CA.UTF-8")).toBe("fr");
+    expect(pick("C", "POSIX")).toBe("en");
+    expect(pick("ja-JP")).toBe("en");
+    // A regional catalog beats its base language.
+    expect(resolveLocale("system", ["pt-BR"], ["en", "pt", "pt-BR"])).toBe("pt-BR");
+    expect(resolveLocale("system", ["pt-PT"], ["en", "pt", "pt-BR"])).toBe("pt");
+  });
+
+  it("only offers registered catalogs", () => {
+    expect(resolveLocale("system", ["fr-FR"])).toBe("en");
+    expect(resolveLocale("de")).toBe("en");
+  });
+
   it("names each language in itself", () => {
     catalogs.fr = { "language.name": "Français" };
     expect(languageName("en")).toBe("English");
