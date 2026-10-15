@@ -40,6 +40,7 @@ tauri-plugin-process = "2"
 tauri-plugin-log = "2"
 tauri-plugin-dialog = "2"
 sys-locale = "0.3"
+tauri-plugin-clipboard-manager = "2.5"
 
 
 # Read the optimization guideline for more details: https://tauri.app/concept/size/#cargo-configuration

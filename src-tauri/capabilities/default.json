@@ -15,6 +15,7 @@
     "dialog:allow-ask",
     "dialog:allow-message",
     "dialog:allow-save",
+    "clipboard-manager:allow-write-text",
     "notification:default",
     "autostart:default",
     "process:allow-restart",

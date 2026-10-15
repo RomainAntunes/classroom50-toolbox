@@ -12,6 +12,7 @@
   import { tildify } from "$lib/paths.svelte";
   import { groupDetails } from "$lib/group";
   import { session } from "$lib/session.svelte";
+  import { copyLink, openLink } from "$lib/links";
   import Details from "./Details.svelte";
 
   let { project, now, unseen }: { project: Project; now: Date; unseen: boolean } = $props();
@@ -99,6 +100,7 @@
   );
   const openTarget = $derived(project.webUrl ?? githubUrl);
   const hidden = $derived(isHidden(project.id));
+  const link = $derived(openLink(project));
   // The editor that last opened the clone, else the default one.
   const editor = $derived(path ? editorFor(project) : null);
   const cloneable = $derived(!path && Boolean(project.owner && project.repo));
@@ -298,6 +300,11 @@
         action: () => path && api.openTerminal(path),
       }),
       separator(),
+      MenuItem.new({
+        text: t("projects.copyLink"),
+        enabled: link !== null,
+        action: () => link && copyLink(link),
+      }),
       MenuItem.new({
         text: t(hidden ? "projects.unhide" : "projects.hide"),
         action: () => setHidden(project.id, !hidden),

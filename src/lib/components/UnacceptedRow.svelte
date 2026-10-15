@@ -5,6 +5,7 @@
   import { isHidden, setHidden } from "$lib/hidden";
   import { acceptAssignment, acceptBlocked } from "$lib/accept";
   import { session } from "$lib/session.svelte";
+  import { acceptLink, copyLink } from "$lib/links";
   import { groupDetails, groupName } from "$lib/group";
   import { formatDate, fromNow, t } from "$lib/i18n";
   import Details from "./Details.svelte";
@@ -42,6 +43,10 @@
       MenuItem.new({
         text: t("projects.openAcceptPage"),
         action: () => openUrl(item.acceptUrl),
+      }),
+      MenuItem.new({
+        text: t("projects.copyLink"),
+        action: () => copyLink(acceptLink(item)),
       }),
       PredefinedMenuItem.new({ item: "Separator" }),
       MenuItem.new({
