@@ -19,7 +19,15 @@
     type SyncDetails,
     type ToolStatus,
   } from "$lib/api";
-  import { catalogs, formatDate, fromNow, hoursLabel, languageName, t } from "$lib/i18n";
+  import {
+    catalogs,
+    formatDate,
+    formatNumber,
+    fromNow,
+    hoursLabel,
+    languageName,
+    t,
+  } from "$lib/i18n";
   import { sampleNotices, showNotice } from "$lib/notices";
   import { loadSettings, pickWatchedFolder, saveSettings, settings } from "$lib/settings.svelte";
   import { CheckMenuItem, Menu, MenuItem, PredefinedMenuItem } from "@tauri-apps/api/menu";
@@ -167,7 +175,7 @@
     if (!run) return t("settings.sync.never");
     return t("settings.sync.run", {
       when: fromNow(new Date(run.at)),
-      seconds: run.seconds.toFixed(1),
+      seconds: formatNumber(run.seconds, 1),
     });
   }
 

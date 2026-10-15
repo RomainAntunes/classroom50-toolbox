@@ -100,6 +100,14 @@ export function formatList(items: string[]): string {
 }
 
 /** "Fri 17 Oct, 23:59" in the catalog's language: for exact dates in details. */
+/** A number in the UI's language, with exactly `digits` decimals: 1.5 -> "1,5" in French. */
+export function formatNumber(value: number, digits = 0): string {
+  return new Intl.NumberFormat(locale.code, {
+    minimumFractionDigits: digits,
+    maximumFractionDigits: digits,
+  }).format(value);
+}
+
 export function formatDate(date: Date): string {
   return new Intl.DateTimeFormat(locale.code, {
     weekday: "short",

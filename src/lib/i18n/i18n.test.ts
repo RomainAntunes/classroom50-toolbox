@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it } from "vitest";
 import en from "./en.json";
-import { catalogs, languageName, resolveLocale, setLocale, t } from "./index";
+import { catalogs, formatNumber, languageName, resolveLocale, setLocale, t } from "./index";
 
 afterEach(() => setLocale("en"));
 
@@ -104,6 +104,13 @@ describe("locales", () => {
   it("only offers registered catalogs", () => {
     expect(resolveLocale("system", ["pt-PT", "it"])).toBe("en");
     expect(resolveLocale("ja")).toBe("en");
+  });
+
+  it("formats numbers in the UI's language", () => {
+    setLocale("fr");
+    expect(formatNumber(1.54, 1)).toBe("1,5");
+    setLocale("en");
+    expect(formatNumber(2, 1)).toBe("2.0");
   });
 
   it("names each language in itself", () => {
