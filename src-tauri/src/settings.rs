@@ -33,6 +33,11 @@ pub struct Settings {
     /// Project and unaccepted-assignment ids the user hid: left out of the list unless a
     /// search matches them, and never notified about.
     pub hidden: Vec<String>,
+    /// Classes (`owner/classroom`, lowercase) hidden whole, like `hidden` for each of
+    /// their assignments.
+    pub hidden_classes: Vec<String>,
+    /// Classes whose section is folded in the list.
+    pub collapsed_classes: Vec<String>,
     /// The first-run guide was finished or skipped.
     pub onboarded: bool,
 }
@@ -62,6 +67,8 @@ impl Default for Settings {
             notify_hours_before: vec![24, 1],
             default_editor: None,
             hidden: Vec::new(),
+            hidden_classes: Vec::new(),
+            collapsed_classes: Vec::new(),
             onboarded: false,
         }
     }
@@ -73,8 +80,14 @@ impl Settings {
         let mut seen = BTreeSet::new();
         self.watched_folders
             .retain(|path| seen.insert(path.clone()));
-        let mut seen = BTreeSet::new();
-        self.hidden.retain(|id| seen.insert(id.clone()));
+        for ids in [
+            &mut self.hidden,
+            &mut self.hidden_classes,
+            &mut self.collapsed_classes,
+        ] {
+            let mut seen = BTreeSet::new();
+            ids.retain(|id| seen.insert(id.clone()));
+        }
 
         let hours: BTreeSet<u32> = self
             .notify_hours_before
@@ -165,9 +178,13 @@ mod tests {
             notify_hours_before: vec![1, 24, 0, 1, 1000, 6],
             default_editor: None,
             hidden: vec!["a".into(), "a".into()],
+            hidden_classes: vec!["o/c".into(), "o/c".into()],
+            collapsed_classes: Vec::new(),
             onboarded: true,
         }
         .normalized();
+        assert_eq!(settings.hidden, vec!["a".to_owned()]);
+        assert_eq!(settings.hidden_classes, vec!["o/c".to_owned()]);
         assert_eq!(
             settings.watched_folders,
             vec![PathBuf::from("/a"), "/b".into()]

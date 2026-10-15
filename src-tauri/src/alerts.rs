@@ -152,7 +152,7 @@ pub fn process(app: &AppHandle, snapshot: &Snapshot) {
     }
     let settings = app.state::<SettingsStore>().get();
     let hours = settings.notify_hours_before;
-    let snapshot = &without_hidden(snapshot, &settings.hidden);
+    let snapshot = &without_hidden(snapshot, &settings.hidden, &settings.hidden_classes);
     let state = app.state::<AlertsState>();
     let Ok(mut memory) = state.memory.lock() else {
         return;
@@ -178,12 +178,21 @@ pub fn process(app: &AppHandle, snapshot: &Snapshot) {
     set_badge(app, attention);
 }
 
-/// The snapshot minus hidden assignments, which stay quiet; what changed meanwhile is told
-/// once they're shown again.
-fn without_hidden(snapshot: &Snapshot, hidden: &[String]) -> Snapshot {
+/// The snapshot minus hidden assignments and classes, which stay quiet; what changed
+/// meanwhile is told once they're shown again.
+fn without_hidden(snapshot: &Snapshot, hidden: &[String], classes: &[String]) -> Snapshot {
+    let class_hidden = |owner: &str, classroom: &str| {
+        let key = format!("{owner}/{classroom}").to_lowercase();
+        classes.contains(&key)
+    };
     let mut visible = snapshot.clone();
-    visible.projects.retain(|p| !hidden.contains(&p.id));
-    visible.unaccepted.retain(|u| !hidden.contains(&u.id));
+    visible.projects.retain(|p| {
+        !hidden.contains(&p.id)
+            && !class_hidden(p.owner.as_deref().unwrap_or(""), &p.config.classroom)
+    });
+    visible
+        .unaccepted
+        .retain(|u| !hidden.contains(&u.id) && !class_hidden(&u.classroom.org, &u.classroom.slug));
     visible
 }
 
@@ -697,11 +706,14 @@ mod tests {
         let soon = || snapshot(vec![project("lab1", Some(now + TimeDelta::minutes(30)))]);
         let hidden = vec!["org/c-lab1-alice".to_owned()];
         let mut memory = Memory::default();
-        let quiet = without_hidden(&soon(), &hidden);
+        let quiet = without_hidden(&soon(), &hidden, &[]);
         assert!(quiet.projects.is_empty());
         assert!(diff(&mut memory, &quiet, &[1], now).is_empty());
+        // A hidden class quiets all of its assignments, whatever the case of its key.
+        let class = vec!["org/c".to_owned()];
+        assert!(without_hidden(&soon(), &[], &class).projects.is_empty());
         // Shown again, the pending reminder goes out.
-        let shown = without_hidden(&soon(), &[]);
+        let shown = without_hidden(&soon(), &[], &[]);
         assert_eq!(diff(&mut memory, &shown, &[1], now).len(), 1);
     }
 

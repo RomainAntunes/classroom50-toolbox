@@ -250,6 +250,10 @@ export interface Settings {
   defaultEditor: string | null;
   /** Hidden project and unaccepted-assignment ids: listed only when a search matches. */
   hidden: string[];
+  /** Classes (`owner/classroom`, lowercase, see `classKey`) hidden whole. */
+  hiddenClasses: string[];
+  /** Classes whose section is folded in the list. */
+  collapsedClasses: string[];
   /** The first-run guide was finished or skipped. */
   onboarded: boolean;
 }
