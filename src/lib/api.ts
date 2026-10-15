@@ -234,6 +234,12 @@ export interface CalendarLabels {
   notAccepted: string;
 }
 
+/** The words of the tray icon's menu. */
+export interface TrayLabels {
+  open: string;
+  quit: string;
+}
+
 /** A published assignment the user hasn't accepted yet. */
 export interface Unaccepted {
   id: string;
@@ -414,6 +420,7 @@ export const api = {
   /** Writes the due dates as an `.ics` file; returns the number of events. */
   exportCalendar: (path: string) => invoke<number>("export_calendar", { path }),
   setCalendarLabels: (labels: CalendarLabels) => invoke<void>("set_calendar_labels", { labels }),
+  setTrayLabels: (labels: TrayLabels) => invoke<void>("set_tray_labels", { labels }),
   /** Asks for calendar access the first time. */
   nativeCalendars: () => invoke<NativeCalendar[]>("native_calendars"),
   /** Writes the due dates into that calendar from now on; `null` removes them. */

@@ -29,7 +29,7 @@
     document.documentElement.lang = currentLocale();
   });
 
-  // Rust writes calendar notes with these words (placeholders filled
+  // Rust writes calendar notes and the tray menu with these words (placeholders filled
   // there); sent again when the language changes.
   $effect(() => {
     void api.setCalendarLabels({
@@ -40,6 +40,7 @@
       submitted: t("calendar.notes.submitted"),
       notAccepted: t("calendar.notes.notAccepted"),
     });
+    void api.setTrayLabels({ open: t("tray.open"), quit: t("tray.quit") });
   });
 
   // Lives in the layout so notices arrive whichever page is shown, and while hidden.

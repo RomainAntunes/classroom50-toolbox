@@ -122,6 +122,7 @@ pub fn run() {
             commands::export_calendar,
             commands::native_calendars,
             commands::set_calendar_labels,
+            commands::set_tray_labels,
             commands::set_native_calendar,
             commands::simulate_network,
             commands::simulated_network,

@@ -160,6 +160,12 @@ pub fn set_calendar_labels(
     }
 }
 
+/// The words of the tray menu, from the UI's i18n.
+#[tauri::command]
+pub fn set_tray_labels(app: AppHandle, labels: crate::tray::Labels) {
+    crate::tray::set_labels(&app, &labels);
+}
+
 /// The OS calendars the user can write to; asks for access the first time.
 #[tauri::command]
 pub async fn native_calendars() -> Result<Vec<platform::NativeCalendar>> {
