@@ -13,7 +13,7 @@ A tray app for [Classroom 50](https://github.com/foundation50/classroom50) stude
 The first release is for students only. Keep the domain layer role-agnostic so a teacher mode (`gh teacher`) can be added later without a rewrite.
 
 - Repo: `github.com/RomainAntunes/classroom50-toolbox`. License: GPL-3.0, the same as Classroom 50.
-- Status: tray, popover, tool detection and install, persisted settings, in-app sign-in, the merged project list (GitHub discovery, editor and folder scan with git status, Pages manifests), grades, Feedback PR activity, unmerged-branch detection, unaccepted assignments, notifications, the tray badge, and accept, clone, submit commit and commit & push from the app are done.
+- Status: tray, popover, tool detection and install, persisted settings, in-app sign-in, the merged project list (GitHub discovery, editor and folder scan with git status, Pages manifests), grades, Feedback PR activity, unmerged-branch detection, unaccepted assignments, notifications, the tray badge, and accept, clone, submit, commit and commit & push from the app are done.
 
 ## Stack and decisions (settled, don't re-litigate)
 
