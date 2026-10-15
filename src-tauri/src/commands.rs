@@ -109,23 +109,20 @@ pub struct SyncDetails {
     clones: usize,
 }
 
-/// Writes the due dates as an `.ics` file at `path` (chosen in a save dialog) and returns
-/// how many events it holds.
+/// Writes the due dates as an `.ics` file at `path` (chosen in a save dialog), keeps it
+/// updated after each sync from now on, and returns how many events it holds.
 #[tauri::command]
 pub fn export_calendar(
     path: PathBuf,
     state: State<'_, ProjectsState>,
     settings: State<'_, SettingsStore>,
 ) -> Result<usize> {
-    let settings = settings.get();
-    let (ics, count) = crate::calendar::ics(
-        &state.snapshot(),
-        &settings.hidden,
-        &settings.hidden_classes,
-        &settings.notify_hours_before,
-        chrono::Utc::now(),
-    );
-    crate::github::write_atomic(&path, ics.as_bytes())?;
+    let current = settings.get();
+    let count = crate::calendar::export(&path, &state.snapshot(), &current)?;
+    settings.set(Settings {
+        calendar_file: Some(path),
+        ..current
+    })?;
     Ok(count)
 }
 
@@ -189,6 +186,13 @@ pub fn update_settings(
         apply_launch_at_login(&app, next.launch_at_login)?;
     }
     let saved = settings.set(next)?;
+    // What the calendar holds depends on these.
+    if saved.hidden != previous.hidden
+        || saved.hidden_classes != previous.hidden_classes
+        || saved.notify_hours_before != previous.notify_hours_before
+    {
+        crate::calendar::sync(&app);
+    }
     if saved.appearance != previous.appearance {
         popover::apply_appearance(&app, saved.appearance);
     }

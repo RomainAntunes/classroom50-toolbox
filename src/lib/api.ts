@@ -258,6 +258,8 @@ export interface Settings {
   /** Classes whose section is folded in the list. */
   collapsedClasses: string[];
   appearance: Appearance;
+  /** The last exported `.ics`, rewritten by Rust after each sync while set. */
+  calendarFile: string | null;
   /** The first-run guide was finished or skipped. */
   onboarded: boolean;
 }

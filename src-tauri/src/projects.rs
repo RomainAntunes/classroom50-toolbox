@@ -560,6 +560,7 @@ async fn publish(
     state.save_state();
     watch::rewatch(app, targets);
     crate::alerts::process(app, &snapshot);
+    crate::calendar::sync(app);
     snapshot
 }
 

@@ -70,6 +70,8 @@
     if (!path) return;
     try {
       exported = await api.exportCalendar(path);
+      // Rust now keeps that file updated (`calendarFile`).
+      await loadSettings();
     } catch (err) {
       await withDialog(() => message(errorMessage(err), { kind: "error" }));
     }
@@ -280,6 +282,16 @@
         </span>
         <button onclick={exportCalendar}>{t("settings.calendar.export")}</button>
       </div>
+      {#if current.calendarFile}
+        <div class="row">
+          <span class="text">
+            <span>{t("settings.calendar.kept")}</span>
+            <span class="sub path" title={current.calendarFile}>{current.calendarFile}</span>
+          </span>
+          <button onclick={() => save({ calendarFile: null })}>{t("settings.calendar.stop")}</button
+          >
+        </div>
+      {/if}
     </Section>
 
     {#if sync}

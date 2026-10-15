@@ -3,10 +3,15 @@
 //! user picked. UIDs are the list's ids, so importing again updates events rather than
 //! duplicating them.
 
+use std::path::Path;
+
 use chrono::{DateTime, Utc};
+use tauri::{AppHandle, Manager};
 
 use crate::classroom50::{Assignment, Classroom};
-use crate::projects::Snapshot;
+use crate::error::Result;
+use crate::projects::{ProjectsState, Snapshot};
+use crate::settings::{Settings, SettingsStore};
 
 const PRODID: &str = "-//classroom50-toolbox//EN";
 
@@ -105,6 +110,48 @@ pub fn ics(
     }
     line(&mut out, "END:VCALENDAR");
     (out, count)
+}
+
+/// Writes the calendar of `snapshot` to `path`; returns the number of events.
+pub fn export(path: &Path, snapshot: &Snapshot, settings: &Settings) -> Result<usize> {
+    let (ics, count) = for_settings(snapshot, settings);
+    crate::github::write_atomic(path, ics.as_bytes())?;
+    Ok(count)
+}
+
+fn for_settings(snapshot: &Snapshot, settings: &Settings) -> (String, usize) {
+    ics(
+        snapshot,
+        &settings.hidden,
+        &settings.hidden_classes,
+        &settings.notify_hours_before,
+        Utc::now(),
+    )
+}
+
+/// After a sync or a settings change: rewrites the exported file when its events changed,
+/// so a calendar subscribed to it, or the next import, gets the new dates.
+pub fn sync(app: &AppHandle) {
+    let settings = app.state::<SettingsStore>().get();
+    let snapshot = app.state::<ProjectsState>().snapshot();
+    if let Some(path) = &settings.calendar_file {
+        let (ics, _) = for_settings(&snapshot, &settings);
+        let current = std::fs::read_to_string(path).unwrap_or_default();
+        if without_stamps(&current) != without_stamps(&ics)
+            && path.parent().is_some_and(Path::is_dir)
+            && let Err(err) = crate::github::write_atomic(path, ics.as_bytes())
+        {
+            log::warn!("could not update {}: {err}", path.display());
+        }
+    }
+}
+
+/// The calendar minus its `DTSTAMP` lines, which change on every write.
+fn without_stamps(ics: &str) -> String {
+    ics.lines()
+        .filter(|line| !line.starts_with("DTSTAMP:"))
+        .collect::<Vec<_>>()
+        .join("\n")
 }
 
 fn utc(at: DateTime<Utc>) -> String {
@@ -213,6 +260,25 @@ mod tests {
         assert_eq!(ics(&snapshot, &hidden, &[], &[], Utc::now()).1, 0);
         let classes = ["org/poo".to_owned()];
         assert_eq!(ics(&snapshot, &[], &classes, &[], Utc::now()).1, 0);
+    }
+
+    #[test]
+    fn ignores_stamps_when_comparing() {
+        let snapshot = Snapshot {
+            unaccepted: vec![unaccepted("a", "Lab 1", Some("2026-11-02T23:59:00Z"))],
+            ..Snapshot::default()
+        };
+        let earlier = ics(
+            &snapshot,
+            &[],
+            &[],
+            &[],
+            Utc::now() - chrono::TimeDelta::hours(1),
+        )
+        .0;
+        let later = ics(&snapshot, &[], &[], &[], Utc::now()).0;
+        assert_ne!(earlier, later);
+        assert_eq!(without_stamps(&earlier), without_stamps(&later));
     }
 
     #[test]
