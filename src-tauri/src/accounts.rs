@@ -67,6 +67,23 @@ pub async fn switch(login: &str) -> Result<()> {
     Ok(())
 }
 
+/// Removes `login` from gh (its token leaves gh's store; GitHub keeps the authorization,
+/// which the user can revoke in their settings). gh makes another account active if it
+/// holds one. Like switching, the terminal follows.
+pub async fn sign_out(login: &str) -> Result<()> {
+    let login = valid_login(login)?;
+    if let Some(var) = crate::tools::env_token_var() {
+        return Err(Error::TokenFromEnv(var.into()));
+    }
+    process::run(
+        "gh",
+        ["auth", "logout", "--hostname", HOST, "--user", login],
+        None,
+    )
+    .await?;
+    Ok(())
+}
+
 /// The avatar as a `data:` URL, from the cache when it is less than a week old.
 pub async fn avatar(http: &reqwest::Client, cache_dir: &Path, login: &str) -> Result<String> {
     let login = valid_login(login)?;
