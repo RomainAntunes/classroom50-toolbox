@@ -673,6 +673,11 @@ mod tests {
         );
         assert!(diff(&mut memory, &joined, &[], now).is_empty());
         assert!(memory.unseen.contains("org/c-lab1-alice"));
+        // A classmate leaving says nothing, and the user's own login is never news.
+        let left = with_group(vec![member("bob", Some("Bob B"))]);
+        assert!(diff(&mut memory, &left, &[], now).is_empty());
+        let back = with_group(vec![member("bob", Some("Bob B")), member("ALICE", None)]);
+        assert!(diff(&mut memory, &back, &[], now).is_empty());
     }
 
     #[test]

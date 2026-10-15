@@ -54,6 +54,7 @@
   "settings.dev.kind.grade": "New grade",
   "settings.dev.kind.feedback": "New feedback",
   "settings.dev.kind.newAssignment": "New assignment",
+  "settings.dev.kind.gradingFailed": "Grading failed",
   "settings.dev.kind.teammatePush": "Teammate push",
   "settings.dev.kind.groupJoined": "Group joined",
   "settings.dev.kind.deadlineChanged": "Deadline changed",

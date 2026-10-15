@@ -4,7 +4,7 @@ import {
   sendNotification,
 } from "@tauri-apps/plugin-notification";
 import type { Notice } from "$lib/api";
-import { formatDate, fromNow, t } from "$lib/i18n";
+import { formatDate, formatList, fromNow, t } from "$lib/i18n";
 
 /** Words a notice from Rust (`alerts.rs`) and shows it as a system notification. */
 export async function showNotice(notice: Notice) {
@@ -14,7 +14,7 @@ export async function showNotice(notice: Notice) {
     if (typeof value === "string" || typeof value === "number") values[key] = value;
   }
   if (notice.kind === "groupJoined") {
-    values.members = new Intl.ListFormat(undefined, { type: "conjunction" }).format(notice.members);
+    values.members = formatList(notice.members);
     values.count = notice.members.length;
   }
   if (notice.kind === "due") values.when = fromNow(new Date(notice.due));
