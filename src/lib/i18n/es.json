@@ -253,6 +253,7 @@
   "commit.noPush.closed": "Solo hace commit en este clon: las entregas están cerradas.",
   "commit.noPush.otherBranch": "Solo hace commit en este clon: el push se ofrece en {branch}, la rama que se califica.",
   "commit.noPush.remoteAhead": "Solo hace commit en este clon: GitHub tiene commits nuevos que fusionar antes del push.",
+  "commit.noPush.notOnGitHub": "Solo hace commit en este clon: este repositorio aún no está en tu lista de GitHub. Actualiza o cambia a la cuenta a la que pertenece.",
   "commit.noPush.fallback": "Solo hace commit en este clon: el push no está disponible para este proyecto.",
   "commit.nothingToCommit": "Nada que incluir en un commit: no hay cambios en este clon.",
   "commit.failed": "Falló el commit: {error}",

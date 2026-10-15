@@ -253,6 +253,7 @@
   "commit.noPush.closed": "Commit dans ce clone seulement : les rendus sont fermés.",
   "commit.noPush.otherBranch": "Commit dans ce clone seulement : le push est proposé sur {branch}, la branche notée.",
   "commit.noPush.remoteAhead": "Commit dans ce clone seulement : GitHub a de nouveaux commits à fusionner avant votre push.",
+  "commit.noPush.notOnGitHub": "Commit dans ce clone seulement : ce dépôt n'est pas encore dans votre liste GitHub. Actualisez, ou passez au compte qui le possède.",
   "commit.noPush.fallback": "Commit dans ce clone seulement : le push n'est pas disponible pour ce projet.",
   "commit.nothingToCommit": "Rien à commiter : il n'y a aucune modification dans ce clone.",
   "commit.failed": "Le commit a échoué : {error}",
