@@ -1,4 +1,5 @@
 <script lang="ts">
+  import logo from "../../assets/icon-small.svg";
   import { onMount } from "svelte";
   import { goto } from "$app/navigation";
   import { listen } from "@tauri-apps/api/event";
@@ -212,7 +213,7 @@
 </script>
 
 <header class="titlebar">
-  <h1>{t("app.title")}</h1>
+  <h1><img class="logo" src={logo} alt={t("app.title")} /></h1>
   <input
     class="search"
     type="search"
@@ -432,8 +433,14 @@
 
   h1 {
     margin: 0;
-    font-size: 1.1em;
-    font-weight: 600;
+    display: flex;
+    flex-shrink: 0;
+  }
+
+  /* The app icon stands in for the title, as tall as the title's line was. */
+  .logo {
+    height: 20px;
+    width: 20px;
   }
 
   main {
