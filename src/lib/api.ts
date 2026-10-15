@@ -276,6 +276,7 @@ export type Notice =
   | { kind: "feedback"; assignment: string; count: number }
   | { kind: "newAssignment"; assignment: string; classroom: string }
   | { kind: "teammatePush"; assignment: string; author: string }
+  | { kind: "groupJoined"; assignment: string; members: string[] }
   | { kind: "deadlineChanged"; assignment: string; due: string | null }
   | { kind: "closed"; assignment: string };
 

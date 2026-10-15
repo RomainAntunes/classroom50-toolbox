@@ -11,7 +11,11 @@ export async function showNotice(notice: Notice) {
   const { kind, ...params } = notice;
   const values: Record<string, string | number> = {};
   for (const [key, value] of Object.entries(params)) {
-    if (value !== null) values[key] = value;
+    if (typeof value === "string" || typeof value === "number") values[key] = value;
+  }
+  if (notice.kind === "groupJoined") {
+    values.members = new Intl.ListFormat(undefined, { type: "conjunction" }).format(notice.members);
+    values.count = notice.members.length;
   }
   if (notice.kind === "due") values.when = fromNow(new Date(notice.due));
   if (notice.kind === "deadlineChanged") {
@@ -38,6 +42,7 @@ export function sampleNotices(now = Date.now()): Notice[] {
     { kind: "feedback", assignment, count: 2 },
     { kind: "newAssignment", assignment: "Lab 2", classroom: "CS50" },
     { kind: "teammatePush", assignment, author: "alice" },
+    { kind: "groupJoined", assignment, members: ["Alice Martin"] },
     { kind: "deadlineChanged", assignment, due: new Date(now + 48 * HOUR).toISOString() },
     { kind: "closed", assignment },
   ];

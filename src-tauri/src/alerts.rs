@@ -60,6 +60,11 @@ pub enum Notice {
         assignment: String,
         author: String,
     },
+    /// Classmates joined the user's group (names, else logins).
+    GroupJoined {
+        assignment: String,
+        members: Vec<String>,
+    },
     /// `due` is `None` when the deadline was removed.
     DeadlineChanged {
         assignment: String,
@@ -85,6 +90,8 @@ struct Memory {
     feedback: BTreeMap<String, u32>,
     /// Default-branch head per project.
     heads: BTreeMap<String, String>,
+    /// Group member logins (lowercase) per project.
+    groups: BTreeMap<String, BTreeSet<String>>,
     /// Due date (Unix seconds, `None` for no deadline) per `org/classroom/assignment`.
     dues: BTreeMap<String, Option<i64>>,
     /// Assignments seen closed, by the same key.
@@ -293,6 +300,33 @@ fn diff(
 
     let login = memory.login.clone().unwrap_or_default();
     for project in &snapshot.projects {
+        if let Some(group) = &project.group {
+            let members: BTreeSet<String> = group
+                .members
+                .iter()
+                .map(|m| m.login.to_ascii_lowercase())
+                .collect();
+            let previous = memory.groups.insert(project.id.clone(), members);
+            if let Some(before) = previous {
+                let joined: Vec<String> = group
+                    .members
+                    .iter()
+                    .filter(|m| {
+                        let lower = m.login.to_ascii_lowercase();
+                        !before.contains(&lower) && !lower.eq_ignore_ascii_case(&login)
+                    })
+                    .map(|m| m.name.clone().unwrap_or_else(|| m.login.clone()))
+                    .collect();
+                if !joined.is_empty() {
+                    notices.push(Notice::GroupJoined {
+                        assignment: assignment_name(project),
+                        members: joined,
+                    });
+                    memory.unseen.insert(project.id.clone());
+                }
+            }
+        }
+
         let Some(remote) = &project.remote else {
             continue;
         };
@@ -599,6 +633,46 @@ mod tests {
         assert_eq!(diff(&mut memory, &failed("a"), &[], now), expected);
         assert!(diff(&mut memory, &failed("a"), &[], now).is_empty());
         assert_eq!(diff(&mut memory, &failed("b"), &[], now), expected);
+    }
+
+    #[test]
+    fn announces_classmates_joining_the_group() {
+        let now = Utc::now();
+        let mut memory = Memory {
+            login: Some("alice".into()),
+            ..Memory::default()
+        };
+        let member = |login: &str, name: Option<&str>| crate::groups::Member {
+            login: login.into(),
+            name: name.map(Into::into),
+        };
+        let with_group = |members: Vec<crate::groups::Member>| {
+            let mut p = project("lab1", None);
+            p.group = Some(crate::groups::Group {
+                org: "org".into(),
+                slug: "classroom50-group-0123456789abcdef-1".into(),
+                number: 1,
+                name: None,
+                members,
+                url: String::new(),
+                classroom: None,
+                assignment: None,
+            });
+            snapshot(vec![p])
+        };
+        // The first sight of a group is the baseline.
+        let first = with_group(vec![member("Alice", None)]);
+        assert!(diff(&mut memory, &first, &[], now).is_empty());
+        let joined = with_group(vec![member("Alice", None), member("bob", Some("Bob B"))]);
+        assert_eq!(
+            diff(&mut memory, &joined, &[], now),
+            vec![Notice::GroupJoined {
+                assignment: "LAB1".into(),
+                members: vec!["Bob B".into()],
+            }]
+        );
+        assert!(diff(&mut memory, &joined, &[], now).is_empty());
+        assert!(memory.unseen.contains("org/c-lab1-alice"));
     }
 
     #[test]
