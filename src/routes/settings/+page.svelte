@@ -295,9 +295,14 @@
           {upToDate ? t("settings.about.upToDate") : t("settings.about.checkUpdates")}
         </button>
       </div>
+      <div class="row">
+        <span class="text">
+          <span>{t("settings.quit.label")}</span>
+          <span class="sub">{t("settings.quit.hint")}</span>
+        </span>
+        <button onclick={() => exit(0)}>{t("settings.quit.action")}</button>
+      </div>
     </Section>
-
-    <button class="quit" onclick={() => exit(0)}>{t("settings.quit")}</button>
 
     <footer>
       {#if info}
@@ -440,20 +445,19 @@
 
   .link {
     padding: 0;
+    border-radius: 0;
     background: transparent;
     color: inherit;
     font: inherit;
     font-variant-numeric: tabular-nums;
+    cursor: pointer;
   }
 
-  .link:hover {
-    color: var(--accent);
-    text-decoration: underline;
-  }
-
-  .quit {
-    align-self: center;
-    color: var(--danger);
+  /* Beats the global `button:hover` background, which drew a box behind the text. */
+  .link:hover:not(:disabled) {
     background: transparent;
+    color: var(--fg);
+    text-decoration: underline;
+    text-underline-offset: 2px;
   }
 </style>
