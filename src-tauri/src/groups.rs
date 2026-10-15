@@ -108,24 +108,8 @@ struct MemberConnection {
 pub async fn load(http: &reqwest::Client, token: &str, teams: &[GroupTeam]) -> Result<Vec<Group>> {
     let mut groups = Vec::new();
     for batch in teams.chunks(BATCH) {
-        let mut declarations = Vec::new();
-        let mut fields = Vec::new();
-        let mut variables = Map::new();
-        for (i, team) in batch.iter().enumerate() {
-            declarations.push(format!("$o{i}: String!, $s{i}: String!"));
-            fields.push(format!(
-                "g{i}: organization(login: $o{i}) {{ team(slug: $s{i}) {{ members(first: {MAX_MEMBERS}) {{ nodes {{ login name }} }} }} }}"
-            ));
-            variables.insert(format!("o{i}"), json!(team.org));
-            variables.insert(format!("s{i}"), json!(team.slug));
-        }
-        let query = format!(
-            "query({}) {{ {} }}",
-            declarations.join(", "),
-            fields.join(" ")
-        );
-        let mut data: Map<String, Value> =
-            github::graphql(http, token, &query, Value::Object(variables)).await?;
+        let (query, variables) = members_query(batch);
+        let mut data: Map<String, Value> = github::graphql(http, token, &query, variables).await?;
         for (i, team) in batch.iter().enumerate() {
             let members = data
                 .remove(&format!("g{i}"))
@@ -139,6 +123,28 @@ pub async fn load(http: &reqwest::Client, token: &str, teams: &[GroupTeam]) -> R
         }
     }
     Ok(groups)
+}
+
+/// One aliased query (`g0`, `g1`, ...) reading each team's members. Org and team names
+/// travel as variables, never spliced into the query text.
+fn members_query(batch: &[GroupTeam]) -> (String, Value) {
+    let mut declarations = Vec::new();
+    let mut fields = Vec::new();
+    let mut variables = Map::new();
+    for (i, team) in batch.iter().enumerate() {
+        declarations.push(format!("$o{i}: String!, $s{i}: String!"));
+        fields.push(format!(
+            "g{i}: organization(login: $o{i}) {{ team(slug: $s{i}) {{ members(first: {MAX_MEMBERS}) {{ nodes {{ login name }} }} }} }}"
+        ));
+        variables.insert(format!("o{i}"), json!(team.org));
+        variables.insert(format!("s{i}"), json!(team.slug));
+    }
+    let query = format!(
+        "query({}) {{ {} }}",
+        declarations.join(", "),
+        fields.join(" ")
+    );
+    (query, Value::Object(variables))
 }
 
 /// A group from its team. The description record is only trusted when its classroom and
@@ -214,6 +220,44 @@ mod tests {
         .unwrap();
         assert_eq!(forged.name, None);
         assert!(group(&team("not json"), Vec::new()).is_some());
+    }
+
+    #[test]
+    fn passes_team_names_as_variables() {
+        let team = |org: &str, slug: &str| GroupTeam {
+            org: org.into(),
+            slug: slug.into(),
+            description: None,
+        };
+        let (query, variables) = members_query(&[
+            team("HEIGVD-POO", "classroom50-group-3eaa7f60afc3ad98-3"),
+            team("evil\") { x }", "s"),
+        ]);
+        assert!(query.starts_with("query($o0: String!, $s0: String!, $o1: String!, $s1: String!)"));
+        assert!(query.contains("g1: organization(login: $o1) { team(slug: $s1)"));
+        assert!(!query.contains("HEIGVD") && !query.contains("evil"));
+        assert_eq!(variables["o0"], "HEIGVD-POO");
+        assert_eq!(variables["s0"], "classroom50-group-3eaa7f60afc3ad98-3");
+        assert_eq!(variables["o1"], "evil\") { x }");
+    }
+
+    #[test]
+    fn reads_the_group_number_from_the_slug() {
+        let number = |slug: &str| {
+            group(
+                &GroupTeam {
+                    org: "o".into(),
+                    slug: slug.into(),
+                    description: None,
+                },
+                Vec::new(),
+            )
+            .map(|g| g.number)
+        };
+        assert_eq!(number("classroom50-group-cee5352cb880dff5-12"), Some(12));
+        assert_eq!(number("classroom50-group-cee5352cb880dff5-x"), None);
+        assert_eq!(number("classroom50-group-"), None);
+        assert_eq!(number("classroom50-poo"), None);
     }
 
     #[test]
