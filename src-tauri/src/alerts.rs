@@ -487,6 +487,7 @@ mod tests {
             pending: None,
             web_url: None,
             late_seconds: None,
+            editor: None,
         }
     }
 

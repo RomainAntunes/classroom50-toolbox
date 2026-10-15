@@ -158,6 +158,9 @@ pub struct Project {
     /// date, as upstream grades it, past the due date. Advisory: nothing is blocked.
     #[serde(default)]
     pub late_seconds: Option<i64>,
+    /// The editor that last opened the clone (`editors::Editor::id`), when one did.
+    #[serde(default)]
+    pub editor: Option<String>,
 }
 
 /// Why the last sync was partial, as `{ kind, message }` like command errors.
@@ -713,21 +716,31 @@ async fn sync(
         settings.scan_editor_projects,
         progress.clone(),
     );
-    let (snapshot, scan_targets) = if mode != Mode::Full {
-        let (locals, targets) = scan.await;
+    let (snapshot, scan_targets, recents) = if mode != Mode::Full {
+        let (locals, targets, recents) = scan.await;
         let status = mode == Mode::Status;
         (
             local_snapshot(state, http, locals, now, status, progress).await,
             targets,
+            recents,
         )
     } else {
-        let (remote, (locals, targets)) = tokio::join!(sync_remote(state, http, progress), scan);
+        let (remote, (locals, targets, recents)) =
+            tokio::join!(sync_remote(state, http, progress), scan);
         (
             full_snapshot(state, http, remote, locals, now, progress).await,
             targets,
+            recents,
         )
     };
     let mut snapshot = snapshot;
+    for project in &mut snapshot.projects {
+        project.editor = project
+            .path
+            .as_deref()
+            .and_then(|path| editors::editor_for(path, &recents))
+            .map(|editor| editor.id.to_owned());
+    }
     snapshot.login = state.remote().login;
     let targets = watch_targets(&settings.watched_folders, scan_targets, &snapshot.projects);
     (snapshot, targets)
@@ -1595,9 +1608,9 @@ async fn scan_local(
     clones: Vec<PathBuf>,
     editors: bool,
     progress: Progress,
-) -> (Vec<LocalProject>, Vec<WatchTarget>) {
+) -> (Vec<LocalProject>, Vec<WatchTarget>, Vec<editors::Recent>) {
     tauri::async_runtime::spawn_blocking(move || {
-        let (roots, targets) = scan_roots(folders, clones, editors);
+        let (roots, targets, recents) = scan_roots(folders, clones, editors);
         progress.add(roots.len());
         if let Ok(mut stats) = progress.0.state::<ProjectsState>().stats.lock() {
             stats.scan_roots = roots.len();
@@ -1609,18 +1622,23 @@ async fn scan_local(
             locals.extend(found.into_iter().filter(|l| seen.insert(l.path.clone())));
             progress.advance();
         }
-        (locals, targets)
+        (locals, targets, recents)
     })
     .await
     .unwrap_or_default()
 }
 
-/// Folders to scan with their depth, and the non-recursive watch targets.
+/// Folders to scan with their depth, the non-recursive watch targets, and the folders
+/// editors opened (to tell which editor a clone belongs to).
 fn scan_roots(
     folders: Vec<PathBuf>,
     clones: Vec<PathBuf>,
     editors: bool,
-) -> (Vec<(PathBuf, usize)>, Vec<WatchTarget>) {
+) -> (
+    Vec<(PathBuf, usize)>,
+    Vec<WatchTarget>,
+    Vec<editors::Recent>,
+) {
     let mut roots: Vec<(PathBuf, usize)> = folders
         .iter()
         .map(|folder| (folder.clone(), discovery::DEFAULT_MAX_DEPTH))
@@ -1634,9 +1652,10 @@ fn scan_roots(
     );
     let mut targets = Vec::new();
     if !editors {
-        return (roots, targets);
+        return (roots, targets, Vec::new());
     }
     let found = editors::find();
+    let recents: Vec<editors::Recent> = found.recent.iter().chain(&found.roots).cloned().collect();
     let home = crate::platform::home_dir();
     let usable =
         |dir: &Path| !folders.iter().any(|f| dir.starts_with(f)) && is_narrow(dir, home.as_deref());
@@ -1676,7 +1695,7 @@ fn scan_roots(
             .filter(|dir| usable(dir))
             .map(WatchTarget::flat),
     );
-    (roots, targets)
+    (roots, targets, recents)
 }
 
 /// Deep enough for `~/IdeaProjects/<course>/<assignment>`.
@@ -1836,6 +1855,7 @@ fn merge(
                 pending: None,
                 web_url: None,
                 late_seconds: None,
+                editor: None,
             };
             (id, project)
         })
@@ -1873,6 +1893,7 @@ fn merge(
                         pending: None,
                         web_url: None,
                         late_seconds: None,
+                        editor: None,
                     },
                 );
             }
@@ -2138,6 +2159,7 @@ mod tests {
             pending: None,
             web_url: None,
             late_seconds: None,
+            editor: None,
         };
 
         let unsubmitted = project(remote("r", "aaa", Some("old")), None);
@@ -2203,6 +2225,7 @@ mod tests {
                 pending: None,
                 web_url: None,
                 late_seconds: None,
+                editor: None,
             }],
             ..Snapshot::default()
         };

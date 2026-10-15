@@ -163,6 +163,8 @@ export interface Project {
   webUrl: string | null;
   /** How far past the due date the graded work is; advisory, nothing is blocked. */
   lateSeconds: number | null;
+  /** The editor that last opened the clone (`EditorInfo.id`), when one did. */
+  editor: string | null;
 }
 
 /** A published assignment the user hasn't accepted yet. */
@@ -217,6 +219,14 @@ export interface Settings {
   launchAtLogin: boolean;
   listFilter: ListFilter;
   notifyHoursBefore: number[];
+  /** Editor for clones no editor has opened yet; `null` picks the first one installed. */
+  defaultEditor: string | null;
+}
+
+/** An editor installed here that can open a folder. */
+export interface EditorInfo {
+  id: string;
+  name: string;
 }
 
 /** The date filter above the project list. */
@@ -329,6 +339,8 @@ export const api = {
   login: () => invoke<AuthStatus>("login"),
   cancelLogin: () => invoke<void>("cancel_login"),
   openTerminal: (path: string) => invoke<void>("open_terminal", { path }),
+  installedEditors: () => invoke<EditorInfo[]>("installed_editors"),
+  openInEditor: (path: string, editor: string) => invoke<void>("open_in_editor", { path, editor }),
   /** Runs `gh student accept`, then syncs; rejects with `needsTeam` when a group is needed. */
   acceptAssignment: (id: string, newTeam: boolean) =>
     invoke<Accepted>("accept_assignment", { id, newTeam }),

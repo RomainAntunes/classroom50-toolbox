@@ -116,6 +116,8 @@ pub fn run() {
             commands::login,
             commands::cancel_login,
             commands::open_terminal,
+            commands::installed_editors,
+            commands::open_in_editor,
             commands::clone_project,
             commands::accept_assignment,
             commands::submit_check,

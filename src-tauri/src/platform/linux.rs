@@ -71,6 +71,56 @@ pub fn editor_config_dirs() -> Vec<PathBuf> {
     xdg.into_iter().chain(flatpaks).collect()
 }
 
+/// Flatpak ids per editor, run with `flatpak run`.
+fn editor_flatpaks(id: &str) -> &'static [&'static str] {
+    match id {
+        "idea" => &["com.jetbrains.IntelliJ-IDEA-Ultimate"],
+        "idea-ce" => &["com.jetbrains.IntelliJ-IDEA-Community"],
+        "clion" => &["com.jetbrains.CLion"],
+        "pycharm" => &["com.jetbrains.PyCharm-Professional"],
+        "pycharm-ce" => &["com.jetbrains.PyCharm-Community"],
+        "webstorm" => &["com.jetbrains.WebStorm"],
+        "goland" => &["com.jetbrains.GoLand"],
+        "phpstorm" => &["com.jetbrains.PhpStorm"],
+        "rider" => &["com.jetbrains.Rider"],
+        "rubymine" => &["com.jetbrains.RubyMine"],
+        "datagrip" => &["com.jetbrains.DataGrip"],
+        "android-studio" => &["com.google.AndroidStudio"],
+        "vscode" => &["com.visualstudio.code"],
+        "vscodium" => &["com.vscodium.codium"],
+        "zed" => &["dev.zed.Zed"],
+        "sublime" => &["com.sublimetext.three"],
+        "netbeans" => &["org.apache.netbeans"],
+        _ => &[],
+    }
+}
+
+/// The editor's CLI from the JetBrains Toolbox scripts, PATH or `/snap/bin`, else its
+/// Flatpak (system-wide or per user).
+pub fn editor_launcher(id: &str) -> Option<CommandSpec> {
+    let home = home_dir();
+    let mut dirs = vec![PathBuf::from("/snap/bin")];
+    if let Some(home) = &home {
+        dirs.insert(0, home.join(".local/share/JetBrains/Toolbox/scripts"));
+    }
+    for name in super::editor_commands(id) {
+        if let Some(path) = dirs.iter().map(|dir| dir.join(name)).find(|p| p.is_file()) {
+            return Some(CommandSpec::new(&path.to_string_lossy(), &[]));
+        }
+        if let Some(path) = process::find_in_path(name) {
+            return Some(CommandSpec::new(&path.to_string_lossy(), &[]));
+        }
+    }
+    let mut installs = vec![PathBuf::from("/var/lib/flatpak/app")];
+    if let Some(home) = &home {
+        installs.push(home.join(".local/share/flatpak/app"));
+    }
+    let app = editor_flatpaks(id)
+        .iter()
+        .find(|app| installs.iter().any(|dir| dir.join(app).is_dir()))?;
+    Some(CommandSpec::new("flatpak", &["run", app]))
+}
+
 /// The XDG data dir (Zed, NetBeans), plus Zed's Flatpak sandbox.
 pub fn editor_data_dirs() -> Vec<PathBuf> {
     let home = home_dir();

@@ -1,8 +1,9 @@
 <script lang="ts">
-  import { Menu, MenuItem, PredefinedMenuItem } from "@tauri-apps/api/menu";
+  import { Menu, MenuItem, PredefinedMenuItem, Submenu } from "@tauri-apps/api/menu";
   import { openUrl, revealItemInDir } from "@tauri-apps/plugin-opener";
   import { api, withDialog, type Project } from "$lib/api";
   import { cloneProject } from "$lib/clone";
+  import { editorFor, editors, openInEditor } from "$lib/editor.svelte";
   import { pullProject } from "$lib/pull";
   import { submitProject } from "$lib/submit";
   import { durationLabel, formatDate, fromNow, t } from "$lib/i18n";
@@ -84,6 +85,8 @@
         : null),
   );
   const openTarget = $derived(project.webUrl ?? githubUrl);
+  // The editor that last opened the clone, else the default one.
+  const editor = $derived(path ? editorFor(project) : null);
   const cloneable = $derived(!path && Boolean(project.owner && project.repo));
 
   const submittable = $derived(Boolean(path) && !closed);
@@ -229,6 +232,23 @@
         text: t("projects.cloneTo"),
         enabled: cloneable && !cloning,
         action: () => clone(true),
+      }),
+      MenuItem.new({
+        text: editor ? t("editor.open", { editor: editor.name }) : t("editor.none"),
+        enabled: Boolean(path && editor),
+        action: () => path && editor && openInEditor(path, editor),
+      }),
+      Submenu.new({
+        text: t("editor.openWith"),
+        enabled: Boolean(path) && editors.installed.length > 1,
+        items: await Promise.all(
+          editors.installed.map((other) =>
+            MenuItem.new({
+              text: other.name,
+              action: () => path && openInEditor(path, other),
+            }),
+          ),
+        ),
       }),
       MenuItem.new({
         text: t(`projects.openFolder.${os}`, {}, "projects.openFolder.linux"),

@@ -221,5 +221,12 @@
   "projects.conflictHint": "A teammate pushed while you have uncommitted or unpushed work. Pull now to avoid a merge conflict.",
   "projects.late": "Submitted {duration} late",
   "projects.lateHint": "Graded work is dated after the deadline. Nothing is blocked; your teacher sees it as late.",
-  "projects.issue.offline": "You're offline. Showing what was last synced."
+  "projects.issue.offline": "You're offline. Showing what was last synced.",
+  "editor.open": "Open in {editor}",
+  "editor.none": "Open in an editor",
+  "editor.openWith": "Open with",
+  "editor.failed": "Couldn't open {editor}: {error}",
+  "settings.editor.label": "Editor",
+  "settings.editor.hint": "For clones no editor has opened yet. Others open where you last worked on them.",
+  "settings.editor.none": "No supported editor found. Install one and it shows up here."
 }

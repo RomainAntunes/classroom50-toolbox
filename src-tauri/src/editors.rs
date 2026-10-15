@@ -6,7 +6,8 @@
 use std::collections::BTreeSet;
 use std::path::{Path, PathBuf};
 
-use crate::platform;
+use crate::error::{Error, Result};
+use crate::{platform, process};
 
 /// An editor the app recognizes, by a stable id and the name shown in the UI.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -147,6 +148,43 @@ pub const ALL: &[Editor] = &[
 
 pub fn by_id(id: &str) -> Option<Editor> {
     ALL.iter().copied().find(|editor| editor.id == id)
+}
+
+/// The editors installed here that can open a folder. Blocking (file checks).
+pub fn installed() -> Vec<Editor> {
+    ALL.iter()
+        .copied()
+        .filter(|editor| platform::editor_launcher(editor.id).is_some())
+        .collect()
+}
+
+/// Opens `dir` in the editor `id`.
+pub fn open(id: &str, dir: &Path) -> Result<()> {
+    let editor = by_id(id).ok_or_else(|| Error::Unsupported(format!("unknown editor `{id}`")))?;
+    let launcher = platform::editor_launcher(editor.id).ok_or_else(|| Error::NotInstalled {
+        program: editor.name.to_owned(),
+    })?;
+    let mut args: Vec<std::ffi::OsString> = launcher.args.into_iter().map(Into::into).collect();
+    args.push(dir.into());
+    process::spawn_detached(&launcher.program, args, Some(dir))
+}
+
+/// The editor that last worked on `path`, judged from the folders editors opened: the
+/// folder itself, then a folder inside it, then the nearest folder holding it (a course
+/// folder, or a default project folder like `~/CLionProjects`).
+pub fn editor_for(path: &Path, recents: &[Recent]) -> Option<Editor> {
+    let exact = recents.iter().find(|r| r.path == path);
+    let inside = || recents.iter().find(|r| r.path.starts_with(path));
+    let holding = || {
+        recents
+            .iter()
+            .filter(|r| path.starts_with(&r.path))
+            .max_by_key(|r| r.path.components().count())
+    };
+    [exact, inside(), holding()]
+        .into_iter()
+        .flatten()
+        .find_map(|recent| recent.editor)
 }
 
 /// Recent folders kept per editor install; older entries are rarely class work.
@@ -858,6 +896,26 @@ mod tests {
         let text = format!("\u{2}{}\n{}\u{3}0,1", a.display(), b.display());
         assert_eq!(paths_under(&text, &home), vec![a, b]);
         std::fs::remove_dir_all(&home).unwrap();
+    }
+
+    #[test]
+    fn picks_the_editor_closest_to_a_clone() {
+        let recent = |path: &str, editor| Recent {
+            path: PathBuf::from(path),
+            editor: Some(editor),
+        };
+        let recents = vec![
+            recent("/home/a/IdeaProjects", IDEA),
+            recent("/home/a/IdeaProjects/poo", CURSOR),
+            recent("/home/a/IdeaProjects/poo/lab2/src", ZED),
+            recent("/home/a/IdeaProjects/poo/lab1", VSCODE),
+        ];
+        let pick = |path: &str| editor_for(Path::new(path), &recents);
+        assert_eq!(pick("/home/a/IdeaProjects/poo/lab1"), Some(VSCODE));
+        assert_eq!(pick("/home/a/IdeaProjects/poo/lab2"), Some(ZED));
+        assert_eq!(pick("/home/a/IdeaProjects/poo/lab3"), Some(CURSOR));
+        assert_eq!(pick("/home/a/IdeaProjects/bdr"), Some(IDEA));
+        assert_eq!(pick("/home/a/code/x"), None);
     }
 
     #[test]

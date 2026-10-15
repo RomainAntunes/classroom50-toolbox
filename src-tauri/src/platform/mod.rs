@@ -70,6 +70,49 @@ pub fn editor_config_dirs() -> Vec<PathBuf> {
     imp::editor_config_dirs()
 }
 
+/// How to open a folder in the editor `id` (see `editors::ALL`), the folder being the last
+/// argument; `None` when it isn't installed or can't open folders.
+pub fn editor_launcher(id: &str) -> Option<CommandSpec> {
+    imp::editor_launcher(id)
+}
+
+/// Command-line launchers of each editor, shared by Windows and Linux: the editor's own CLI
+/// and the JetBrains Toolbox script names (the Toolbox's `scripts` folder or PATH).
+#[cfg_attr(target_os = "macos", allow(dead_code))]
+fn editor_commands(id: &str) -> &'static [&'static str] {
+    match id {
+        "idea" => &["idea", "intellij-idea-ultimate"],
+        "idea-ce" => &["idea-ce", "idea", "intellij-idea-community"],
+        "clion" => &["clion"],
+        "pycharm" => &["pycharm", "pycharm-professional"],
+        "pycharm-ce" => &["pycharm-ce", "pycharm", "pycharm-community"],
+        "rustrover" => &["rustrover"],
+        "webstorm" => &["webstorm"],
+        "goland" => &["goland"],
+        "phpstorm" => &["phpstorm"],
+        "rider" => &["rider"],
+        "rubymine" => &["rubymine"],
+        "datagrip" => &["datagrip"],
+        "dataspell" => &["dataspell"],
+        "android-studio" => &["studio", "android-studio"],
+        "vscode" => &["code"],
+        "vscode-insiders" => &["code-insiders"],
+        "vscodium" => &["codium"],
+        "code-oss" => &["code-oss"],
+        "cursor" => &["cursor"],
+        "windsurf" => &["windsurf"],
+        "kiro" => &["kiro"],
+        "trae" => &["trae"],
+        "positron" => &["positron"],
+        "void" => &["void"],
+        "antigravity" => &["antigravity"],
+        "zed" => &["zed", "zeditor", "zedit"],
+        "sublime" => &["subl"],
+        "netbeans" => &["netbeans"],
+        _ => &[],
+    }
+}
+
 /// Data dirs that may hold editor state (Zed's database, NetBeans, Visual Studio). Same as
 /// the config dirs on macOS.
 pub fn editor_data_dirs() -> Vec<PathBuf> {

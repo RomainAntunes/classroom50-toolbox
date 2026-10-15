@@ -27,6 +27,9 @@ pub struct Settings {
     pub list_filter: ListFilter,
     /// Hours before a due date at which to send a reminder, largest first.
     pub notify_hours_before: Vec<u32>,
+    /// Editor for clones no editor has opened yet (`editors::Editor::id`); `None` picks the
+    /// first one installed.
+    pub default_editor: Option<String>,
 }
 
 /// The date filter above the project list.
@@ -52,6 +55,7 @@ impl Default for Settings {
             launch_at_login: true,
             list_filter: ListFilter::All,
             notify_hours_before: vec![24, 1],
+            default_editor: None,
         }
     }
 }
@@ -144,6 +148,7 @@ mod tests {
             launch_at_login: false,
             list_filter: ListFilter::All,
             notify_hours_before: vec![1, 24, 0, 1, 1000, 6],
+            default_editor: None,
         }
         .normalized();
         assert_eq!(
