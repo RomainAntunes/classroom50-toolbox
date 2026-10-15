@@ -7,7 +7,8 @@ use serde::Serialize;
 use tauri::{AppHandle, Manager, State};
 use tauri_plugin_autostart::ManagerExt;
 
-use crate::error::Result;
+use crate::clones::{self, CloneStore};
+use crate::error::{Error, Result};
 use crate::login::{self, LoginState};
 use crate::platform::{self, CommandSpec, Os};
 use crate::popover::PopoverState;
@@ -219,6 +220,33 @@ pub fn open_terminal(path: PathBuf) -> Result<()> {
     platform::open_terminal(&path)
 }
 
+/// Clones a project that has no local copy into `parent/<repo>`, registers the clone and
+/// rescans the disk. Returns the new folder; `projects-updated` follows.
+#[tauri::command]
+pub async fn clone_project(
+    app: AppHandle,
+    state: State<'_, ProjectsState>,
+    id: String,
+    parent: PathBuf,
+) -> Result<PathBuf> {
+    let project = state
+        .snapshot()
+        .projects
+        .into_iter()
+        .find(|p| p.id == id)
+        .ok_or_else(|| Error::Unsupported(format!("unknown project {id}")))?;
+    let (Some(owner), Some(repo)) = (project.owner, project.repo) else {
+        return Err(Error::Unsupported(format!("{id} has no GitHub repository")));
+    };
+    if let Some(path) = project.path {
+        return Err(Error::PathExists(path));
+    }
+    let path = clones::clone(&owner, &repo, &parent).await?;
+    app.state::<CloneStore>().add(path.clone())?;
+    projects::refresh_local(&app, false).await;
+    Ok(path)
+}
+
 #[tauri::command]
 pub async fn check_update(app: AppHandle) -> Result<Option<UpdateInfo>> {
     updater::check(&app).await
@@ -234,7 +262,7 @@ pub async fn install_update(app: AppHandle) -> Result<()> {
 #[tauri::command]
 pub async fn preview_badge(app: AppHandle) -> Result<()> {
     if !cfg!(debug_assertions) {
-        return Err(crate::error::Error::Unsupported(
+        return Err(Error::Unsupported(
             "the badge preview is for dev builds".into(),
         ));
     }

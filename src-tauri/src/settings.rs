@@ -20,6 +20,8 @@ pub struct Settings {
     pub watched_folders: Vec<PathBuf>,
     /// Also look for clones in the editors' recent projects and default project folders.
     pub scan_editor_projects: bool,
+    /// Where the app clones assignments; asked the first time.
+    pub clone_folder: Option<PathBuf>,
     pub launch_at_login: bool,
     /// Which assignments the list shows.
     pub list_filter: ListFilter,
@@ -46,6 +48,7 @@ impl Default for Settings {
         Self {
             watched_folders: Vec::new(),
             scan_editor_projects: true,
+            clone_folder: None,
             launch_at_login: true,
             list_filter: ListFilter::All,
             notify_hours_before: vec![24, 1],
@@ -137,6 +140,7 @@ mod tests {
         let settings = Settings {
             watched_folders: vec!["/a".into(), "/b".into(), "/a".into()],
             scan_editor_projects: true,
+            clone_folder: None,
             launch_at_login: false,
             list_filter: ListFilter::All,
             notify_hours_before: vec![1, 24, 0, 1, 1000, 6],

@@ -23,6 +23,9 @@ pub enum Error {
     #[error("cancelled")]
     Cancelled,
 
+    #[error("{} already exists", .0.display())]
+    PathExists(std::path::PathBuf),
+
     #[error("{url} uses schema {found:?}, expected {expected:?}; update the toolbox")]
     SchemaMismatch {
         url: String,
@@ -81,6 +84,7 @@ impl Error {
             Error::Unsupported(_) => "unsupported",
             Error::BlockedInDev(_) => "blockedInDev",
             Error::Cancelled => "cancelled",
+            Error::PathExists(_) => "pathExists",
             Error::SchemaMismatch { .. } => "schemaMismatch",
             Error::NotSignedIn => "notSignedIn",
             Error::RateLimited { .. } => "rateLimited",

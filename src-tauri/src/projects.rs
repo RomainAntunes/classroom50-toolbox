@@ -21,6 +21,7 @@ use tokio::task::JoinSet;
 use crate::classroom50::{
     self, Assignment, Classroom, RepoConfig, SUBMIT_TAG_PREFIX, SubmissionMode,
 };
+use crate::clones::CloneStore;
 use crate::discovery::{self, LocalProject};
 use crate::editors;
 use crate::error::{Error, Result};
@@ -459,7 +460,8 @@ async fn publish(
 
     let progress = Progress::start(app, foreground);
     let started = std::time::Instant::now();
-    let (snapshot, targets) = sync(&state, http, &settings, mode, &progress).await;
+    let clones = app.state::<CloneStore>().list();
+    let (snapshot, targets) = sync(&state, http, &settings, clones, mode, &progress).await;
     progress.finish();
     let run = LastRun {
         at: Utc::now(),
@@ -672,12 +674,14 @@ async fn sync(
     state: &ProjectsState,
     http: &reqwest::Client,
     settings: &Settings,
+    clones: Vec<PathBuf>,
     mode: Mode,
     progress: &Progress,
 ) -> (Snapshot, Vec<WatchTarget>) {
     let now = Utc::now();
     let scan = scan_local(
         settings.watched_folders.clone(),
+        clones,
         settings.scan_editor_projects,
         progress.clone(),
     );
@@ -1546,15 +1550,16 @@ fn key(name_with_owner: &str) -> String {
 // ---- Local clones ----------------------------------------------------------------------
 
 /// Candidate clones, and the editor files and folders to watch for new ones. Looks in the
-/// watched folders and, when `editors` is on, in the editors' recent projects, the folders
+/// watched folders, the clones the app made and, when `editors` is on, in the editors' recent projects, the folders
 /// holding them and the IDEs' default project folders.
 async fn scan_local(
     folders: Vec<PathBuf>,
+    clones: Vec<PathBuf>,
     editors: bool,
     progress: Progress,
 ) -> (Vec<LocalProject>, Vec<WatchTarget>) {
     tauri::async_runtime::spawn_blocking(move || {
-        let (roots, targets) = scan_roots(folders, editors);
+        let (roots, targets) = scan_roots(folders, clones, editors);
         progress.add(roots.len());
         if let Ok(mut stats) = progress.0.state::<ProjectsState>().stats.lock() {
             stats.scan_roots = roots.len();
@@ -1573,11 +1578,22 @@ async fn scan_local(
 }
 
 /// Folders to scan with their depth, and the non-recursive watch targets.
-fn scan_roots(folders: Vec<PathBuf>, editors: bool) -> (Vec<(PathBuf, usize)>, Vec<WatchTarget>) {
+fn scan_roots(
+    folders: Vec<PathBuf>,
+    clones: Vec<PathBuf>,
+    editors: bool,
+) -> (Vec<(PathBuf, usize)>, Vec<WatchTarget>) {
     let mut roots: Vec<(PathBuf, usize)> = folders
         .iter()
         .map(|folder| (folder.clone(), discovery::DEFAULT_MAX_DEPTH))
         .collect();
+    // A clone the app made is a repo itself: only its own folder is read.
+    roots.extend(
+        clones
+            .into_iter()
+            .filter(|clone| !folders.iter().any(|f| clone.starts_with(f)))
+            .map(|clone| (clone, 0)),
+    );
     let mut targets = Vec::new();
     if !editors {
         return (roots, targets);

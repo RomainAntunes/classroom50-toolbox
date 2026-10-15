@@ -1,6 +1,7 @@
 pub mod accounts;
 pub mod alerts;
 pub mod classroom50;
+pub mod clones;
 mod commands;
 pub mod discovery;
 pub mod editors;
@@ -74,6 +75,7 @@ pub fn run() {
                 }
             }
             app.manage(settings);
+            app.manage(clones::CloneStore::load(&app.path().app_config_dir()?));
             let cache_dir = app.path().app_cache_dir()?;
             app.manage(projects::ProjectsState::load(&cache_dir));
             app.manage(alerts::AlertsState::load(&cache_dir));
@@ -110,6 +112,7 @@ pub fn run() {
             commands::login,
             commands::cancel_login,
             commands::open_terminal,
+            commands::clone_project,
             commands::check_update,
             commands::install_update,
         ])

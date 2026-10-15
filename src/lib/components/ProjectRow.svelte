@@ -2,6 +2,7 @@
   import { Menu, MenuItem, PredefinedMenuItem } from "@tauri-apps/api/menu";
   import { openUrl, revealItemInDir } from "@tauri-apps/plugin-opener";
   import { api, withDialog, type Project } from "$lib/api";
+  import { cloneProject } from "$lib/clone";
   import { durationLabel, formatDate, fromNow, t } from "$lib/i18n";
   import Details from "./Details.svelte";
 
@@ -67,6 +68,17 @@
         : null),
   );
   const openTarget = $derived(project.webUrl ?? githubUrl);
+  const cloneable = $derived(!path && Boolean(project.owner && project.repo));
+
+  let cloning = $state(false);
+  async function clone(choose = false) {
+    cloning = true;
+    try {
+      await cloneProject(project.id, choose);
+    } finally {
+      cloning = false;
+    }
+  }
 
   let open = $state(false);
   const details = $derived.by(() => {
@@ -136,6 +148,16 @@
       }),
       separator(),
       MenuItem.new({
+        text: t("projects.clone"),
+        enabled: cloneable && !cloning,
+        action: () => clone(),
+      }),
+      MenuItem.new({
+        text: t("projects.cloneTo"),
+        enabled: cloneable && !cloning,
+        action: () => clone(true),
+      }),
+      MenuItem.new({
         text: t(`projects.openFolder.${os}`, {}, "projects.openFolder.linux"),
         enabled: Boolean(path),
         action: () => path && revealItemInDir(path),
@@ -187,7 +209,9 @@
             >{t("projects.late", { duration: durationLabel(project.lateSeconds) })}</span
           > ·
         {/if}
-        {path ? (project.repo ?? project.config.assignment) : t("projects.notCloned")}
+        {path
+          ? (project.repo ?? project.config.assignment)
+          : t(cloning ? "projects.cloning" : "projects.notCloned")}
       </span>
     </div>
     {#if grade}
@@ -196,6 +220,16 @@
         class:full={grade.score === grade.maxScore}
         title={t("projects.gradeTests", { passed: grade.testsPassed, total: grade.testsTotal })}
         >{grade.score}/{grade.maxScore}</span
+      >
+    {/if}
+    {#if cloneable}
+      <button
+        title={t("projects.clone")}
+        disabled={cloning}
+        onclick={(event) => {
+          event.stopPropagation();
+          clone();
+        }}>⤓</button
       >
     {/if}
     {#if openTarget}
