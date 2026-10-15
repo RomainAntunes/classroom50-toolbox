@@ -5,6 +5,7 @@
   import { cloneProject } from "$lib/clone";
   import { submitProject } from "$lib/submit";
   import { durationLabel, formatDate, fromNow, t } from "$lib/i18n";
+  import { tildify } from "$lib/paths.svelte";
   import Details from "./Details.svelte";
 
   let { project, now, unseen }: { project: Project; now: Date; unseen: boolean } = $props();
@@ -108,18 +109,20 @@
     const add = (key: string, value: string | null | undefined) => {
       if (value) items.push([t(`details.${key}`), value]);
     };
-    add("class", project.classroom?.name ?? project.config.classroom);
+    // The class is the section title, and the repo is on the row and behind ↗.
     if (a) {
       add("type", t(`details.mode.${a.mode}`));
       add("submission", t(`details.submissionMode.${a.submissionMode ?? "every-push"}`));
-      if (a.availableFrom) add("opens", formatDate(new Date(a.availableFrom)));
+      const opens = a.availableFrom ? new Date(a.availableFrom) : null;
+      if (opens && opens > now) add("opens", formatDate(opens));
     }
     if (due) add("due", formatDate(due));
     if (remote?.head?.at) {
       const when = fromNow(new Date(remote.head.at), now);
       add("lastPush", remote.head.author ? `${remote.head.author}, ${when}` : when);
     }
-    if (remote?.lastSubmission?.at) {
+    // With every-push grading the last submission is the last push.
+    if (a?.submissionMode === "tag" && remote?.lastSubmission?.at) {
       add("lastSubmission", fromNow(new Date(remote.lastSubmission.at), now));
     }
     if (grade) {
@@ -128,15 +131,15 @@
         `${grade.score}/${grade.maxScore} · ${t("projects.gradeTests", { passed: grade.testsPassed, total: grade.testsTotal })}`,
       );
     }
-    if (feedback) add("feedback", String(feedback.comments));
+    if (feedback?.comments) add("feedback", String(feedback.comments));
     if (unmerged.length) add("unmerged", unmerged.join(", "));
     if (project.local) {
       const local = project.local;
-      add("branch", local.branch);
+      // Only the default branch is graded, so another one is worth pointing out.
+      if (local.branch !== defaultBranch) add("branch", local.branch);
       if (local.changedFiles) add("changes", String(local.changedFiles));
     }
-    add("folder", path);
-    add("repository", project.owner && project.repo ? `${project.owner}/${project.repo}` : null);
+    add("folder", path ? tildify(path) : null);
     return items;
   });
 

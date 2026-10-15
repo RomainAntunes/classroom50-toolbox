@@ -40,7 +40,6 @@
   const details = $derived.by(() => {
     const a = item.assignment;
     const items: [string, string][] = [
-      [t("details.class"), item.classroom.name ?? item.classroom.slug],
       [t("details.type"), t(`details.mode.${a.mode}`)],
       [t("details.submission"), t(`details.submissionMode.${a.submissionMode ?? "every-push"}`)],
     ];
