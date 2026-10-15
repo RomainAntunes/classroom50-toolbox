@@ -118,6 +118,7 @@ pub fn run() {
             commands::preview_badge,
             commands::export_calendar,
             commands::native_calendars,
+            commands::set_calendar_labels,
             commands::set_native_calendar,
             commands::simulate_network,
             commands::simulated_network,

@@ -49,6 +49,9 @@ pub struct Group {
 pub struct Member {
     pub login: String,
     pub name: Option<String>,
+    /// The public email of their GitHub profile, else one they commit with in the clone.
+    #[serde(default)]
+    pub email: Option<String>,
 }
 
 /// `classroom50-group-<16 hex of sha256(classroom \0 assignment)>-`, both lowercased.
@@ -115,7 +118,16 @@ pub async fn load(http: &reqwest::Client, token: &str, teams: &[GroupTeam]) -> R
                 .remove(&format!("g{i}"))
                 .and_then(|value| serde_json::from_value::<TeamData>(value).ok())
                 .and_then(|org| org.team)
-                .map(|team| team.members.nodes.into_iter().flatten().collect())
+                .map(|team| {
+                    let members = team.members.nodes.into_iter().flatten();
+                    // GitHub answers "" for a profile without a public email.
+                    members
+                        .map(|m| Member {
+                            email: m.email.filter(|e| !e.trim().is_empty()),
+                            ..m
+                        })
+                        .collect()
+                })
                 .unwrap_or_default();
             if let Some(group) = group(team, members) {
                 groups.push(group);
@@ -134,7 +146,7 @@ fn members_query(batch: &[GroupTeam]) -> (String, Value) {
     for (i, team) in batch.iter().enumerate() {
         declarations.push(format!("$o{i}: String!, $s{i}: String!"));
         fields.push(format!(
-            "g{i}: organization(login: $o{i}) {{ team(slug: $s{i}) {{ members(first: {MAX_MEMBERS}) {{ nodes {{ login name }} }} }} }}"
+            "g{i}: organization(login: $o{i}) {{ team(slug: $s{i}) {{ members(first: {MAX_MEMBERS}) {{ nodes {{ login name email }} }} }} }}"
         ));
         variables.insert(format!("o{i}"), json!(team.org));
         variables.insert(format!("s{i}"), json!(team.slug));

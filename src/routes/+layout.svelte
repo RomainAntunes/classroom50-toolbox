@@ -3,7 +3,7 @@
   import { onMount } from "svelte";
   import { listen } from "@tauri-apps/api/event";
   import { api, NOTIFY_EVENT, UNSEEN_EVENT, type Notice } from "$lib/api";
-  import { setLocale } from "$lib/i18n";
+  import { setLocale, t } from "$lib/i18n";
   import { showNotice } from "$lib/notices";
   import { loadEditors } from "$lib/editor.svelte";
   import { initTheme } from "$lib/theme/preview.svelte";
@@ -24,6 +24,15 @@
   // Lives in the layout so notices arrive whichever page is shown, and while hidden.
   onMount(() => {
     setLocale(navigator.language);
+    // Rust writes calendar notes with these words (placeholders filled there).
+    void api.setCalendarLabels({
+      class: t("calendar.notes.class"),
+      group: t("calendar.notes.group"),
+      groupNumber: t("calendar.notes.groupNumber"),
+      graded: t("calendar.notes.graded"),
+      submitted: t("calendar.notes.submitted"),
+      notAccepted: t("calendar.notes.notAccepted"),
+    });
     void loadEditors();
     void api.appInfo().then((info) => initTheme(info.os));
     void api.unseen().then((ids) => {

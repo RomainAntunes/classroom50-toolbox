@@ -10,7 +10,10 @@ use std::sync::Mutex;
 use chrono::{DateTime, Utc};
 use tauri::{AppHandle, Manager};
 
+use serde::Deserialize;
+
 use crate::error::Result;
+use crate::groups::Group;
 use crate::platform::{self, CalendarEvent, WrittenEvents};
 use crate::projects::{ProjectsState, Snapshot};
 use crate::settings::{Settings, SettingsStore};
@@ -26,6 +29,88 @@ const CALENDAR_ALERT_HOURS: u32 = 1;
 /// must not orphan events).
 const WRITTEN_FILE: &str = "calendar-events.json";
 
+/// The words of the event notes, from the UI's i18n (`set_calendar_labels`), so Rust writes
+/// no English of its own. `{name}`, `{n}`, `{score}` and `{max}` are filled in.
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct Labels {
+    pub class: String,
+    pub group: String,
+    pub group_number: String,
+    pub graded: String,
+    pub submitted: String,
+    pub not_accepted: String,
+}
+
+impl Default for Labels {
+    /// Until the UI has sent its own (it loads at startup, hidden).
+    fn default() -> Self {
+        Self {
+            class: "Class: {name}".into(),
+            group: "Group: {name}".into(),
+            group_number: "Group {n}".into(),
+            graded: "Grade: {score}/{max}".into(),
+            submitted: "Submitted".into(),
+            not_accepted: "Not accepted yet".into(),
+        }
+    }
+}
+
+/// Where the assignment stands, for the notes.
+enum Status<'a> {
+    NotAccepted,
+    Graded(&'a crate::status::Grade),
+    Submitted,
+    Open,
+}
+
+/// The class, where the work stands, the group with each member's email, then the
+/// assignment's own description.
+fn notes(
+    labels: &Labels,
+    class: &str,
+    status: Status,
+    group: Option<&Group>,
+    description: Option<&str>,
+) -> String {
+    let mut lines = vec![labels.class.replace("{name}", class)];
+    match status {
+        Status::NotAccepted => lines.push(labels.not_accepted.clone()),
+        Status::Graded(grade) => lines.push(
+            labels
+                .graded
+                .replace("{score}", &grade.score.to_string())
+                .replace("{max}", &grade.max_score.to_string()),
+        ),
+        Status::Submitted => lines.push(labels.submitted.clone()),
+        Status::Open => {}
+    }
+    if let Some(group) = group {
+        let name = group.name.clone().unwrap_or_else(|| {
+            labels
+                .group_number
+                .replace("{n}", &group.number.to_string())
+        });
+        lines.push(String::new());
+        lines.push(labels.group.replace("{name}", &name));
+        for member in &group.members {
+            let mut line = match &member.name {
+                Some(name) => format!("- {name} (@{})", member.login),
+                None => format!("- @{}", member.login),
+            };
+            if let Some(email) = &member.email {
+                line.push_str(&format!(" <{email}>"));
+            }
+            lines.push(line);
+        }
+    }
+    if let Some(text) = description.map(str::trim).filter(|t| !t.is_empty()) {
+        lines.push(String::new());
+        lines.push(text.to_owned());
+    }
+    lines.join("\n")
+}
+
 /// Every assignment with a due date, accepted or not, minus those the user hid (one by one
 /// or by class, keyed like `filter::classKey`).
 pub fn events(
@@ -33,6 +118,7 @@ pub fn events(
     hidden: &[String],
     hidden_classes: &[String],
     reminder_hours: &[u32],
+    labels: &Labels,
 ) -> Vec<CalendarEvent> {
     let class_hidden = |owner: &str, classroom: &str| {
         hidden_classes.contains(&format!("{owner}/{classroom}").to_lowercase())
@@ -45,12 +131,23 @@ pub fn events(
                 && !class_hidden(p.owner.as_deref().unwrap_or(""), &p.config.classroom)
         })
         .filter_map(|p| {
+            let remote = p.remote.as_ref();
+            let status = match (
+                remote.and_then(|r| r.grade.as_ref()),
+                remote.and_then(|r| r.last_submission.as_ref()),
+            ) {
+                (Some(grade), _) => Status::Graded(grade),
+                (None, Some(_)) => Status::Submitted,
+                (None, None) => Status::Open,
+            };
             Some((
                 &p.id,
                 p.assignment.as_ref()?,
                 p.classroom.as_ref(),
                 &p.config.classroom,
                 p.web_url.as_deref(),
+                status,
+                p.group.as_ref(),
             ))
         });
     let unaccepted = snapshot
@@ -64,11 +161,13 @@ pub fn events(
                 Some(&u.classroom),
                 &u.classroom.slug,
                 Some(u.accept_url.as_str()),
+                Status::NotAccepted,
+                u.group.as_ref(),
             )
         });
     projects
         .chain(unaccepted)
-        .filter_map(|(uid, assignment, classroom, slug, url)| {
+        .filter_map(|(uid, assignment, classroom, slug, url, status, group)| {
             let due = assignment.due?.with_timezone(&Utc);
             let class = classroom.and_then(|c| c.name.as_deref()).unwrap_or(slug);
             let mut alarm_hours: Vec<u32> = reminder_hours.to_vec();
@@ -77,8 +176,15 @@ pub fn events(
             alarm_hours.dedup();
             let mut event = CalendarEvent {
                 uid: uid.clone(),
-                title: format!("{} · {class}", assignment.name),
-                notes: assignment.description.clone(),
+                // Short enough for a week view; the class is in the notes.
+                title: assignment.name.clone(),
+                notes: Some(notes(
+                    labels,
+                    class,
+                    status,
+                    group,
+                    assignment.description.as_deref(),
+                )),
                 url: url.map(str::to_owned),
                 start: due - BLOCK,
                 due,
@@ -110,9 +216,10 @@ pub fn ics(
     hidden: &[String],
     hidden_classes: &[String],
     reminder_hours: &[u32],
+    labels: &Labels,
     now: DateTime<Utc>,
 ) -> (String, usize) {
-    let events = events(snapshot, hidden, hidden_classes, reminder_hours);
+    let events = events(snapshot, hidden, hidden_classes, reminder_hours, labels);
     let mut out = String::new();
     line(&mut out, "BEGIN:VCALENDAR");
     line(&mut out, "VERSION:2.0");
@@ -153,18 +260,24 @@ pub fn ics(
 }
 
 /// Writes the calendar of `snapshot` to `path`; returns the number of events.
-pub fn export(path: &Path, snapshot: &Snapshot, settings: &Settings) -> Result<usize> {
-    let (ics, count) = for_settings(snapshot, settings);
+pub fn export(
+    path: &Path,
+    snapshot: &Snapshot,
+    settings: &Settings,
+    labels: &Labels,
+) -> Result<usize> {
+    let (ics, count) = for_settings(snapshot, settings, labels);
     crate::github::write_atomic(path, ics.as_bytes())?;
     Ok(count)
 }
 
-fn for_settings(snapshot: &Snapshot, settings: &Settings) -> (String, usize) {
+fn for_settings(snapshot: &Snapshot, settings: &Settings, labels: &Labels) -> (String, usize) {
     ics(
         snapshot,
         &settings.hidden,
         &settings.hidden_classes,
         &settings.notify_hours_before,
+        labels,
         Utc::now(),
     )
 }
@@ -173,6 +286,7 @@ fn for_settings(snapshot: &Snapshot, settings: &Settings) -> (String, usize) {
 pub struct CalendarState {
     path: PathBuf,
     written: Mutex<WrittenEvents>,
+    labels: Mutex<Labels>,
 }
 
 impl CalendarState {
@@ -185,7 +299,18 @@ impl CalendarState {
         Self {
             path,
             written: Mutex::new(written),
+            labels: Mutex::default(),
         }
+    }
+
+    pub fn set_labels(&self, labels: Labels) {
+        if let Ok(mut current) = self.labels.lock() {
+            *current = labels;
+        }
+    }
+
+    pub fn labels(&self) -> Labels {
+        self.labels.lock().map(|l| l.clone()).unwrap_or_default()
     }
 
     fn save(&self, written: &WrittenEvents) {
@@ -218,6 +343,7 @@ pub async fn write_native(app: &AppHandle, calendar_id: Option<String>) -> Resul
                     &settings.hidden,
                     &settings.hidden_classes,
                     &settings.notify_hours_before,
+                    &state.labels(),
                 );
                 platform::write_calendar(&id, &events, &mut written)
             }
@@ -245,7 +371,8 @@ pub fn sync(app: &AppHandle) {
         });
     }
     if let Some(path) = &settings.calendar_file {
-        let (ics, _) = for_settings(&snapshot, &settings);
+        let labels = app.state::<CalendarState>().labels();
+        let (ics, _) = for_settings(&snapshot, &settings, &labels);
         let current = std::fs::read_to_string(path).unwrap_or_default();
         if without_stamps(&current) != without_stamps(&ics)
             && path.parent().is_some_and(Path::is_dir)
@@ -346,17 +473,26 @@ mod tests {
             ],
             ..Snapshot::default()
         };
-        let (ics, count) = ics(&snapshot, &[], &[], &[24, 1], Utc::now());
+        let (ics, count) = ics(
+            &snapshot,
+            &[],
+            &[],
+            &[24, 1],
+            &Labels::default(),
+            Utc::now(),
+        );
         assert_eq!(count, 1);
         assert!(ics.starts_with("BEGIN:VCALENDAR\r\n"));
         assert!(ics.contains("DTSTART:20261102T215900Z\r\n"));
         assert!(ics.contains("DTEND:20261102T225900Z\r\n"));
-        assert!(ics.contains("SUMMARY:Lab 1\\; part A · POO\\, C\r\n"));
+        assert!(ics.contains("SUMMARY:Lab 1\\; part A\r\n"));
+        assert!(ics.contains("DESCRIPTION:Class: POO\\, C\\nNot accepted yet\r\n"));
         assert!(ics.contains("UID:org/poo/lab1@classroom50-toolbox\r\n"));
         assert_eq!(ics.matches("BEGIN:VALARM").count(), 2);
         assert!(ics.contains("TRIGGER;RELATED=END:-PT24H\r\n"));
         // The 1h alert is always there, without doubling one already picked.
-        let (only_week, _) = super::ics(&snapshot, &[], &[], &[168], Utc::now());
+        let (only_week, _) =
+            super::ics(&snapshot, &[], &[], &[168], &Labels::default(), Utc::now());
         assert!(only_week.contains("TRIGGER;RELATED=END:-PT1H\r\n"));
         assert!(!ics.contains("No date"));
     }
@@ -372,9 +508,23 @@ mod tests {
             ..Snapshot::default()
         };
         let hidden = ["org/poo/lab1".to_owned()];
-        assert_eq!(ics(&snapshot, &hidden, &[], &[], Utc::now()).1, 0);
+        assert_eq!(
+            ics(&snapshot, &hidden, &[], &[], &Labels::default(), Utc::now()).1,
+            0
+        );
         let classes = ["org/poo".to_owned()];
-        assert_eq!(ics(&snapshot, &[], &classes, &[], Utc::now()).1, 0);
+        assert_eq!(
+            ics(
+                &snapshot,
+                &[],
+                &classes,
+                &[],
+                &Labels::default(),
+                Utc::now()
+            )
+            .1,
+            0
+        );
     }
 
     #[test]
@@ -388,10 +538,11 @@ mod tests {
             &[],
             &[],
             &[],
+            &Labels::default(),
             Utc::now() - chrono::TimeDelta::hours(1),
         )
         .0;
-        let later = ics(&snapshot, &[], &[], &[], Utc::now()).0;
+        let later = ics(&snapshot, &[], &[], &[], &Labels::default(), Utc::now()).0;
         assert_ne!(earlier, later);
         assert_eq!(without_stamps(&earlier), without_stamps(&later));
     }

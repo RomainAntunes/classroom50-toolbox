@@ -10,8 +10,8 @@ const group = (name: string | null): Group => ({
   name,
   url: "",
   members: [
-    { login: "Alice", name: "Alice Martin" },
-    { login: "bob", name: null },
+    { login: "Alice", name: "Alice Martin", email: null },
+    { login: "bob", name: null, email: null },
   ],
 });
 

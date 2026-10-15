@@ -116,17 +116,28 @@ pub struct SyncDetails {
 /// updated after each sync from now on, and returns how many events it holds.
 #[tauri::command]
 pub fn export_calendar(
+    app: AppHandle,
     path: PathBuf,
     state: State<'_, ProjectsState>,
     settings: State<'_, SettingsStore>,
 ) -> Result<usize> {
     let current = settings.get();
-    let count = crate::calendar::export(&path, &state.snapshot(), &current)?;
+    let labels = app.state::<crate::calendar::CalendarState>().labels();
+    let count = crate::calendar::export(&path, &state.snapshot(), &current, &labels)?;
     settings.set(Settings {
         calendar_file: Some(path),
         ..current
     })?;
     Ok(count)
+}
+
+/// The words of calendar event notes, from the UI's i18n.
+#[tauri::command]
+pub fn set_calendar_labels(
+    state: State<'_, crate::calendar::CalendarState>,
+    labels: crate::calendar::Labels,
+) {
+    state.set_labels(labels);
 }
 
 /// The OS calendars the user can write to; asks for access the first time.
