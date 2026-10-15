@@ -95,6 +95,8 @@
   p {
     margin: 0;
     color: var(--fg-muted);
+    white-space: pre-line;
+    overflow-wrap: anywhere;
   }
 
   input {
