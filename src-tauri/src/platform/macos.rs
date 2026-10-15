@@ -41,6 +41,10 @@ pub fn editor_config_dirs() -> Vec<PathBuf> {
         .collect()
 }
 
+pub fn editor_data_dirs() -> Vec<PathBuf> {
+    editor_config_dirs()
+}
+
 pub fn open_terminal(dir: &Path) -> Result<()> {
     process::spawn_detached(
         "open",

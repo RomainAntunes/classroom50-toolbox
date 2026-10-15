@@ -71,6 +71,17 @@ pub fn editor_config_dirs() -> Vec<PathBuf> {
     xdg.into_iter().chain(flatpaks).collect()
 }
 
+/// The XDG data dir (Zed, NetBeans), plus Zed's Flatpak sandbox.
+pub fn editor_data_dirs() -> Vec<PathBuf> {
+    let home = home_dir();
+    let xdg = std::env::var_os("XDG_DATA_HOME")
+        .map(PathBuf::from)
+        .filter(|dir| dir.is_absolute())
+        .or_else(|| home.as_ref().map(|home| home.join(".local/share")));
+    let flatpak = home.map(|home| home.join(".var/app/dev.zed.Zed/data"));
+    xdg.into_iter().chain(flatpak).collect()
+}
+
 pub fn open_terminal(dir: &Path) -> Result<()> {
     for terminal in [
         "x-terminal-emulator",

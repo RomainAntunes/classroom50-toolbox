@@ -61,6 +61,14 @@ pub fn editor_config_dirs() -> Vec<PathBuf> {
         .collect()
 }
 
+/// `%LOCALAPPDATA%`: Zed and Visual Studio keep their state there.
+pub fn editor_data_dirs() -> Vec<PathBuf> {
+    std::env::var_os("LOCALAPPDATA")
+        .map(PathBuf::from)
+        .into_iter()
+        .collect()
+}
+
 pub fn open_terminal(dir: &Path) -> Result<()> {
     if process::find_in_path("wt").is_some() {
         return process::spawn_detached("wt", ["-d".as_ref(), dir.as_os_str()], None);

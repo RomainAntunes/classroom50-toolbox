@@ -91,7 +91,7 @@
   "projects.noMatch": "No assignment matches your search.",
   "projects.syncing": "Syncing",
   "settings.folders.editors": "Find projects opened in your editors",
-  "settings.folders.editorsHint": "JetBrains IDEs and VS Code",
+  "settings.folders.editorsHint": "JetBrains IDEs, VS Code and its forks, Zed, Sublime Text, Eclipse, NetBeans and Visual Studio",
   "projects.openClassroom50": "Open on Classroom 50",
   "projects.openFolder.macos": "Show in Finder",
   "projects.openFolder.windows": "Show in File Explorer",

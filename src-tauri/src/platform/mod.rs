@@ -70,6 +70,12 @@ pub fn editor_config_dirs() -> Vec<PathBuf> {
     imp::editor_config_dirs()
 }
 
+/// Data dirs that may hold editor state (Zed's database, NetBeans, Visual Studio). Same as
+/// the config dirs on macOS.
+pub fn editor_data_dirs() -> Vec<PathBuf> {
+    imp::editor_data_dirs()
+}
+
 pub fn home_dir() -> Option<PathBuf> {
     std::env::var_os(if cfg!(windows) { "USERPROFILE" } else { "HOME" }).map(PathBuf::from)
 }

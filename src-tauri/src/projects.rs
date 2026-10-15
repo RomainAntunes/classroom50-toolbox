@@ -1643,18 +1643,18 @@ fn scan_roots(
     let parents: Vec<PathBuf> = found
         .recent
         .iter()
-        .filter_map(|dir| dir.parent().map(Path::to_path_buf))
+        .filter_map(|recent| recent.path.parent().map(Path::to_path_buf))
         .collect();
+    let roots_found: Vec<PathBuf> = found.roots.into_iter().map(|root| root.path).collect();
     // A recent folder may be a course folder holding the clones; its siblings may be
     // clones the editor never opened.
     let candidates = found
         .recent
         .into_iter()
-        .map(|dir| (dir, EDITOR_SCAN_DEPTH))
+        .map(|recent| (recent.path, EDITOR_SCAN_DEPTH))
         .chain(parents.iter().cloned().map(|dir| (dir, 1)))
         .chain(
-            found
-                .roots
+            roots_found
                 .iter()
                 .cloned()
                 .map(|dir| (dir, EDITOR_SCAN_DEPTH)),
@@ -1672,7 +1672,7 @@ fn scan_roots(
     targets.extend(
         parents
             .into_iter()
-            .chain(found.roots)
+            .chain(roots_found)
             .filter(|dir| usable(dir))
             .map(WatchTarget::flat),
     );
