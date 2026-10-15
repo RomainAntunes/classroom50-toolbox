@@ -810,6 +810,16 @@ mod tests {
             std::fs::create_dir_all(&dir).unwrap();
             dir
         };
+        // As the editors write them: `/C:/Users/x` in URIs, `/C/Users/x` for Sublime.
+        let uri_path = |dir: &Path| {
+            let path = dir.display().to_string().replace('\\', "/");
+            if path.starts_with('/') {
+                path
+            } else {
+                format!("/{path}")
+            }
+        };
+        let sublime_path = |dir: &Path| uri_path(dir).replacen(':', "", 1);
         let write = |path: PathBuf, text: String| {
             std::fs::create_dir_all(path.parent().unwrap()).unwrap();
             std::fs::write(path, text).unwrap();
@@ -834,7 +844,7 @@ mod tests {
         );
         write(
             config.join("Cursor/User/globalStorage/storage.json"),
-            format!(r#"{{"folderUri":"file://{}"}}"#, vscode.display()),
+            format!(r#"{{"folderUri":"file://{}"}}"#, uri_path(&vscode)),
         );
         write(
             config.join("Zed/db/0-stable/db.sqlite"),
@@ -842,11 +852,11 @@ mod tests {
         );
         write(
             config.join("Sublime Text/Local/Session.sublime_session"),
-            format!(r#"{{"folder_history": ["{}"]}}"#, sublime.display()),
+            format!(r#"{{"folder_history": ["{}"]}}"#, sublime_path(&sublime)),
         );
         write(
             config.join("NetBeans/24/config/Preferences/org/netbeans/modules/projectui.properties"),
-            format!("recentProjectsURL.0=file\\:{}/\n", netbeans.display()),
+            format!("recentProjectsURL.0=file\\:{}/\n", uri_path(&netbeans)),
         );
 
         let found = find_in(Some(home.clone()), &[config]);

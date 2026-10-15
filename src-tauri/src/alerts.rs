@@ -150,7 +150,9 @@ pub fn process(app: &AppHandle, snapshot: &Snapshot) {
     if snapshot.checked_at.is_none() {
         return;
     }
-    let hours = app.state::<SettingsStore>().get().notify_hours_before;
+    let settings = app.state::<SettingsStore>().get();
+    let hours = settings.notify_hours_before;
+    let snapshot = &without_hidden(snapshot, &settings.hidden);
     let state = app.state::<AlertsState>();
     let Ok(mut memory) = state.memory.lock() else {
         return;
@@ -174,6 +176,15 @@ pub fn process(app: &AppHandle, snapshot: &Snapshot) {
     }
     let _ = app.emit(UNSEEN_EVENT, &unseen);
     set_badge(app, attention);
+}
+
+/// The snapshot minus hidden assignments, which stay quiet; what changed meanwhile is told
+/// once they're shown again.
+fn without_hidden(snapshot: &Snapshot, hidden: &[String]) -> Snapshot {
+    let mut visible = snapshot.clone();
+    visible.projects.retain(|p| !hidden.contains(&p.id));
+    visible.unaccepted.retain(|u| !hidden.contains(&u.id));
+    visible
 }
 
 /// At startup: the badge from the saved news, before any sync.
@@ -678,6 +689,20 @@ mod tests {
         assert!(diff(&mut memory, &left, &[], now).is_empty());
         let back = with_group(vec![member("bob", Some("Bob B")), member("ALICE", None)]);
         assert!(diff(&mut memory, &back, &[], now).is_empty());
+    }
+
+    #[test]
+    fn hidden_assignments_stay_quiet() {
+        let now = Utc::now();
+        let soon = || snapshot(vec![project("lab1", Some(now + TimeDelta::minutes(30)))]);
+        let hidden = vec!["org/c-lab1-alice".to_owned()];
+        let mut memory = Memory::default();
+        let quiet = without_hidden(&soon(), &hidden);
+        assert!(quiet.projects.is_empty());
+        assert!(diff(&mut memory, &quiet, &[1], now).is_empty());
+        // Shown again, the pending reminder goes out.
+        let shown = without_hidden(&soon(), &[]);
+        assert_eq!(diff(&mut memory, &shown, &[1], now).len(), 1);
     }
 
     #[test]
