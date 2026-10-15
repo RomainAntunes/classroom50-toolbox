@@ -82,6 +82,7 @@ pub fn run() {
             }
             app.manage(settings);
             app.manage(clones::CloneStore::load(&app.path().app_config_dir()?));
+            app.manage(calendar::CalendarState::load(&app.path().app_config_dir()?));
             let cache_dir = app.path().app_cache_dir()?;
             app.manage(projects::ProjectsState::load(&cache_dir));
             app.manage(alerts::AlertsState::load(&cache_dir));
@@ -116,6 +117,8 @@ pub fn run() {
             commands::account_avatar,
             commands::preview_badge,
             commands::export_calendar,
+            commands::native_calendars,
+            commands::set_native_calendar,
             commands::simulate_network,
             commands::simulated_network,
             commands::get_settings,

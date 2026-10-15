@@ -66,6 +66,10 @@ pub enum Error {
     #[error("can't reach GitHub")]
     Offline,
 
+    /// The OS's calendar store refused access (never granted, or turned off since).
+    #[error("calendar access isn't allowed")]
+    CalendarAccess,
+
     #[error("invalid .classroom50.yaml: {0}")]
     RepoConfig(#[from] serde_norway::Error),
 
@@ -114,6 +118,7 @@ impl Error {
             Error::RateLimited { .. } => "rateLimited",
             Error::GitHub(_) => "github",
             Error::Offline => "offline",
+            Error::CalendarAccess => "calendarAccess",
             Error::RepoConfig(_) => "repoConfig",
             Error::Io(_) => "io",
             Error::Http(_) => "http",

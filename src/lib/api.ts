@@ -8,6 +8,16 @@ export type Tool = "git" | "gh" | "gh-student";
 export interface AppInfo {
   os: Os;
   version: string;
+  /** The OS has a calendar store the app can write into (macOS). */
+  nativeCalendar: boolean;
+}
+
+/** A calendar of the OS's calendar app the user can write to. */
+export interface NativeCalendar {
+  id: string;
+  title: string;
+  /** The account holding it (iCloud, Google, On My Mac...). */
+  account: string;
 }
 
 export interface ToolStatus {
@@ -260,6 +270,8 @@ export interface Settings {
   appearance: Appearance;
   /** The last exported `.ics`, rewritten by Rust after each sync while set. */
   calendarFile: string | null;
+  /** The OS calendar the due dates are kept in. */
+  nativeCalendar: string | null;
   /** The first-run guide was finished or skipped. */
   onboarded: boolean;
 }
@@ -361,6 +373,10 @@ export const api = {
   previewBadge: () => invoke<void>("preview_badge"),
   /** Writes the due dates as an `.ics` file; returns the number of events. */
   exportCalendar: (path: string) => invoke<number>("export_calendar", { path }),
+  /** Asks for calendar access the first time. */
+  nativeCalendars: () => invoke<NativeCalendar[]>("native_calendars"),
+  /** Writes the due dates into that calendar from now on; `null` removes them. */
+  setNativeCalendar: (id: string | null) => invoke<Settings>("set_native_calendar", { id }),
   /** Dev builds only: pretends GitHub is down or the device is offline. */
   simulateNetwork: (network: SimulatedNetwork) => invoke<void>("simulate_network", { network }),
   simulatedNetwork: () => invoke<SimulatedNetwork>("simulated_network"),

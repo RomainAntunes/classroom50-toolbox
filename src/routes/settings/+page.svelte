@@ -14,6 +14,7 @@
     withDialog,
     type AppInfo,
     type LastRun,
+    type NativeCalendar,
     type SimulatedNetwork,
     type SyncDetails,
     type ToolStatus,
@@ -21,6 +22,7 @@
   import { formatDate, fromNow, hoursLabel, t } from "$lib/i18n";
   import { sampleNotices, showNotice } from "$lib/notices";
   import { loadSettings, pickWatchedFolder, saveSettings, settings } from "$lib/settings.svelte";
+  import { Menu, MenuItem, PredefinedMenuItem } from "@tauri-apps/api/menu";
   import { pickCloneFolder } from "$lib/clone";
   import { chooseDefaultEditor, defaultEditor, editors, loadEditors } from "$lib/editor.svelte";
   import Section from "$lib/components/Section.svelte";
@@ -75,6 +77,67 @@
     } catch (err) {
       await withDialog(() => message(errorMessage(err), { kind: "error" }));
     }
+  }
+
+  let calendars = $state<NativeCalendar[]>([]);
+  let writing = $state(false);
+  const chosenCalendar = $derived(
+    calendars.find((c) => c.id === settings.current?.nativeCalendar) ?? null,
+  );
+
+  async function setNativeCalendar(id: string | null) {
+    writing = true;
+    try {
+      settings.current = await api.setNativeCalendar(id);
+    } catch (err) {
+      await withDialog(() =>
+        message(
+          t(`calendar.error.${(err as { kind?: string }).kind}`, {}, "calendar.error.other"),
+          {
+            kind: "error",
+          },
+        ),
+      );
+    } finally {
+      writing = false;
+    }
+  }
+
+  async function chooseCalendar() {
+    try {
+      calendars = await api.nativeCalendars();
+    } catch (err) {
+      await withDialog(() =>
+        message(
+          t(`calendar.error.${(err as { kind?: string }).kind}`, {}, "calendar.error.other"),
+          {
+            kind: "error",
+          },
+        ),
+      );
+      return;
+    }
+    const current = settings.current?.nativeCalendar ?? null;
+    const items: (MenuItem | PredefinedMenuItem)[] = await Promise.all(
+      calendars.map((calendar) =>
+        MenuItem.new({
+          text: calendar.account ? `${calendar.title} (${calendar.account})` : calendar.title,
+          enabled: calendar.id !== current,
+          action: () => setNativeCalendar(calendar.id),
+        }),
+      ),
+    );
+    if (current) {
+      items.push(
+        await PredefinedMenuItem.new({ item: "Separator" }),
+        await MenuItem.new({
+          text: t("settings.calendar.stopSync"),
+          action: () => setNativeCalendar(null),
+        }),
+      );
+    }
+    const menu = await Menu.new({ items });
+    await withDialog(() => menu.popup());
   }
 
   let checkingTools = $state(false);
@@ -151,9 +214,13 @@
     void loadEditors(true);
     if (import.meta.env.DEV) void api.simulatedNetwork().then((n) => (network = n));
     void Promise.all([api.appInfo(), loadSettings(), api.syncDetails()]).then(
-      ([appInfo, , details]) => {
+      ([appInfo, loaded, details]) => {
         info = appInfo;
         sync = details;
+        // Names the chosen calendar; access was granted when it was chosen.
+        if (appInfo.nativeCalendar && loaded.nativeCalendar) {
+          void api.nativeCalendars().then((list) => (calendars = list));
+        }
       },
     );
     const unlisten = listen(PROJECTS_UPDATED_EVENT, async () => {
@@ -271,6 +338,25 @@
     </Section>
 
     <Section title={t("settings.calendar.title")}>
+      {#if info?.nativeCalendar}
+        <div class="row">
+          <span class="text">
+            <span>{t("settings.calendar.app")}</span>
+            <span class="sub"
+              >{current.nativeCalendar
+                ? t("settings.calendar.syncing", {
+                    calendar: chosenCalendar?.title ?? t("settings.calendar.unknown"),
+                  })
+                : t("settings.calendar.appHint")}</span
+            >
+          </span>
+          <button disabled={writing} onclick={chooseCalendar}
+            >{t(
+              current.nativeCalendar ? "settings.calendar.change" : "settings.calendar.choose",
+            )}</button
+          >
+        </div>
+      {/if}
       <div class="row">
         <span class="text">
           <span>{t("settings.calendar.label")}</span>

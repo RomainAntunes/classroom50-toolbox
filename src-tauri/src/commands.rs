@@ -25,6 +25,8 @@ use crate::updater::{self, UpdateInfo};
 pub struct AppInfo {
     os: Os,
     version: String,
+    /// The OS has a calendar store the app can write into (macOS).
+    native_calendar: bool,
 }
 
 #[tauri::command]
@@ -32,6 +34,7 @@ pub fn app_info(app: AppHandle) -> AppInfo {
     AppInfo {
         os: platform::os(),
         version: app.package_info().version.to_string(),
+        native_calendar: platform::has_native_calendar(),
     }
 }
 
@@ -124,6 +127,33 @@ pub fn export_calendar(
         ..current
     })?;
     Ok(count)
+}
+
+/// The OS calendars the user can write to; asks for access the first time.
+#[tauri::command]
+pub async fn native_calendars() -> Result<Vec<platform::NativeCalendar>> {
+    tauri::async_runtime::spawn_blocking(|| platform::native_calendars(true))
+        .await
+        .map_err(|err| Error::Unsupported(err.to_string()))?
+}
+
+/// Picks the OS calendar to keep the due dates in (writing them now), or with `None` stops
+/// and removes the events the app wrote.
+#[tauri::command]
+pub async fn set_native_calendar(
+    app: AppHandle,
+    settings: State<'_, SettingsStore>,
+    id: Option<String>,
+) -> Result<Settings> {
+    let current = settings.get();
+    // Writing to a new calendar also removes what sits in the old one.
+    if id.is_some() || current.native_calendar.is_some() {
+        crate::calendar::write_native(&app, id.clone()).await?;
+    }
+    settings.set(Settings {
+        native_calendar: id,
+        ..current
+    })
 }
 
 #[tauri::command]
