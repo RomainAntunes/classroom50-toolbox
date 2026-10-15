@@ -40,6 +40,18 @@ pub enum Error {
     #[error("you are not in a group for this assignment yet")]
     NeedsTeam,
 
+    /// Pull refused: uncommitted changes to tracked files.
+    #[error("the clone has uncommitted changes")]
+    LocalChanges,
+
+    /// Pull refused: the clone isn't on the default branch (named here).
+    #[error("the clone isn't on {0}")]
+    OtherBranch(String),
+
+    /// Pull refused: the clone and GitHub both have new commits.
+    #[error("the clone and GitHub have both changed")]
+    Diverged,
+
     #[error("not signed in to GitHub")]
     NotSignedIn,
 
@@ -95,6 +107,9 @@ impl Error {
             Error::SchemaMismatch { .. } => "schemaMismatch",
             Error::Student(_) => "student",
             Error::NeedsTeam => "needsTeam",
+            Error::LocalChanges => "localChanges",
+            Error::OtherBranch(_) => "otherBranch",
+            Error::Diverged => "diverged",
             Error::NotSignedIn => "notSignedIn",
             Error::RateLimited { .. } => "rateLimited",
             Error::GitHub(_) => "github",

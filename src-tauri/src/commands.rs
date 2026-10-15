@@ -13,6 +13,7 @@ use crate::login::{self, LoginState};
 use crate::platform::{self, CommandSpec, Os};
 use crate::popover::PopoverState;
 use crate::projects::{self, ProjectsState, Snapshot, SyncProgress};
+use crate::pull;
 use crate::settings::{Settings, SettingsStore};
 use crate::student;
 use crate::tools::{self, AuthStatus, Tool, ToolStatus};
@@ -348,6 +349,32 @@ pub async fn submit_project(
         projects::refresh_after_push(&app).await;
     });
     Ok(submitted)
+}
+
+/// Fast-forwards project `id`'s clone to GitHub's default branch (`pull.rs` says when it
+/// refuses). The watcher sees the remote refs move and re-reads the status.
+#[tauri::command]
+pub async fn pull_project(
+    app: AppHandle,
+    state: State<'_, ProjectsState>,
+    id: String,
+) -> Result<()> {
+    let project = state
+        .snapshot()
+        .projects
+        .into_iter()
+        .find(|p| p.id == id)
+        .ok_or_else(|| Error::Unsupported(format!("unknown project {id}")))?;
+    let path = project
+        .path
+        .ok_or_else(|| Error::Unsupported(format!("{id} has no local clone")))?;
+    let branch = project
+        .remote
+        .and_then(|r| r.default_branch)
+        .ok_or_else(|| Error::Unsupported(format!("{id} has no default branch on GitHub")))?;
+    pull::pull(&path, &branch).await?;
+    projects::refresh_local(&app, false).await;
+    Ok(())
 }
 
 #[tauri::command]

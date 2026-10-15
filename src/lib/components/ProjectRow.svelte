@@ -3,6 +3,7 @@
   import { openUrl, revealItemInDir } from "@tauri-apps/plugin-opener";
   import { api, withDialog, type Project } from "$lib/api";
   import { cloneProject } from "$lib/clone";
+  import { pullProject } from "$lib/pull";
   import { submitProject } from "$lib/submit";
   import { durationLabel, formatDate, fromNow, t } from "$lib/i18n";
   import { tildify } from "$lib/paths.svelte";
@@ -93,6 +94,26 @@
         project.pending === "unpushed" ||
         project.pending === "unsubmitted"),
   );
+
+  // GitHub has commits the clone lacks. The button only shows when a fast-forward can work;
+  // the menu always offers it and explains a refusal.
+  const incoming = $derived(Boolean(path) && (behind > 0 || Boolean(project.local?.remoteAhead)));
+  const pullable = $derived(
+    incoming &&
+      project.local?.branch === defaultBranch &&
+      project.local.changedFiles === 0 &&
+      !project.local.ahead,
+  );
+
+  let pulling = $state(false);
+  async function pull() {
+    pulling = true;
+    try {
+      await pullProject(project, name);
+    } finally {
+      pulling = false;
+    }
+  }
 
   let submitting = $state(false);
   async function submit() {
@@ -190,6 +211,11 @@
       }),
       separator(),
       MenuItem.new({
+        text: t("projects.pullAction"),
+        enabled: incoming && !pulling,
+        action: () => pull(),
+      }),
+      MenuItem.new({
         text: t("projects.submit"),
         enabled: submittable && !submitting,
         action: () => submit(),
@@ -244,6 +270,8 @@
       <span class="meta">
         {#if submitting}
           <span class="status">{t("projects.submitting")}</span> ·
+        {:else if pulling}
+          <span class="status">{t("projects.pulling")}</span> ·
         {:else if status}
           <span class="status" class:warn={status.warn} title={status.hint}>{status.label}</span> ·
         {/if}
@@ -271,6 +299,16 @@
         class:full={grade.score === grade.maxScore}
         title={t("projects.gradeTests", { passed: grade.testsPassed, total: grade.testsTotal })}
         >{grade.score}/{grade.maxScore}</span
+      >
+    {/if}
+    {#if pullable}
+      <button
+        title={t("projects.pullHint")}
+        disabled={pulling}
+        onclick={(event) => {
+          event.stopPropagation();
+          pull();
+        }}>{t("projects.pullAction")}</button
       >
     {/if}
     {#if ready}

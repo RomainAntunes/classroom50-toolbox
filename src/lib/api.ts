@@ -337,6 +337,8 @@ export const api = {
   submitProject: (id: string) => invoke<Submitted>("submit_project", { id }),
   /** Clones into `parent/<repo>` and returns the new folder; `projects-updated` follows. */
   cloneProject: (id: string, parent: string) => invoke<string>("clone_project", { id, parent }),
+  /** Fast-forwards the clone's default branch; rejects with `localChanges`, `otherBranch` or `diverged`. */
+  pullProject: (id: string) => invoke<void>("pull_project", { id }),
   checkUpdate: () => invoke<UpdateInfo | null>("check_update"),
   installUpdate: () => invoke<void>("install_update"),
 };

@@ -12,6 +12,7 @@ pub mod platform;
 mod popover;
 pub mod process;
 pub mod projects;
+pub mod pull;
 pub mod settings;
 pub mod status;
 pub mod student;
@@ -119,6 +120,7 @@ pub fn run() {
             commands::accept_assignment,
             commands::submit_check,
             commands::submit_project,
+            commands::pull_project,
             commands::check_update,
             commands::install_update,
         ])
