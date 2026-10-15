@@ -18,11 +18,13 @@
 //! ````
 //!
 //! The fence is longer than any backtick run inside the block, so it is matched exactly.
-//! Passing tests that opted into `show-output` get a `Test output` section, skipped here. A
-//! custom autograder writes its own body, and the runner may append a note listing files
-//! removed by `allowed_files`: whatever isn't the heading, the table, a `Status:` line or a
-//! parsed section is kept as `notes`. Every text is stripped of escape sequences and capped,
-//! since it ends up in the snapshot.
+//! Passing tests that opted into `show-output` get a `Test output` section, skipped here. The
+//! runner may append a note listing files removed by `allowed_files`: whatever isn't the
+//! heading, the table, the `Status:` line or one of those two sections is kept as `notes`.
+//! Those parts are only recognized when the body has the runner's heading. A custom
+//! autograder writes its own body, kept whole as `notes` (its tables, `Status:` lines and
+//! `<details>` sections too), minus the `<details>`/`<summary>` tags. Every text is stripped
+//! of escape sequences and capped, since it ends up in the snapshot.
 
 use serde::{Deserialize, Serialize};
 
@@ -36,6 +38,8 @@ pub const NOTES_CAP: usize = 4 * 1024;
 
 const SCORE_HEADING: &str = "### classroom50 autograde:";
 const FAILURES_SUMMARY: &str = "Failure details";
+/// The runner's section for passing tests that opted into `show-output`.
+const OUTPUT_SUMMARY: &str = "Test output";
 
 /// The parts of a release body.
 #[derive(Debug, Default, PartialEq, Eq)]
@@ -63,17 +67,34 @@ pub struct Clipped {
     pub clipped: bool,
 }
 
-/// Splits a release body into each failed test's output and the rest.
+/// Splits a release body into each failed test's output and the rest. The runner's own
+/// parts (score heading, table, `Status:` line, its `Failure details` and `Test output`
+/// sections) are only recognized in a body that has the runner's heading; a custom
+/// autograder's report keeps its tables, `Status:` lines and sections, with just the
+/// `<details>`/`<summary>` tags dropped.
 pub fn parse(body: &str) -> Parsed {
     let body = clean(body);
+    let runner = body
+        .lines()
+        .any(|line| line.trim().starts_with(SCORE_HEADING));
     let mut parsed = Parsed::default();
     let mut notes: Vec<&str> = Vec::new();
     let mut lines = body.lines().peekable();
-    // Inside a `<details>` section: whether it holds failures (else it's skipped).
+    // Inside one of the runner's `<details>` sections: whether it holds failures (else it's
+    // skipped).
     let mut section: Option<bool> = None;
     let mut name: Option<String> = None;
+    // Inside a code block of the notes: the backticks that open it.
+    let mut notes_fence: Option<usize> = None;
     while let Some(line) = lines.next() {
         let trimmed = line.trim();
+        if let Some(open) = notes_fence {
+            if fence(trimmed).is_some_and(|f| f.len() >= open) {
+                notes_fence = None;
+            }
+            notes.push(line);
+            continue;
+        }
         if let Some(open) = section {
             if trimmed == "</details>" {
                 section = None;
@@ -96,16 +117,27 @@ pub fn parse(body: &str) -> Parsed {
             }
             continue;
         }
-        if let Some(summary) = details_summary(trimmed) {
-            section = Some(summary == FAILURES_SUMMARY);
+        if runner {
+            if let Some(summary) = details_summary(trimmed)
+                && (summary == FAILURES_SUMMARY || summary == OUTPUT_SUMMARY)
+            {
+                section = Some(summary == FAILURES_SUMMARY);
+                continue;
+            }
+            if trimmed.starts_with(SCORE_HEADING)
+                || trimmed.starts_with('|')
+                || trimmed.starts_with("Status: ")
+            {
+                continue;
+            }
+        }
+        if let Some(summary) = without_details_tags(trimmed) {
+            if !summary.is_empty() {
+                notes.push(summary);
+            }
             continue;
         }
-        if trimmed.starts_with(SCORE_HEADING)
-            || trimmed.starts_with('|')
-            || trimmed.starts_with("Status: ")
-        {
-            continue;
-        }
+        notes_fence = opening_fence(trimmed);
         notes.push(line);
     }
     parsed.notes = tidy(&notes);
@@ -185,6 +217,35 @@ fn fence(line: &str) -> Option<&str> {
 fn bold(line: &str) -> Option<&str> {
     let name = line.strip_prefix("**")?.strip_suffix("**")?;
     (!name.trim().is_empty()).then_some(name)
+}
+
+/// The backticks opening a code block (an info string may follow them).
+fn opening_fence(line: &str) -> Option<usize> {
+    let ticks = line.bytes().take_while(|&b| b == b'`').count();
+    (ticks >= 3 && !line[ticks..].contains('`')).then_some(ticks)
+}
+
+/// A line made only of `<details>`, `<summary>` and their closing tags: the summary's text
+/// (empty when there is none). `None` for any other line.
+fn without_details_tags(line: &str) -> Option<&str> {
+    let mut rest = line;
+    let mut found = false;
+    for tag in ["<details open>", "<details>", "<summary>"] {
+        if let Some(after) = rest.strip_prefix(tag) {
+            rest = after;
+            found = true;
+        }
+    }
+    for tag in ["</details>", "</summary>"] {
+        if let Some(before) = rest.strip_suffix(tag) {
+            rest = before;
+            found = true;
+        }
+    }
+    let rest = rest.trim();
+    let only_tags = !rest.contains("<details") && !rest.contains("</details>");
+    (found && only_tags && !rest.contains("<summary>") && !rest.contains("</summary>"))
+        .then_some(rest)
 }
 
 /// The summary of a `<details><summary>X</summary>` line.
@@ -332,8 +393,41 @@ These files are not in this assignment's `allowed_files` set, so the autograder 
 
     #[test]
     fn an_unclosed_section_still_parses() {
-        let body = "<details><summary>Failure details</summary>\n**a**\n```\nboom\n";
+        let body = "### classroom50 autograde: 0/1\n\
+                    <details><summary>Failure details</summary>\n**a**\n```\nboom\n";
         assert_eq!(parse(body).tests, [("a".to_owned(), "boom".to_owned())]);
+    }
+
+    /// A custom autograder's report without the runner's heading: its table, `Status:` line
+    /// and every `<details>` section (even one named like the runner's) stay in the notes,
+    /// tags dropped, and a code block keeps its `</details>` line.
+    #[test]
+    fn keeps_a_custom_reports_tables_and_sections() {
+        let body = "## Report\n\n\
+                    | Check | Result |\n|---|---|\n| style | ok |\n\n\
+                    Status: 4/5 checks passed\n\n\
+                    <details><summary>Failure details</summary>\n\n**style**\n\n```\nline 3\n```\n\n\
+                    </details>\n\n\
+                    <details>\n<summary>Lint output</summary>\n\n```text\nwarn: x\n</details>\n```\n\n\
+                    </details>\n";
+        let parsed = parse(body);
+        assert!(parsed.tests.is_empty());
+        assert_eq!(
+            parsed.notes,
+            "Report\n\n| Check | Result |\n|---|---|\n| style | ok |\n\n\
+             Status: 4/5 checks passed\n\nFailure details\n\n**style**\n\n```\nline 3\n```\n\n\
+             Lint output\n\n```text\nwarn: x\n</details>\n```"
+        );
+    }
+
+    /// With the runner's heading, a section the runner doesn't write is kept like any note.
+    #[test]
+    fn keeps_unknown_sections_of_a_runner_body() {
+        let body = "### classroom50 autograde: 1/2\n\n| Test | Result | Score |\n\n\
+                    <details><summary>Hints</summary>\n\nRead the spec.\n\n</details>\n\n\
+                    Status: classroom50 autograde: 1/2\n";
+        let parsed = parse(body);
+        assert_eq!(parsed.notes, "Hints\n\nRead the spec.");
     }
 
     #[test]

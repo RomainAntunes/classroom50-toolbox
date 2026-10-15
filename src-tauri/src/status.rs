@@ -705,7 +705,8 @@ mod tests {
             url: "u".into(),
             release_notes: None,
         };
-        let body = "<details><summary>Failure details</summary>\n\n**same**\n\n```\nfirst\n```\n\n\
+        let body = "### classroom50 autograde: 1/4\n\n\
+                    <details><summary>Failure details</summary>\n\n**same**\n\n```\nfirst\n```\n\n\
                     **same**\n\n```\nsecond\n```\n\n**ok**\n\n```\nnot this one\n```\n</details>\n";
         grade.apply_release_body(Some(body));
         let outputs: Vec<Option<&str>> = grade.tests.iter().map(|t| t.output.as_deref()).collect();
