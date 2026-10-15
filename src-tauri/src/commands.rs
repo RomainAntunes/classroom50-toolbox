@@ -642,3 +642,88 @@ pub fn simulate_network(network: simulate::Network) -> Result<()> {
 pub fn simulated_network() -> simulate::Network {
     simulate::network()
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::classroom50::RepoConfig;
+    use crate::projects::Project;
+
+    fn project(owner: Option<&str>, repo: &str, classroom: &str, assignment: &str) -> Project {
+        Project {
+            id: match owner {
+                Some(owner) => format!("{owner}/{repo}").to_ascii_lowercase(),
+                None => format!("/clones/{repo}"),
+            },
+            owner: owner.map(str::to_owned),
+            repo: owner.map(|_| repo.to_owned()),
+            config: RepoConfig {
+                classroom: classroom.into(),
+                assignment: assignment.into(),
+                secret: None,
+            },
+            path: None,
+            local: None,
+            remote: None,
+            classroom: None,
+            assignment: None,
+            pending: None,
+            web_url: None,
+            late_seconds: None,
+            editor: None,
+            group: None,
+        }
+    }
+
+    fn snapshot(projects: Vec<Project>) -> Snapshot {
+        Snapshot {
+            projects,
+            ..Snapshot::default()
+        }
+    }
+
+    #[test]
+    fn answers_an_accept_with_the_project_a_sync_found() {
+        let snapshot = snapshot(vec![
+            project(Some("HEIGVD"), "poo-labo-1-alice", "poo", "labo-1"),
+            project(Some("HEIGVD"), "POO-Labo-2-alice", "POO", "Labo-2"),
+        ]);
+
+        let accepted = accepted_project(&snapshot, "heigvd/poo/labo-2").unwrap();
+        assert_eq!(accepted.repo, "HEIGVD/POO-Labo-2-alice");
+        assert_eq!(
+            accepted.project_id.as_deref(),
+            Some("heigvd/poo-labo-2-alice")
+        );
+    }
+
+    #[test]
+    fn finds_no_project_in_another_org_or_classroom() {
+        let snapshot = snapshot(vec![
+            project(Some("other"), "poo-labo-1-alice", "poo", "labo-1"),
+            project(Some("heigvd"), "bdr-labo-1-alice", "bdr", "labo-1"),
+        ]);
+
+        assert!(accepted_project(&snapshot, "heigvd/poo/labo-1").is_none());
+    }
+
+    #[test]
+    fn ignores_clones_without_a_github_origin() {
+        let snapshot = snapshot(vec![project(None, "labo-1", "poo", "labo-1")]);
+
+        assert!(accepted_project(&snapshot, "heigvd/poo/labo-1").is_none());
+    }
+
+    #[test]
+    fn rejects_ids_that_are_not_org_classroom_assignment() {
+        let snapshot = snapshot(vec![project(
+            Some("heigvd"),
+            "poo-labo-1-a",
+            "poo",
+            "labo-1",
+        )]);
+
+        assert!(accepted_project(&snapshot, "heigvd/poo").is_none());
+        assert!(accepted_project(&snapshot, "").is_none());
+    }
+}
