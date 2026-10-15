@@ -393,12 +393,12 @@ pub async fn accept_assignment(
     id: String,
     new_team: bool,
 ) -> Result<Accepted> {
-    let item = state
-        .snapshot()
-        .unaccepted
-        .into_iter()
-        .find(|u| u.id == id)
-        .ok_or_else(|| Error::Unsupported(format!("unknown assignment {id}")))?;
+    let snapshot = state.snapshot();
+    let Some(item) = snapshot.unaccepted.iter().find(|u| u.id == id).cloned() else {
+        // A sync may have found the repo (accepted elsewhere) since the row was drawn.
+        return accepted_project(&snapshot, &id)
+            .ok_or_else(|| Error::Unsupported(format!("unknown assignment {id}")));
+    };
     let accepted = student::accept(&student::AcceptRequest {
         org: &item.classroom.org,
         classroom: &item.classroom.slug,
@@ -435,6 +435,23 @@ pub async fn accept_assignment(
         });
     }
     Ok(Accepted { repo, project_id })
+}
+
+/// The project of the assignment behind unaccepted id `org/classroom/assignment`.
+fn accepted_project(snapshot: &Snapshot, id: &str) -> Option<Accepted> {
+    let mut parts = id.splitn(3, '/');
+    let (org, classroom, assignment) = (parts.next()?, parts.next()?, parts.next()?);
+    let project = snapshot.projects.iter().find(|p| {
+        p.owner
+            .as_deref()
+            .is_some_and(|o| o.eq_ignore_ascii_case(org))
+            && p.config.classroom.eq_ignore_ascii_case(classroom)
+            && p.config.assignment.eq_ignore_ascii_case(assignment)
+    })?;
+    Some(Accepted {
+        repo: format!("{}/{}", project.owner.as_deref()?, project.repo.as_deref()?),
+        project_id: Some(project.id.clone()),
+    })
 }
 
 /// Gives a classmate push access to project `id`: joins them to the group on a team
