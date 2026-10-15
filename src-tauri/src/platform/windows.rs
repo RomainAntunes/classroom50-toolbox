@@ -206,6 +206,20 @@ pub fn open_terminal(dir: &Path) -> Result<()> {
     process::spawn_detached("powershell", ["-NoExit"], Some(dir))
 }
 
+pub const NATIVE_CALENDAR: bool = false;
+
+pub fn native_calendars(_ask: bool) -> Result<Vec<super::NativeCalendar>> {
+    Err(Error::Unsupported("no calendar store on this OS".into()))
+}
+
+pub fn write_calendar(
+    _calendar_id: &str,
+    _events: &[super::CalendarEvent],
+    _written: &mut super::WrittenEvents,
+) -> Result<()> {
+    Err(Error::Unsupported("no calendar store on this OS".into()))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -234,18 +248,4 @@ mod tests {
         assert_eq!(newest_child(&dir, "GoLand"), None);
         std::fs::remove_dir_all(&dir).unwrap();
     }
-}
-
-pub const NATIVE_CALENDAR: bool = false;
-
-pub fn native_calendars(_ask: bool) -> Result<Vec<super::NativeCalendar>> {
-    Err(Error::Unsupported("no calendar store on this OS".into()))
-}
-
-pub fn write_calendar(
-    _calendar_id: &str,
-    _events: &[super::CalendarEvent],
-    _written: &mut super::WrittenEvents,
-) -> Result<()> {
-    Err(Error::Unsupported("no calendar store on this OS".into()))
 }
