@@ -3,7 +3,8 @@
   import { openUrl } from "@tauri-apps/plugin-opener";
   import { withDialog, type Unaccepted } from "$lib/api";
   import { isHidden, setHidden } from "$lib/hidden";
-  import { acceptAssignment } from "$lib/accept";
+  import { acceptAssignment, acceptBlocked } from "$lib/accept";
+  import { session } from "$lib/session.svelte";
   import { groupDetails, groupName } from "$lib/group";
   import { formatDate, fromNow, t } from "$lib/i18n";
   import Details from "./Details.svelte";
@@ -21,22 +22,11 @@
   );
   const upcoming = $derived(opens !== null && opens > now);
 
-  const blocked = $derived(
-    item.assignment.locked
-      ? t("projects.lockedHint")
-      : upcoming
-        ? t("projects.upcomingHint")
-        : null,
-  );
+  const blocked = $derived(acceptBlocked(item, now));
 
-  let accepting = $state(false);
-  async function accept() {
-    accepting = true;
-    try {
-      await acceptAssignment(item);
-    } finally {
-      accepting = false;
-    }
+  const accepting = $derived(session.accepting.includes(item.id));
+  function accept() {
+    void acceptAssignment(item);
   }
 
   const hidden = $derived(isHidden(item.id));

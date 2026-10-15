@@ -15,6 +15,9 @@ export const session = $state<{
   /** Avatar `data:` URLs by login, fetched once per run. */
   avatars: Record<string, string>;
   search: string;
+  /** Assignments being accepted and projects being cloned, wherever it was started. */
+  accepting: string[];
+  cloning: string[];
 }>({
   tools: [],
   auth: null,
@@ -25,4 +28,20 @@ export const session = $state<{
   signingIn: false,
   avatars: {},
   search: "",
+  accepting: [],
+  cloning: [],
 });
+
+/** Runs `task` with `id` listed in `session[list]` meanwhile. */
+export async function busy<T>(
+  list: "accepting" | "cloning",
+  id: string,
+  task: () => Promise<T>,
+): Promise<T> {
+  session[list] = [...session[list], id];
+  try {
+    return await task();
+  } finally {
+    session[list] = session[list].filter((other) => other !== id);
+  }
+}

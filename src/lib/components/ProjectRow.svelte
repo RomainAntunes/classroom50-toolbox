@@ -11,6 +11,7 @@
   import { durationLabel, formatDate, fromNow, t } from "$lib/i18n";
   import { tildify } from "$lib/paths.svelte";
   import { groupDetails } from "$lib/group";
+  import { session } from "$lib/session.svelte";
   import Details from "./Details.svelte";
 
   let { project, now, unseen }: { project: Project; now: Date; unseen: boolean } = $props();
@@ -141,14 +142,9 @@
     }
   }
 
-  let cloning = $state(false);
-  async function clone(choose = false) {
-    cloning = true;
-    try {
-      await cloneProject(project.id, choose);
-    } finally {
-      cloning = false;
-    }
+  const cloning = $derived(session.cloning.includes(project.id));
+  function clone(choose = false) {
+    void cloneProject(project.id, choose);
   }
 
   let open = $state(false);
