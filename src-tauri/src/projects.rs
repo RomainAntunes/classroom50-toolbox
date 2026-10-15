@@ -846,8 +846,49 @@ async fn sync(
     };
     let mut snapshot = snapshot;
     annotate(state, &mut snapshot, &recents);
+    commit_emails(&mut snapshot.projects).await;
     let targets = watch_targets(&settings.watched_folders, scan_targets, &snapshot.projects);
     (snapshot, targets)
+}
+
+/// Teammates without a public email on GitHub get the one they commit with in the shared
+/// clone (read from the local history, no request). GitHub's `noreply` addresses don't count.
+async fn commit_emails(projects: &mut [Project]) {
+    for project in projects {
+        let (Some(path), Some(group)) = (project.path.clone(), project.group.as_mut()) else {
+            continue;
+        };
+        if group.members.iter().all(|m| m.email.is_some()) {
+            continue;
+        }
+        let args = ["log", "--no-merges", "-n", "500", "--format=%an%x1f%ae"];
+        let Ok(out) = process::run("git", args, Some(&path)).await else {
+            continue;
+        };
+        for member in group.members.iter_mut().filter(|m| m.email.is_none()) {
+            member.email = author_email(&out.stdout, member);
+        }
+    }
+}
+
+/// The newest commit email of `member`: an author named like their login or GitHub name, or
+/// an address whose local part is their login.
+fn author_email(log: &str, member: &groups::Member) -> Option<String> {
+    log.lines()
+        .filter_map(|line| line.split_once('\x1f'))
+        .find(|(name, email)| {
+            let name = name.trim();
+            let local = email.split('@').next().unwrap_or("");
+            email.contains('@')
+                && !email.ends_with("@users.noreply.github.com")
+                && (name.eq_ignore_ascii_case(&member.login)
+                    || member
+                        .name
+                        .as_deref()
+                        .is_some_and(|n| n.trim().eq_ignore_ascii_case(name))
+                    || local.eq_ignore_ascii_case(&member.login))
+        })
+        .map(|(_, email)| email.trim().to_owned())
 }
 
 /// Adds what isn't decided by the build: groups, the editor that opened each clone, the
@@ -2252,6 +2293,25 @@ fn sort_key(project: &Project, now: DateTime<Utc>) -> (u8, i64, String) {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn finds_teammates_commit_emails() {
+        let log = "Bob B\x1f12+bob@users.noreply.github.com\nBob B\x1fbob@heig-vd.ch\nalice\x1falice@x.ch\n";
+        let member = |login: &str, name: Option<&str>| groups::Member {
+            login: login.into(),
+            name: name.map(Into::into),
+            email: None,
+        };
+        assert_eq!(
+            author_email(log, &member("bobby", Some("Bob B"))).as_deref(),
+            Some("bob@heig-vd.ch")
+        );
+        assert_eq!(
+            author_email(log, &member("ALICE", None)).as_deref(),
+            Some("alice@x.ch")
+        );
+        assert_eq!(author_email(log, &member("carol", None)), None);
+    }
 
     fn config(assignment: &str) -> RepoConfig {
         RepoConfig {

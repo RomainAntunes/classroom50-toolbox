@@ -200,6 +200,18 @@ export interface Group {
 export interface Member {
   login: string;
   name: string | null;
+  /** Public GitHub email, else one they commit with in the clone. */
+  email: string | null;
+}
+
+/** The words of calendar event notes; `{name}`, `{n}`, `{score}`, `{max}` stay as is. */
+export interface CalendarLabels {
+  class: string;
+  group: string;
+  groupNumber: string;
+  graded: string;
+  submitted: string;
+  notAccepted: string;
 }
 
 /** A published assignment the user hasn't accepted yet. */
@@ -373,6 +385,7 @@ export const api = {
   previewBadge: () => invoke<void>("preview_badge"),
   /** Writes the due dates as an `.ics` file; returns the number of events. */
   exportCalendar: (path: string) => invoke<number>("export_calendar", { path }),
+  setCalendarLabels: (labels: CalendarLabels) => invoke<void>("set_calendar_labels", { labels }),
   /** Asks for calendar access the first time. */
   nativeCalendars: () => invoke<NativeCalendar[]>("native_calendars"),
   /** Writes the due dates into that calendar from now on; `null` removes them. */

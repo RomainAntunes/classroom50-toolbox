@@ -665,6 +665,7 @@ mod tests {
         let member = |login: &str, name: Option<&str>| crate::groups::Member {
             login: login.into(),
             name: name.map(Into::into),
+            email: None,
         };
         let with_group = |members: Vec<crate::groups::Member>| {
             let mut p = project("lab1", None);

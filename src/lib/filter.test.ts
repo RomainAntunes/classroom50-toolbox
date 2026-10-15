@@ -12,7 +12,7 @@ const group: Group = {
   number: 1,
   name: "The Sharks",
   url: "",
-  members: [{ login: "jmaendly", name: "Julie Maendly" }],
+  members: [{ login: "jmaendly", name: "Julie Maendly", email: null }],
 };
 
 function project(id: string, due: string | null, withGroup = false): Project {
