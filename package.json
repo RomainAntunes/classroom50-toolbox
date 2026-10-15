@@ -1,7 +1,10 @@
 {
   "name": "classroom50-toolbox",
-  "version": "0.7.1",
+  "version": "0.7.2",
   "description": "Tray toolbox for Classroom 50 students",
+  "author": "Romain Antunes (https://github.com/RomainAntunes)",
+  "license": "GPL-3.0-only",
+  "repository": "github:RomainAntunes/classroom50-toolbox",
   "type": "module",
   "scripts": {
     "dev": "vite dev",
