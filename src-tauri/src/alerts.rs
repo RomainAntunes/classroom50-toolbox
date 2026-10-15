@@ -509,6 +509,7 @@ mod tests {
             max_score: 10,
             tests_passed: 1,
             tests_total: 2,
+            tests: Vec::new(),
             published_at: Some(now - TimeDelta::days(30)),
             url: "u".into(),
         });
@@ -536,6 +537,7 @@ mod tests {
             max_score: 10,
             tests_passed: 4,
             tests_total: 5,
+            tests: Vec::new(),
             published_at: Some(now),
             url: "u".into(),
         });
