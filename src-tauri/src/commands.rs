@@ -15,6 +15,7 @@ use crate::platform::{self, Os};
 use crate::popover::{self, PopoverState};
 use crate::projects::{self, ProjectsState, Snapshot, SyncProgress};
 use crate::pull;
+use crate::push;
 use crate::settings::{Settings, SettingsStore};
 use crate::simulate;
 use crate::student;
@@ -627,6 +628,82 @@ pub async fn pull_project(
     pull::pull(&path, &branch).await?;
     projects::refresh_local(&app, false).await;
     Ok(())
+}
+
+/// Where Commit & push writes for project `id`: its clone, the branch, and GitHub's head of
+/// it. Only every-push assignments that still take submissions; tag-mode ones submit.
+fn pushable(state: &ProjectsState, id: &str) -> Result<(PathBuf, String, Option<String>)> {
+    let path = submittable_clone(state, id)?;
+    let project = state
+        .snapshot()
+        .projects
+        .into_iter()
+        .find(|p| p.id == id)
+        .ok_or_else(|| Error::Unsupported(format!("unknown project {id}")))?;
+    let every_push = project
+        .assignment
+        .as_ref()
+        .is_some_and(|a| a.submission_mode != Some(crate::classroom50::SubmissionMode::Tag));
+    if !every_push {
+        return Err(Error::Unsupported(format!(
+            "{id} isn't graded on every push; submit it instead"
+        )));
+    }
+    let remote = project.remote.as_ref();
+    let head = remote.and_then(|r| r.head.as_ref()).map(|h| h.oid.clone());
+    // An empty repo on GitHub has no default branch yet: the first push makes the clone's.
+    let branch = remote
+        .and_then(|r| r.default_branch.clone())
+        .or_else(|| {
+            head.is_none()
+                .then(|| project.local.as_ref().and_then(|l| l.branch.clone()))
+                .flatten()
+        })
+        .ok_or_else(|| Error::Unsupported(format!("{id} has no default branch on GitHub")))?;
+    Ok((path, branch, head))
+}
+
+/// What Commit & push would send for project `id`, or why it can't (`push.rs`).
+#[tauri::command]
+pub async fn push_check(state: State<'_, ProjectsState>, id: String) -> Result<push::PushCheck> {
+    let (path, branch, head) = pushable(&state, &id)?;
+    push::check(&path, &branch, head.as_deref()).await
+}
+
+/// Commits project `id`'s changes with `message` and pushes its default branch, then
+/// re-reads the status while the autograder runs.
+#[tauri::command]
+pub async fn commit_push(
+    app: AppHandle,
+    state: State<'_, ProjectsState>,
+    id: String,
+    message: Option<String>,
+) -> Result<push::Pushed> {
+    let (path, branch, head) = pushable(&state, &id)?;
+    let pushed = push::commit_and_push(&path, &branch, head.as_deref(), message.as_deref()).await?;
+    projects::refresh_local(&app, false).await;
+    tauri::async_runtime::spawn(async move {
+        projects::refresh_after_push(&app).await;
+    });
+    Ok(pushed)
+}
+
+/// The name and private email of the signed-in account, offered when git has no identity.
+#[tauri::command]
+pub async fn suggested_git_identity() -> Result<push::Identity> {
+    push::suggested_identity().await
+}
+
+/// Sets project `id`'s clone's own `user.name` and `user.email` (not the global config).
+#[tauri::command]
+pub async fn set_git_identity(
+    state: State<'_, ProjectsState>,
+    id: String,
+    name: String,
+    email: String,
+) -> Result<()> {
+    let (path, ..) = pushable(&state, &id)?;
+    push::set_identity(&path, &name, &email).await
 }
 
 #[tauri::command]

@@ -87,6 +87,30 @@ pub enum Error {
     #[error("the clone and GitHub have both changed")]
     Diverged,
 
+    /// Commit & push refused: GitHub has commits the clone lacks (pull first).
+    #[error("GitHub has commits the clone doesn't have")]
+    RemoteAhead,
+
+    /// Commit & push refused: a merge, rebase, cherry-pick or revert is under way.
+    #[error("a merge or rebase is in progress in the clone")]
+    GitInProgress,
+
+    /// Commit & push refused: no change to commit and no commit to push.
+    #[error("nothing to commit or push")]
+    NothingToPush,
+
+    /// Commit refused: git has no `user.name` or `user.email` for this clone.
+    #[error("git doesn't know your name and email yet")]
+    NoIdentity,
+
+    /// Commit refused: files GitHub would reject (over 100 MB), named here.
+    #[error("files too large for GitHub: {}", .0.join(", "))]
+    FileTooLarge(Vec<String>),
+
+    /// GitHub refused the push: its branch moved since (not a fast-forward).
+    #[error("GitHub refused the push because it has newer commits")]
+    PushRejected,
+
     #[error("not signed in to GitHub")]
     NotSignedIn,
 
@@ -237,6 +261,12 @@ impl Error {
             Error::LocalChanges => "localChanges",
             Error::OtherBranch(_) => "otherBranch",
             Error::Diverged => "diverged",
+            Error::RemoteAhead => "remoteAhead",
+            Error::GitInProgress => "gitInProgress",
+            Error::NothingToPush => "nothingToPush",
+            Error::NoIdentity => "noIdentity",
+            Error::FileTooLarge(_) => "fileTooLarge",
+            Error::PushRejected => "pushRejected",
             Error::NotSignedIn => "notSignedIn",
             Error::TokenFromEnv(_) => "tokenFromEnv",
             Error::RateLimited { .. } => "rateLimited",
