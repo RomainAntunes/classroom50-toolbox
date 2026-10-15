@@ -216,6 +216,20 @@ impl HttpCache {
         Ok(body)
     }
 
+    /// `get_text`, or the last body downloaded from `url` when the request fails (GitHub
+    /// unreachable, a server error).
+    pub async fn get_text_or_cached(
+        &self,
+        http: &reqwest::Client,
+        url: &str,
+        max_age: chrono::TimeDelta,
+    ) -> Result<String> {
+        match self.get_text(http, url, max_age).await {
+            Err(err) => self.cached_text(url).ok_or(err),
+            fetched => fetched,
+        }
+    }
+
     /// The last body downloaded from `url`, without any request.
     pub fn cached_text(&self, url: &str) -> Option<String> {
         let entries = self.entries.lock().ok()?;
@@ -259,6 +273,40 @@ pub fn write_atomic(path: &Path, bytes: &[u8]) -> std::io::Result<()> {
 mod tests {
     use super::*;
     use reqwest::header::HeaderValue;
+
+    /// Nothing listens on port 9 (discard), so the request fails at once.
+    #[tokio::test]
+    async fn a_failed_request_falls_back_to_the_last_body() {
+        let dir = std::env::temp_dir().join(format!("c50-http-{}", std::process::id()));
+        std::fs::create_dir_all(&dir).unwrap();
+        let cache = HttpCache::load(&dir);
+        let known = "http://127.0.0.1:9/known.json";
+        cache.entries.lock().unwrap().insert(
+            known.to_owned(),
+            Cached {
+                etag: "\"1\"".into(),
+                body: "last".into(),
+                checked_at: None,
+            },
+        );
+        let http = reqwest::Client::new();
+        let max_age = chrono::TimeDelta::minutes(10);
+        assert_eq!(
+            cache
+                .get_text_or_cached(&http, known, max_age)
+                .await
+                .unwrap(),
+            "last"
+        );
+        let unknown = "http://127.0.0.1:9/unknown.json";
+        assert!(
+            cache
+                .get_text_or_cached(&http, unknown, max_age)
+                .await
+                .is_err()
+        );
+        std::fs::remove_dir_all(&dir).unwrap();
+    }
 
     #[test]
     fn detects_rate_limits() {
