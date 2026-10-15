@@ -167,6 +167,8 @@ fn command(program: &str) -> Command {
         // gh must never block on an interactive prompt or print an upgrade banner.
         .env("GH_PROMPT_DISABLED", "1")
         .env("GH_NO_UPDATE_NOTIFIER", "1")
+        // Nor git (submit pushes with the user's own credentials): fail instead of hanging.
+        .env("GIT_TERMINAL_PROMPT", "0")
         .env("NO_COLOR", "1");
     #[cfg(windows)]
     {

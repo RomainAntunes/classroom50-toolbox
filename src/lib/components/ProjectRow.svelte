@@ -3,6 +3,7 @@
   import { openUrl, revealItemInDir } from "@tauri-apps/plugin-opener";
   import { api, withDialog, type Project } from "$lib/api";
   import { cloneProject } from "$lib/clone";
+  import { submitProject } from "$lib/submit";
   import { durationLabel, formatDate, fromNow, t } from "$lib/i18n";
   import Details from "./Details.svelte";
 
@@ -69,6 +70,25 @@
   );
   const openTarget = $derived(project.webUrl ?? githubUrl);
   const cloneable = $derived(!path && Boolean(project.owner && project.repo));
+
+  const submittable = $derived(Boolean(path) && !closed);
+  // Local work that isn't graded yet; other rows submit from the menu only.
+  const ready = $derived(
+    submittable &&
+      (project.pending === "uncommitted" ||
+        project.pending === "unpushed" ||
+        project.pending === "unsubmitted"),
+  );
+
+  let submitting = $state(false);
+  async function submit() {
+    submitting = true;
+    try {
+      await submitProject(project, name);
+    } finally {
+      submitting = false;
+    }
+  }
 
   let cloning = $state(false);
   async function clone(choose = false) {
@@ -148,6 +168,11 @@
       }),
       separator(),
       MenuItem.new({
+        text: t("projects.submit"),
+        enabled: submittable && !submitting,
+        action: () => submit(),
+      }),
+      MenuItem.new({
         text: t("projects.clone"),
         enabled: cloneable && !cloning,
         action: () => clone(),
@@ -195,7 +220,9 @@
         {#if unseen}<span class="dot" aria-label={t("projects.new")}></span>{/if}{name}
       </span>
       <span class="meta">
-        {#if status}
+        {#if submitting}
+          <span class="status">{t("projects.submitting")}</span> ·
+        {:else if status}
           <span class="status" class:warn={status.warn} title={status.hint}>{status.label}</span> ·
         {/if}
         {#if feedback && feedback.comments > 0}
@@ -220,6 +247,16 @@
         class:full={grade.score === grade.maxScore}
         title={t("projects.gradeTests", { passed: grade.testsPassed, total: grade.testsTotal })}
         >{grade.score}/{grade.maxScore}</span
+      >
+    {/if}
+    {#if ready}
+      <button
+        class="primary"
+        disabled={submitting}
+        onclick={(event) => {
+          event.stopPropagation();
+          submit();
+        }}>{t("submit.ok")}</button
       >
     {/if}
     {#if cloneable}

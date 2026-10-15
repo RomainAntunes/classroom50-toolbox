@@ -6,11 +6,16 @@ use std::ffi::OsString;
 use std::path::Path;
 use std::time::Duration;
 
+use serde::Serialize;
+
+use crate::classroom50::REPO_CONFIG_FILE;
 use crate::error::{Error, Result};
 use crate::process;
 
 /// Accept's retry loops are bounded at a minute or two.
 const ACCEPT_TIMEOUT: Duration = Duration::from_secs(180);
+/// Submit clones the repo and pushes; gh student gives up on git after 10 minutes.
+const SUBMIT_TIMEOUT: Duration = Duration::from_secs(11 * 60);
 
 /// What accept needs to know about an assignment.
 pub struct AcceptRequest<'a> {
@@ -51,6 +56,74 @@ pub async fn accept(request: &AcceptRequest<'_>) -> Result<String> {
             "gh student accept succeeded but printed no repository: {}",
             output.stdout
         ))
+    })
+}
+
+/// What a submit is about to send, for the confirmation. `gh student submit` snapshots the
+/// working tree (tracked files and untracked ones that aren't ignored) and pushes it to the
+/// default branch as a new commit on top of GitHub's head; the clone itself isn't changed.
+#[derive(Debug, Clone, Default, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SubmitCheck {
+    /// Submit needs `.classroom50.yaml`; `empty_repo` assignments have none and are pushed
+    /// by hand.
+    pub has_marker: bool,
+    /// New files that will be included.
+    pub untracked: Vec<String>,
+    /// Tracked files deleted without `git rm`: submit fails on them.
+    pub deleted: Vec<String>,
+}
+
+/// Lists what `check` reports, without taking the index lock.
+pub async fn check(path: &Path) -> Result<SubmitCheck> {
+    let list = |flag: &'static str| async move {
+        let args = [
+            "--no-optional-locks",
+            "ls-files",
+            flag,
+            "--exclude-standard",
+            "-z",
+        ];
+        process::run("git", args, Some(path))
+            .await
+            .map(|out| split_nul(&out.stdout))
+    };
+    let (untracked, deleted) = tokio::try_join!(list("--others"), list("--deleted"))?;
+    Ok(SubmitCheck {
+        has_marker: path.join(REPO_CONFIG_FILE).is_file(),
+        untracked,
+        deleted,
+    })
+}
+
+fn split_nul(out: &str) -> Vec<String> {
+    out.split('\0')
+        .filter(|s| !s.is_empty())
+        .map(str::to_owned)
+        .collect()
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct Submitted {
+    /// The submission commit on GitHub.
+    pub url: Option<String>,
+}
+
+/// Runs `gh student submit` in the clone at `path`.
+pub async fn submit(path: &Path) -> Result<Submitted> {
+    let args = vec![OsString::from("student"), "submit".into()];
+    let output = run(args, path, SUBMIT_TIMEOUT).await?;
+    Ok(Submitted {
+        url: submission_url(&output.stdout),
+    })
+}
+
+/// `View your submission at: https://github.com/o/r/commit/<sha>`.
+fn submission_url(stdout: &str) -> Option<String> {
+    stdout.lines().find_map(|line| {
+        let url = line.strip_prefix("View your submission at: ")?.trim();
+        url.starts_with("https://").then(|| url.to_owned())
     })
 }
 
@@ -106,6 +179,26 @@ mod tests {
             Some("o/r")
         );
         assert_eq!(accepted_repo("Something else"), None);
+    }
+
+    #[test]
+    fn reads_the_submission_url() {
+        let stdout = "Submitted assignment \"Lab 1\" at 2026-10-15 14:03:22 CEST\n\
+            View your submission at: https://github.com/o/r/commit/abc123";
+        assert_eq!(
+            submission_url(stdout).as_deref(),
+            Some("https://github.com/o/r/commit/abc123")
+        );
+        assert_eq!(submission_url("Submission pushed"), None);
+    }
+
+    #[test]
+    fn splits_git_file_lists() {
+        assert_eq!(
+            split_nul("a.txt\0dir/b c.txt\0"),
+            vec!["a.txt", "dir/b c.txt"]
+        );
+        assert!(split_nul("").is_empty());
     }
 
     #[test]

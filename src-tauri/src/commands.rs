@@ -291,6 +291,52 @@ pub async fn accept_assignment(
     Ok(Accepted { repo, project_id })
 }
 
+/// The clone of project `id`, which must exist and still take submissions.
+fn submittable_clone(state: &ProjectsState, id: &str) -> Result<PathBuf> {
+    let project = state
+        .snapshot()
+        .projects
+        .into_iter()
+        .find(|p| p.id == id)
+        .ok_or_else(|| Error::Unsupported(format!("unknown project {id}")))?;
+    let closed = project.assignment.as_ref().is_some_and(|a| a.closed)
+        || project.remote.as_ref().is_some_and(|r| r.archived);
+    if closed {
+        return Err(Error::Student(
+            "submissions are closed for this assignment".into(),
+        ));
+    }
+    project
+        .path
+        .ok_or_else(|| Error::Unsupported(format!("{id} has no local clone")))
+}
+
+/// What submitting project `id` would send, for the confirmation dialog.
+#[tauri::command]
+pub async fn submit_check(
+    state: State<'_, ProjectsState>,
+    id: String,
+) -> Result<student::SubmitCheck> {
+    let path = submittable_clone(&state, &id)?;
+    student::check(&path).await
+}
+
+/// Submits project `id` with `gh student submit`, then re-reads its status while the
+/// autograder runs (the clone's refs don't move, so the watcher wouldn't notice).
+#[tauri::command]
+pub async fn submit_project(
+    app: AppHandle,
+    state: State<'_, ProjectsState>,
+    id: String,
+) -> Result<student::Submitted> {
+    let path = submittable_clone(&state, &id)?;
+    let submitted = student::submit(&path).await?;
+    tauri::async_runtime::spawn(async move {
+        projects::refresh_after_push(&app).await;
+    });
+    Ok(submitted)
+}
+
 #[tauri::command]
 pub async fn check_update(app: AppHandle) -> Result<Option<UpdateInfo>> {
     updater::check(&app).await
