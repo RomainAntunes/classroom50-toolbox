@@ -33,6 +33,7 @@
   let error = $state<string | null>(null);
 
   async function signIn() {
+    if (!ghInstalled) return;
     pending = true;
     error = null;
     device = null;
@@ -65,6 +66,23 @@
     session.signingIn = device !== null;
   });
 
+  // gh just got installed (from the app or found by Check again): it may already hold an
+  // account from an earlier install, so the status read while gh was missing is re-read.
+  // Unset until the first run, which only records the starting value.
+  let hadGh: boolean | null = null;
+  $effect(() => {
+    const installed = ghInstalled;
+    if (installed && hadGh === false && auth && !auth.loggedIn) {
+      void api
+        .authStatus()
+        .then((status) => {
+          if (status.loggedIn) onchange(status);
+        })
+        .catch(() => {});
+    }
+    hadGh = installed;
+  });
+
   const login = $derived(auth?.loggedIn ? auth.login : null);
   const avatar = $derived(login ? session.avatars[login] : undefined);
 
@@ -93,7 +111,12 @@
         }),
       ),
       PredefinedMenuItem.new({ item: "Separator" }),
-      MenuItem.new({ text: t("auth.addAccount"), action: () => void signIn() }),
+      // Adding an account runs gh's device flow too.
+      MenuItem.new({
+        text: t(ghInstalled ? "auth.addAccount" : "auth.addAccountNeedsGh"),
+        enabled: ghInstalled,
+        action: () => void signIn(),
+      }),
     ]);
     const menu = await Menu.new({ items });
     await withDialog(() => menu.popup());
