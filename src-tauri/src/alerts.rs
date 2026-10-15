@@ -488,6 +488,7 @@ mod tests {
             web_url: None,
             late_seconds: None,
             editor: None,
+            group: None,
         }
     }
 

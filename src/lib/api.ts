@@ -165,6 +165,26 @@ export interface Project {
   lateSeconds: number | null;
   /** The editor that last opened the clone (`EditorInfo.id`), when one did. */
   editor: string | null;
+  /** The user's group, on a team assignment. */
+  group: Group | null;
+}
+
+/** A group team (`classroom50-group-<hash>-<n>`) the user is on. */
+export interface Group {
+  org: string;
+  slug: string;
+  /** The `<n>` of the team name, also in the shared repo's name. */
+  number: number;
+  /** The display name the founders chose, when they did. */
+  name: string | null;
+  members: Member[];
+  /** The team's page on GitHub. */
+  url: string;
+}
+
+export interface Member {
+  login: string;
+  name: string | null;
 }
 
 /** A published assignment the user hasn't accepted yet. */

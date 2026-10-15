@@ -26,6 +26,7 @@ use crate::discovery::{self, LocalProject};
 use crate::editors;
 use crate::error::{Error, Result};
 use crate::github::{self, Http, HttpCache};
+use crate::groups::{self, Group, GroupTeam};
 use crate::process;
 use crate::settings::{Settings, SettingsStore};
 use crate::status::{self, Branch, Feedback, Grade, Grading, StatusFields};
@@ -161,6 +162,9 @@ pub struct Project {
     /// The editor that last opened the clone (`editors::Editor::id`), when one did.
     #[serde(default)]
     pub editor: Option<String>,
+    /// The user's group, on a team assignment.
+    #[serde(default)]
+    pub group: Option<Group>,
 }
 
 /// Why the last sync was partial, as `{ kind, message }` like command errors.
@@ -225,6 +229,9 @@ struct RemoteCache {
     repos: BTreeMap<String, RemoteRepo>,
     /// From the user's classroom teams.
     classrooms: Vec<Classroom>,
+    /// The user's group teams with their members.
+    #[serde(default)]
+    groups: Vec<Group>,
 }
 
 /// How far the sync in flight is. `total` grows as the work is discovered (repo batches,
@@ -734,7 +741,20 @@ async fn sync(
         )
     };
     let mut snapshot = snapshot;
+    let groups = state.remote().groups;
     for project in &mut snapshot.projects {
+        project.group = project
+            .owner
+            .as_deref()
+            .and_then(|owner| {
+                groups::find(
+                    &groups,
+                    owner,
+                    &project.config.classroom,
+                    &project.config.assignment,
+                )
+            })
+            .cloned();
         project.editor = project
             .path
             .as_deref()
@@ -1339,7 +1359,13 @@ async fn sync_remote(
         }
     }
     match classrooms {
-        Ok(classrooms) => cache.classrooms = classrooms,
+        Ok((classrooms, group_teams)) => {
+            cache.classrooms = classrooms;
+            match groups::load(http, &token, &group_teams).await {
+                Ok(groups) => cache.groups = groups,
+                Err(err) => log::warn!("could not read group members: {err}"),
+            }
+        }
         // Teams are a bonus over marker files; keep the last known list.
         Err(err) => log::warn!("could not read classroom teams: {err}"),
     }
@@ -1389,29 +1415,41 @@ struct TeamNode {
     description: Option<String>,
 }
 
-/// The classrooms the user is enrolled in, from their `classroom50-<classroom>` teams.
+/// The classrooms the user is enrolled in, from their `classroom50-<classroom>` teams, and
+/// their group teams.
 async fn list_classrooms(
     http: &reqwest::Client,
     token: &str,
     login: &str,
-) -> Result<Vec<Classroom>> {
+) -> Result<(Vec<Classroom>, Vec<GroupTeam>)> {
     let mut classrooms = Vec::new();
+    let mut group_teams = Vec::new();
     let mut cursor: Option<String> = None;
     for _ in 0..MAX_LIST_PAGES {
         let variables = json!({ "login": login, "cursor": cursor });
         let data: TeamsData = github::graphql(http, token, TEAMS_QUERY, variables).await?;
         let page = data.viewer.organizations;
         for org in page.nodes.into_iter().flatten() {
-            classrooms.extend(org.teams.nodes.into_iter().flatten().filter_map(|team| {
-                Classroom::from_team(&org.login, &team.slug, team.description.as_deref())
-            }));
+            for team in org.teams.nodes.into_iter().flatten() {
+                if groups::is_group_team(&team.slug) {
+                    group_teams.push(GroupTeam {
+                        org: org.login.clone(),
+                        slug: team.slug,
+                        description: team.description,
+                    });
+                } else if let Some(classroom) =
+                    Classroom::from_team(&org.login, &team.slug, team.description.as_deref())
+                {
+                    classrooms.push(classroom);
+                }
+            }
         }
         match page.page_info.end_cursor {
             Some(next) if page.page_info.has_next_page => cursor = Some(next),
             _ => break,
         }
     }
-    Ok(classrooms)
+    Ok((classrooms, group_teams))
 }
 
 async fn list_repos(http: &reqwest::Client, token: &str) -> Result<(String, Vec<ListedRepo>)> {
@@ -1856,6 +1894,7 @@ fn merge(
                 web_url: None,
                 late_seconds: None,
                 editor: None,
+                group: None,
             };
             (id, project)
         })
@@ -1894,6 +1933,7 @@ fn merge(
                         web_url: None,
                         late_seconds: None,
                         editor: None,
+                        group: None,
                     },
                 );
             }
@@ -2160,6 +2200,7 @@ mod tests {
             web_url: None,
             late_seconds: None,
             editor: None,
+            group: None,
         };
 
         let unsubmitted = project(remote("r", "aaa", Some("old")), None);
@@ -2226,6 +2267,7 @@ mod tests {
                 web_url: None,
                 late_seconds: None,
                 editor: None,
+                group: None,
             }],
             ..Snapshot::default()
         };

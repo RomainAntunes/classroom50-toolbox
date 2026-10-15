@@ -8,6 +8,7 @@
   import { submitProject } from "$lib/submit";
   import { durationLabel, formatDate, fromNow, t } from "$lib/i18n";
   import { tildify } from "$lib/paths.svelte";
+  import { session } from "$lib/session.svelte";
   import Details from "./Details.svelte";
 
   let { project, now, unseen }: { project: Project; now: Date; unseen: boolean } = $props();
@@ -170,6 +171,21 @@
       );
     }
     if (feedback?.comments) add("feedback", String(feedback.comments));
+    if (project.group) {
+      const group = project.group;
+      const me = session.snapshot?.login?.toLowerCase();
+      add("group", group.name ?? t("details.groupNumber", { number: group.number }));
+      add(
+        "members",
+        group.members
+          .map((m) =>
+            m.login.toLowerCase() === me
+              ? t("details.you", { name: m.name ?? m.login })
+              : (m.name ?? m.login),
+          )
+          .join("\n"),
+      );
+    }
     if (unmerged.length) add("unmerged", unmerged.join(", "));
     if (project.local) {
       const local = project.local;
@@ -201,6 +217,11 @@
         text: t("projects.openFeedback"),
         enabled: Boolean(feedback),
         action: () => feedback && openUrl(feedback.url),
+      }),
+      MenuItem.new({
+        text: t("projects.openGroup"),
+        enabled: Boolean(project.group),
+        action: () => project.group && openUrl(project.group.url),
       }),
       MenuItem.new({
         text: t("projects.openGrade"),

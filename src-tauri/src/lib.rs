@@ -7,6 +7,7 @@ pub mod discovery;
 pub mod editors;
 pub mod error;
 pub mod github;
+pub mod groups;
 mod login;
 pub mod platform;
 mod popover;
