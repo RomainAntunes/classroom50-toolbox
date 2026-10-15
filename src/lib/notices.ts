@@ -34,6 +34,7 @@ export function sampleNotices(now = Date.now()): Notice[] {
   return [
     { kind: "due", assignment, due: new Date(now + 6 * HOUR).toISOString() },
     { kind: "grade", assignment, score: 8, maxScore: 10 },
+    { kind: "gradingFailed", assignment },
     { kind: "feedback", assignment, count: 2 },
     { kind: "newAssignment", assignment: "Lab 2", classroom: "CS50" },
     { kind: "teammatePush", assignment, author: "alice" },

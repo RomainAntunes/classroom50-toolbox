@@ -1,5 +1,5 @@
 //! Turns snapshot changes into notifications and the tray badge (a teammate's push only): deadline reminders, new
-//! grades, new feedback and newly published assignments. What was already announced is
+//! grades, grading that failed, new feedback and newly published assignments. What was already announced is
 //! remembered in `alerts.json` (app cache dir) so a restart doesn't repeat it, and the
 //! first snapshot only records a baseline. The UI formats and sends the notifications
 //! (`notify` event), so the text goes through i18n.
@@ -16,6 +16,7 @@ use crate::classroom50::SubmissionMode;
 use crate::github;
 use crate::projects::{Project, Snapshot};
 use crate::settings::SettingsStore;
+use crate::status::Grading;
 use crate::tray;
 
 pub const NOTIFY_EVENT: &str = "notify";
@@ -42,6 +43,10 @@ pub enum Notice {
         assignment: String,
         score: u32,
         max_score: u32,
+    },
+    /// The autograder couldn't grade the last push (not failing tests: those are a grade).
+    GradingFailed {
+        assignment: String,
     },
     Feedback {
         assignment: String,
@@ -74,6 +79,8 @@ struct Memory {
     assignments: BTreeMap<String, BTreeSet<String>>,
     /// Graded `submit/*` tag per project.
     grades: BTreeMap<String, String>,
+    /// Default-branch head whose failed grading was announced, per project.
+    grading_failed: BTreeMap<String, String>,
     /// Feedback PR comment count per project.
     feedback: BTreeMap<String, u32>,
     /// Default-branch head per project.
@@ -325,6 +332,18 @@ fn diff(
             }
         }
 
+        if let (Some(Grading::Failed { .. }), Some(head)) = (&remote.grading, &remote.head) {
+            let previous = memory
+                .grading_failed
+                .insert(project.id.clone(), head.oid.clone());
+            if previous.as_ref() != Some(&head.oid) && fresh(head.at) {
+                notices.push(Notice::GradingFailed {
+                    assignment: name.clone(),
+                });
+                memory.unseen.insert(project.id.clone());
+            }
+        }
+
         if let Some(feedback) = &remote.feedback {
             let previous = memory
                 .feedback
@@ -550,6 +569,32 @@ mod tests {
             ]
         );
         assert!(memory.unseen.contains("org/c-lab1-alice"));
+    }
+
+    #[test]
+    fn announces_failed_grading_once_per_push() {
+        let now = Utc::now();
+        let mut memory = Memory::default();
+        let failed = |oid: &str| {
+            let mut lab1 = project("lab1", None);
+            let remote = lab1.remote.as_mut().unwrap();
+            remote.head = Some(crate::projects::Commit {
+                oid: oid.into(),
+                at: Some(now),
+                author: None,
+            });
+            remote.grading = Some(Grading::Failed {
+                url: None,
+                message: None,
+            });
+            snapshot(vec![lab1])
+        };
+        let expected = vec![Notice::GradingFailed {
+            assignment: "LAB1".into(),
+        }];
+        assert_eq!(diff(&mut memory, &failed("a"), &[], now), expected);
+        assert!(diff(&mut memory, &failed("a"), &[], now).is_empty());
+        assert_eq!(diff(&mut memory, &failed("b"), &[], now), expected);
     }
 
     #[test]
