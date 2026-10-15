@@ -63,6 +63,7 @@
   "settings.dev.badgeHint": "Close the popover to see it; opening and closing it again clears it.",
   "settings.dev.badgeShow": "Show in 3 s",
   "settings.dev.badgeQueued": "Close the popover",
+  "settings.dev.kind.gradingFailed": "Grading failed",
   "settings.quit.label": "Quit",
   "settings.quit.hint": "Closing the window keeps it in the tray. Quitting stops syncs and reminders.",
   "settings.quit.action": "Quit",
