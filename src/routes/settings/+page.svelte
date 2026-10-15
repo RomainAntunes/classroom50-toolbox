@@ -323,11 +323,13 @@
 
   main {
     flex: 1;
-    overflow-y: auto;
+    /* The 10px track is always there (and invisible), so the right margin is 2px plus the
+       track and matches the left one whether or not the page scrolls. */
+    overflow-y: scroll;
     display: flex;
     flex-direction: column;
     gap: calc(var(--space) * 2);
-    padding: var(--space) 12px 14px;
+    padding: var(--space) 2px 14px 12px;
   }
 
   .disclosure {
