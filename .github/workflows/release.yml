@@ -109,3 +109,28 @@ jobs:
           releaseDraft: true
           prerelease: false
           args: ${{ matrix.args }}
+
+  # tauri-action points latest.json at api.github.com asset URLs, which allow 60
+  # unauthenticated requests an hour per IP: on a campus network every student shares one,
+  # and the update download fails with 403. Point it at the release's download links
+  # instead (they work once the draft is published under its tag).
+  updater-urls:
+    needs: [version, build]
+    runs-on: ubuntu-latest
+    steps:
+      - env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: v${{ needs.version.outputs.version }}
+        run: |
+          id=$(gh api "repos/$GITHUB_REPOSITORY/releases" --paginate \
+            --jq ".[] | select(.tag_name == \"$TAG\") | .id")
+          gh api "repos/$GITHUB_REPOSITORY/releases/$id/assets" --paginate > assets.json
+          gh release download "$TAG" --repo "$GITHUB_REPOSITORY" --pattern latest.json
+          jq --slurpfile assets assets.json \
+            --arg base "https://github.com/$GITHUB_REPOSITORY/releases/download/$TAG/" '
+            ($assets | add | map({key: .url, value: ($base + (.name | @uri))}) | from_entries) as $links
+            | .platforms |= map_values(.url = ($links[.url] // error("no asset for \(.url)")))
+          ' latest.json > latest.fixed.json
+          mv latest.fixed.json latest.json
+          cat latest.json
+          gh release upload "$TAG" latest.json --clobber --repo "$GITHUB_REPOSITORY"
