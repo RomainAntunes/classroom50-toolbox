@@ -138,12 +138,104 @@ async fn commit_changes(path: &Path, state: &PushCheck, message: Option<&str>) -
         .map(str::trim)
         .filter(|m| !m.is_empty())
         .ok_or_else(|| Error::Unsupported("a commit message is needed".into()))?;
+    let saved = SavedIndex::read(path).await?;
     git(path, &["add", "--all"]).await?;
     let args = commit_args(message);
-    process::run_with_timeout("git", &args, Some(path), COMMIT_TIMEOUT)
+    let committed = process::run_with_timeout("git", &args, Some(path), COMMIT_TIMEOUT)
         .await
         .map(drop)
-        .map_err(git_failure)
+        .map_err(git_failure);
+    if committed.is_err() {
+        saved.restore(path).await;
+    }
+    committed
+}
+
+/// The clone's index before `git add --all`, put back byte for byte when the commit then
+/// fails (a hook, signing, the time limit), so a refused commit doesn't leave everything
+/// staged or replace what the student had staged. Only the index file changes, never the
+/// working tree.
+struct SavedIndex {
+    file: PathBuf,
+    /// `None`: no index yet (a fresh clone of an empty repo).
+    bytes: Option<Vec<u8>>,
+    head: Option<String>,
+}
+
+impl SavedIndex {
+    async fn read(path: &Path) -> Result<Self> {
+        let file = PathBuf::from(
+            git(path, &["rev-parse", "--git-path", "index"])
+                .await?
+                .trim(),
+        );
+        let file = if file.is_absolute() {
+            file
+        } else {
+            path.join(file)
+        };
+        let bytes = match std::fs::read(&file) {
+            Ok(bytes) => Some(bytes),
+            Err(err) if err.kind() == std::io::ErrorKind::NotFound => None,
+            Err(err) => return Err(err.into()),
+        };
+        Ok(Self {
+            file,
+            bytes,
+            head: head(path).await,
+        })
+    }
+
+    /// Puts the index back, unless the commit was made after all (HEAD moved: a hook that
+    /// timed out after it) or a git process holds the index's lock.
+    async fn restore(self, path: &Path) {
+        if head(path).await != self.head {
+            return;
+        }
+        if let Err(err) = self.write() {
+            log::warn!("couldn't restore the index after a failed commit: {err}");
+        }
+    }
+
+    /// git's own protocol: create `index.lock` exclusively, fill it, rename it over `index`.
+    fn write(&self) -> std::io::Result<()> {
+        let mut lock_name = self.file.clone().into_os_string();
+        lock_name.push(".lock");
+        let lock = PathBuf::from(lock_name);
+        let mut out = std::fs::OpenOptions::new()
+            .write(true)
+            .create_new(true)
+            .open(&lock)?;
+        let written = match &self.bytes {
+            Some(bytes) => std::io::Write::write_all(&mut out, bytes)
+                .and_then(|()| out.sync_all())
+                .and_then(|()| {
+                    drop(out);
+                    std::fs::rename(&lock, &self.file)
+                }),
+            None => {
+                drop(out);
+                std::fs::remove_file(&self.file)
+                    .or_else(|err| match err.kind() {
+                        std::io::ErrorKind::NotFound => Ok(()),
+                        _ => Err(err),
+                    })
+                    .and_then(|()| std::fs::remove_file(&lock))
+            }
+        };
+        if written.is_err() {
+            let _ = std::fs::remove_file(&lock);
+        }
+        written
+    }
+}
+
+/// The commit HEAD points to, `None` before the first commit.
+async fn head(path: &Path) -> Option<String> {
+    git(path, &["rev-parse", "--quiet", "--verify", "HEAD"])
+        .await
+        .ok()
+        .map(|out| out.trim().to_owned())
 }
 
 /// Commits every change with `message` (when there are changes) and pushes `branch` to
@@ -617,6 +709,84 @@ mod tests {
             commit_check(&clone).await,
             Err(Error::NothingToCommit)
         ));
+        let _ = std::fs::remove_dir_all(&root);
+    }
+
+    /// A commit refused by a hook puts the index back as it was: the student's partial
+    /// staging kept, nothing else left staged, the working tree untouched. Same for a fresh
+    /// repo that had no index at all.
+    #[cfg(unix)]
+    #[tokio::test]
+    async fn a_failed_commit_restores_the_index() {
+        use std::os::unix::fs::PermissionsExt;
+        let root = std::env::temp_dir().join(format!("c50tb-hook-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&root);
+        let hooks = root.join("hooks");
+        std::fs::create_dir_all(&hooks).unwrap();
+        let hook = hooks.join("pre-commit");
+        std::fs::write(&hook, "#!/bin/sh\necho refused >&2\nexit 1\n").unwrap();
+        std::fs::set_permissions(&hook, std::fs::Permissions::from_mode(0o755)).unwrap();
+        let setup = |clone: &Path| {
+            std::fs::create_dir_all(clone).unwrap();
+            sh(clone, &["init", "-q", "-b", "main"]);
+            sh(clone, &["config", "--local", "commit.gpgsign", "false"]);
+            sh(clone, &["config", "--local", "user.name", "Ada"]);
+            sh(clone, &["config", "--local", "user.email", "a@a"]);
+        };
+        let index = |clone: &Path| std::fs::read(clone.join(".git").join("index")).ok();
+
+        let clone = root.join("clone");
+        setup(&clone);
+        std::fs::write(clone.join("tracked.txt"), "1").unwrap();
+        sh(&clone, &["add", "tracked.txt"]);
+        sh(&clone, &["commit", "-q", "-m", "one"]);
+        sh(
+            &clone,
+            &[
+                "config",
+                "--local",
+                "core.hooksPath",
+                hooks.to_str().unwrap(),
+            ],
+        );
+        std::fs::write(clone.join("tracked.txt"), "2").unwrap();
+        std::fs::write(clone.join("staged.txt"), "s").unwrap();
+        std::fs::write(clone.join("new.txt"), "n").unwrap();
+        sh(&clone, &["add", "staged.txt"]);
+        let head = sh(&clone, &["rev-parse", "HEAD"]);
+        let (before, status) = (index(&clone), sh(&clone, &["status", "--porcelain"]));
+        let result = commit(&clone, "Add").await;
+        assert!(result.is_err(), "{result:?}");
+        assert_eq!(sh(&clone, &["rev-parse", "HEAD"]), head);
+        assert_eq!(index(&clone), before);
+        assert_eq!(sh(&clone, &["status", "--porcelain"]), status);
+        assert_eq!(
+            sh(&clone, &["diff", "--cached", "--name-only"]),
+            "staged.txt"
+        );
+        assert_eq!(
+            std::fs::read_to_string(clone.join("tracked.txt")).unwrap(),
+            "2"
+        );
+        assert!(!clone.join(".git").join("index.lock").exists());
+
+        // No commit and no index yet: none afterwards either.
+        let fresh = root.join("fresh");
+        setup(&fresh);
+        sh(
+            &fresh,
+            &[
+                "config",
+                "--local",
+                "core.hooksPath",
+                hooks.to_str().unwrap(),
+            ],
+        );
+        std::fs::write(fresh.join("a.txt"), "a").unwrap();
+        assert_eq!(index(&fresh), None);
+        assert!(commit(&fresh, "Add").await.is_err());
+        assert_eq!(index(&fresh), None);
+        assert_eq!(sh(&fresh, &["status", "--porcelain"]), "?? a.txt");
         let _ = std::fs::remove_dir_all(&root);
     }
 }
