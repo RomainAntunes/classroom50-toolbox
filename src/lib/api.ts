@@ -85,8 +85,17 @@ export interface Grade {
   maxScore: number;
   testsPassed: number;
   testsTotal: number;
+  /** Each test, in the autograder's order; why one failed is only on the release page. */
+  tests: GradeTest[];
   publishedAt: string | null;
   url: string;
+}
+
+export interface GradeTest {
+  name: string;
+  passed: boolean;
+  score: number;
+  maxScore: number;
 }
 
 /** Teacher comments and reviews on the Feedback PR. */

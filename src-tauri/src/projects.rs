@@ -1551,7 +1551,14 @@ async fn refresh_statuses(
         repo.feedback = status.feedback(&auth.login);
         repo.grading = status.grading();
         repo.grade = match status.graded_release() {
-            Some(release) if old.grade.as_ref().is_some_and(|g| g.tag == release.tag) => old.grade,
+            Some(release)
+                if old
+                    .grade
+                    .as_ref()
+                    .is_some_and(|g| g.tag == release.tag && g.has_tests()) =>
+            {
+                old.grade
+            }
             Some(release) => match status::download_grade(http, &release).await {
                 Ok(grade) => Some(grade),
                 Err(err) => {

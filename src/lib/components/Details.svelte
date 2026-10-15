@@ -1,9 +1,23 @@
 <script lang="ts">
-  /** The expanded part of a row: the assignment's description, then label/value lines. */
+  import type { GradeTest } from "$lib/api";
+  import { t } from "$lib/i18n";
+
+  /** Failed tests listed before "and N more". */
+  const MAX_TESTS = 8;
+
+  /**
+   * The expanded part of a row: the assignment's description, label/value lines, then the
+   * tests the last grade failed.
+   */
   let {
     description,
     items,
-  }: { description: string | null; items: [label: string, value: string][] } = $props();
+    failed = [],
+  }: {
+    description: string | null;
+    items: [label: string, value: string][];
+    failed?: GradeTest[];
+  } = $props();
 </script>
 
 <div class="details">
@@ -16,6 +30,20 @@
       <dd title={value}>{value}</dd>
     {/each}
   </dl>
+  {#if failed.length}
+    <p class="heading">{t("details.failedTests")}</p>
+    <ul class="tests">
+      {#each failed.slice(0, MAX_TESTS) as test, i (i)}
+        <li>
+          <span class="name" title={test.name}>{test.name}</span>
+          <span class="points">{test.score}/{test.maxScore}</span>
+        </li>
+      {/each}
+    </ul>
+    {#if failed.length > MAX_TESTS}
+      <p class="more">{t("details.moreTests", { count: failed.length - MAX_TESTS })}</p>
+    {/if}
+  {/if}
 </div>
 
 <style>
@@ -56,5 +84,39 @@
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
+  }
+
+  .heading {
+    margin: 8px 0 3px;
+    color: var(--fg-muted);
+  }
+
+  .tests {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .tests li {
+    display: flex;
+    gap: 12px;
+  }
+
+  .tests .name {
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .tests .points {
+    color: var(--warning);
+    font-variant-numeric: tabular-nums;
+  }
+
+  .more {
+    margin: 3px 0 0;
+    color: var(--fg-muted);
   }
 </style>

@@ -70,6 +70,10 @@
     return null;
   });
   const grade = $derived(project.remote?.grade ?? null);
+  // A grade older than the head says nothing about it while the new one is on its way.
+  const failedTests = $derived(
+    grading?.state === "running" ? [] : (grade?.tests.filter((test) => !test.passed) ?? []),
+  );
   const feedback = $derived(project.remote?.feedback ?? null);
   const path = $derived(project.path);
   const githubUrl = $derived(
@@ -300,7 +304,11 @@
     {/if}
   </div>
   {#if open}
-    <Details description={project.assignment?.description ?? null} items={details} />
+    <Details
+      description={project.assignment?.description ?? null}
+      items={details}
+      failed={failedTests}
+    />
   {/if}
 </div>
 

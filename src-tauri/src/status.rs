@@ -70,8 +70,30 @@ pub struct Grade {
     pub max_score: u32,
     pub tests_passed: u32,
     pub tests_total: u32,
+    /// Each test, in the autograder's order. Why one failed is only in the release body
+    /// (`url`); `result.json` doesn't carry it.
+    #[serde(default)]
+    pub tests: Vec<GradeTest>,
     pub published_at: Option<DateTime<Utc>>,
     pub url: String,
+}
+
+impl Grade {
+    /// Grades cached before the test list was kept have none: download them again.
+    pub fn has_tests(&self) -> bool {
+        self.tests.len() == self.tests_total as usize
+    }
+}
+
+/// One test of a grade. Its own type, camelCase both ways, so the saved snapshot reads
+/// back (`TestResult` reads `result.json`'s kebab-case names).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct GradeTest {
+    pub name: String,
+    pub passed: bool,
+    pub score: u32,
+    pub max_score: u32,
 }
 
 /// The autograder's run on the head commit, while it says something the grade doesn't.
@@ -348,6 +370,16 @@ fn grade_from(release: &GradedRelease, result: &GradeResult) -> Grade {
         max_score: result.max_score,
         tests_passed: result.tests.iter().filter(|t| t.passed).count() as u32,
         tests_total: result.tests.len() as u32,
+        tests: result
+            .tests
+            .iter()
+            .map(|t| GradeTest {
+                name: t.name.clone(),
+                passed: t.passed,
+                score: t.score,
+                max_score: t.max_score,
+            })
+            .collect(),
         published_at: release.published_at,
         url: release.url.clone(),
     }
@@ -497,5 +529,25 @@ mod tests {
         let grade = grade_from(&release, &result);
         assert_eq!((grade.score, grade.max_score), (7, 10));
         assert_eq!((grade.tests_passed, grade.tests_total), (1, 2));
+        assert_eq!(
+            grade.tests[1],
+            GradeTest {
+                name: "t2".into(),
+                passed: false,
+                score: 0,
+                max_score: 3
+            }
+        );
+        assert!(grade.has_tests());
+
+        // The saved snapshot reads back.
+        let saved: Grade = serde_json::from_str(&serde_json::to_string(&grade).unwrap()).unwrap();
+        assert_eq!(saved, grade);
+        let old: Grade = serde_json::from_str(
+            r#"{"tag": "t", "score": 1, "maxScore": 2, "testsPassed": 1, "testsTotal": 2,
+                "publishedAt": null, "url": "u"}"#,
+        )
+        .unwrap();
+        assert!(!old.has_tests());
     }
 }
