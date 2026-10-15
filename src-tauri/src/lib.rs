@@ -54,6 +54,7 @@ pub fn run() {
         .plugin(tauri_plugin_opener::init())
         .manage(popover::PopoverState::default())
         .manage(login::LoginState::default())
+        .manage(tools::ToolJobs::default())
         .manage(watch::FolderWatcher::default())
         .manage(github::Http(
             reqwest::Client::builder()
@@ -103,6 +104,8 @@ pub fn run() {
             commands::install_command,
             commands::install_tool,
             commands::upgrade_tool,
+            commands::tool_jobs,
+            commands::cancel_tool_job,
             commands::tool_update,
             commands::auth_status,
             commands::list_projects,

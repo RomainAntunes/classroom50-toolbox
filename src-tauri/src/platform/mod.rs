@@ -63,6 +63,21 @@ pub fn install_command(tool: Tool) -> Result<CommandSpec> {
     imp::install_command(tool)
 }
 
+/// Environment for `install_command` that keeps the package manager from doing slow,
+/// unrelated work first (Homebrew updating itself and every tap).
+pub fn install_env() -> &'static [(&'static str, &'static str)] {
+    imp::INSTALL_ENV
+}
+
+/// How far along an install is (0 to 1) when `line` is one of the package manager's step
+/// markers, else `None`.
+pub fn install_progress(line: &str) -> Option<f32> {
+    imp::INSTALL_STEPS
+        .iter()
+        .find(|(marker, _)| line.contains(marker))
+        .map(|&(_, progress)| progress)
+}
+
 pub fn open_terminal(dir: &Path) -> Result<()> {
     imp::open_terminal(dir)
 }
