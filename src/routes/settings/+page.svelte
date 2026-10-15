@@ -24,6 +24,13 @@
   import Toggle from "$lib/components/Toggle.svelte";
   import ToolRow from "$lib/components/ToolRow.svelte";
   import { session } from "$lib/session.svelte";
+  import {
+    OS_CHOICES,
+    THEME_CHOICES,
+    preview,
+    setPreviewOs,
+    setPreviewTheme,
+  } from "$lib/theme/preview.svelte";
 
   const REMINDER_CHOICES = [72, 24, 6, 1];
   const REPO_URL = "https://github.com/RomainAntunes/classroom50-toolbox";
@@ -277,6 +284,26 @@
 
     {#if import.meta.env.DEV}
       <Section title={t("settings.dev.title")}>
+        <div class="row">
+          <span title={t("settings.dev.skinHint")}>{t("settings.dev.skin")}</span>
+          <div class="segmented">
+            {#each OS_CHOICES as os (os)}
+              <button aria-pressed={preview.os === os} onclick={() => setPreviewOs(os)}
+                >{t(`settings.dev.os.${os}`)}</button
+              >
+            {/each}
+          </div>
+        </div>
+        <div class="row">
+          <span>{t("settings.dev.appearance")}</span>
+          <div class="segmented">
+            {#each THEME_CHOICES as theme (theme)}
+              <button aria-pressed={preview.theme === theme} onclick={() => setPreviewTheme(theme)}
+                >{t(`settings.dev.theme.${theme}`)}</button
+              >
+            {/each}
+          </div>
+        </div>
         <button class="disclosure" aria-expanded={showDev} onclick={() => (showDev = !showDev)}>
           <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m9 18 6-6-6-6" /></svg>
           {t("settings.dev.notifications")}
@@ -410,6 +437,25 @@
 
   .sync .issue {
     color: var(--warning);
+  }
+
+  .segmented {
+    display: flex;
+    gap: 2px;
+    padding: 2px;
+    border-radius: var(--radius-control);
+    background: var(--bg-control);
+  }
+
+  .segmented button {
+    padding: 2px 8px;
+    background: transparent;
+    font-size: 0.9em;
+  }
+
+  .segmented button[aria-pressed="true"] {
+    background: var(--bg-card);
+    box-shadow: 0 0 0 1px var(--border);
   }
 
   .row.nested {
