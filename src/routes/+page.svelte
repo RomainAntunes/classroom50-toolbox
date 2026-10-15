@@ -442,10 +442,10 @@
     flex-shrink: 0;
   }
 
-  /* The app icon stands in for the title, as tall as the title's line was. */
+  /* The app icon stands in for the title, as tall as the search field beside it. */
   .logo {
-    height: 20px;
-    width: 20px;
+    height: 26px;
+    width: 26px;
   }
 
   main {
