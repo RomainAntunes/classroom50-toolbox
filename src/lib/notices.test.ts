@@ -18,7 +18,8 @@ describe("notices", () => {
         `alerts.${kind}.title`,
         `alerts.${kind}.body`,
       ]) {
-        expect(en[key], key).toBeTruthy();
+        // A string with a count has plural forms instead.
+        expect(en[key] ?? en[`${key}.other`], key).toBeTruthy();
       }
     }
   });

@@ -335,7 +335,7 @@
 
   {#if issue}
     <p class="issue" title={issue.message}>
-      {t(`projects.issue.${issue.kind}`, {}, "projects.issue.other")}
+      {t(`projects.issue.${issue.kind}`, {}, "projects.issue.fallback")}
     </p>
   {/if}
 

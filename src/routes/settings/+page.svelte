@@ -92,7 +92,7 @@
     } catch (err) {
       await withDialog(() =>
         message(
-          t(`calendar.error.${(err as { kind?: string }).kind}`, {}, "calendar.error.other"),
+          t(`calendar.error.${(err as { kind?: string }).kind}`, {}, "calendar.error.fallback"),
           {
             kind: "error",
           },
@@ -109,7 +109,7 @@
     } catch (err) {
       await withDialog(() =>
         message(
-          t(`calendar.error.${(err as { kind?: string }).kind}`, {}, "calendar.error.other"),
+          t(`calendar.error.${(err as { kind?: string }).kind}`, {}, "calendar.error.fallback"),
           {
             kind: "error",
           },
@@ -406,22 +406,22 @@
                   ? t("settings.sync.resets", { when: formatDate(new Date(rate.resetAt)) })
                   : undefined}
               >
-                {t("settings.sync.budgetValue", { remaining: rate.remaining, limit: rate.limit })}
+                {t("settings.sync.budgetValue", { remaining: rate.remaining, count: rate.limit })}
               </dd>
             {/if}
             <dt>{t("settings.sync.found")}</dt>
             <dd>
               {t("settings.sync.foundValue", {
-                repos: sync.stats.reposSeen,
-                assignments: sync.assignments,
-                clones: sync.clones,
+                repos: t("settings.sync.repos", { count: sync.stats.reposSeen }),
+                assignments: t("settings.sync.assignments", { count: sync.assignments }),
+                clones: t("settings.sync.cloned", { count: sync.clones }),
               })}
             </dd>
             <dt>{t("settings.sync.disk")}</dt>
             <dd>
               {t("settings.sync.diskValue", {
-                folders: sync.stats.scanRoots,
-                watched: sync.stats.watchTargets,
+                folders: t("settings.sync.folders", { count: sync.stats.scanRoots }),
+                watched: t("settings.sync.watched", { count: sync.stats.watchTargets }),
               })}
             </dd>
             {#if sync.issue}
