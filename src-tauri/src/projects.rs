@@ -241,6 +241,16 @@ struct RemoteCache {
     /// The user's group teams with their members.
     #[serde(default)]
     groups: Vec<Group>,
+    /// The last sync stopped before reading every listed repo, so `repos` may lack some.
+    #[serde(default)]
+    incomplete: bool,
+}
+
+impl RemoteCache {
+    /// Holds the whole repo list of an account, so a repo missing from it doesn't exist.
+    fn complete(&self) -> bool {
+        self.login.is_some() && !self.incomplete
+    }
 }
 
 /// How far the sync in flight is (see `sync_progress`).
@@ -949,6 +959,16 @@ fn watch_targets(
     targets
 }
 
+/// Whether `previous` holds the account's GitHub repos: a full sync has run, and the last
+/// one wasn't cut short by a missing sign-in or gh (it then lists clones only).
+fn discovered(previous: &Snapshot) -> bool {
+    previous.synced_at.is_some()
+        && !previous
+            .issue
+            .as_ref()
+            .is_some_and(|issue| matches!(issue.kind.as_str(), "notSignedIn" | "notInstalled"))
+}
+
 async fn local_snapshot(
     state: &ProjectsState,
     http: &reqwest::Client,
@@ -959,6 +979,7 @@ async fn local_snapshot(
     progress: &Progress,
 ) -> Snapshot {
     let previous = state.snapshot();
+    let discovered = discovered(&previous) && state.remote().complete();
     let remote_repos = previous
         .projects
         .into_iter()
@@ -979,6 +1000,7 @@ async fn local_snapshot(
         remote: remote_repos,
         classrooms,
         locals,
+        discovered,
     };
     let (projects, unaccepted) =
         build(sources, state, http, auth.as_ref(), network, now, progress).await;
@@ -1012,6 +1034,10 @@ async fn full_snapshot(
         progress.skip(Phase::Listing);
         progress.skip(Phase::Details);
     }
+    let discovered = !matches!(
+        remote,
+        Err(Error::NotSignedIn | Error::NotInstalled { .. })
+    ) && state.remote().complete();
     let (repos, classrooms, issue) = match remote {
         Ok(()) => {
             let cache = state.remote();
@@ -1042,6 +1068,7 @@ async fn full_snapshot(
         remote: repos,
         classrooms,
         locals,
+        discovered,
     };
     let (projects, unaccepted) =
         build(sources, state, http, auth.as_ref(), true, now, progress).await;
@@ -1063,6 +1090,9 @@ struct Sources {
     remote: Vec<RemoteRepo>,
     classrooms: Vec<Classroom>,
     locals: Vec<LocalProject>,
+    /// Whether `remote` is the account's repo list (fresh or cached). Without it a missing
+    /// repo proves nothing, so no assignment is offered for accepting.
+    discovered: bool,
 }
 
 async fn build(
@@ -1078,6 +1108,7 @@ async fn build(
         remote,
         classrooms: team_classrooms,
         locals,
+        discovered,
     } = sources;
     // Teams carry the display name and secret, so they win over marker files.
     let mut classrooms: BTreeMap<ClassroomKey, Classroom> =
@@ -1150,7 +1181,10 @@ async fn build(
         project.assignment = key
             .as_ref()
             .and_then(|k| manifests.get(k))
-            .and_then(|list| list.iter().find(|a| a.slug == project.config.assignment))
+            .and_then(|list| {
+                list.iter()
+                    .find(|a| a.slug.eq_ignore_ascii_case(&project.config.assignment))
+            })
             .cloned();
         project.web_url = project.owner.as_deref().map(|owner| {
             classroom50::submission_url(
@@ -1167,27 +1201,43 @@ async fn build(
         project.late_seconds = late_seconds(project);
     }
     projects.sort_by_cached_key(|p| sort_key(p, now));
-    let unaccepted = unaccepted(&projects, &classrooms, &manifests);
+    let unaccepted = if discovered {
+        unaccepted(&projects, &classrooms, &manifests)
+    } else {
+        Vec::new()
+    };
     (projects, unaccepted)
 }
 
 /// Open assignments of the user's classrooms with no repo yet, published or upcoming, by
-/// due date.
+/// due date. An assignment counts as accepted when a repo of the classroom's org names it
+/// in its marker file or by the naming rule, slugs compared without regard to case (a marker
+/// written by hand or by an older CLI may differ from the manifest in case, or name the
+/// assignment differently from the repo).
 fn unaccepted(
     projects: &[Project],
     classrooms: &BTreeMap<ClassroomKey, Classroom>,
     manifests: &HashMap<ClassroomKey, Vec<Assignment>>,
 ) -> Vec<Unaccepted> {
-    let accepted: HashSet<(ClassroomKey, &str)> = projects
-        .iter()
-        .filter_map(|p| {
-            let key = (
-                p.owner.as_deref()?.to_ascii_lowercase(),
-                p.config.classroom.to_ascii_lowercase(),
-            );
-            Some((key, p.config.assignment.as_str()))
-        })
-        .collect();
+    let mut accepted: HashSet<(ClassroomKey, String)> = HashSet::new();
+    for p in projects {
+        let Some(owner) = p.owner.as_deref().map(str::to_ascii_lowercase) else {
+            continue;
+        };
+        accepted.insert((
+            (owner.clone(), p.config.classroom.to_ascii_lowercase()),
+            p.config.assignment.to_ascii_lowercase(),
+        ));
+        let Some(name) = p.repo.as_deref() else {
+            continue;
+        };
+        for (key, classroom) in classrooms.iter().filter(|((org, _), _)| *org == owner) {
+            let slugs = manifests.get(key).into_iter().flatten().map(|a| a.slug.as_str());
+            if let Some(slug) = classroom50::assignment_for_repo(name, &classroom.slug, slugs) {
+                accepted.insert((key.clone(), slug.to_ascii_lowercase()));
+            }
+        }
+    }
     let mut list: Vec<Unaccepted> = manifests
         .iter()
         .filter_map(|(key, assignments)| Some((classrooms.get(key)?, key, assignments)))
@@ -1197,7 +1247,7 @@ fn unaccepted(
                 .iter()
                 // Upcoming ones (`available_from` ahead) are listed too, as "Opens ...".
                 .filter(|a| !a.closed)
-                .filter(|a| !accepted.contains(&(key.clone(), a.slug.as_str())))
+                .filter(|a| !accepted.contains(&(key.clone(), a.slug.to_ascii_lowercase())))
                 .map(|a| Unaccepted {
                     id: format!("{}/{}/{}", key.0, key.1, a.slug),
                     classroom: classroom.clone(),
@@ -1548,6 +1598,8 @@ async fn sync_remote(
             }
         }
     }
+    // Repos never read (the sync stopped first) are unknown: not proof of anything missing.
+    cache.incomplete = listed_keys.iter().any(|k| !cache.checked.contains_key(k));
     match classrooms {
         Ok((classrooms, group_teams)) => {
             cache.classrooms = classrooms;
@@ -2507,6 +2559,85 @@ mod tests {
             find(Some("other-org"), Some("26-poo-c-lab02-group-1"), None),
             None
         );
+    }
+
+    #[test]
+    fn lists_only_assignments_without_a_repo() {
+        let poo = Classroom::from_team("HEIGVD-POO", "classroom50-26-poo-c", None).unwrap();
+        let classrooms = BTreeMap::from([(poo.key(), poo)]);
+        let manifest: Vec<Assignment> = serde_json::from_value(json!([
+            {"slug": "lab01", "name": "Labo 1", "mode": "team"},
+            {"slug": "lab02", "name": "Labo 2", "mode": "team"},
+            {"slug": "labo-3", "name": "Labo 3", "mode": "team"},
+            {"slug": "labo-4", "name": "Labo 4", "mode": "team"},
+            {"slug": "labo-5", "name": "Labo 5", "mode": "team"},
+            {"slug": "old", "name": "Old", "mode": "team", "closed": true}
+        ]))
+        .unwrap();
+        let manifests =
+            HashMap::from([(("heigvd-poo".to_owned(), "26-poo-c".to_owned()), manifest)]);
+        let poo_config = |assignment: &str| RepoConfig {
+            classroom: "26-poo-c".into(),
+            assignment: assignment.into(),
+            secret: None,
+        };
+        let on_github = |name: &str, config: RepoConfig| {
+            let mut repo = remote(name, "aaa", None);
+            repo.owner = "HEIGVD-POO".into();
+            (repo, config)
+        };
+        let clone = |path: &str, owner: Option<&str>, name: Option<&str>| LocalProject {
+            path: path.into(),
+            owner: owner.map(str::to_owned),
+            repo: name.map(str::to_owned),
+            config: Some(poo_config("labo-4")),
+        };
+        let projects = merge(
+            vec![
+                // A marker spelled in another case than the manifest.
+                on_github("26-poo-c-lab01-group-3", poo_config("LAB01")),
+                // A marker naming something else; the repo's name still says lab02.
+                on_github("26-poo-c-lab02-group-6", poo_config("template-lab")),
+            ],
+            vec![
+                // A clone not seen on GitHub yet, found by its origin.
+                (
+                    clone(
+                        "/code/lab3",
+                        Some("heigvd-poo"),
+                        Some("26-poo-c-labo-3-alice"),
+                    ),
+                    poo_config("labo-3"),
+                    None,
+                ),
+                // No GitHub origin: which org it belongs to is unknown.
+                (clone("/code/copy", None, None), poo_config("labo-4"), None),
+            ],
+        );
+
+        let list = unaccepted(&projects, &classrooms, &manifests);
+        let slugs: Vec<&str> = list.iter().map(|u| u.assignment.slug.as_str()).collect();
+        assert_eq!(slugs, ["labo-4", "labo-5"]);
+        assert_eq!(list[0].id, "heigvd-poo/26-poo-c/labo-4");
+    }
+
+    #[test]
+    fn offers_accepting_only_with_the_account_repo_list() {
+        let mut snapshot = Snapshot::default();
+        assert!(!discovered(&snapshot), "no full sync yet");
+        snapshot.synced_at = Some(Utc::now());
+        assert!(discovered(&snapshot));
+        snapshot.issue = Some(SyncIssue::from(&Error::Offline));
+        assert!(discovered(&snapshot), "offline keeps the cached list");
+        snapshot.issue = Some(SyncIssue::from(&Error::NotSignedIn));
+        assert!(!discovered(&snapshot), "signed out lists clones only");
+
+        let mut cache = RemoteCache::default();
+        assert!(!cache.complete());
+        cache.login = Some("alice".into());
+        assert!(cache.complete());
+        cache.incomplete = true;
+        assert!(!cache.complete());
     }
 
     #[test]
