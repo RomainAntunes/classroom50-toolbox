@@ -332,6 +332,17 @@ fn signed_in(app: AppHandle, result: Result<AuthStatus>) -> Result<AuthStatus> {
     result
 }
 
+/// Signs `login` out of gh, then syncs whichever account is left (or clears the list).
+#[tauri::command]
+pub async fn sign_out(app: AppHandle, login: String) -> Result<AuthStatus> {
+    crate::accounts::sign_out(&login).await?;
+    let status = tools::auth_status().await;
+    tauri::async_runtime::spawn(async move {
+        projects::refresh(&app).await;
+    });
+    Ok(status)
+}
+
 #[tauri::command]
 pub fn cancel_login(state: State<'_, LoginState>) {
     state.cancel();

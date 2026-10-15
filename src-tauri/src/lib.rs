@@ -130,6 +130,7 @@ pub fn run() {
             commands::login,
             commands::cancel_login,
             commands::grant_scopes,
+            commands::sign_out,
             commands::open_terminal,
             commands::installed_editors,
             commands::open_in_editor,

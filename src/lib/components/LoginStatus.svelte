@@ -3,6 +3,7 @@
   import { listen } from "@tauri-apps/api/event";
   import { CheckMenuItem, Menu, MenuItem, PredefinedMenuItem } from "@tauri-apps/api/menu";
   import { openUrl } from "@tauri-apps/plugin-opener";
+  import { ask } from "@tauri-apps/plugin-dialog";
   import {
     isPermissionGranted,
     requestPermission,
@@ -144,6 +145,14 @@
               enabled: ghInstalled,
               action: () => void signIn(),
             }),
+            ...(login
+              ? [
+                  MenuItem.new({
+                    text: t("auth.signOut", { login }),
+                    action: () => void signOut(login),
+                  }),
+                ]
+              : []),
           ],
     );
     const menu = await Menu.new({ items });
@@ -157,6 +166,25 @@
       onchange(await api.switchAccount(next));
     } catch (err) {
       error = errorMessage(err);
+    }
+  }
+
+  /** gh's sign-in is global: the terminal is signed out too, so it is confirmed first. */
+  async function signOut(account: string) {
+    error = null;
+    const confirmed = await withDialog(() =>
+      ask(t("auth.signOutConfirm", { login: account }), {
+        title: t("auth.signOutTitle"),
+        kind: "warning",
+        okLabel: t("auth.signOutTitle"),
+        cancelLabel: t("auth.cancel"),
+      }),
+    );
+    if (!confirmed) return;
+    try {
+      onchange(await api.signOut(account));
+    } catch (err) {
+      error = loginError(err);
     }
   }
 

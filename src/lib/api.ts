@@ -437,6 +437,7 @@ export const api = {
   /** `gh auth refresh` with gh-student's scopes, through the same device flow as `login`. */
   grantScopes: () => invoke<AuthStatus>("grant_scopes"),
   cancelLogin: () => invoke<void>("cancel_login"),
+  signOut: (login: string) => invoke<AuthStatus>("sign_out", { login }),
   openTerminal: (path: string) => invoke<void>("open_terminal", { path }),
   installedEditors: () => invoke<EditorInfo[]>("installed_editors"),
   addTeammate: (id: string, username: string) => invoke<void>("add_teammate", { id, username }),
