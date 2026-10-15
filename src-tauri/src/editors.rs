@@ -171,17 +171,21 @@ pub struct EditorDirs {
 
 /// Blocking: call from `spawn_blocking`.
 pub fn find() -> EditorDirs {
-    let home = platform::home_dir();
-    let mut found = EditorDirs::default();
-    let mut seen = BTreeSet::new();
     let mut dirs = platform::editor_config_dirs();
     for dir in platform::editor_data_dirs() {
         if !dirs.contains(&dir) {
             dirs.push(dir);
         }
     }
+    find_in(platform::home_dir(), &dirs)
+}
 
-    for dir in &dirs {
+/// `find` over given home and editor dirs, so tests can point it at a fake home.
+fn find_in(home: Option<PathBuf>, dirs: &[PathBuf]) -> EditorDirs {
+    let mut found = EditorDirs::default();
+    let mut seen = BTreeSet::new();
+
+    for dir in dirs {
         for (file, editor) in jetbrains_files(dir) {
             let Ok(xml) = std::fs::read_to_string(&file) else {
                 continue;
@@ -356,7 +360,10 @@ fn zed_files(data_dir: &Path) -> Vec<PathBuf> {
         };
         for channel in entries.flatten().map(|entry| entry.path()) {
             for file in ["db.sqlite", "db.sqlite-wal"] {
-                let file = channel.join(file);
+                // `Zed` and `zed` are one folder on a case-insensitive disk.
+                let Ok(file) = std::fs::canonicalize(channel.join(file)) else {
+                    continue;
+                };
                 if file.is_file() && !files.contains(&file) {
                     files.push(file);
                 }
@@ -752,6 +759,105 @@ mod tests {
             visual_studio_recent(xml),
             vec![PathBuf::from(r"C:\Users\alice\source\repos\Lab1\Lab1.sln")]
         );
+    }
+
+    /// A fake home with one project per editor kind, read end to end.
+    #[test]
+    fn finds_recent_projects_of_every_editor_kind() {
+        let home = std::env::temp_dir().join(format!("c50-home-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&home);
+        let config = home.join("config");
+        let project = |name: &str| {
+            let dir = home.join("code").join(name);
+            std::fs::create_dir_all(&dir).unwrap();
+            dir
+        };
+        let write = |path: PathBuf, text: String| {
+            std::fs::create_dir_all(path.parent().unwrap()).unwrap();
+            std::fs::write(path, text).unwrap();
+        };
+        let idea = project("idea-lab");
+        let rider = project("rider-lab");
+        std::fs::write(rider.join("Lab.sln"), "").unwrap();
+        let vscode = project("vscode-lab");
+        let zed = project("zed-lab");
+        let sublime = project("sublime-lab");
+        let netbeans = project("netbeans-lab");
+        std::fs::create_dir_all(home.join("IdeaProjects")).unwrap();
+        std::fs::create_dir_all(home.join("Developer")).unwrap();
+
+        write(
+            config.join("JetBrains/IntelliJIdea2026.2/options/recentProjects.xml"),
+            r#"<entry key="$USER_HOME$/code/idea-lab">"#.to_owned(),
+        );
+        write(
+            config.join("JetBrains/Rider2026.1/options/recentSolutions.xml"),
+            format!(r#"<entry key="{}">"#, rider.join("Lab.sln").display()),
+        );
+        write(
+            config.join("Cursor/User/globalStorage/storage.json"),
+            format!(r#"{{"folderUri":"file://{}"}}"#, vscode.display()),
+        );
+        write(
+            config.join("Zed/db/0-stable/db.sqlite"),
+            format!("\u{1}{}0\u{0}", zed.display()),
+        );
+        write(
+            config.join("Sublime Text/Local/Session.sublime_session"),
+            format!(r#"{{"folder_history": ["{}"]}}"#, sublime.display()),
+        );
+        write(
+            config.join("NetBeans/24/config/Preferences/org/netbeans/modules/projectui.properties"),
+            format!("recentProjectsURL.0=file\\:{}/\n", netbeans.display()),
+        );
+
+        let found = find_in(Some(home.clone()), &[config]);
+        let editor_of = |dir: &Path| {
+            found
+                .recent
+                .iter()
+                .find(|r| r.path == dir)
+                .map(|r| r.editor.map(|e| e.id))
+        };
+        assert_eq!(editor_of(&idea), Some(Some("idea")));
+        assert_eq!(editor_of(&rider), Some(Some("rider")));
+        assert_eq!(editor_of(&vscode), Some(Some("cursor")));
+        assert_eq!(editor_of(&zed), Some(Some("zed")));
+        assert_eq!(editor_of(&sublime), Some(Some("sublime")));
+        assert_eq!(editor_of(&netbeans), Some(Some("netbeans")));
+        let roots: Vec<_> = found
+            .roots
+            .iter()
+            .map(|r| {
+                (
+                    r.path.strip_prefix(&home).unwrap().to_owned(),
+                    r.editor.map(|e| e.id),
+                )
+            })
+            .collect();
+        assert_eq!(
+            roots,
+            vec![
+                (PathBuf::from("IdeaProjects"), Some("idea")),
+                (PathBuf::from("Developer"), None),
+                (PathBuf::from("code"), None),
+            ]
+        );
+        // Every file read is watched, so a newly opened project shows up.
+        assert_eq!(found.files.len(), 6);
+        std::fs::remove_dir_all(&home).unwrap();
+    }
+
+    #[test]
+    fn reads_several_zed_paths_from_one_row() {
+        let home = std::env::temp_dir().join(format!("c50-zed-rows-{}", std::process::id()));
+        let a = home.join("cours-é");
+        let b = home.join("b");
+        std::fs::create_dir_all(&a).unwrap();
+        std::fs::create_dir_all(&b).unwrap();
+        let text = format!("\u{2}{}\n{}\u{3}0,1", a.display(), b.display());
+        assert_eq!(paths_under(&text, &home), vec![a, b]);
+        std::fs::remove_dir_all(&home).unwrap();
     }
 
     #[test]
