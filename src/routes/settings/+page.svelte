@@ -8,6 +8,7 @@
   import {
     api,
     errorMessage,
+    APPEARANCES,
     PROJECTS_UPDATED_EVENT,
     SIMULATED_NETWORKS,
     withDialog,
@@ -26,13 +27,7 @@
   import Toggle from "$lib/components/Toggle.svelte";
   import ToolRow from "$lib/components/ToolRow.svelte";
   import { session } from "$lib/session.svelte";
-  import {
-    OS_CHOICES,
-    THEME_CHOICES,
-    preview,
-    setPreviewOs,
-    setPreviewTheme,
-  } from "$lib/theme/preview.svelte";
+  import { OS_CHOICES, preview, setPreviewOs } from "$lib/theme/preview.svelte";
 
   const REMINDER_CHOICES = [72, 24, 6, 1];
   const REPO_URL = "https://github.com/RomainAntunes/classroom50-toolbox";
@@ -244,6 +239,18 @@
           >
         </div>
       {/if}
+      <div class="row">
+        <span>{t("settings.appearance")}</span>
+        <div class="segmented">
+          {#each APPEARANCES as choice (choice)}
+            <button
+              aria-pressed={current.appearance === choice}
+              onclick={() => save({ appearance: choice })}
+              >{t(`settings.appearance.${choice}`)}</button
+            >
+          {/each}
+        </div>
+      </div>
       <Toggle
         label={t("settings.launchAtLogin")}
         checked={current.launchAtLogin}
@@ -336,16 +343,6 @@
             {#each OS_CHOICES as os (os)}
               <button aria-pressed={preview.os === os} onclick={() => setPreviewOs(os)}
                 >{t(`settings.dev.os.${os}`)}</button
-              >
-            {/each}
-          </div>
-        </div>
-        <div class="row">
-          <span>{t("settings.dev.appearance")}</span>
-          <div class="segmented">
-            {#each THEME_CHOICES as theme (theme)}
-              <button aria-pressed={preview.theme === theme} onclick={() => setPreviewTheme(theme)}
-                >{t(`settings.dev.theme.${theme}`)}</button
               >
             {/each}
           </div>
