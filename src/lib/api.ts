@@ -318,8 +318,14 @@ export interface PushCheck {
   hasIdentity: boolean;
 }
 
+/** What Commit would do (`commit_check`), and whether Commit & push is offered with it. */
+export interface CommitCheck extends PushCheck {
+  /** Why push isn't offered (`tagMode`, `closed`, `otherBranch`, `remoteAhead`, ...); null when it is. */
+  pushBlocked: string | null;
+}
+
 export interface Pushed {
-  /** The pushed head commit. */
+  /** The new head commit (local only after `commitOnly`). */
   commit: string;
 }
 
@@ -550,6 +556,10 @@ export const api = {
   /** Commits every change with `message` (unless only commits are waiting) and pushes the default branch. */
   commitPush: (id: string, message: string | null) =>
     invoke<Pushed>("commit_push", { id, message }),
+  /** What a local commit would hold, on any branch; rejects with `gitInProgress` or `nothingToCommit`. */
+  commitCheck: (id: string) => invoke<CommitCheck>("commit_check", { id }),
+  /** Commits every change with `message` in the clone, without pushing. */
+  commitOnly: (id: string, message: string) => invoke<Pushed>("commit_only", { id, message }),
   suggestedGitIdentity: () => invoke<GitIdentity>("suggested_git_identity"),
   /** Writes `user.name` and `user.email` to the clone's own git config. */
   setGitIdentity: (id: string, name: string, email: string) =>

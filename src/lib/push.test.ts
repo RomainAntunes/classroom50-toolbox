@@ -1,10 +1,12 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import type { Assignment, Project, PushCheck } from "$lib/api";
+import type { Assignment, CommitCheck, Project } from "$lib/api";
 import { prompt } from "$lib/prompt.svelte";
 
 const dialog = vi.hoisted(() => ({ ask: vi.fn(), message: vi.fn() }));
 const api = vi.hoisted(() => ({
   pushCheck: vi.fn(),
+  commitCheck: vi.fn(),
+  commitOnly: vi.fn(),
   submitCheck: vi.fn(),
   commitPush: vi.fn(),
   suggestedGitIdentity: vi.fn(),
@@ -17,7 +19,7 @@ vi.mock("$lib/api", async (importOriginal) => ({
   withDialog: <T>(run: () => Promise<T>) => run(),
 }));
 
-const { commitPush, gradedOnPush } = await import("$lib/push");
+const { commitLocal, commitPush, gradedOnPush } = await import("$lib/push");
 const { submitProject } = await import("$lib/submit");
 
 const project = (assignment: Partial<Assignment> | null = {}) =>
@@ -27,25 +29,27 @@ const project = (assignment: Partial<Assignment> | null = {}) =>
     remote: { defaultBranch: "main" },
   }) as Project;
 
-const check = (over: Partial<PushCheck> = {}): PushCheck => ({
+const check = (over: Partial<CommitCheck> = {}): CommitCheck => ({
   files: ["a.txt"],
   untracked: [],
   large: [],
   tooLarge: [],
   ahead: 0,
   hasIdentity: true,
+  pushBlocked: null,
   ...over,
 });
 
-/** Answers the in-popover prompt once it opens. */
-async function answer(text: string | null) {
+/** Answers the in-popover prompt once it opens, with its second action when `alt`. */
+async function answer(text: string | null, alt = false) {
   await vi.waitFor(() => expect(prompt.current).not.toBeNull());
-  prompt.current?.resolve(text);
+  prompt.current?.resolve(text, alt);
 }
 
 beforeEach(() => {
   vi.resetAllMocks();
   api.commitPush.mockResolvedValue({ commit: "abc" });
+  api.commitOnly.mockResolvedValue({ commit: "abc" });
 });
 
 describe("gradedOnPush", () => {
@@ -59,7 +63,7 @@ describe("gradedOnPush", () => {
 
 describe("commitPush", () => {
   it("commits with the message typed", async () => {
-    api.pushCheck.mockResolvedValue(check());
+    api.commitCheck.mockResolvedValue(check());
     const done = commitPush(project(), "Lab");
     await answer("  Fix the loop ");
     expect(await done).toBe(true);
@@ -68,22 +72,38 @@ describe("commitPush", () => {
   });
 
   it("does nothing when the prompt is cancelled", async () => {
-    api.pushCheck.mockResolvedValue(check());
+    api.commitCheck.mockResolvedValue(check());
     const done = commitPush(project(), "Lab");
     await answer(null);
     expect(await done).toBe(false);
     expect(api.commitPush).not.toHaveBeenCalled();
   });
 
-  it("confirms a late push first", async () => {
-    api.pushCheck.mockResolvedValue(check());
+  it("confirms a late push", async () => {
+    api.commitCheck.mockResolvedValue(check());
     dialog.ask.mockResolvedValue(false);
-    expect(await commitPush(project({ due: "2000-01-01T00:00:00Z" }), "Lab")).toBe(false);
-    expect(prompt.current).toBeNull();
+    const done = commitPush(project({ due: "2000-01-01T00:00:00Z" }), "Lab");
+    await answer("msg");
+    expect(await done).toBe(false);
+    expect(dialog.ask).toHaveBeenCalledOnce();
     expect(api.commitPush).not.toHaveBeenCalled();
   });
 
+  it("commits only with the second action, late or not, without a confirm", async () => {
+    api.commitCheck.mockResolvedValue(check());
+    const done = commitPush(project({ due: "2000-01-01T00:00:00Z" }), "Lab");
+    await vi.waitFor(() => expect(prompt.current).not.toBeNull());
+    expect(prompt.current?.okLabel).toBe("Commit & push");
+    expect(prompt.current?.altLabel).toBe("Commit only");
+    await answer("WIP", true);
+    expect(await done).toBe(true);
+    expect(api.commitOnly).toHaveBeenCalledWith("o/r", "WIP");
+    expect(api.commitPush).not.toHaveBeenCalled();
+    expect(dialog.ask).not.toHaveBeenCalled();
+  });
+
   it("only confirms when there are just commits to push", async () => {
+    api.commitCheck.mockRejectedValue({ kind: "nothingToCommit", message: "x" });
     api.pushCheck.mockResolvedValue(check({ files: [], ahead: 2 }));
     dialog.ask.mockResolvedValue(true);
     expect(await commitPush(project(), "Lab")).toBe(true);
@@ -91,7 +111,7 @@ describe("commitPush", () => {
   });
 
   it("sets the identity in the clone when git has none", async () => {
-    api.pushCheck.mockResolvedValue(check({ hasIdentity: false }));
+    api.commitCheck.mockResolvedValue(check({ hasIdentity: false }));
     api.suggestedGitIdentity.mockResolvedValue({ name: "Ada", email: "1+ada@x" });
     dialog.ask.mockResolvedValue(true);
     const done = commitPush(project(), "Lab");
@@ -101,7 +121,7 @@ describe("commitPush", () => {
   });
 
   it("refuses files GitHub would reject", async () => {
-    api.pushCheck.mockResolvedValue(check({ tooLarge: ["big.bin"] }));
+    api.commitCheck.mockResolvedValue(check({ tooLarge: ["big.bin"] }));
     expect(await commitPush(project(), "Lab")).toBe(false);
     expect(dialog.message).toHaveBeenCalledWith(
       expect.stringContaining("big.bin"),
@@ -110,6 +130,7 @@ describe("commitPush", () => {
   });
 
   it("words a refusal", async () => {
+    api.commitCheck.mockRejectedValue({ kind: "nothingToCommit", message: "x" });
     api.pushCheck.mockRejectedValue({ kind: "remoteAhead", message: "x" });
     expect(await commitPush(project(), "Lab")).toBe(false);
     expect(dialog.message).toHaveBeenCalledWith(
@@ -119,12 +140,71 @@ describe("commitPush", () => {
   });
 });
 
+describe("commitLocal", () => {
+  it("puts Commit first and offers Commit & push second", async () => {
+    api.commitCheck.mockResolvedValue(check());
+    const done = commitLocal(project(), "Lab");
+    await vi.waitFor(() => expect(prompt.current).not.toBeNull());
+    expect(prompt.current?.okLabel).toBe("Commit");
+    expect(prompt.current?.altLabel).toBe("Commit & push");
+    await answer("Fix");
+    expect(await done).toBe(true);
+    expect(api.commitOnly).toHaveBeenCalledWith("o/r", "Fix");
+    expect(api.commitPush).not.toHaveBeenCalled();
+  });
+
+  it("pushes with the second action", async () => {
+    api.commitCheck.mockResolvedValue(check());
+    const done = commitLocal(project(), "Lab");
+    await answer("Fix", true);
+    expect(await done).toBe(true);
+    expect(api.commitPush).toHaveBeenCalledWith("o/r", "Fix");
+  });
+
+  it.each([
+    ["tagMode", "graded through Submit"],
+    ["otherBranch", "main, the graded branch"],
+    ["remoteAhead", "GitHub has newer commits"],
+    ["somethingElse", "push isn't available"],
+  ])("offers only Commit when push is blocked (%s), and says why", async (reason, why) => {
+    api.commitCheck.mockResolvedValue(check({ pushBlocked: reason }));
+    const done = commitPush(project({ due: "2000-01-01T00:00:00Z" }), "Lab");
+    await vi.waitFor(() => expect(prompt.current).not.toBeNull());
+    expect(prompt.current?.okLabel).toBe("Commit");
+    expect(prompt.current?.altLabel).toBeUndefined();
+    expect(prompt.current?.message).toContain(why);
+    await answer("Fix");
+    expect(await done).toBe(true);
+    expect(api.commitOnly).toHaveBeenCalledWith("o/r", "Fix");
+    expect(dialog.ask).not.toHaveBeenCalled();
+  });
+
+  it("says when there is nothing to commit", async () => {
+    api.commitCheck.mockRejectedValue({ kind: "nothingToCommit", message: "x" });
+    expect(await commitLocal(project(), "Lab")).toBe(false);
+    expect(api.pushCheck).not.toHaveBeenCalled();
+    expect(dialog.message).toHaveBeenCalledWith(
+      expect.stringContaining("Nothing to commit"),
+      expect.anything(),
+    );
+  });
+
+  it("words a failed commit as a commit", async () => {
+    api.commitCheck.mockResolvedValue(check());
+    api.commitOnly.mockRejectedValue({ kind: "unsupported", message: "hook failed" });
+    const done = commitLocal(project(), "Lab");
+    await answer("Fix");
+    expect(await done).toBe(false);
+    expect(dialog.message).toHaveBeenCalledWith("Commit failed: hook failed", expect.anything());
+  });
+});
+
 describe("submitProject without a marker", () => {
   const noMarker = { hasMarker: false, untracked: [], deleted: [] };
 
   it("offers Commit & push on every-push assignments", async () => {
     api.submitCheck.mockResolvedValue(noMarker);
-    api.pushCheck.mockResolvedValue(check());
+    api.commitCheck.mockResolvedValue(check());
     dialog.ask.mockResolvedValue(true);
     const done = submitProject(project(), "Lab");
     await answer("First version");

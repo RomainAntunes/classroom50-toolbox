@@ -1,10 +1,11 @@
-// Commit & push for every-push assignments, where each push to the default branch is graded.
-// Rust commits every change with the student's message and pushes the default branch, and
-// refuses anything that would need a merge; the refusals are explained here.
+// Commit, and Commit & push for every-push assignments, where each push to the default branch
+// is graded. Rust commits every change with the student's message (any branch, any clone) and,
+// when chosen, pushes the default branch, refusing anything that would need a merge; the
+// refusals are explained here.
 import { ask, message } from "@tauri-apps/plugin-dialog";
 import { api, errorKind, errorMessage, withDialog, type Project } from "$lib/api";
 import { t } from "$lib/i18n";
-import { askText } from "$lib/prompt.svelte";
+import { askTextAction } from "$lib/prompt.svelte";
 import { fileList } from "$lib/files";
 
 const REASONS = [
@@ -53,51 +54,99 @@ async function setIdentity(project: Project, name: string): Promise<boolean> {
   return true;
 }
 
-/** Asks for the message, commits and pushes. Returns true when the push went through. */
-export async function commitPush(project: Project, name: string): Promise<boolean> {
+/** Commit & push (row button, menu): pushing is the main action, "Commit only" the second. */
+export function commitPush(project: Project, name: string): Promise<boolean> {
+  return commitWork(project, name, true);
+}
+
+/** Commit (menu, any clone): committing is the main action, Commit & push the second when it
+ *  applies. */
+export function commitLocal(project: Project, name: string): Promise<boolean> {
+  return commitWork(project, name, false);
+}
+
+/** Why push isn't offered next to Commit, in one line. */
+function noPushLine(reason: string, branch: string): string {
+  const known = ["tagMode", "closed", "otherBranch", "remoteAhead"];
+  return t(`commit.noPush.${known.includes(reason) ? reason : "other"}`, { branch });
+}
+
+/** Asks for the message, then commits, and pushes when chosen. Returns true when it went
+ *  through. */
+async function commitWork(project: Project, name: string, preferPush: boolean): Promise<boolean> {
   const branch = project.remote?.defaultBranch ?? project.local?.branch ?? "main";
+  let pushing = preferPush;
   try {
-    const check = await api.pushCheck(project.id);
+    let check;
+    try {
+      check = await api.commitCheck(project.id);
+    } catch (err) {
+      // Nothing to commit: Commit & push may still have commits to push.
+      if (preferPush && errorKind(err) === "nothingToCommit") {
+        return await pushOnly(project, name, branch);
+      }
+      throw err;
+    }
     if (check.tooLarge.length) {
       await show(t("push.fileTooLarge", { files: fileList(check.tooLarge) }), name, "error");
       return false;
     }
-    if (check.files.length && !check.hasIdentity && !(await setIdentity(project, name))) {
-      return false;
+    if (!check.hasIdentity && !(await setIdentity(project, name))) return false;
+    const canPush = check.pushBlocked === null;
+    const lines = [t("push.files", { count: check.files.length, files: fileList(check.files) })];
+    if (check.untracked.length) {
+      lines.push(t("push.untracked", { files: fileList(check.untracked) }));
     }
-    const due = project.assignment?.due ? new Date(project.assignment.due) : null;
-    const late = due !== null && due < new Date();
-    let commitMessage: string | null = null;
-    if (check.files.length) {
-      if (late && !(await confirm(t("push.lateConfirm"), name, t("push.continue")))) {
+    if (check.large.length) lines.push(t("push.large", { files: fileList(check.large) }));
+    if (canPush && check.ahead) lines.push(t("push.ahead", { count: check.ahead }));
+    if (!canPush) lines.push(noPushLine(check.pushBlocked ?? "", branch));
+    const pushFirst = canPush && preferPush;
+    const answer = await askTextAction({
+      title: t(pushFirst ? "push.title" : "commit.title"),
+      message: lines.join("\n"),
+      placeholder: t("push.placeholder"),
+      okLabel: t(pushFirst ? "push.ok" : "commit.ok"),
+      altLabel: canPush ? t(pushFirst ? "commit.only" : "push.ok") : undefined,
+    });
+    if (!answer) return false;
+    pushing = canPush && answer.alt !== preferPush;
+    if (pushing) {
+      if (late(project) && !(await confirm(t("push.lateConfirm"), name, t("push.continue")))) {
         return false;
       }
-      const lines = [t("push.files", { count: check.files.length, files: fileList(check.files) })];
-      if (check.untracked.length) {
-        lines.push(t("push.untracked", { files: fileList(check.untracked) }));
-      }
-      if (check.large.length) lines.push(t("push.large", { files: fileList(check.large) }));
-      if (check.ahead) lines.push(t("push.ahead", { count: check.ahead }));
-      commitMessage = await askText({
-        title: t("push.title"),
-        message: lines.join("\n"),
-        placeholder: t("push.placeholder"),
-        okLabel: t("push.ok"),
-      });
-      if (!commitMessage) return false;
+      await api.commitPush(project.id, answer.text);
     } else {
-      const lines = [t("push.pushOnly", { count: check.ahead, branch })];
-      if (late) lines.push(t("push.late"));
-      if (!(await confirm(lines.join("\n\n"), name, t("push.pushOk")))) return false;
+      await api.commitOnly(project.id, answer.text);
     }
-    await api.commitPush(project.id, commitMessage);
     return true;
   } catch (err) {
-    const kind = errorKind(err) ?? "";
-    const text = REASONS.includes(kind)
-      ? t(`push.${kind}`, { branch })
-      : t("push.failed", { error: errorMessage(err) });
-    await show(text, name, "warning");
+    await refused(err, name, branch, pushing);
     return false;
   }
+}
+
+function late(project: Project): boolean {
+  const due = project.assignment?.due ? new Date(project.assignment.due) : null;
+  return due !== null && due < new Date();
+}
+
+/** No changes, only local commits GitHub lacks: one confirm, then the push. */
+async function pushOnly(project: Project, name: string, branch: string): Promise<boolean> {
+  const check = await api.pushCheck(project.id);
+  const lines = [t("push.pushOnly", { count: check.ahead, branch })];
+  if (late(project)) lines.push(t("push.late"));
+  if (!(await confirm(lines.join("\n\n"), name, t("push.pushOk")))) return false;
+  await api.commitPush(project.id, null);
+  return true;
+}
+
+async function refused(err: unknown, name: string, branch: string, pushing: boolean) {
+  const kind = errorKind(err) ?? "";
+  const text =
+    kind === "nothingToCommit"
+      ? t("commit.nothingToCommit")
+      : REASONS.includes(kind)
+        ? t(`push.${kind}`, { branch })
+        : t(pushing ? "push.failed" : "commit.failed", { error: errorMessage(err) });
+  await show(text, name, "warning");
 }

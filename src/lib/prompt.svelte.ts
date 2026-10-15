@@ -6,22 +6,34 @@ export interface PromptOptions {
   message?: string;
   placeholder?: string;
   okLabel: string;
+  /** A second action next to the main one (`askTextAction` only). */
+  altLabel?: string;
 }
 
 export const prompt = $state<{
-  current: (PromptOptions & { resolve: (value: string | null) => void }) | null;
+  current: (PromptOptions & { resolve: (value: string | null, alt?: boolean) => void }) | null;
 }>({ current: null });
 
-/** Shows the prompt; resolves to the trimmed text, or null when cancelled or empty. */
-export function askText(options: PromptOptions): Promise<string | null> {
+/** Shows the prompt; resolves to the trimmed text and whether the second action was chosen,
+ *  or null when cancelled or empty. */
+export function askTextAction(
+  options: PromptOptions,
+): Promise<{ text: string; alt: boolean } | null> {
   prompt.current?.resolve(null);
   return new Promise((resolve) => {
     prompt.current = {
       ...options,
-      resolve: (value) => {
+      resolve: (value, alt = false) => {
         prompt.current = null;
-        resolve(value?.trim() || null);
+        const text = value?.trim();
+        resolve(text ? { text, alt } : null);
       },
     };
   });
+}
+
+/** Shows the prompt; resolves to the trimmed text, or null when cancelled or empty. */
+export async function askText(options: PromptOptions): Promise<string | null> {
+  const answer = await askTextAction({ ...options, altLabel: undefined });
+  return answer?.text ?? null;
 }

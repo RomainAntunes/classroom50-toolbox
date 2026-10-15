@@ -5,7 +5,7 @@
   import { cloneProject } from "$lib/clone";
   import { editorFor, editors, openInEditor } from "$lib/editor.svelte";
   import { pullProject } from "$lib/pull";
-  import { commitPush, gradedOnPush } from "$lib/push";
+  import { commitLocal, commitPush, gradedOnPush } from "$lib/push";
   import { submitProject } from "$lib/submit";
   import { addTeammate, joinsGroup } from "$lib/teammate";
   import { isHidden, setHidden } from "$lib/hidden";
@@ -158,6 +158,18 @@
     }
   }
 
+  // A local commit works on any clone with changes, whatever the branch or submission mode.
+  const committable = $derived(Boolean(path) && (project.local?.changedFiles ?? 0) > 0);
+  let committing = $state(false);
+  async function commit() {
+    committing = true;
+    try {
+      await commitLocal(project, name);
+    } finally {
+      committing = false;
+    }
+  }
+
   let submitting = $state(false);
   async function submit() {
     submitting = true;
@@ -276,11 +288,16 @@
         enabled: incoming && !pulling,
         action: () => pull(),
       }),
+      MenuItem.new({
+        text: t("commit.menu"),
+        enabled: committable && !committing && !pushing,
+        action: () => commit(),
+      }),
       ...(everyPush
         ? [
             MenuItem.new({
               text: t("push.menu"),
-              enabled: pushable && !pushing,
+              enabled: pushable && !pushing && !committing,
               action: () => push(),
             }),
           ]
@@ -377,6 +394,8 @@
           <span class="status">{t("projects.submitting")}</span> ·
         {:else if pushing}
           <span class="status">{t("push.pushing")}</span> ·
+        {:else if committing}
+          <span class="status">{t("commit.committing")}</span> ·
         {:else if pulling}
           <span class="status">{t("projects.pulling")}</span> ·
         {:else if status}
@@ -422,7 +441,7 @@
       <button
         class="primary"
         title={t("push.hint")}
-        disabled={pushing}
+        disabled={pushing || committing}
         onclick={(event) => {
           event.stopPropagation();
           push();

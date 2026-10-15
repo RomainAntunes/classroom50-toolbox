@@ -12,8 +12,8 @@
     }
   });
 
-  function close(result: string | null) {
-    prompt.current?.resolve(result);
+  function close(result: string | null, alt = false) {
+    prompt.current?.resolve(result, alt);
   }
 </script>
 
@@ -49,6 +49,11 @@
         />
         <div class="buttons">
           <button type="button" onclick={() => close(null)}>{t("prompt.cancel")}</button>
+          {#if current.altLabel}
+            <button type="button" disabled={!value.trim()} onclick={() => close(value, true)}
+              >{current.altLabel}</button
+            >
+          {/if}
           <button type="submit" class="primary" disabled={!value.trim()}>{current.okLabel}</button>
         </div>
       </form>
