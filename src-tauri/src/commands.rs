@@ -739,16 +739,19 @@ pub async fn commit_check(state: State<'_, ProjectsState>, id: String) -> Result
         },
         Err(err) => CommitCheck {
             check: changes,
-            push_blocked: Some(
-                match err {
-                    // Submissions are closed (`submittable_clone`).
-                    Error::Student(_) => "closed",
-                    err => err.kind(),
-                }
-                .into(),
-            ),
+            push_blocked: Some(push_blocked(&err)),
         },
     })
+}
+
+/// Why push isn't offered next to Commit (`CommitCheck::push_blocked`), from `pushable`'s
+/// refusal: `closed`, or the error's kind.
+fn push_blocked(err: &Error) -> String {
+    match err {
+        Error::SubmissionsClosed => "closed",
+        err => err.kind(),
+    }
+    .into()
 }
 
 /// Commits project `id`'s changes with `message` in its clone and nothing else: no push, so
@@ -935,5 +938,15 @@ mod tests {
 
         assert!(accepted_project(&snapshot, "heigvd/poo").is_none());
         assert!(accepted_project(&snapshot, "").is_none());
+    }
+
+    #[test]
+    fn names_why_push_is_blocked() {
+        assert_eq!(push_blocked(&Error::SubmissionsClosed), "closed");
+        assert_eq!(
+            push_blocked(&Error::OtherBranch("main".into())),
+            "otherBranch"
+        );
+        assert_eq!(push_blocked(&Error::RemoteAhead), "remoteAhead");
     }
 }
