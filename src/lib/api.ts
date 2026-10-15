@@ -126,6 +126,10 @@ export interface Assignment {
   closed: boolean;
   feedbackPr: boolean;
   passThreshold: number | null;
+  /** `team` mode only: who forms the groups. */
+  teamFormation: "teacher" | "student" | null;
+  /** `"public"` when accepting creates a public repo. */
+  repoVisibility: string | null;
 }
 
 /** One assignment repo, merged from GitHub, the watched folders and the Pages manifest. */
@@ -152,6 +156,14 @@ export interface Unaccepted {
   classroom: Classroom;
   assignment: Assignment;
   acceptUrl: string;
+}
+
+/** Result of `accept_assignment`. */
+export interface Accepted {
+  /** `owner/name` as GitHub spells it. */
+  repo: string;
+  /** Null when the sync after the accept hasn't found the repo yet. */
+  projectId: string | null;
 }
 
 export interface Snapshot {
@@ -282,6 +294,9 @@ export const api = {
   login: () => invoke<AuthStatus>("login"),
   cancelLogin: () => invoke<void>("cancel_login"),
   openTerminal: (path: string) => invoke<void>("open_terminal", { path }),
+  /** Runs `gh student accept`, then syncs; rejects with `needsTeam` when a group is needed. */
+  acceptAssignment: (id: string, newTeam: boolean) =>
+    invoke<Accepted>("accept_assignment", { id, newTeam }),
   /** Clones into `parent/<repo>` and returns the new folder; `projects-updated` follows. */
   cloneProject: (id: string, parent: string) => invoke<string>("clone_project", { id, parent }),
   checkUpdate: () => invoke<UpdateInfo | null>("check_update"),

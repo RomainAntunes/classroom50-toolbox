@@ -33,6 +33,13 @@ pub enum Error {
         expected: &'static str,
     },
 
+    /// `gh student` refused; the message is meant for the student.
+    #[error("{0}")]
+    Student(String),
+
+    #[error("you are not in a group for this assignment yet")]
+    NeedsTeam,
+
     #[error("not signed in to GitHub")]
     NotSignedIn,
 
@@ -86,6 +93,8 @@ impl Error {
             Error::Cancelled => "cancelled",
             Error::PathExists(_) => "pathExists",
             Error::SchemaMismatch { .. } => "schemaMismatch",
+            Error::Student(_) => "student",
+            Error::NeedsTeam => "needsTeam",
             Error::NotSignedIn => "notSignedIn",
             Error::RateLimited { .. } => "rateLimited",
             Error::GitHub(_) => "github",
