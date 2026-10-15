@@ -231,6 +231,8 @@
   "link.needsSignIn": "Sign in to GitHub first (at the bottom of the window), then open the link again.",
   "link.noProject": "{repo} isn't in your list. It may show up after the next sync, or belong to another GitHub account.",
   "link.noAssignment": "The class {classroom} has no open assignment named {assignment}. Check the link with your teacher.",
+  "link.openAssignment": "Open the assignment {assignment} of {classroom}? The app then reads the class's published assignment list.",
+  "link.open": "Open",
   "link.cloneNow": "{repo} isn't on this computer yet. Clone it now?",
   "link.failed": "The link couldn't be opened: {error}",
   "alerts.due.title": "{assignment} is due {when}",

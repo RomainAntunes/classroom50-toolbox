@@ -274,6 +274,8 @@ export type DeepLinkTarget =
   | { kind: "project"; id: string; link: DeepLink }
   /** An assignment to accept; `listed` is false when the list doesn't show it. */
   | { kind: "accept"; item: Unaccepted; listed: boolean }
+  /** An accept link outside the list: ask, then `fetchLinkedAssignment` (no request before). */
+  | { kind: "unlisted"; link: DeepLink }
   /** Not in the list (open), or not published in that class (accept). */
   | { kind: "missing"; link: DeepLink };
 
@@ -465,6 +467,8 @@ export const api = {
   simulatedNetwork: () => invoke<SimulatedNetwork>("simulated_network"),
   /** The link the app was opened with, once, and where it leads. */
   takeDeepLink: () => invoke<DeepLinkTarget | null>("take_deep_link"),
+  /** Reads the class's manifest for the `unlisted` link the student agreed to open. */
+  fetchLinkedAssignment: () => invoke<DeepLinkTarget | null>("fetch_linked_assignment"),
   /** Dev builds only: handles `url` as if the OS had opened it. */
   simulateDeepLink: (url: string) => invoke<void>("simulate_deep_link", { url }),
   setPopoverPinned: (pinned: boolean) => invoke<void>("set_popover_pinned", { pinned }),

@@ -664,10 +664,16 @@ pub fn simulated_network() -> simulate::Network {
     simulate::network()
 }
 
-/// The link the OS opened the app with, if one waits, and where it leads.
+/// The link the OS opened the app with, if one waits, and where the list says it leads.
 #[tauri::command]
-pub async fn take_deep_link(app: AppHandle) -> Result<Option<deeplink::Target>> {
-    deeplink::take(&app).await
+pub fn take_deep_link(app: AppHandle) -> Option<deeplink::Target> {
+    deeplink::take(&app)
+}
+
+/// Reads the manifest behind the `unlisted` link the student just agreed to open.
+#[tauri::command]
+pub async fn fetch_linked_assignment(app: AppHandle) -> Result<Option<deeplink::Target>> {
+    deeplink::fetch_unlisted(&app).await
 }
 
 /// Dev builds only: handles `url` as if the OS had opened it.

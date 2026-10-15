@@ -132,6 +132,9 @@ pub enum Target {
     /// Offer to accept. `listed` is false for an assignment outside the list (an upcoming
     /// one, a class the last sync didn't see), which `accept_assignment` then finds here.
     Accept { item: Box<Unaccepted>, listed: bool },
+    /// An `accept` link to an assignment outside the list. Nothing was requested yet: the
+    /// UI asks with the link's own names first, then `fetch_unlisted` reads the manifest.
+    Unlisted { link: Link },
     /// Not in the list (open) or not published in that class (accept).
     Missing { link: Link },
 }
@@ -139,6 +142,8 @@ pub enum Target {
 #[derive(Default)]
 pub struct DeepLinkState {
     pending: Mutex<Option<Link>>,
+    /// The `Unlisted` link the student is being asked about.
+    unlisted: Mutex<Option<Link>>,
     /// Assignments resolved from a link outside the list, by unaccepted id.
     linked: Mutex<Vec<Unaccepted>>,
 }
@@ -152,6 +157,16 @@ impl DeepLinkState {
 
     fn take_pending(&self) -> Option<Link> {
         self.pending.lock().ok().and_then(|mut p| p.take())
+    }
+
+    fn set_unlisted(&self, link: Option<Link>) {
+        if let Ok(mut unlisted) = self.unlisted.lock() {
+            *unlisted = link;
+        }
+    }
+
+    fn take_unlisted(&self) -> Option<Link> {
+        self.unlisted.lock().ok().and_then(|mut u| u.take())
     }
 
     fn remember(&self, item: Unaccepted) {
@@ -291,7 +306,10 @@ fn unaccepted_id(org: &str, classroom: &str, assignment: &str) -> String {
 }
 
 /// The classroom an `accept` link names: the one the last sync read when it is the
-/// user's (the link's key wins when it has one), else just what the link says.
+/// user's (the link's key wins when it has one), else just what the link says. Always
+/// read from `https://<org>.github.io/`: a synced custom Pages host isn't used, so a link
+/// can only make the app ask the org's own GitHub Pages (which redirects to a custom
+/// domain when the org has one).
 fn link_classroom(known: Option<Classroom>, org: &str, slug: &str, key: Option<&str>) -> Classroom {
     let mut classroom = known.unwrap_or_else(|| Classroom {
         org: org.to_owned(),
@@ -302,22 +320,31 @@ fn link_classroom(known: Option<Classroom>, org: &str, slug: &str, key: Option<&
         secret: None,
         pages_base_url: None,
     });
+    classroom.pages_base_url = None;
     if let Some(key) = key {
         classroom.secret = Some(key.to_owned());
     }
     classroom
 }
 
-/// Takes the waiting link, if any, and works out where it leads. An `accept` link to an
-/// assignment outside the list reads its class's published manifest (public, no token).
-pub async fn take(app: &AppHandle) -> Result<Option<Target>> {
-    let Some(link) = app.state::<DeepLinkState>().take_pending() else {
+/// Takes the waiting link, if any, and works out where it leads from the list alone: no
+/// request is made before the student agrees.
+pub fn take(app: &AppHandle) -> Option<Target> {
+    let state = app.state::<DeepLinkState>();
+    let link = state.take_pending()?;
+    let projects = app.state::<ProjectsState>();
+    let target = resolve_local(&projects.snapshot(), &link);
+    state.set_unlisted(target.is_none().then(|| link.clone()));
+    Some(target.unwrap_or(Target::Unlisted { link }))
+}
+
+/// After the student agreed to an `Unlisted` link: reads its class's published manifest
+/// (public, no token) and returns the assignment to accept, which `accept_assignment`
+/// then finds here, or `Missing`.
+pub async fn fetch_unlisted(app: &AppHandle) -> Result<Option<Target>> {
+    let Some(link) = app.state::<DeepLinkState>().take_unlisted() else {
         return Ok(None);
     };
-    let projects = app.state::<ProjectsState>();
-    if let Some(target) = resolve_local(&projects.snapshot(), &link) {
-        return Ok(Some(target));
-    }
     let Link::Accept {
         org,
         classroom: slug,
@@ -327,6 +354,7 @@ pub async fn take(app: &AppHandle) -> Result<Option<Target>> {
     else {
         return Ok(None);
     };
+    let projects = app.state::<ProjectsState>();
     let classroom = link_classroom(
         projects.known_classroom(org, slug),
         org,
@@ -529,6 +557,24 @@ mod tests {
     }
 
     #[test]
+    fn fetches_only_from_the_orgs_github_pages() {
+        let mut custom = link_classroom(None, "CS50", "fall-2026", None);
+        custom.pages_base_url = Some("https://elsewhere.example/classroom50".to_owned());
+        for classroom in [
+            link_classroom(None, "CS50", "fall-2026", Some("k3y9")),
+            link_classroom(Some(custom), "CS50", "fall-2026", None),
+        ] {
+            assert!(
+                classroom
+                    .assignments_url()
+                    .starts_with("https://cs50.github.io/classroom50/fall-2026/"),
+                "{}",
+                classroom.assignments_url()
+            );
+        }
+    }
+
+    #[test]
     fn resolves_links_against_the_list() {
         let snapshot = snapshot();
         let resolve = |url: &str| resolve_local(&snapshot, &parse(url).unwrap());
@@ -575,8 +621,10 @@ mod tests {
         let mut synced = known.clone();
         synced.name = Some("CS50".to_owned());
         synced.secret = Some("old1".to_owned());
+        synced.pages_base_url = Some("https://evil.example".to_owned());
         let classroom = link_classroom(Some(synced.clone()), "cs50", "fall-2026", None);
-        assert_eq!(classroom, synced);
+        assert_eq!(classroom.secret.as_deref(), Some("old1"));
+        assert_eq!(classroom.name.as_deref(), Some("CS50"));
         let classroom = link_classroom(Some(synced), "cs50", "fall-2026", Some("new1"));
         assert_eq!(classroom.secret.as_deref(), Some("new1"));
         assert_eq!(classroom.name.as_deref(), Some("CS50"));

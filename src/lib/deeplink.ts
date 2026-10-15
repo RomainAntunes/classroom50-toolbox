@@ -21,7 +21,7 @@ async function ready(target: DeepLinkTarget): Promise<boolean> {
     await tell(t("link.finishSetup"));
     return false;
   }
-  const accepting = target.kind === "accept";
+  const accepting = target.kind === "accept" || target.kind === "unlisted";
   const tools = await api.toolStatuses();
   session.tools = tools;
   const needed = accepting ? ["gh", "gh-student"] : ["gh"];
@@ -58,6 +58,36 @@ function missing(link: DeepLink): string {
 
 async function act(target: DeepLinkTarget): Promise<void> {
   switch (target.kind) {
+    case "unlisted": {
+      // Nothing was requested yet: the link's own names are all there is to show.
+      const { link } = target;
+      if (link.kind !== "accept") return;
+      await goto("/");
+      const open = await withDialog(() =>
+        ask(
+          t("link.openAssignment", {
+            assignment: link.assignment,
+            classroom: `${link.org}/${link.classroom}`,
+          }),
+          {
+            title: t("link.title"),
+            kind: "info",
+            okLabel: t("link.open"),
+            cancelLabel: t("accept.cancel"),
+          },
+        ),
+      );
+      if (!open) return;
+      let fetched: DeepLinkTarget | null;
+      try {
+        fetched = await api.fetchLinkedAssignment();
+      } catch (err) {
+        await tell(t("link.failed", { error: errorMessage(err) }), "error");
+        return;
+      }
+      if (fetched && fetched.kind !== "unlisted") await act(fetched);
+      return;
+    }
     case "missing":
       await goto("/");
       await tell(missing(target.link));
@@ -106,13 +136,7 @@ export async function handleDeepLink(): Promise<void> {
   try {
     do {
       again = false;
-      let target: DeepLinkTarget | null;
-      try {
-        target = await api.takeDeepLink();
-      } catch (err) {
-        await tell(t("link.failed", { error: errorMessage(err) }), "error");
-        continue;
-      }
+      const target = await api.takeDeepLink();
       if (target && (await ready(target))) await act(target);
     } while (again);
   } finally {
