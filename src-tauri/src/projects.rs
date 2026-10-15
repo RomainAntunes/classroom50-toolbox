@@ -996,6 +996,22 @@ fn discovered(previous: &Snapshot) -> bool {
             .is_some_and(|issue| matches!(issue.kind.as_str(), "notSignedIn" | "notInstalled"))
 }
 
+/// The GitHub repos a build without discovery starts from: every repo of the last one, not
+/// only those the last build recognized. A build without a class manifest (offline, a
+/// failed download) drops the repos recognized by name only, which then come back as soon
+/// as the manifest is read again.
+fn last_discovery(previous: &Snapshot, cache: &RemoteCache) -> Vec<RemoteRepo> {
+    if discovered(previous) {
+        cache.repos.values().cloned().collect()
+    } else {
+        previous
+            .projects
+            .iter()
+            .filter_map(|p| p.remote.clone())
+            .collect()
+    }
+}
+
 async fn local_snapshot(
     state: &ProjectsState,
     http: &reqwest::Client,
@@ -1006,13 +1022,10 @@ async fn local_snapshot(
     progress: &Progress,
 ) -> Snapshot {
     let previous = state.snapshot();
-    let discovered = discovered(&previous) && state.remote().complete();
-    let remote_repos = previous
-        .projects
-        .into_iter()
-        .filter_map(|p| p.remote)
-        .collect();
-    let classrooms = state.remote().classrooms;
+    let cache = state.remote();
+    let remote_repos = last_discovery(&previous, &cache);
+    let discovered = discovered(&previous) && cache.complete();
+    let classrooms = cache.classrooms;
     let auth = if status {
         status_auth(state).await
     } else {
@@ -2683,6 +2696,37 @@ mod tests {
         settings.hidden.clear();
         settings.hidden_classes = vec!["heigvd-poo/26-poo-c".into()];
         assert!(!awaiting_accept(&snapshot, &settings, now));
+    }
+
+    #[test]
+    fn rebuilds_from_every_repo_of_the_last_discovery() {
+        let cache = RemoteCache {
+            login: Some("alice".into()),
+            repos: BTreeMap::from([
+                ("cs50/fall-hello-alice".into(), remote("fall-hello-alice", "a", None)),
+                ("cs50/fall-lab2-alice".into(), remote("fall-lab2-alice", "b", None)),
+            ]),
+            ..RemoteCache::default()
+        };
+        // The last build had no manifest and kept only the repo with a marker file.
+        let mut previous = Snapshot {
+            synced_at: Some(Utc::now()),
+            ..Snapshot::default()
+        };
+        previous.projects = merge(
+            vec![(remote("fall-hello-alice", "a", None), config("hello"))],
+            Vec::new(),
+        );
+        let names = |repos: Vec<RemoteRepo>| -> Vec<String> {
+            repos.into_iter().map(|r| r.name).collect()
+        };
+        assert_eq!(
+            names(last_discovery(&previous, &cache)),
+            ["fall-hello-alice", "fall-lab2-alice"]
+        );
+        // Signed out: the cache may hold another account's repos.
+        previous.issue = Some(SyncIssue::from(&Error::NotSignedIn));
+        assert_eq!(names(last_discovery(&previous, &cache)), ["fall-hello-alice"]);
     }
 
     #[test]
