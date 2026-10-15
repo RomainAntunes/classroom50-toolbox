@@ -15,14 +15,17 @@ notification area.
 - **Signs you in** to GitHub through `gh`, with a one-time code in your browser. Several
   accounts are supported; the app never keeps its own copy of your token.
 - **Lists your assignments**, from GitHub and from the folders on your disk (including the
-  projects your JetBrains IDE or VS Code opened recently): due dates, late work, uncommitted or
-  unsubmitted changes, branches not merged yet, grades with how many tests passed, and teacher
-  feedback.
+  projects your editor opened recently: JetBrains IDEs, VS Code and its forks such as Cursor,
+  Zed, Sublime Text, Eclipse, NetBeans or Visual Studio): due dates, late work, uncommitted or
+  unsubmitted changes, branches not merged yet, grades with the tests that failed, the
+  autograder running or failing, and teacher feedback.
+- **Shows your group** on team assignments, with who is in it. Search finds assignments by
+  teammate too.
 - **Shows the assignments you haven't accepted yet**, and accepts them for you.
-- **Clones and submits** your work, and opens a project in your terminal, your file manager or
-  on GitHub.
+- **Clones, pulls and submits** your work, and opens a project in the editor you last used for
+  it, your terminal, your file manager or on GitHub.
 - **Notifies you** before a deadline, when a grade or feedback arrives, when a new assignment is
-  published, and when a teammate pushes.
+  published, when a teammate pushes, and when a classmate joins your group.
 - Starts at login, hidden in the tray, and updates itself.
 
 ## Install
@@ -58,8 +61,8 @@ After that the app updates itself.
 ## Privacy
 
 The app talks to GitHub only, with the token `gh` already holds, and never sends data anywhere
-else. It reads your repositories and never changes them on its own: accepting, cloning and
-submitting only happen when you click.
+else. It reads your repositories and never changes them on its own: accepting, cloning, pulling
+and submitting only happen when you click.
 
 ## Support the project
 
