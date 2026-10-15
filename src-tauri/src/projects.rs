@@ -56,6 +56,8 @@ const STATUS_BATCH: usize = 3;
 /// A class's assignment list is re-downloaded at most this often (it's on GitHub Pages,
 /// and rarely changes).
 const MANIFEST_MAX_AGE: chrono::TimeDelta = chrono::TimeDelta::minutes(10);
+/// Threads walking scan roots at once.
+const MAX_SCAN_THREADS: usize = 4;
 /// Status requests in flight at once.
 const MAX_STATUS_REQUESTS: usize = 4;
 /// 100 repos per page; anything past 2000 accessible repos isn't scanned.
@@ -1843,18 +1845,51 @@ async fn scan_local(
         if let Ok(mut stats) = progress.app.state::<ProjectsState>().stats.lock() {
             stats.scan_roots = roots.len();
         }
-        let mut seen = HashSet::new();
-        let mut locals = Vec::new();
-        for (root, depth) in &roots {
-            let found = discovery::scan(root, *depth);
-            locals.extend(found.into_iter().filter(|l| seen.insert(l.path.clone())));
-            progress.advance(Phase::Scan);
-        }
+        let found = scan_parallel(&roots, &progress);
         progress.finish_phase(Phase::Scan);
+        // In root order, so a clone found from two roots is kept once, as before.
+        let mut seen = HashSet::new();
+        let locals = found
+            .into_iter()
+            .flatten()
+            .filter(|l| seen.insert(l.path.clone()))
+            .collect();
         (locals, targets, recents)
     })
     .await
     .unwrap_or_default()
+}
+
+/// Walks the roots on a few threads (disk latency, not CPU, is what a walk waits on),
+/// capped so a scan never takes over the machine. Results come back in root order.
+fn scan_parallel(roots: &[(PathBuf, usize)], progress: &Progress) -> Vec<Vec<LocalProject>> {
+    let threads = std::thread::available_parallelism()
+        .map_or(1, |n| n.get())
+        .clamp(1, MAX_SCAN_THREADS)
+        .min(roots.len().max(1));
+    let next = std::sync::atomic::AtomicUsize::new(0);
+    let results: Vec<Mutex<Vec<LocalProject>>> = roots.iter().map(|_| Mutex::default()).collect();
+    std::thread::scope(|scope| {
+        for _ in 0..threads {
+            scope.spawn(|| {
+                loop {
+                    let i = next.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+                    let Some((root, depth)) = roots.get(i) else {
+                        break;
+                    };
+                    let found = discovery::scan(root, *depth);
+                    if let Ok(mut slot) = results[i].lock() {
+                        *slot = found;
+                    }
+                    progress.advance(Phase::Scan);
+                }
+            });
+        }
+    });
+    results
+        .into_iter()
+        .map(|slot| slot.into_inner().unwrap_or_default())
+        .collect()
 }
 
 /// Folders to scan with their depth, the non-recursive watch targets, and the folders
