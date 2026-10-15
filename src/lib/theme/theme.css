@@ -16,12 +16,14 @@
   --space: 8px;
 
   --bg-window: transparent;
-  --bg-card: rgb(255 255 255 / 0.55);
-  --bg-control: rgb(0 0 0 / 0.05);
-  --bg-control-hover: rgb(0 0 0 / 0.09);
-  --border: rgb(0 0 0 / 0.1);
-  --fg: rgb(0 0 0 / 0.88);
-  --fg-muted: rgb(0 0 0 / 0.5);
+  /* Light mode sits on a translucent backdrop that a dark wallpaper turns grey, so the
+     cards are close to opaque and the muted text is darker than the native 50%. */
+  --bg-card: rgb(255 255 255 / 0.72);
+  --bg-control: rgb(0 0 0 / 0.06);
+  --bg-control-hover: rgb(0 0 0 / 0.1);
+  --border: rgb(0 0 0 / 0.12);
+  --fg: rgb(0 0 0 / 0.9);
+  --fg-muted: rgb(0 0 0 / 0.62);
   --accent: #007aff;
   --accent-fg: #fff;
   --danger: #d70015;
@@ -55,6 +57,13 @@
   --accent: AccentColor;
 }
 
+/* Lifts the vibrancy material, which goes mid-grey over a dark wallpaper in light mode. */
+@media (prefers-color-scheme: light) {
+  :root[data-os="macos"] {
+    --bg-window: rgb(255 255 255 / 0.35);
+  }
+}
+
 :root[data-os="windows"] {
   --font: "Segoe UI Variable Text", "Segoe UI", sans-serif;
   --font-size: 14px;
@@ -62,7 +71,7 @@
   --radius-control: 4px;
   --radius-card: 8px;
   --accent: #005fb8;
-  --bg-card: rgb(255 255 255 / 0.7);
+  --bg-card: rgb(255 255 255 / 0.78);
 }
 
 @media (prefers-color-scheme: dark) {
