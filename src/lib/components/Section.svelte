@@ -103,8 +103,9 @@
     gap: 4px;
     min-width: 0;
     flex: 1;
-    padding: 0;
+    padding: 3px 8px 3px 6px;
     border: 0;
+    border-radius: var(--radius-control);
     background: none;
     color: inherit;
     font: inherit;
