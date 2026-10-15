@@ -45,4 +45,7 @@ iconutil -c icns "$set_dir" -o "$icons/icon.icns"
 render assets/tray.svg 36 "$icons/tray-template.png"
 render assets/icon-small.svg 64 "$icons/tray-color.png"
 
+# 6. The popover's header logo (26px), at 3x. An SVG with filters renders soft in WebKit.
+render assets/icon-small.svg 78 src/lib/assets/logo.png
+
 echo "icons regenerated in $icons"

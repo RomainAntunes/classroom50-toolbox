@@ -1,5 +1,6 @@
 <script lang="ts">
-  import logo from "../../assets/icon-small.svg";
+  // A PNG at 3x: WebKit rasterizes an SVG's drop-shadow filters at 1x, which blurs it.
+  import logo from "$lib/assets/logo.png";
   import { onMount } from "svelte";
   import { goto } from "$app/navigation";
   import { listen } from "@tauri-apps/api/event";
