@@ -118,10 +118,12 @@
   // Every-push assignments commit and push from the app; tag-mode ones submit.
   const everyPush = $derived(gradedOnPush(project));
   const pushable = $derived(submittable && everyPush);
-  // The button only shows when it can work: work to send on the default branch, and GitHub
-  // has nothing the clone lacks. The menu always offers it and explains a refusal.
+  // The button only shows when it can work: GitHub's data known, work to send on the default
+  // branch, and GitHub has nothing the clone lacks. The menu always offers it and explains a
+  // refusal.
   const pushReady = $derived(
     pushable &&
+      Boolean(project.remote) &&
       project.local?.branch === defaultBranch &&
       (project.local.changedFiles > 0 || (project.local.ahead ?? 0) > 0) &&
       behind === 0 &&

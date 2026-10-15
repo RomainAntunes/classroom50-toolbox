@@ -320,7 +320,7 @@ export interface PushCheck {
 
 /** What Commit would do (`commit_check`), and whether Commit & push is offered with it. */
 export interface CommitCheck extends PushCheck {
-  /** Why push isn't offered (`tagMode`, `closed`, `otherBranch`, `remoteAhead`, ...); null when it is. */
+  /** Why push isn't offered (`tagMode`, `closed`, `notOnGitHub`, `otherBranch`, `remoteAhead`, ...); null when it is. */
   pushBlocked: string | null;
 }
 

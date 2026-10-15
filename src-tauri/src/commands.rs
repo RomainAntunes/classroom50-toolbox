@@ -13,7 +13,7 @@ use crate::error::{Error, Result};
 use crate::login::{self, LoginState};
 use crate::platform::{self, Os};
 use crate::popover::{self, PopoverState};
-use crate::projects::{self, ProjectsState, Snapshot, SyncProgress};
+use crate::projects::{self, Project, ProjectsState, Snapshot, SyncProgress};
 use crate::pull;
 use crate::push;
 use crate::settings::{Settings, SettingsStore};
@@ -640,6 +640,17 @@ fn pushable(state: &ProjectsState, id: &str) -> Result<(PathBuf, String, Option<
         .into_iter()
         .find(|p| p.id == id)
         .ok_or_else(|| Error::Unsupported(format!("unknown project {id}")))?;
+    let (branch, head) = push_target(&project)?;
+    Ok((path, branch, head))
+}
+
+/// The branch Commit & push writes for `project`, and GitHub's head of it. Always GitHub's
+/// default branch, so a clone on another branch is refused by `push::check`; the clone's own
+/// branch only when GitHub's repo is known to be empty (the first push makes it the
+/// default). Without GitHub's data (another account, a sync that hasn't listed the repo
+/// yet) nothing says which branch is graded, so push isn't offered.
+fn push_target(project: &Project) -> Result<(String, Option<String>)> {
+    let id = &project.id;
     let every_push = project
         .assignment
         .as_ref()
@@ -649,18 +660,31 @@ fn pushable(state: &ProjectsState, id: &str) -> Result<(PathBuf, String, Option<
             "{id} isn't graded on every push; submit it instead"
         )));
     }
-    let remote = project.remote.as_ref();
-    let head = remote.and_then(|r| r.head.as_ref()).map(|h| h.oid.clone());
-    // An empty repo on GitHub has no default branch yet: the first push makes the clone's.
-    let branch = remote
-        .and_then(|r| r.default_branch.clone())
-        .or_else(|| {
-            head.is_none()
-                .then(|| project.local.as_ref().and_then(|l| l.branch.clone()))
-                .flatten()
-        })
-        .ok_or_else(|| Error::Unsupported(format!("{id} has no default branch on GitHub")))?;
-    Ok((path, branch, head))
+    let remote = project.remote.as_ref().ok_or_else(|| {
+        Error::Unsupported(format!(
+            "{id} isn't among your GitHub repos yet; refresh first"
+        ))
+    })?;
+    let head = remote.head.as_ref().map(|h| h.oid.clone());
+    let empty = remote.default_branch.is_none() && head.is_none();
+    let branch = match &remote.default_branch {
+        Some(branch) => Some(branch.clone()),
+        None if empty => project.local.as_ref().and_then(|l| l.branch.clone()),
+        None => None,
+    }
+    .ok_or_else(|| Error::Unsupported(format!("{id} has no default branch on GitHub")))?;
+    Ok((branch, head))
+}
+
+/// Why push isn't offered next to Commit (`CommitCheck::push_blocked`), from `pushable`'s
+/// refusal: `closed`, `notOnGitHub` (no GitHub data for the project), or the error's kind.
+fn push_blocked(err: &Error, on_github: bool) -> String {
+    match err {
+        Error::SubmissionsClosed => "closed",
+        _ if !on_github => "notOnGitHub",
+        err => err.kind(),
+    }
+    .into()
 }
 
 /// What Commit & push would send for project `id`, or why it can't (`push.rs`).
@@ -716,12 +740,14 @@ pub struct CommitCheck {
 pub async fn commit_check(state: State<'_, ProjectsState>, id: String) -> Result<CommitCheck> {
     let path = local_clone(&state, &id)?;
     let changes = push::commit_check(&path).await?;
-    let tag_mode = state.snapshot().projects.iter().any(|p| {
-        p.id == id
-            && p.assignment
-                .as_ref()
-                .is_some_and(|a| a.submission_mode == Some(crate::classroom50::SubmissionMode::Tag))
+    let snapshot = state.snapshot();
+    let project = snapshot.projects.iter().find(|p| p.id == id);
+    let tag_mode = project.is_some_and(|p| {
+        p.assignment
+            .as_ref()
+            .is_some_and(|a| a.submission_mode == Some(crate::classroom50::SubmissionMode::Tag))
     });
+    let on_github = project.is_some_and(|p| p.remote.is_some());
     if tag_mode {
         return Ok(CommitCheck {
             check: changes,
@@ -739,19 +765,9 @@ pub async fn commit_check(state: State<'_, ProjectsState>, id: String) -> Result
         },
         Err(err) => CommitCheck {
             check: changes,
-            push_blocked: Some(push_blocked(&err)),
+            push_blocked: Some(push_blocked(&err, on_github)),
         },
     })
-}
-
-/// Why push isn't offered next to Commit (`CommitCheck::push_blocked`), from `pushable`'s
-/// refusal: `closed`, or the error's kind.
-fn push_blocked(err: &Error) -> String {
-    match err {
-        Error::SubmissionsClosed => "closed",
-        err => err.kind(),
-    }
-    .into()
 }
 
 /// Commits project `id`'s changes with `message` in its clone and nothing else: no push, so
@@ -850,7 +866,7 @@ pub fn simulate_deep_link(app: AppHandle, url: String) -> Result<()> {
 mod tests {
     use super::*;
     use crate::classroom50::RepoConfig;
-    use crate::projects::Project;
+    use crate::projects::{LocalState, RemoteRepo};
 
     /// Whatever this machine prefers comes out as BCP 47 tags, ready for `resolveLocale`.
     #[test]
@@ -940,13 +956,71 @@ mod tests {
         assert!(accepted_project(&snapshot, "").is_none());
     }
 
+    /// An every-push project on branch `local_branch`, with GitHub's data when `remote` is
+    /// `Some((default branch, head))`.
+    fn every_push(local_branch: &str, remote: Option<(Option<&str>, Option<&str>)>) -> Project {
+        let mut p = project(Some("org"), "lab-1-alice", "c", "lab-1");
+        p.assignment = Some(
+            serde_json::from_value(serde_json::json!({
+                "slug": "lab-1", "name": "Lab 1", "mode": "individual"
+            }))
+            .unwrap(),
+        );
+        p.local = Some(LocalState {
+            branch: Some(local_branch.into()),
+            ..LocalState::default()
+        });
+        p.remote = remote.map(|(branch, head)| {
+            let mut repo: RemoteRepo = serde_json::from_value(serde_json::json!({
+                "owner": "org", "name": "lab-1-alice", "url": "https://github.com/org/lab-1-alice",
+                "archived": false, "canPush": true
+            }))
+            .unwrap();
+            repo.default_branch = branch.map(str::to_owned);
+            repo.head =
+                head.map(|oid| serde_json::from_value(serde_json::json!({ "oid": oid })).unwrap());
+            repo
+        });
+        p
+    }
+
+    #[test]
+    fn pushes_only_githubs_default_branch() {
+        // GitHub's default branch, whatever the clone has checked out (push::check refuses).
+        let (branch, head) =
+            push_target(&every_push("experiment", Some((Some("main"), Some("abc"))))).unwrap();
+        assert_eq!((branch.as_str(), head.as_deref()), ("main", Some("abc")));
+        // An empty repo on GitHub: the first push makes the clone's branch the default.
+        let (branch, head) = push_target(&every_push("trunk", Some((None, None)))).unwrap();
+        assert_eq!((branch.as_str(), head), ("trunk", None));
+        // No GitHub data (another account, not synced yet): no push, whatever the branch.
+        let err = push_target(&every_push("experiment", None)).unwrap_err();
+        assert_eq!(push_blocked(&err, false), "notOnGitHub");
+        // A head without a default branch isn't an empty repo: no guessing.
+        assert!(push_target(&every_push("experiment", Some((None, Some("abc"))))).is_err());
+        // Tag mode submits instead.
+        let mut tag = every_push("main", Some((Some("main"), None)));
+        tag.assignment.as_mut().unwrap().submission_mode =
+            Some(crate::classroom50::SubmissionMode::Tag);
+        assert!(push_target(&tag).is_err());
+    }
+
     #[test]
     fn names_why_push_is_blocked() {
-        assert_eq!(push_blocked(&Error::SubmissionsClosed), "closed");
+        assert_eq!(push_blocked(&Error::SubmissionsClosed, true), "closed");
+        assert_eq!(push_blocked(&Error::SubmissionsClosed, false), "closed");
         assert_eq!(
-            push_blocked(&Error::OtherBranch("main".into())),
+            push_blocked(&Error::OtherBranch("main".into()), true),
             "otherBranch"
         );
-        assert_eq!(push_blocked(&Error::RemoteAhead), "remoteAhead");
+        assert_eq!(push_blocked(&Error::RemoteAhead, true), "remoteAhead");
+        assert_eq!(
+            push_blocked(&Error::Unsupported("x".into()), false),
+            "notOnGitHub"
+        );
+        assert_eq!(
+            push_blocked(&Error::Unsupported("x".into()), true),
+            "unsupported"
+        );
     }
 }
