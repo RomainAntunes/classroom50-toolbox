@@ -1,0 +1,86 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Classroom 50 Toolbox</title>
+    <meta
+      name="description"
+      content="A tray app for Classroom 50 students: assignments, due dates, grades, accept, clone and submit, from the menu bar."
+    />
+    <link rel="icon" href="icon.svg" type="image/svg+xml" />
+    <link rel="stylesheet" href="style.css" />
+    <script src="download.js" defer></script>
+  </head>
+  <body>
+    <main>
+      <header>
+        <img src="icon.svg" alt="" width="96" height="96" />
+        <h1>Classroom 50 Toolbox</h1>
+        <p class="lead">
+          Your <a href="https://github.com/foundation50/classroom50">Classroom 50</a> assignments,
+          due dates and grades, one click away in the menu bar or notification area.
+        </p>
+      </header>
+
+      <section class="download" aria-live="polite">
+        <a
+          id="primary"
+          class="button"
+          href="https://github.com/RomainAntunes/classroom50-toolbox/releases/latest"
+        >
+          Download
+        </a>
+        <p id="version" class="muted"></p>
+        <details id="others" hidden>
+          <summary>Other platforms</summary>
+          <ul id="files"></ul>
+        </details>
+      </section>
+
+      <section>
+        <h2>What it does</h2>
+        <ul class="features">
+          <li>
+            <strong>Sets up your machine.</strong> Installs git, the GitHub CLI and the
+            <code>gh student</code> extension, and keeps them up to date.
+          </li>
+          <li>
+            <strong>Lists your assignments.</strong> Due dates, late work, unsubmitted changes,
+            grades and teacher feedback, from GitHub and the folders on your disk.
+          </li>
+          <li><strong>Accepts, clones and submits</strong> your work, without the terminal.</li>
+          <li>
+            <strong>Notifies you</strong> before a deadline, when a grade or feedback arrives, and
+            when a teammate pushes.
+          </li>
+        </ul>
+      </section>
+
+      <section id="first-launch">
+        <h2>First launch</h2>
+        <p>The app isn't code-signed yet, so your system asks you to confirm it once.</p>
+        <dl>
+          <dt>macOS</dt>
+          <dd>
+            Open the app, then go to System Settings › Privacy &amp; Security and click
+            <strong>Open Anyway</strong>.
+          </dd>
+          <dt>Windows</dt>
+          <dd>
+            When SmartScreen says "Windows protected your PC", click
+            <strong>More info › Run anyway</strong>.
+          </dd>
+          <dt>Linux</dt>
+          <dd>On GNOME, tray icons need the AppIndicator extension (Ubuntu ships it).</dd>
+        </dl>
+        <p>After that the app updates itself.</p>
+      </section>
+    </main>
+
+    <footer class="muted">
+      <a href="https://github.com/RomainAntunes/classroom50-toolbox">Source on GitHub</a> · GPL-3.0
+      · Not affiliated with the Fifty Foundation.
+    </footer>
+  </body>
+</html>
