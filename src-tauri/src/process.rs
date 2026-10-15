@@ -66,6 +66,87 @@ where
     Ok(Output { stdout, stderr })
 }
 
+/// Runs `program` like `run`, but gives up after `timeout` with `Error::TimedOut` (its output
+/// so far in `output`), killing the program and everything it started: its process group on
+/// Unix, its process tree on Windows. For `gh` extensions, which `gh` runs as a child that
+/// killing `gh` alone would leave running.
+pub async fn run_with_timeout<I, S>(
+    program: &str,
+    args: I,
+    cwd: Option<&Path>,
+    timeout: Duration,
+) -> Result<Output>
+where
+    I: IntoIterator<Item = S>,
+    S: AsRef<OsStr>,
+{
+    let args = checked_args(program, args)?;
+    let mut cmd = command(program)?;
+    cmd.args(args)
+        .stdin(Stdio::null())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .kill_on_drop(true);
+    #[cfg(unix)]
+    cmd.process_group(0);
+    if let Some(dir) = cwd {
+        cmd.current_dir(dir);
+    }
+    let mut child = match cmd.spawn() {
+        Ok(child) => child,
+        Err(err) if err.kind() == ErrorKind::NotFound => {
+            return Err(Error::NotInstalled {
+                program: program.to_owned(),
+            });
+        }
+        Err(err) => return Err(err.into()),
+    };
+    let pid = child.id();
+    let read = |pipe: Option<Box<dyn AsyncRead + Unpin + Send>>| {
+        tokio::spawn(async move {
+            let mut bytes = Vec::new();
+            if let Some(mut pipe) = pipe {
+                let _ = pipe.read_to_end(&mut bytes).await;
+            }
+            bytes
+        })
+    };
+    let stdout = read(child.stdout.take().map(|p| Box::new(p) as _));
+    let stderr = read(child.stderr.take().map(|p| Box::new(p) as _));
+    let status = tokio::select! {
+        status = child.wait() => Some(status?),
+        () = tokio::time::sleep(timeout) => None,
+    };
+    if status.is_none() {
+        kill(&mut child, pid).await;
+    }
+    // A grandchild that inherited the pipes may hold them open: don't wait on it forever.
+    let collect = |task: tokio::task::JoinHandle<Vec<u8>>| async move {
+        let abort = task.abort_handle();
+        match tokio::time::timeout(DRAIN_GRACE, task).await {
+            Ok(Ok(bytes)) => String::from_utf8_lossy(&bytes).trim_end().to_owned(),
+            _ => {
+                abort.abort();
+                String::new()
+            }
+        }
+    };
+    let (stdout, stderr) = tokio::join!(collect(stdout), collect(stderr));
+    match status {
+        None => Err(Error::TimedOut {
+            program: program.to_owned(),
+            minutes: timeout.as_millis().div_ceil(60_000) as u64,
+            output: if stderr.is_empty() { stdout } else { stderr },
+        }),
+        Some(status) if !status.success() => Err(Error::CommandFailed {
+            program: program.to_owned(),
+            code: status.code(),
+            stderr,
+        }),
+        Some(_) => Ok(Output { stdout, stderr }),
+    }
+}
+
 /// How `run_streaming` runs a long command (package managers, `gh extension install`).
 pub struct Streaming<'a> {
     /// Extra environment for the child (e.g. Homebrew's `HOMEBREW_NO_AUTO_UPDATE`).
@@ -233,28 +314,45 @@ fn abort(readers: &[Option<tokio::task::JoinHandle<()>>]) {
 /// finish on its own.
 async fn kill(child: &mut tokio::process::Child, pid: Option<u32>) {
     if let Some(pid) = pid {
-        kill_tree(pid);
+        kill_descendants(pid);
     }
     let _ = child.kill().await;
 }
 
-/// `taskkill /T` walks the tree from `pid` (it ships with every Windows, in System32).
+/// Kills a program started by `spawn_piped` and, on Windows, whatever it started (a `.cmd`
+/// shim runs the real exe as a child, which `TerminateProcess` on the shim would leave
+/// running). On Unix it has no group of its own, so only the program is killed.
+pub async fn kill_tree(child: &mut tokio::process::Child) {
+    #[cfg(windows)]
+    if let Some(pid) = child.id() {
+        kill_windows_tree(pid);
+    }
+    let _ = child.kill().await;
+}
+
+/// The group (Unix) or tree (Windows) started from `pid`.
+fn kill_descendants(pid: u32) {
+    #[cfg(unix)]
+    kill_group(pid);
+    #[cfg(windows)]
+    kill_windows_tree(pid);
+    #[cfg(not(any(unix, windows)))]
+    let _ = pid;
+}
+
+/// `taskkill /T` walks the process tree, which Windows has no group kill for (it ships with
+/// every Windows, in System32).
 #[cfg(windows)]
-fn kill_tree(pid: u32) {
+fn kill_windows_tree(pid: u32) {
     use std::os::windows::process::CommandExt;
     const CREATE_NO_WINDOW: u32 = 0x0800_0000;
     let _ = std::process::Command::new("taskkill")
-        .args(["/PID", &pid.to_string(), "/T", "/F"])
+        .args(["/T", "/F", "/PID", &pid.to_string()])
         .stdin(Stdio::null())
         .stdout(Stdio::null())
         .stderr(Stdio::null())
         .creation_flags(CREATE_NO_WINDOW)
         .status();
-}
-
-#[cfg(unix)]
-fn kill_tree(pid: u32) {
-    kill_group(pid);
 }
 
 /// The group's id is the program's pid (`process_group(0)`).
@@ -630,6 +728,60 @@ mod tests {
             matches!(&err, Error::TimedOut { output, minutes: 1, .. } if output == "waiting"),
             "{err:?}"
         );
+    }
+
+    #[cfg(unix)]
+    #[tokio::test]
+    async fn runs_to_completion_within_the_time_limit() {
+        let out = run_with_timeout(
+            "sh",
+            ["-c", "echo out; echo err >&2"],
+            None,
+            Duration::from_secs(10),
+        )
+        .await
+        .unwrap();
+        assert_eq!((out.stdout.as_str(), out.stderr.as_str()), ("out", "err"));
+        let err = run_with_timeout(
+            "sh",
+            ["-c", "echo no >&2; exit 3"],
+            None,
+            Duration::from_secs(10),
+        )
+        .await
+        .unwrap_err();
+        assert!(
+            matches!(&err, Error::CommandFailed { code: Some(3), stderr, .. } if stderr == "no"),
+            "{err:?}"
+        );
+    }
+
+    /// Like `gh` running an extension: the grandchild must die with the program.
+    #[cfg(unix)]
+    #[tokio::test]
+    async fn a_time_out_kills_the_program_and_what_it_started() {
+        let marker = std::env::temp_dir().join(format!("c50-timeout-{}", std::process::id()));
+        let _ = std::fs::remove_file(&marker);
+        let script = format!(
+            "(sleep 2; touch '{}') & echo started; wait",
+            marker.display()
+        );
+        let start = std::time::Instant::now();
+        let err = run_with_timeout(
+            "sh",
+            ["-c", script.as_str()],
+            None,
+            Duration::from_millis(500),
+        )
+        .await
+        .unwrap_err();
+        assert!(start.elapsed() < Duration::from_secs(2));
+        assert!(
+            matches!(&err, Error::TimedOut { output, .. } if output == "started"),
+            "{err:?}"
+        );
+        tokio::time::sleep(Duration::from_millis(2500)).await;
+        assert!(!marker.exists(), "the grandchild survived the time out");
     }
 
     /// The sleep is a grandchild holding the pipes: cancelling kills the whole group.

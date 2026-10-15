@@ -302,10 +302,45 @@ pub async fn account_avatar(app: AppHandle, login: String) -> Result<String> {
     crate::accounts::avatar(&http, &cache_dir, &login).await
 }
 
-/// Runs gh's device flow; the code arrives through the `login-device-code` event.
+/// Runs gh's device flow; the code arrives through the `login-device-code` event. The new
+/// account is gh's active one afterwards, so its projects are synced right away.
 #[tauri::command]
 pub async fn login(app: AppHandle, state: State<'_, LoginState>) -> Result<AuthStatus> {
-    login::login(&app, &state).await
+    signed_in(
+        app.clone(),
+        login::login(&app, &state, login::Flow::SignIn).await,
+    )
+}
+
+/// Adds gh-student's missing scopes to the active account (`gh auth refresh`), through the
+/// same device flow as `login`.
+#[tauri::command]
+pub async fn grant_scopes(app: AppHandle, state: State<'_, LoginState>) -> Result<AuthStatus> {
+    signed_in(
+        app.clone(),
+        login::login(&app, &state, login::Flow::GrantScopes).await,
+    )
+}
+
+fn signed_in(app: AppHandle, result: Result<AuthStatus>) -> Result<AuthStatus> {
+    if result.as_ref().is_ok_and(|status| status.logged_in) {
+        // A view that asks for a sync too shares this one.
+        tauri::async_runtime::spawn(async move {
+            projects::refresh(&app).await;
+        });
+    }
+    result
+}
+
+/// Signs `login` out of gh, then syncs whichever account is left (or clears the list).
+#[tauri::command]
+pub async fn sign_out(app: AppHandle, login: String) -> Result<AuthStatus> {
+    crate::accounts::sign_out(&login).await?;
+    let status = tools::auth_status().await;
+    tauri::async_runtime::spawn(async move {
+        projects::refresh(&app).await;
+    });
+    Ok(status)
 }
 
 #[tauri::command]
@@ -393,28 +428,65 @@ pub async fn accept_assignment(
     id: String,
     new_team: bool,
 ) -> Result<Accepted> {
-    let item = state
-        .snapshot()
-        .unaccepted
-        .into_iter()
-        .find(|u| u.id == id)
-        .ok_or_else(|| Error::Unsupported(format!("unknown assignment {id}")))?;
-    let repo = student::accept(&student::AcceptRequest {
+    let snapshot = state.snapshot();
+    let Some(item) = snapshot.unaccepted.iter().find(|u| u.id == id).cloned() else {
+        // A sync may have found the repo (accepted elsewhere) since the row was drawn.
+        return accepted_project(&snapshot, &id)
+            .ok_or_else(|| Error::Unsupported(format!("unknown assignment {id}")));
+    };
+    let accepted = student::accept(&student::AcceptRequest {
         org: &item.classroom.org,
         classroom: &item.classroom.slug,
         assignment: &item.assignment.slug,
         key: item.classroom.secret.as_deref(),
         new_team,
     })
-    .await?;
-    let snapshot = projects::refresh(&app).await;
+    .await;
+    let repo = match accepted {
+        Ok(repo) => repo,
+        // A failure or a timeout may come after the repo was made: look again.
+        Err(err @ Error::Student(_)) => {
+            let app = app.clone();
+            tauri::async_runtime::spawn(async move {
+                projects::refresh_after_write(&app).await;
+            });
+            return Err(err);
+        }
+        Err(err) => return Err(err),
+    };
+    let snapshot = projects::refresh_after_write(&app).await;
     let key = repo.to_ascii_lowercase();
     let project_id = snapshot
         .projects
         .iter()
         .find(|p| p.id == key)
         .map(|p| p.id.clone());
+    if project_id.is_none() {
+        // GitHub may list a new repo a little later; the next full sync could be an hour off.
+        let app = app.clone();
+        tauri::async_runtime::spawn(async move {
+            tokio::time::sleep(std::time::Duration::from_secs(20)).await;
+            projects::refresh_after_write(&app).await;
+        });
+    }
     Ok(Accepted { repo, project_id })
+}
+
+/// The project of the assignment behind unaccepted id `org/classroom/assignment`.
+fn accepted_project(snapshot: &Snapshot, id: &str) -> Option<Accepted> {
+    let mut parts = id.splitn(3, '/');
+    let (org, classroom, assignment) = (parts.next()?, parts.next()?, parts.next()?);
+    let project = snapshot.projects.iter().find(|p| {
+        p.owner
+            .as_deref()
+            .is_some_and(|o| o.eq_ignore_ascii_case(org))
+            && p.config.classroom.eq_ignore_ascii_case(classroom)
+            && p.config.assignment.eq_ignore_ascii_case(assignment)
+    })?;
+    Some(Accepted {
+        repo: format!("{}/{}", project.owner.as_deref()?, project.repo.as_deref()?),
+        project_id: Some(project.id.clone()),
+    })
 }
 
 /// Gives a classmate push access to project `id`: joins them to the group on a team
@@ -460,7 +532,7 @@ pub async fn add_teammate(
         }
     };
     student::add(&addition, &username).await?;
-    projects::refresh(&app).await;
+    projects::refresh_after_write(&app).await;
     Ok(())
 }
 

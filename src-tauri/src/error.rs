@@ -76,6 +76,10 @@ pub enum Error {
     #[error("not signed in to GitHub")]
     NotSignedIn,
 
+    /// gh takes its token from this environment variable, so it can't store a sign-in.
+    #[error("the GitHub CLI is using the {0} environment variable; unset it to sign in here")]
+    TokenFromEnv(String),
+
     #[error("GitHub rate limit reached, retrying after {reset_at:?}")]
     RateLimited {
         reset_at: Option<chrono::DateTime<chrono::Utc>>,
@@ -139,6 +143,7 @@ impl Error {
             Error::OtherBranch(_) => "otherBranch",
             Error::Diverged => "diverged",
             Error::NotSignedIn => "notSignedIn",
+            Error::TokenFromEnv(_) => "tokenFromEnv",
             Error::RateLimited { .. } => "rateLimited",
             Error::GitHub(_) => "github",
             Error::Offline => "offline",

@@ -2,13 +2,21 @@
 //! `classroom50-group-<hash>-<n>`, where the hash comes from the classroom and assignment,
 //! so a project's group is found from the user's own team memberships (as `gh student team
 //! list` does), and its members are read with one aliased query. Read-only.
+//!
+//! Emails don't come from GraphQL: its `email` field needs `user:email` or `read:user`,
+//! which `gh student login` doesn't grant, and one such field fails the whole query. The
+//! REST profile (`users/{login}`) gives the public email with any token, so each member's
+//! is read from there, at most daily, revalidated with its ETag.
 
+use std::collections::HashMap;
+
+use futures_util::future::join_all;
 use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value, json};
 use sha2::{Digest, Sha256};
 
 use crate::error::Result;
-use crate::github;
+use crate::github::{self, HttpCache};
 
 const GROUP_TEAM_PREFIX: &str = "classroom50-group-";
 const GROUP_HASH_HEX_LEN: usize = 16;
@@ -17,6 +25,11 @@ const GROUP_RECORD_SCHEMA: &str = "classroom50/group/v1";
 const MAX_MEMBERS: u32 = 50;
 /// Teams per aliased query.
 const BATCH: usize = 25;
+/// How long a member's profile is trusted before it is revalidated (a free `304` when it
+/// hasn't changed).
+const PROFILE_MAX_AGE: chrono::TimeDelta = chrono::TimeDelta::days(1);
+/// Profile requests in flight at once.
+const PROFILE_BATCH: usize = 8;
 
 /// A group team the user is on, as listed with their other `classroom50-` teams.
 #[derive(Debug, Clone)]
@@ -106,9 +119,20 @@ struct MemberConnection {
     nodes: Vec<Option<Member>>,
 }
 
-/// Reads the members of each group team. Names travel as variables, never spliced into the
-/// query text.
-pub async fn load(http: &reqwest::Client, token: &str, teams: &[GroupTeam]) -> Result<Vec<Group>> {
+#[derive(Deserialize)]
+struct Profile {
+    #[serde(default)]
+    email: Option<String>,
+}
+
+/// Reads the members of each group team, then their public emails. Names travel as
+/// variables, never spliced into the query text.
+pub async fn load(
+    http: &reqwest::Client,
+    token: &str,
+    cache: &HttpCache,
+    teams: &[GroupTeam],
+) -> Result<Vec<Group>> {
     let mut groups = Vec::new();
     for batch in teams.chunks(BATCH) {
         let (query, variables) = members_query(batch);
@@ -118,23 +142,71 @@ pub async fn load(http: &reqwest::Client, token: &str, teams: &[GroupTeam]) -> R
                 .remove(&format!("g{i}"))
                 .and_then(|value| serde_json::from_value::<TeamData>(value).ok())
                 .and_then(|org| org.team)
-                .map(|team| {
-                    let members = team.members.nodes.into_iter().flatten();
-                    // GitHub answers "" for a profile without a public email.
-                    members
-                        .map(|m| Member {
-                            email: m.email.filter(|e| !e.trim().is_empty()),
-                            ..m
-                        })
-                        .collect()
-                })
+                .map(|team| team.members.nodes.into_iter().flatten().collect())
                 .unwrap_or_default();
             if let Some(group) = group(team, members) {
                 groups.push(group);
             }
         }
     }
+    public_emails(http, token, cache, &mut groups).await;
     Ok(groups)
+}
+
+/// Fills each member's public email from their REST profile, once per login. A profile
+/// that can't be read leaves the email unset (the clone's commits may still give one);
+/// it never fails the groups.
+async fn public_emails(
+    http: &reqwest::Client,
+    token: &str,
+    cache: &HttpCache,
+    groups: &mut [Group],
+) {
+    let mut logins: Vec<String> = groups
+        .iter()
+        .flat_map(|g| g.members.iter().map(|m| m.login.to_lowercase()))
+        .collect();
+    logins.sort();
+    logins.dedup();
+    let mut emails = HashMap::new();
+    for chunk in logins.chunks(PROFILE_BATCH) {
+        let fetched = join_all(chunk.iter().map(|login| async move {
+            let url = profile_url(login);
+            match cache
+                .get_api_text_or_cached(http, token, &url, PROFILE_MAX_AGE)
+                .await
+            {
+                Ok(body) => profile_email(&body),
+                Err(err) => {
+                    log::debug!("could not read the profile of {login}: {err}");
+                    None
+                }
+            }
+        }))
+        .await;
+        emails.extend(chunk.iter().cloned().zip(fetched));
+    }
+    for member in groups.iter_mut().flat_map(|g| g.members.iter_mut()) {
+        member.email = emails.get(&member.login.to_lowercase()).cloned().flatten();
+    }
+}
+
+/// A login is `[A-Za-z0-9-]`, so it needs no escaping; anything else is dropped.
+fn profile_url(login: &str) -> String {
+    let login: String = login
+        .chars()
+        .filter(|c| c.is_ascii_alphanumeric() || *c == '-')
+        .collect();
+    format!("https://api.github.com/users/{login}")
+}
+
+/// The public email of a REST profile; GitHub answers `null` (or "") without one.
+fn profile_email(body: &str) -> Option<String> {
+    serde_json::from_str::<Profile>(body)
+        .ok()?
+        .email
+        .map(|e| e.trim().to_owned())
+        .filter(|e| e.contains('@'))
 }
 
 /// One aliased query (`g0`, `g1`, ...) reading each team's members. Org and team names
@@ -146,7 +218,7 @@ fn members_query(batch: &[GroupTeam]) -> (String, Value) {
     for (i, team) in batch.iter().enumerate() {
         declarations.push(format!("$o{i}: String!, $s{i}: String!"));
         fields.push(format!(
-            "g{i}: organization(login: $o{i}) {{ team(slug: $s{i}) {{ members(first: {MAX_MEMBERS}) {{ nodes {{ login name email }} }} }} }}"
+            "g{i}: organization(login: $o{i}) {{ team(slug: $s{i}) {{ members(first: {MAX_MEMBERS}) {{ nodes {{ login name }} }} }} }}"
         ));
         variables.insert(format!("o{i}"), json!(team.org));
         variables.insert(format!("s{i}"), json!(team.slug));
@@ -251,6 +323,42 @@ mod tests {
         assert_eq!(variables["o0"], "HEIGVD-POO");
         assert_eq!(variables["s0"], "classroom50-group-3eaa7f60afc3ad98-3");
         assert_eq!(variables["o1"], "evil\") { x }");
+    }
+
+    #[test]
+    fn never_asks_graphql_for_emails() {
+        let team = GroupTeam {
+            org: "o".into(),
+            slug: "s".into(),
+            description: None,
+        };
+        let (query, _) = members_query(&[team]);
+        assert!(query.contains("nodes { login name }"));
+        assert!(!query.contains("email"));
+    }
+
+    #[test]
+    fn reads_the_public_email_of_a_profile() {
+        assert_eq!(
+            profile_email(r#"{"login":"a","email":" a@b.ch "}"#).as_deref(),
+            Some("a@b.ch")
+        );
+        assert_eq!(profile_email(r#"{"login":"a","email":null}"#), None);
+        assert_eq!(profile_email(r#"{"login":"a","email":""}"#), None);
+        assert_eq!(profile_email(r#"{"login":"a"}"#), None);
+        assert_eq!(profile_email("not json"), None);
+    }
+
+    #[test]
+    fn builds_profile_urls_from_logins_only() {
+        assert_eq!(
+            profile_url("Romain-Antunes"),
+            "https://api.github.com/users/Romain-Antunes"
+        );
+        assert_eq!(
+            profile_url("../repos/x?y"),
+            "https://api.github.com/users/reposxy"
+        );
     }
 
     #[test]

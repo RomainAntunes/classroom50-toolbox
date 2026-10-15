@@ -39,6 +39,10 @@ export interface ToolJob {
 export interface AuthStatus {
   loggedIn: boolean;
   login: string | null;
+  /** gh-student's scopes the token lacks; `grantScopes` adds them. */
+  missingScopes: string[];
+  /** gh uses a token from this environment variable: no sign-in, switch or sign-out. */
+  envToken: string | null;
 }
 
 /** A github.com account gh is signed in to. */
@@ -442,7 +446,10 @@ export const api = {
   getSettings: () => invoke<Settings>("get_settings"),
   updateSettings: (next: Settings) => invoke<Settings>("update_settings", { next }),
   login: () => invoke<AuthStatus>("login"),
+  /** `gh auth refresh` with gh-student's scopes, through the same device flow as `login`. */
+  grantScopes: () => invoke<AuthStatus>("grant_scopes"),
   cancelLogin: () => invoke<void>("cancel_login"),
+  signOut: (login: string) => invoke<AuthStatus>("sign_out", { login }),
   openTerminal: (path: string) => invoke<void>("open_terminal", { path }),
   installedEditors: () => invoke<EditorInfo[]>("installed_editors"),
   addTeammate: (id: string, username: string) => invoke<void>("add_teammate", { id, username }),
