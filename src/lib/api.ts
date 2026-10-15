@@ -250,6 +250,8 @@ export interface Settings {
   defaultEditor: string | null;
   /** Hidden project and unaccepted-assignment ids: listed only when a search matches. */
   hidden: string[];
+  /** The first-run guide was finished or skipped. */
+  onboarded: boolean;
 }
 
 /** An editor installed here that can open a folder. */

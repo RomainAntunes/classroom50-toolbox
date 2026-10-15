@@ -116,7 +116,11 @@
 
   /** Cheap local state: settings, tools, login and the last synced list. */
   async function load() {
-    await loadSettings();
+    const loaded = await loadSettings();
+    if (!loaded.onboarded) {
+      await goto("/welcome", { replaceState: true });
+      return;
+    }
     const [tools, auth, snapshot, progress] = await Promise.all([
       api.toolStatuses(),
       api.authStatus(),
