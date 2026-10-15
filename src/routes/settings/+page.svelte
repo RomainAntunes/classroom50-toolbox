@@ -32,7 +32,6 @@
   let info = $state<AppInfo | null>(null);
   let checking = $state(false);
   let upToDate = $state(false);
-  let rescanning = $state(false);
   let sync = $state<SyncDetails | null>(null);
   let clearing = $state(false);
   // Diagnostics: folded away unless asked for.
@@ -102,15 +101,6 @@
     save({ notifyHoursBefore: on ? [...rest, hours] : rest });
   }
 
-  async function rescan() {
-    rescanning = true;
-    try {
-      session.snapshot = await api.rescanLocal();
-    } finally {
-      rescanning = false;
-    }
-  }
-
   async function checkUpdates() {
     checking = true;
     upToDate = false;
@@ -150,12 +140,6 @@
 {#if current}
   <main>
     <Section title={t("settings.folders.title")}>
-      {#snippet actions()}
-        <div class="actions">
-          <button disabled={rescanning} onclick={rescan}>{t("projects.rescan")}</button>
-          <button onclick={pickWatchedFolder}>{t("projects.addFolder")}</button>
-        </div>
-      {/snippet}
       <Toggle
         label={t("settings.folders.editors")}
         hint={t("settings.folders.editorsHint")}
@@ -171,15 +155,18 @@
         </span>
         <button onclick={pickCloneFolder}>{t("settings.folders.change")}</button>
       </div>
+      <div class="row">
+        <span class="text">
+          <span>{t("settings.folders.watched")}</span>
+          <span class="sub">{t("settings.folders.hint")}</span>
+        </span>
+        <button onclick={pickWatchedFolder}>{t("projects.addFolder")}</button>
+      </div>
       {#each current.watchedFolders as folder (folder)}
-        <div class="row">
+        <div class="row nested">
           <span class="path" title={folder}>{folder}</span>
           <button onclick={() => removeFolder(folder)}>{t("settings.folders.remove")}</button>
         </div>
-      {:else}
-        {#if !current.scanEditorProjects}
-          <p class="hint">{t("settings.folders.hint")}</p>
-        {/if}
       {/each}
     </Section>
 
@@ -395,9 +382,8 @@
     color: var(--warning);
   }
 
-  .actions {
-    display: flex;
-    gap: 6px;
+  .row.nested {
+    padding-left: 24px;
   }
 
   .row {
