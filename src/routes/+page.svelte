@@ -42,7 +42,7 @@
   let now = $state(new Date());
   let loading = $state(false);
 
-  const missingTool = $derived(session.tools.some((tool) => !tool.installed));
+  const missingTool = $derived(session.tools.some((tool) => !tool.installed || tool.outdated));
   const ghInstalled = $derived(session.tools.some((tool) => tool.tool === "gh" && tool.installed));
   // Signing in is already offered in the footer.
   const issue = $derived(

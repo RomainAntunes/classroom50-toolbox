@@ -1,6 +1,14 @@
 <script lang="ts">
-  import { message } from "@tauri-apps/plugin-dialog";
-  import { api, errorKind, errorMessage, withDialog, type ToolStatus } from "$lib/api";
+  import { ask, message } from "@tauri-apps/plugin-dialog";
+  import { openUrl } from "@tauri-apps/plugin-opener";
+  import {
+    api,
+    errorKind,
+    errorMessage,
+    withDialog,
+    type CommandError,
+    type ToolStatus,
+  } from "$lib/api";
   import { t } from "$lib/i18n";
   import { session } from "$lib/session.svelte";
   import { toolJobs, watchToolJobs } from "$lib/toolJobs.svelte";
@@ -54,11 +62,36 @@
 
   /** A failure says what went wrong (the command's last lines) and how to do it by hand. */
   async function failed(err: unknown, key: string, command: string | null) {
-    if (errorKind(err) === "cancelled") return;
+    const kind = errorKind(err);
+    if (kind === "cancelled") return;
     const tool = t(`setup.tool.${status.tool}`);
-    let text = t(key, { tool, error: errorMessage(err) });
-    if (command && errorKind(err) !== "busy") text += t("setup.runYourself", { command });
+    if (kind === "manualInstall") return manual(err as CommandError, tool);
+    const error = kind === "notSignedIn" ? t("setup.signInFirst") : errorMessage(err);
+    let text = t(key, { tool, error });
+    if (command && kind !== "busy" && kind !== "notSignedIn") {
+      text += t("setup.runYourself", { command });
+    }
     await withDialog(() => message(text, { kind: "error" }));
+  }
+
+  /** The app can't install it here (no package manager, no password prompt): say why and
+   * offer the download page or the command for a terminal. */
+  async function manual(err: CommandError, tool: string) {
+    let text = t("setup.manual", { tool, reason: err.message });
+    if (err.command) text += t("setup.runYourself", { command: err.command });
+    const url = err.url;
+    if (!url) {
+      await withDialog(() => message(text, { kind: "info" }));
+      return;
+    }
+    const open = await withDialog(() =>
+      ask(text, {
+        kind: "info",
+        okLabel: t("setup.openDownload"),
+        cancelLabel: t("setup.notNow"),
+      }),
+    );
+    if (open) await openUrl(url);
   }
 
   async function upgrade() {
@@ -82,8 +115,8 @@
       // gh-student depends on gh, so every row gets its fresh status.
       for (const next of await api.installTool(status.tool)) onchange(next);
     } catch (err) {
-      const spec = await api.installCommand(status.tool).catch(() => null);
-      await failed(err, "setup.installFailed", spec && [spec.program, ...spec.args].join(" "));
+      const plan = await api.installCommand(status.tool).catch(() => null);
+      await failed(err, "setup.installFailed", plan?.manual ?? null);
     } finally {
       starting = null;
     }
@@ -96,16 +129,25 @@
 
 <div class="tool">
   <div class="row">
-    <span class="dot" class:ok={status.installed}></span>
+    <span class="dot" class:ok={status.installed && !status.outdated}></span>
     <span class="name">{t(`setup.tool.${status.tool}`)}</span>
     {#if status.installed}
-      <span class="meta" class:update={latest}
+      <span
+        class="meta"
+        class:update={latest}
+        class:outdated={status.outdated}
+        title={status.outdated ? t("setup.outdatedHint") : undefined}
         >{latest
           ? t("setup.newVersion", { current: status.version ?? "", latest })
-          : status.version}</span
+          : status.outdated
+            ? t("setup.outdated", { version: status.version ?? "" })
+            : status.version}</span
       >
-      {#if upgrading}
+      {#if upgrading || installing}
         <button onclick={cancel} disabled={!job}>{t("setup.cancel")}</button>
+      {:else if status.outdated}
+        <!-- Installing again upgrades it, through the same package manager. -->
+        <button class="primary" onclick={install}>{t("setup.update")}</button>
       {:else if latest}
         <button class="primary" onclick={upgrade}>{t("setup.update")}</button>
       {/if}
@@ -153,6 +195,10 @@
 
   .meta.update {
     color: var(--accent);
+  }
+
+  .meta.outdated {
+    color: var(--warning);
   }
 
   .dot {

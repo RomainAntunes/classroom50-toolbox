@@ -24,6 +24,8 @@ export interface ToolStatus {
   tool: Tool;
   installed: boolean;
   version: string | null;
+  /** Installed but older than the app needs (gh only); installing again upgrades it. */
+  outdated: boolean;
 }
 
 /** An install or update still running (`tool_jobs`, the `tool-jobs` event). */
@@ -48,6 +50,12 @@ export interface Account {
 export interface CommandSpec {
   program: string;
   args: string[];
+}
+
+/** How a tool installs here (`install_command`). */
+export interface InstallPlan extends CommandSpec {
+  /** The same install typed in a terminal, shown when it fails. */
+  manual: string;
 }
 
 export interface RepoConfig {
@@ -387,6 +395,10 @@ export interface UpdateInfo {
 export interface CommandError {
   kind: string;
   message: string;
+  /** `manualInstall`: where to download the tool by hand. */
+  url?: string;
+  /** `manualInstall`: the command to run in a terminal. */
+  command?: string;
 }
 
 export const api = {
@@ -405,7 +417,7 @@ export const api = {
   simulatedNetwork: () => invoke<SimulatedNetwork>("simulated_network"),
   setPopoverPinned: (pinned: boolean) => invoke<void>("set_popover_pinned", { pinned }),
   toolStatuses: () => invoke<ToolStatus[]>("tool_statuses"),
-  installCommand: (tool: Tool) => invoke<CommandSpec>("install_command", { tool }),
+  installCommand: (tool: Tool) => invoke<InstallPlan>("install_command", { tool }),
   /** The newer version `upgradeTool` would install; always null for git and gh. */
   toolUpdate: (tool: Tool) => invoke<string | null>("tool_update", { tool }),
   /** gh-student only; git and gh follow the OS package manager. */
