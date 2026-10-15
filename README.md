@@ -61,6 +61,14 @@ The app talks to GitHub only, with the token `gh` already holds, and never sends
 else. It reads your repositories and never changes them on its own: accepting, cloning and
 submitting only happen when you click.
 
+## Support the project
+
+The toolbox is free and built by a student in their spare time. Its first goal is to pay for
+code signing, so students no longer have to get past a security warning on first launch: the
+Apple Developer Program costs 99 USD a year. If the toolbox helps you or your class,
+[sponsoring it on GitHub](https://github.com/sponsors/RomainAntunes) gets it there faster.
+Starring the repo and telling other students and teachers about it helps too.
+
 ## Develop
 
 Requirements: [Rust](https://rustup.rs), Node.js LTS, pnpm, and the
