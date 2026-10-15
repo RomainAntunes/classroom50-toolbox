@@ -688,6 +688,84 @@ pub async fn commit_push(
     Ok(pushed)
 }
 
+/// Project `id`'s clone, closed or not: a local commit is always allowed.
+fn local_clone(state: &ProjectsState, id: &str) -> Result<PathBuf> {
+    state
+        .snapshot()
+        .projects
+        .into_iter()
+        .find(|p| p.id == id)
+        .ok_or_else(|| Error::Unsupported(format!("unknown project {id}")))?
+        .path
+        .ok_or_else(|| Error::Unsupported(format!("{id} has no local clone")))
+}
+
+/// What a commit of project `id` would hold, and whether Commit & push is offered with it.
+#[derive(Debug, Clone, serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CommitCheck {
+    #[serde(flatten)]
+    pub check: push::PushCheck,
+    /// Why push isn't offered (an error kind, or `tagMode`); none when it is.
+    pub push_blocked: Option<String>,
+}
+
+/// What Commit (and Commit & push, when it applies) would do for project `id`. Refuses
+/// only what blocks a local commit (`push::commit_check`).
+#[tauri::command]
+pub async fn commit_check(state: State<'_, ProjectsState>, id: String) -> Result<CommitCheck> {
+    let path = local_clone(&state, &id)?;
+    let changes = push::commit_check(&path).await?;
+    let tag_mode = state.snapshot().projects.iter().any(|p| {
+        p.id == id
+            && p.assignment
+                .as_ref()
+                .is_some_and(|a| a.submission_mode == Some(crate::classroom50::SubmissionMode::Tag))
+    });
+    if tag_mode {
+        return Ok(CommitCheck {
+            check: changes,
+            push_blocked: Some("tagMode".into()),
+        });
+    }
+    let pushed = match pushable(&state, &id) {
+        Ok((path, branch, head)) => push::check(&path, &branch, head.as_deref()).await,
+        Err(err) => Err(err),
+    };
+    Ok(match pushed {
+        Ok(check) => CommitCheck {
+            check,
+            push_blocked: None,
+        },
+        Err(err) => CommitCheck {
+            check: changes,
+            push_blocked: Some(
+                match err {
+                    // Submissions are closed (`submittable_clone`).
+                    Error::Student(_) => "closed",
+                    err => err.kind(),
+                }
+                .into(),
+            ),
+        },
+    })
+}
+
+/// Commits project `id`'s changes with `message` in its clone and nothing else: no push, so
+/// dev builds allow it, and only the local state is re-read.
+#[tauri::command]
+pub async fn commit_only(
+    app: AppHandle,
+    state: State<'_, ProjectsState>,
+    id: String,
+    message: String,
+) -> Result<push::Pushed> {
+    let path = local_clone(&state, &id)?;
+    let committed = push::commit(&path, &message).await?;
+    projects::refresh_local(&app, false).await;
+    Ok(committed)
+}
+
 /// The name and private email of the signed-in account, offered when git has no identity.
 #[tauri::command]
 pub async fn suggested_git_identity() -> Result<push::Identity> {
@@ -702,7 +780,7 @@ pub async fn set_git_identity(
     name: String,
     email: String,
 ) -> Result<()> {
-    let (path, ..) = pushable(&state, &id)?;
+    let path = local_clone(&state, &id)?;
     push::set_identity(&path, &name, &email).await
 }
 

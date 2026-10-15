@@ -159,6 +159,8 @@ pub fn run() {
             commands::pull_project,
             commands::push_check,
             commands::commit_push,
+            commands::commit_check,
+            commands::commit_only,
             commands::suggested_git_identity,
             commands::set_git_identity,
             commands::check_update,

@@ -99,6 +99,10 @@ pub enum Error {
     #[error("nothing to commit or push")]
     NothingToPush,
 
+    /// Commit refused: no change to commit.
+    #[error("nothing to commit")]
+    NothingToCommit,
+
     /// Commit refused: git has no `user.name` or `user.email` for this clone.
     #[error("git doesn't know your name and email yet")]
     NoIdentity,
@@ -264,6 +268,7 @@ impl Error {
             Error::RemoteAhead => "remoteAhead",
             Error::GitInProgress => "gitInProgress",
             Error::NothingToPush => "nothingToPush",
+            Error::NothingToCommit => "nothingToCommit",
             Error::NoIdentity => "noIdentity",
             Error::FileTooLarge(_) => "fileTooLarge",
             Error::PushRejected => "pushRejected",

@@ -3,7 +3,8 @@
 //! the default branch is pushed, so local history matches GitHub (unlike `gh student
 //! submit`, which pushes a snapshot and leaves the clone a commit behind). Anything that
 //! would need a merge, or that git or GitHub would refuse halfway, is refused before the
-//! first write with a reason the UI explains.
+//! first write with a reason the UI explains. Commit alone (`commit`) works on any clone,
+//! branch or submission mode: it never pushes, so dev builds allow it.
 
 use std::ffi::OsString;
 use std::path::{Path, PathBuf};
@@ -41,7 +42,7 @@ pub struct PushCheck {
     pub has_identity: bool,
 }
 
-/// The pushed head commit.
+/// The new head commit (pushed by Commit & push, local only after a commit).
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Pushed {
@@ -68,6 +69,38 @@ pub async fn check(path: &Path, branch: &str, github_head: Option<&str>) -> Resu
             Err(err) => return Err(err),
         }
     }
+    let mut state = changes(path).await?;
+    state.ahead = ahead(path, github_head).await?;
+    if state.files.is_empty() && state.ahead == 0 {
+        return Err(Error::NothingToPush);
+    }
+    Ok(state)
+}
+
+/// What a local commit of the clone at `path` would hold (`ahead` stays 0). Lighter than
+/// `check`: any branch, and GitHub may be ahead, since a commit never leaves the clone.
+pub async fn commit_check(path: &Path) -> Result<PushCheck> {
+    if in_progress(path).await? {
+        return Err(Error::GitInProgress);
+    }
+    let state = changes(path).await?;
+    if state.files.is_empty() {
+        return Err(Error::NothingToCommit);
+    }
+    Ok(state)
+}
+
+/// Commits every change with `message`, after the checks of `commit_check`. Never pushes,
+/// so dev builds allow it. Returns the new commit.
+pub async fn commit(path: &Path, message: &str) -> Result<Pushed> {
+    let state = commit_check(path).await?;
+    commit_changes(path, &state, Some(message)).await?;
+    let commit = git(path, &["rev-parse", "HEAD"]).await?.trim().to_owned();
+    Ok(Pushed { commit })
+}
+
+/// The changed files of the clone, their sizes and whether git knows who commits.
+async fn changes(path: &Path) -> Result<PushCheck> {
     let status = git(
         path,
         &[
@@ -80,10 +113,6 @@ pub async fn check(path: &Path, branch: &str, github_head: Option<&str>) -> Resu
     )
     .await?;
     let (files, untracked) = parse_status(&status);
-    let ahead = ahead(path, github_head).await?;
-    if files.is_empty() && ahead == 0 {
-        return Err(Error::NothingToPush);
-    }
     let (large, too_large) = sizes(path, &files);
     let has_identity = has_config(path, "user.name").await && has_config(path, "user.email").await;
     Ok(PushCheck {
@@ -91,9 +120,30 @@ pub async fn check(path: &Path, branch: &str, github_head: Option<&str>) -> Resu
         untracked,
         large,
         too_large,
-        ahead,
+        ahead: 0,
         has_identity,
     })
+}
+
+/// `git add --all` and `git commit`, refusing files GitHub would reject and a missing
+/// identity first.
+async fn commit_changes(path: &Path, state: &PushCheck, message: Option<&str>) -> Result<()> {
+    if !state.too_large.is_empty() {
+        return Err(Error::FileTooLarge(state.too_large.clone()));
+    }
+    if !state.has_identity {
+        return Err(Error::NoIdentity);
+    }
+    let message = message
+        .map(str::trim)
+        .filter(|m| !m.is_empty())
+        .ok_or_else(|| Error::Unsupported("a commit message is needed".into()))?;
+    git(path, &["add", "--all"]).await?;
+    let args = commit_args(message);
+    process::run_with_timeout("git", &args, Some(path), COMMIT_TIMEOUT)
+        .await
+        .map(drop)
+        .map_err(git_failure)
 }
 
 /// Commits every change with `message` (when there are changes) and pushes `branch` to
@@ -109,22 +159,7 @@ pub async fn commit_and_push(
     // Dev builds refuse the push: stop before the commit, so nothing is left behind.
     process::ensure_allowed("git", &push)?;
     if !state.files.is_empty() {
-        if !state.too_large.is_empty() {
-            return Err(Error::FileTooLarge(state.too_large));
-        }
-        if !state.has_identity {
-            return Err(Error::NoIdentity);
-        }
-        let message = message
-            .map(str::trim)
-            .filter(|m| !m.is_empty())
-            .ok_or_else(|| Error::Unsupported("a commit message is needed".into()))?;
-        git(path, &["add", "--all"]).await?;
-        let args = commit_args(message);
-        if let Err(err) = process::run_with_timeout("git", &args, Some(path), COMMIT_TIMEOUT).await
-        {
-            return Err(git_failure(err));
-        }
+        commit_changes(path, &state, message).await?;
     }
     match process::run_with_timeout("git", &push, Some(path), PUSH_TIMEOUT).await {
         Ok(_) => {}
@@ -515,6 +550,72 @@ mod tests {
         assert!(matches!(
             check(&clone, "main", Some(&pushed)).await,
             Err(Error::NothingToPush)
+        ));
+        let _ = std::fs::remove_dir_all(&root);
+    }
+
+    /// Commit only: on another branch and with GitHub ahead (both refused by Commit & push),
+    /// in a dev build too, since nothing is pushed.
+    #[tokio::test]
+    async fn commits_locally_on_any_branch() {
+        let root = std::env::temp_dir().join(format!("c50tb-commit-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&root);
+        let clone = root.join("clone");
+        std::fs::create_dir_all(&clone).unwrap();
+        sh(&clone, &["init", "-q", "-b", "main"]);
+        sh(&clone, &["commit", "-q", "--allow-empty", "-m", "one"]);
+        sh(&clone, &["config", "--local", "commit.gpgsign", "false"]);
+        set_identity(&clone, "Ada", &noreply_email(1, "ada"))
+            .await
+            .unwrap();
+        assert!(matches!(
+            commit_check(&clone).await,
+            Err(Error::NothingToCommit)
+        ));
+        std::fs::write(clone.join("a.txt"), "x").unwrap();
+        // A commit GitHub has and the clone lacks: Commit & push refuses, Commit doesn't.
+        let github_head = "1111111111111111111111111111111111111111";
+        assert!(matches!(
+            check(&clone, "main", Some(github_head)).await,
+            Err(Error::RemoteAhead)
+        ));
+        assert!(commit_check(&clone).await.is_ok());
+
+        sh(&clone, &["switch", "-q", "-c", "work"]);
+        assert!(matches!(
+            check(&clone, "main", Some(github_head)).await,
+            Err(Error::OtherBranch(_))
+        ));
+        let state = commit_check(&clone).await.unwrap();
+        assert_eq!(state.untracked, ["a.txt"]);
+        assert_eq!(state.ahead, 0);
+
+        std::fs::write(clone.join(".git").join("MERGE_HEAD"), "x").unwrap();
+        assert!(matches!(
+            commit(&clone, "Add a").await,
+            Err(Error::GitInProgress)
+        ));
+        std::fs::remove_file(clone.join(".git").join("MERGE_HEAD")).unwrap();
+
+        let big = std::fs::File::create(clone.join("big.bin")).unwrap();
+        big.set_len(MAX_FILE + 1).unwrap();
+        drop(big);
+        let before = sh(&clone, &["rev-parse", "HEAD"]);
+        assert!(matches!(
+            commit(&clone, "Add a").await,
+            Err(Error::FileTooLarge(f)) if f == ["big.bin"]
+        ));
+        assert_eq!(sh(&clone, &["rev-parse", "HEAD"]), before);
+        std::fs::remove_file(clone.join("big.bin")).unwrap();
+
+        // The dev guard only stops pushes: this commit goes through in a debug build.
+        let committed = commit(&clone, " Add a ").await.unwrap();
+        assert_eq!(sh(&clone, &["rev-parse", "HEAD"]), committed.commit);
+        assert_eq!(sh(&clone, &["log", "-1", "--format=%s"]), "Add a");
+        assert_eq!(sh(&clone, &["branch", "--show-current"]), "work");
+        assert!(matches!(
+            commit_check(&clone).await,
+            Err(Error::NothingToCommit)
         ));
         let _ = std::fs::remove_dir_all(&root);
     }
