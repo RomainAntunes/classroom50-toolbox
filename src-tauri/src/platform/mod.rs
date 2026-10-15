@@ -122,3 +122,19 @@ pub fn editor_data_dirs() -> Vec<PathBuf> {
 pub fn home_dir() -> Option<PathBuf> {
     std::env::var_os(if cfg!(windows) { "USERPROFILE" } else { "HOME" }).map(PathBuf::from)
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::editors::ALL;
+
+    /// Eclipse and Visual Studio have no command that opens a plain folder.
+    #[test]
+    fn every_editor_has_a_command_line_name() {
+        for editor in ALL {
+            let names = editor_commands(editor.id);
+            let expected = !matches!(editor.id, "eclipse" | "visual-studio");
+            assert_eq!(!names.is_empty(), expected, "{}", editor.id);
+        }
+    }
+}

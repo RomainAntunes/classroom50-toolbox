@@ -205,3 +205,33 @@ pub fn open_terminal(dir: &Path) -> Result<()> {
     }
     process::spawn_detached("powershell", ["-NoExit"], Some(dir))
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::editors::ALL;
+
+    /// Every editor except Eclipse has somewhere to be found: an install folder, a JetBrains
+    /// layout, a CLI name, or (Visual Studio) its own lookup.
+    #[test]
+    fn every_editor_but_eclipse_can_be_found() {
+        for editor in ALL {
+            let found = !editor_exes(editor.id).is_empty()
+                || jetbrains_exe(editor.id).is_some()
+                || !super::super::editor_commands(editor.id).is_empty()
+                || editor.id == "visual-studio";
+            assert_eq!(found, editor.id != "eclipse", "{}", editor.id);
+        }
+    }
+
+    #[test]
+    fn picks_the_newest_install_folder() {
+        let dir = std::env::temp_dir().join(format!("c50-jb-{}", std::process::id()));
+        for name in ["CLion 2025.3", "CLion 2026.1", "CLionNova 2026.2", "Other"] {
+            std::fs::create_dir_all(dir.join(name)).unwrap();
+        }
+        assert_eq!(newest_child(&dir, "CLion"), Some(dir.join("CLion 2026.1")));
+        assert_eq!(newest_child(&dir, "GoLand"), None);
+        std::fs::remove_dir_all(&dir).unwrap();
+    }
+}

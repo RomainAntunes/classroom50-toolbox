@@ -147,3 +147,19 @@ pub fn open_terminal(dir: &Path) -> Result<()> {
     }
     Err(Error::Unsupported("no terminal emulator found".into()))
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::editors::ALL;
+
+    #[test]
+    fn every_editor_but_eclipse_and_visual_studio_can_be_found() {
+        for editor in ALL {
+            let found = !super::super::editor_commands(editor.id).is_empty()
+                || !editor_flatpaks(editor.id).is_empty();
+            let expected = !matches!(editor.id, "eclipse" | "visual-studio");
+            assert_eq!(found, expected, "{}", editor.id);
+        }
+    }
+}

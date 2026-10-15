@@ -39,6 +39,7 @@ jobs:
 
       - run: pnpm install --frozen-lockfile
       - run: pnpm lint
+      - run: pnpm test
       # tauri::generate_context! embeds the built frontend, so it must exist before cargo runs.
       - run: pnpm build
       - run: cargo fmt --check

@@ -107,3 +107,23 @@ pub fn open_terminal(dir: &Path) -> Result<()> {
         None,
     )
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::editors::ALL;
+
+    #[test]
+    fn every_folder_opening_editor_has_an_app() {
+        for editor in ALL {
+            let apps = editor_apps(editor.id);
+            let expected = !matches!(editor.id, "eclipse" | "netbeans" | "visual-studio");
+            assert_eq!(!apps.is_empty(), expected, "{}", editor.id);
+            assert!(
+                apps.iter().all(|app| app.ends_with(".app")),
+                "{}",
+                editor.id
+            );
+        }
+    }
+}
