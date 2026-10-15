@@ -451,7 +451,7 @@
             </dd>
             {#if sync.issue}
               <dt>{t("settings.sync.issue")}</dt>
-              <dd class="issue" title={sync.issue.message}>{sync.issue.message}</dd>
+              <dd class="issue" title={errorMessage(sync.issue)}>{errorMessage(sync.issue)}</dd>
             {/if}
           </dl>
         {/if}

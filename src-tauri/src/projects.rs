@@ -175,12 +175,14 @@ pub struct Project {
     pub group: Option<Group>,
 }
 
-/// Why the last sync was partial, as `{ kind, message }` like command errors.
+/// Why the last sync was partial, as `{ kind, message, params }` like command errors.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct SyncIssue {
     pub kind: String,
     pub message: String,
+    #[serde(default, skip_serializing_if = "std::collections::BTreeMap::is_empty")]
+    pub params: std::collections::BTreeMap<String, String>,
     /// Kept across restarts, so a rate-limit backoff survives one.
     #[serde(default)]
     retry_after: Option<DateTime<Utc>>,
@@ -191,6 +193,11 @@ impl From<&Error> for SyncIssue {
         Self {
             kind: err.kind().to_owned(),
             message: err.to_string(),
+            params: err
+                .params()
+                .into_iter()
+                .map(|(name, value)| (name.to_owned(), value))
+                .collect(),
             retry_after: match err {
                 Error::RateLimited { reset_at } => {
                     Some(reset_at.unwrap_or_else(|| Utc::now() + chrono::TimeDelta::hours(1)))
