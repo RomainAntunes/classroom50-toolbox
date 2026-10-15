@@ -51,6 +51,7 @@
     "license": "GPL-3.0-only",
     "licenseFile": "../LICENSE",
     "publisher": "Romain Antunes",
+    "copyright": "Copyright © 2026 Romain Antunes",
     "homepage": "https://github.com/RomainAntunes/classroom50-toolbox",
     "linux": {
       "deb": {
