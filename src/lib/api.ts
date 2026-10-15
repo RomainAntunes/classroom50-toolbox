@@ -64,6 +64,8 @@ export interface RemoteRepo {
   /** Branches with commits missing from the default branch. */
   unmerged: Branch[];
   grade: Grade | null;
+  /** Every graded submission still listed (the last 10 releases), newest first. */
+  history: GradeSummary[];
   /** The autograder's run on the head commit, while running or when it broke. */
   grading: Grading | null;
   feedback: Feedback | null;
@@ -90,6 +92,9 @@ export interface Grade {
   publishedAt: string | null;
   url: string;
 }
+
+/** A past grade: the score without the test list. */
+export type GradeSummary = Omit<Grade, "tests">;
 
 export interface GradeTest {
   name: string;
@@ -243,6 +248,10 @@ export interface Settings {
   notifyHoursBefore: number[];
   /** Editor for clones no editor has opened yet; `null` picks the first one installed. */
   defaultEditor: string | null;
+  /** Hidden project and unaccepted-assignment ids: listed only when a search matches. */
+  hidden: string[];
+  /** The first-run guide was finished or skipped. */
+  onboarded: boolean;
 }
 
 /** An editor installed here that can open a folder. */

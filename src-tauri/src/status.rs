@@ -85,6 +85,33 @@ impl Grade {
     }
 }
 
+/// A past grade, for the history: the score without the test list.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct GradeSummary {
+    pub tag: String,
+    pub score: u32,
+    pub max_score: u32,
+    pub tests_passed: u32,
+    pub tests_total: u32,
+    pub published_at: Option<DateTime<Utc>>,
+    pub url: String,
+}
+
+impl From<&Grade> for GradeSummary {
+    fn from(grade: &Grade) -> Self {
+        Self {
+            tag: grade.tag.clone(),
+            score: grade.score,
+            max_score: grade.max_score,
+            tests_passed: grade.tests_passed,
+            tests_total: grade.tests_total,
+            published_at: grade.published_at,
+            url: grade.url.clone(),
+        }
+    }
+}
+
 /// One test of a grade. Its own type, camelCase both ways, so the saved snapshot reads
 /// back (`TestResult` reads `result.json`'s kebab-case names).
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -261,13 +288,14 @@ impl StatusFields {
             .collect()
     }
 
-    /// The newest published `submit/*` release carrying a `result.json`.
-    pub fn graded_release(&mut self) -> Option<GradedRelease> {
+    /// The published `submit/*` releases carrying a `result.json`, newest first.
+    pub fn graded_releases(&mut self) -> Vec<GradedRelease> {
         self.releases
-            .take()?
+            .take()
             .into_iter()
+            .flat_map(Nodes::into_iter)
             .filter(|r| !r.is_draft && r.tag_name.starts_with(SUBMIT_PREFIX))
-            .find_map(|r| {
+            .filter_map(|r| {
                 let result_url = r.result?.into_iter().next()?.url;
                 Some(GradedRelease {
                     tag: r.tag_name,
@@ -276,6 +304,7 @@ impl StatusFields {
                     result_url,
                 })
             })
+            .collect()
     }
 
     /// The Autograde run on the head commit, when it's still going or broke. The runner
@@ -403,7 +432,10 @@ mod tests {
          "publishedAt": null, "url": "u1", "result": {"nodes": [{"url": "r1"}]}},
         {"tagName": "submit/2026-10-13T12-00-05Z-def5678", "isDraft": false,
          "publishedAt": "2026-10-13T12:01:00Z", "url": "u2",
-         "result": {"nodes": [{"url": "r2"}]}}
+         "result": {"nodes": [{"url": "r2"}]}},
+        {"tagName": "submit/2026-10-12T09-00-00Z-0123abc", "isDraft": false,
+         "publishedAt": "2026-10-12T09:01:00Z", "url": "u3",
+         "result": {"nodes": [{"url": "r3"}]}}
       ]},
       "feedback": {"nodes": [{
         "url": "https://github.com/o/r/pull/1",
@@ -427,9 +459,11 @@ mod tests {
                 commits: 3
             }]
         );
-        let release = fields.graded_release().unwrap();
-        assert_eq!(release.tag, "submit/2026-10-13T12-00-05Z-def5678");
-        assert_eq!(release.result_url, "r2");
+        // Drafts and non-submit releases aren't grades; newest first.
+        let releases = fields.graded_releases();
+        let urls: Vec<&str> = releases.iter().map(|r| r.result_url.as_str()).collect();
+        assert_eq!(urls, ["r2", "r3"]);
+        assert_eq!(releases[0].tag, "submit/2026-10-13T12-00-05Z-def5678");
 
         let feedback = fields.feedback("alice").unwrap();
         assert_eq!(feedback.comments, 2);

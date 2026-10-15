@@ -29,7 +29,7 @@ use crate::github::{self, Http, HttpCache};
 use crate::groups::{self, Group, GroupTeam};
 use crate::process;
 use crate::settings::{Settings, SettingsStore};
-use crate::status::{self, Branch, Feedback, Grade, Grading, StatusFields};
+use crate::status::{self, Branch, Feedback, Grade, GradeSummary, Grading, StatusFields};
 use crate::tools;
 use crate::watch::{self, WatchTarget};
 
@@ -100,6 +100,9 @@ pub struct RemoteRepo {
     pub unmerged: Vec<Branch>,
     #[serde(default)]
     pub grade: Option<Grade>,
+    /// Every graded submission still listed (the last 10 releases), newest first.
+    #[serde(default)]
+    pub history: Vec<GradeSummary>,
     /// The autograder's run on the head commit, while running or when it broke.
     #[serde(default)]
     pub grading: Option<Grading>,
@@ -1267,6 +1270,7 @@ impl RepoNode {
             config,
             unmerged: Vec::new(),
             grade: None,
+            history: Vec::new(),
             grading: None,
             feedback: None,
         }
@@ -1536,6 +1540,7 @@ struct StatusNode {
 fn keep_status(repo: &mut RemoteRepo, old: &RemoteRepo) {
     repo.unmerged.clone_from(&old.unmerged);
     repo.grade.clone_from(&old.grade);
+    repo.history.clone_from(&old.history);
     repo.grading.clone_from(&old.grading);
     repo.feedback.clone_from(&old.feedback);
 }
@@ -1614,24 +1619,29 @@ async fn refresh_statuses(
         repo.unmerged = status.unmerged(repo.default_branch.as_deref());
         repo.feedback = status.feedback(&auth.login);
         repo.grading = status.grading();
-        repo.grade = match status.graded_release() {
+        let releases = status.graded_releases();
+        repo.grade = match releases.first() {
             Some(release)
                 if old
                     .grade
                     .as_ref()
                     .is_some_and(|g| g.tag == release.tag && g.has_tests()) =>
             {
-                old.grade
+                old.grade.clone()
             }
-            Some(release) => match status::download_grade(http, &release).await {
+            Some(release) => match status::download_grade(http, release).await {
                 Ok(grade) => Some(grade),
                 Err(err) => {
                     log::warn!("{err}");
-                    old.grade
+                    old.grade.clone()
                 }
             },
             None => None,
         };
+        repo.history = grade_history(&releases, repo.grade.as_ref(), &old, |release| {
+            status::download_grade(http, release)
+        })
+        .await;
         updated.push((repo, config));
     }
 
@@ -1643,6 +1653,39 @@ async fn refresh_statuses(
     }
     state.store_remote(cache);
     updated
+}
+
+/// The summary of each graded release, newest first. A result is downloaded once per tag;
+/// after that it comes from the last sync.
+async fn grade_history<'a, F, Fut>(
+    releases: &'a [status::GradedRelease],
+    newest: Option<&Grade>,
+    old: &RemoteRepo,
+    mut download: F,
+) -> Vec<GradeSummary>
+where
+    F: FnMut(&'a status::GradedRelease) -> Fut,
+    Fut: std::future::Future<Output = Result<Grade>>,
+{
+    let mut history = Vec::with_capacity(releases.len());
+    for release in releases {
+        let known = newest
+            .filter(|g| g.tag == release.tag)
+            .map(GradeSummary::from)
+            .or_else(|| old.history.iter().find(|g| g.tag == release.tag).cloned());
+        let summary = match known {
+            Some(summary) => summary,
+            None => match download(release).await {
+                Ok(grade) => GradeSummary::from(&grade),
+                Err(err) => {
+                    log::warn!("{err}");
+                    continue;
+                }
+            },
+        };
+        history.push(summary);
+    }
+    history
 }
 
 fn key(name_with_owner: &str) -> String {
@@ -2068,6 +2111,7 @@ mod tests {
             config: Some(config("hello")),
             unmerged: Vec::new(),
             grade: None,
+            history: Vec::new(),
             grading: None,
             feedback: None,
         }
@@ -2084,6 +2128,45 @@ mod tests {
 
         let fresh = parse_status("# branch.oid (initial)\n# branch.head (detached)");
         assert_eq!(fresh, LocalState::default());
+    }
+
+    #[tokio::test]
+    async fn downloads_each_grade_of_the_history_once() {
+        let release = |tag: &str| status::GradedRelease {
+            tag: tag.into(),
+            published_at: None,
+            url: format!("page-{tag}"),
+            result_url: format!("result-{tag}"),
+        };
+        let grade = |tag: &str, score: u32| Grade {
+            tag: tag.into(),
+            score,
+            max_score: 10,
+            tests_passed: 0,
+            tests_total: 0,
+            tests: Vec::new(),
+            published_at: None,
+            url: format!("page-{tag}"),
+        };
+        let releases = [release("c"), release("b"), release("a"), release("broken")];
+        let newest = grade("c", 9);
+        let mut old = remote("r", "h", None);
+        old.history = vec![GradeSummary::from(&grade("b", 7))];
+        let mut downloaded = Vec::new();
+        let history = grade_history(&releases, Some(&newest), &old, |r| {
+            downloaded.push(r.tag.clone());
+            let result = if r.tag == "broken" {
+                Err(Error::GitHub("gone".into()))
+            } else {
+                Ok(grade(&r.tag, 5))
+            };
+            async move { result }
+        })
+        .await;
+        // The newest grade and the known one are reused; a failed download is left out.
+        assert_eq!(downloaded, ["a", "broken"]);
+        let scores: Vec<(&str, u32)> = history.iter().map(|g| (g.tag.as_str(), g.score)).collect();
+        assert_eq!(scores, [("c", 9), ("b", 7), ("a", 5)]);
     }
 
     #[test]

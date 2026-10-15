@@ -6,6 +6,7 @@
   import { setLocale } from "$lib/i18n";
   import { showNotice } from "$lib/notices";
   import { loadEditors } from "$lib/editor.svelte";
+  import { initTheme } from "$lib/theme/preview.svelte";
   import Prompt from "$lib/components/Prompt.svelte";
   import { session } from "$lib/session.svelte";
 
@@ -24,7 +25,7 @@
   onMount(() => {
     setLocale(navigator.language);
     void loadEditors();
-    void api.appInfo().then((info) => (document.documentElement.dataset.os = info.os));
+    void api.appInfo().then((info) => initTheme(info.os));
     void api.unseen().then((ids) => {
       session.unseen = ids;
     });
