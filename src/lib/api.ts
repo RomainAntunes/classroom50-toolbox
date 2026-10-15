@@ -291,6 +291,9 @@ export type Notice =
   | { kind: "deadlineChanged"; assignment: string; due: string | null }
   | { kind: "closed"; assignment: string };
 
+export const SIMULATED_NETWORKS = ["normal", "githubDown", "noInternet"] as const;
+export type SimulatedNetwork = (typeof SIMULATED_NETWORKS)[number];
+
 /** Payload of `sync-progress`. */
 export interface SyncProgress {
   running: boolean;
@@ -346,6 +349,9 @@ export const api = {
   appInfo: () => invoke<AppInfo>("app_info"),
   /** Dev builds only: lights the tray badge 3 s from now. */
   previewBadge: () => invoke<void>("preview_badge"),
+  /** Dev builds only: pretends GitHub is down or the device is offline. */
+  simulateNetwork: (network: SimulatedNetwork) => invoke<void>("simulate_network", { network }),
+  simulatedNetwork: () => invoke<SimulatedNetwork>("simulated_network"),
   setPopoverPinned: (pinned: boolean) => invoke<void>("set_popover_pinned", { pinned }),
   toolStatuses: () => invoke<ToolStatus[]>("tool_statuses"),
   installCommand: (tool: Tool) => invoke<CommandSpec>("install_command", { tool }),

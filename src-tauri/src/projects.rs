@@ -566,6 +566,9 @@ async fn publish(
 struct Progress {
     app: AppHandle,
     tracker: std::sync::Arc<Mutex<Tracker>>,
+    foreground: bool,
+    /// Reports nothing: for the preview built while the real sync goes on.
+    quiet: bool,
 }
 
 impl Progress {
@@ -579,6 +582,8 @@ impl Progress {
         let progress = Self {
             app: app.clone(),
             tracker: std::sync::Arc::new(Mutex::new(Tracker::new(mode.phases(), &last))),
+            foreground,
+            quiet: false,
         };
         progress.emit(|p| {
             *p = SyncProgress {
@@ -588,6 +593,15 @@ impl Progress {
             }
         });
         progress
+    }
+
+    fn quiet(app: &AppHandle) -> Self {
+        Self {
+            app: app.clone(),
+            tracker: std::sync::Arc::new(Mutex::new(Tracker::new(&[], &Costs::new()))),
+            foreground: false,
+            quiet: true,
+        }
     }
 
     fn set_total(&self, phase: Phase, total: usize) {
@@ -622,6 +636,9 @@ impl Progress {
     }
 
     fn track(&self, change: impl FnOnce(&mut Tracker)) {
+        if self.quiet {
+            return;
+        }
         let Ok(fraction) = self.tracker.lock().map(|mut tracker| {
             change(&mut tracker);
             tracker.fraction()
@@ -762,6 +779,9 @@ fn cadence(snapshot: &Snapshot, now: DateTime<Utc>) -> (chrono::TimeDelta, chron
 
 /// A TCP handshake with the API host: no HTTP request, so nothing counts against any limit.
 async fn github_reachable() -> bool {
+    if !crate::simulate::reachable() {
+        return false;
+    }
     let connect = tokio::net::TcpStream::connect(("api.github.com", 443));
     matches!(
         tokio::time::timeout(Duration::from_secs(3), connect).await,
@@ -769,7 +789,9 @@ async fn github_reachable() -> bool {
     )
 }
 
-/// Returns the snapshot and what to watch for local changes.
+/// Returns the snapshot and what to watch for local changes. A sync the user waits on
+/// first shows the clones as found on disk with the last GitHub data, so the list doesn't
+/// wait on GitHub (or on a connection that times out).
 async fn sync(
     state: &ProjectsState,
     http: &reqwest::Client,
@@ -779,17 +801,34 @@ async fn sync(
     progress: &Progress,
 ) -> (Snapshot, Vec<WatchTarget>) {
     let now = Utc::now();
-    let scan = scan_local(
-        settings.watched_folders.clone(),
-        clones,
-        settings.scan_editor_projects,
-        progress.clone(),
-    );
+    let preview = mode != Mode::Local && (progress.foreground || state.is_offline());
+    let scan = async {
+        let scanned = scan_local(
+            settings.watched_folders.clone(),
+            clones,
+            settings.scan_editor_projects,
+            progress.clone(),
+        )
+        .await;
+        if preview {
+            let (locals, _, recents) = &scanned;
+            let quiet = Progress::quiet(&progress.app);
+            let mut snapshot =
+                local_snapshot(state, http, locals.clone(), now, false, false, &quiet).await;
+            annotate(state, &mut snapshot, recents);
+            if let Err(err) = progress.app.emit(UPDATED_EVENT, &snapshot) {
+                log::warn!("could not emit {UPDATED_EVENT}: {err}");
+            }
+        }
+        scanned
+    };
+    // Offline, the manifests come from the cache rather than a request that times out.
+    let network = !state.is_offline();
     let (snapshot, scan_targets, recents) = if mode != Mode::Full {
         let (locals, targets, recents) = scan.await;
         let status = mode == Mode::Status;
         (
-            local_snapshot(state, http, locals, now, status, progress).await,
+            local_snapshot(state, http, locals, now, status, network, progress).await,
             targets,
             recents,
         )
@@ -803,6 +842,14 @@ async fn sync(
         )
     };
     let mut snapshot = snapshot;
+    annotate(state, &mut snapshot, &recents);
+    let targets = watch_targets(&settings.watched_folders, scan_targets, &snapshot.projects);
+    (snapshot, targets)
+}
+
+/// Adds what isn't decided by the build: groups, the editor that opened each clone, the
+/// account.
+fn annotate(state: &ProjectsState, snapshot: &mut Snapshot, recents: &[editors::Recent]) {
     let groups = state.remote().groups;
     for item in &mut snapshot.unaccepted {
         item.group = groups::find(
@@ -829,12 +876,10 @@ async fn sync(
         project.editor = project
             .path
             .as_deref()
-            .and_then(|path| editors::editor_for(path, &recents))
+            .and_then(|path| editors::editor_for(path, recents))
             .map(|editor| editor.id.to_owned());
     }
     snapshot.login = state.remote().login;
-    let targets = watch_targets(&settings.watched_folders, scan_targets, &snapshot.projects);
-    (snapshot, targets)
 }
 
 /// Watched folders recursively, clones found elsewhere recursively too (to see commits),
@@ -866,6 +911,7 @@ async fn local_snapshot(
     locals: Vec<LocalProject>,
     now: DateTime<Utc>,
     status: bool,
+    network: bool,
     progress: &Progress,
 ) -> Snapshot {
     let previous = state.snapshot();
@@ -890,12 +936,15 @@ async fn local_snapshot(
         classrooms,
         locals,
     };
-    let (projects, unaccepted) = build(sources, state, http, auth.as_ref(), now, progress).await;
+    let (projects, unaccepted) =
+        build(sources, state, http, auth.as_ref(), network, now, progress).await;
     // A status read replaces the issue: cleared when it worked, its error when it didn't.
-    let (checked_at, issue) = match (auth.is_some(), state.take_status_issue()) {
-        (true, None) => (checked_at, None),
-        (true, Some(issue)) => (previous.checked_at, Some(issue)),
-        (false, _) => (checked_at, previous.issue),
+    // Taken only by a run that read the status, never by a preview running alongside one.
+    let issue = auth.is_some().then(|| state.take_status_issue());
+    let (checked_at, issue) = match issue {
+        Some(None) => (checked_at, None),
+        Some(Some(issue)) => (previous.checked_at, Some(issue)),
+        None => (checked_at, previous.issue),
     };
     Snapshot {
         projects,
@@ -950,7 +999,8 @@ async fn full_snapshot(
         classrooms,
         locals,
     };
-    let (projects, unaccepted) = build(sources, state, http, auth.as_ref(), now, progress).await;
+    let (projects, unaccepted) =
+        build(sources, state, http, auth.as_ref(), true, now, progress).await;
     Snapshot {
         projects,
         unaccepted,
@@ -976,6 +1026,7 @@ async fn build(
     state: &ProjectsState,
     http: &reqwest::Client,
     status: Option<&StatusAuth>,
+    network: bool,
     now: DateTime<Utc>,
     progress: &Progress,
 ) -> (Vec<Project>, Vec<Unaccepted>) {
@@ -999,7 +1050,7 @@ async fn build(
         let classroom = Classroom::from_config(owner, config);
         classrooms.entry(classroom.key()).or_insert(classroom);
     }
-    let manifests = fetch_manifests(&classrooms, &state.http_cache, http, progress).await;
+    let manifests = fetch_manifests(&classrooms, &state.http_cache, http, network, progress).await;
     state.http_cache.save();
 
     let identify = |owner: Option<&str>, name: Option<&str>, config: Option<&RepoConfig>| {
@@ -1148,17 +1199,24 @@ fn identify(
         })
 }
 
-/// Fetches each classroom's manifest once (conditional GET).
+/// Fetches each classroom's manifest once (conditional GET), or without `network` takes
+/// the last downloaded copy whatever its age.
 async fn fetch_manifests(
     classrooms: &BTreeMap<ClassroomKey, Classroom>,
     cache: &HttpCache,
     http: &reqwest::Client,
+    network: bool,
     progress: &Progress,
 ) -> HashMap<ClassroomKey, Vec<Assignment>> {
     progress.set_total(Phase::Manifests, classrooms.len());
     let fetches = classrooms.iter().map(|(key, classroom)| async move {
         let url = classroom.assignments_url();
-        let manifest = match cache.get_text(http, &url, MANIFEST_MAX_AGE).await {
+        let body = if network {
+            cache.get_text(http, &url, MANIFEST_MAX_AGE).await
+        } else {
+            cache.cached_text(&url).ok_or(Error::Offline)
+        };
+        let manifest = match body {
             Ok(body) => classroom50::parse_assignments(&url, &body)
                 .inspect_err(|err| log::warn!("{err}"))
                 .ok(),

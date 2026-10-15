@@ -375,6 +375,7 @@ impl StatusFields {
 /// Downloads and reads `result.json`. The signed URL carries its own authorization, so no
 /// token is sent.
 pub async fn download_grade(http: &reqwest::Client, release: &GradedRelease) -> Result<Grade> {
+    crate::simulate::check()?;
     let response = http
         .get(&release.result_url)
         .send()
