@@ -302,10 +302,34 @@ pub async fn account_avatar(app: AppHandle, login: String) -> Result<String> {
     crate::accounts::avatar(&http, &cache_dir, &login).await
 }
 
-/// Runs gh's device flow; the code arrives through the `login-device-code` event.
+/// Runs gh's device flow; the code arrives through the `login-device-code` event. The new
+/// account is gh's active one afterwards, so its projects are synced right away.
 #[tauri::command]
 pub async fn login(app: AppHandle, state: State<'_, LoginState>) -> Result<AuthStatus> {
-    login::login(&app, &state).await
+    signed_in(
+        app.clone(),
+        login::login(&app, &state, login::Flow::SignIn).await,
+    )
+}
+
+/// Adds gh-student's missing scopes to the active account (`gh auth refresh`), through the
+/// same device flow as `login`.
+#[tauri::command]
+pub async fn grant_scopes(app: AppHandle, state: State<'_, LoginState>) -> Result<AuthStatus> {
+    signed_in(
+        app.clone(),
+        login::login(&app, &state, login::Flow::GrantScopes).await,
+    )
+}
+
+fn signed_in(app: AppHandle, result: Result<AuthStatus>) -> Result<AuthStatus> {
+    if result.as_ref().is_ok_and(|status| status.logged_in) {
+        // A view that asks for a sync too shares this one.
+        tauri::async_runtime::spawn(async move {
+            projects::refresh(&app).await;
+        });
+    }
+    result
 }
 
 #[tauri::command]

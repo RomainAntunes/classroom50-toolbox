@@ -45,6 +45,12 @@ pub struct ToolStatus {
 pub struct AuthStatus {
     pub logged_in: bool,
     pub login: Option<String>,
+    /// gh-student's scopes the token lacks (`gh auth refresh` adds them). Empty when it
+    /// can't be told: offline, or a token without classic scopes (fine-grained, app).
+    pub missing_scopes: Vec<String>,
+    /// gh is using a token from this environment variable. gh can't store, switch or
+    /// widen a login then, so the app doesn't offer to.
+    pub env_token: Option<String>,
 }
 
 pub async fn status(tool: Tool) -> ToolStatus {
@@ -284,17 +290,92 @@ fn parse_dry_run(output: &str) -> Option<String> {
     })
 }
 
-/// Reads gh's stored login. The token itself never leaves Rust.
+/// Reads gh's login and the scopes its token was granted, in one request (`X-OAuth-Scopes`
+/// comes back with any authenticated call). The token itself never leaves Rust.
 pub async fn auth_status() -> AuthStatus {
-    let login = process::run("gh", ["api", "user", "--jq", ".login"], None)
-        .await
-        .ok()
-        .map(|out| out.stdout)
-        .filter(|login| !login.is_empty());
-    AuthStatus {
-        logged_in: login.is_some(),
-        login,
+    let env_token = env_token_var().map(str::to_owned);
+    let signed_out = AuthStatus {
+        logged_in: false,
+        login: None,
+        missing_scopes: Vec::new(),
+        env_token: env_token.clone(),
+    };
+    match process::run("gh", ["api", "--include", "user"], None).await {
+        Ok(out) => {
+            let (login, granted) = parse_user_response(&out.stdout);
+            AuthStatus {
+                logged_in: login.is_some(),
+                login,
+                missing_scopes: granted.map(|g| missing_scopes(&g)).unwrap_or_default(),
+                env_token,
+            }
+        }
+        Err(Error::NotInstalled { .. }) => signed_out,
+        Err(err) => {
+            // GitHub turned the token down (revoked, expired): signing in again fixes it.
+            let rejected =
+                matches!(&err, Error::CommandFailed { stderr, .. } if stderr.contains("HTTP 401"));
+            // Otherwise (offline, GitHub down) gh's local state is trusted, so the
+            // account stays on screen.
+            if rejected || gh_token().await.is_err() {
+                return signed_out;
+            }
+            AuthStatus {
+                logged_in: true,
+                login: active_login().await,
+                missing_scopes: Vec::new(),
+                env_token,
+            }
+        }
     }
+}
+
+/// The environment variable gh takes its github.com token from, if set (gh reads
+/// `GH_TOKEN` first, then `GITHUB_TOKEN`). The app inherits it when started from a shell.
+pub fn env_token_var() -> Option<&'static str> {
+    ["GH_TOKEN", "GITHUB_TOKEN"]
+        .into_iter()
+        .find(|var| std::env::var_os(var).is_some_and(|value| !value.is_empty()))
+}
+
+/// `gh api --include user`: the status line and headers, a blank line, then the JSON. The
+/// scopes are `None` when the header is missing (a token without classic scopes).
+fn parse_user_response(stdout: &str) -> (Option<String>, Option<Vec<String>>) {
+    let stdout = stdout.replace("\r\n", "\n");
+    let (head, body) = stdout.split_once("\n\n").unwrap_or(("", stdout.as_str()));
+    let scopes = head.lines().find_map(|line| {
+        let (name, value) = line.split_once(':')?;
+        name.trim().eq_ignore_ascii_case("x-oauth-scopes").then(|| {
+            value
+                .split(',')
+                .map(str::trim)
+                .filter(|s| !s.is_empty())
+                .map(str::to_owned)
+                .collect()
+        })
+    });
+    let login = serde_json::from_str::<serde_json::Value>(body.trim())
+        .ok()
+        .and_then(|user| user.get("login")?.as_str().map(str::to_owned))
+        .filter(|login| !login.is_empty());
+    (login, scopes)
+}
+
+/// gh-student's scopes not covered by `granted`. GitHub reports only the broadest scope it
+/// granted, so `admin:org` stands for `read:org` too.
+fn missing_scopes(granted: &[String]) -> Vec<String> {
+    let has = |scope: &str| granted.iter().any(|g| g == scope);
+    crate::login::REQUIRED_SCOPES
+        .iter()
+        .filter(|&&scope| {
+            let covered = match scope {
+                "read:org" => has("read:org") || has("write:org") || has("admin:org"),
+                other => has(other),
+            };
+            !covered
+        })
+        .map(|scope| (*scope).to_owned())
+        .collect()
 }
 
 /// The account gh uses for github.com, read from its local config (no network). Lets a
@@ -393,6 +474,32 @@ mod tests {
             progress_of("disk 250%"),
             platform::install_progress("disk 250%")
         );
+    }
+
+    #[test]
+    fn reads_login_and_scopes_from_the_user_response() {
+        let stdout = "HTTP/2.0 200 OK\r\nContent-Type: application/json; charset=utf-8\r\n\
+            X-Oauth-Scopes: admin:org, gist, repo, workflow\r\nX-Ratelimit-Limit: 5000\r\n\r\n\
+            {\"login\":\"alice\",\"id\":1}";
+        let (login, scopes) = parse_user_response(stdout);
+        assert_eq!(login.as_deref(), Some("alice"));
+        let scopes = scopes.unwrap();
+        assert_eq!(scopes, ["admin:org", "gist", "repo", "workflow"]);
+        assert!(missing_scopes(&scopes).is_empty());
+
+        // gh's own defaults: what a student who ran `gh auth login` before has.
+        let stdout = "HTTP/2.0 200 OK\nX-Oauth-Scopes: gist, read:org, repo\n\n{\"login\":\"bob\"}";
+        let (_, scopes) = parse_user_response(stdout);
+        assert_eq!(missing_scopes(&scopes.unwrap()), ["admin:org", "workflow"]);
+
+        // A fine-grained token sends no scope header: nothing can be said to be missing.
+        let (login, scopes) = parse_user_response("HTTP/2.0 200 OK\n\n{\"login\":\"carol\"}");
+        assert_eq!(login.as_deref(), Some("carol"));
+        assert_eq!(scopes, None);
+
+        // An empty header is a token with no scopes at all.
+        let (_, scopes) = parse_user_response("HTTP/2.0 200 OK\nX-Oauth-Scopes: \n\n{}");
+        assert_eq!(missing_scopes(&scopes.unwrap()).len(), 4);
     }
 
     #[test]

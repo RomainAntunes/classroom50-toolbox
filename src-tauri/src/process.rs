@@ -234,9 +234,38 @@ async fn kill(child: &mut tokio::process::Child, pid: Option<u32>) {
     if let Some(pid) = pid {
         kill_group(pid);
     }
-    #[cfg(not(unix))]
+    #[cfg(windows)]
+    if let Some(pid) = pid {
+        kill_windows_tree(pid);
+    }
+    #[cfg(not(any(unix, windows)))]
     let _ = pid;
     let _ = child.kill().await;
+}
+
+/// Kills a program started by `spawn_piped` and, on Windows, whatever it started (a `.cmd`
+/// shim runs the real exe as a child, which `TerminateProcess` on the shim would leave
+/// running). On Unix it has no group of its own, so only the program is killed.
+pub async fn kill_tree(child: &mut tokio::process::Child) {
+    #[cfg(windows)]
+    if let Some(pid) = child.id() {
+        kill_windows_tree(pid);
+    }
+    let _ = child.kill().await;
+}
+
+/// `taskkill /T` walks the process tree, which Windows has no group kill for.
+#[cfg(windows)]
+fn kill_windows_tree(pid: u32) {
+    use std::os::windows::process::CommandExt;
+    const CREATE_NO_WINDOW: u32 = 0x0800_0000;
+    let _ = std::process::Command::new("taskkill")
+        .args(["/T", "/F", "/PID", &pid.to_string()])
+        .stdin(Stdio::null())
+        .stdout(Stdio::null())
+        .stderr(Stdio::null())
+        .creation_flags(CREATE_NO_WINDOW)
+        .status();
 }
 
 /// The group's id is the program's pid (`process_group(0)`).
