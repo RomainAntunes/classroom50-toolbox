@@ -1244,7 +1244,9 @@ fn identify(
 }
 
 /// Fetches each classroom's manifest once (conditional GET), or without `network` takes
-/// the last downloaded copy whatever its age.
+/// the last downloaded copy whatever its age. A failed download falls back to that copy
+/// too: a repo without a marker file is only recognized through the manifest, and would
+/// otherwise drop out of the list, its assignment showing as not accepted.
 async fn fetch_manifests(
     classrooms: &BTreeMap<ClassroomKey, Classroom>,
     cache: &HttpCache,
@@ -1256,7 +1258,7 @@ async fn fetch_manifests(
     let fetches = classrooms.iter().map(|(key, classroom)| async move {
         let url = classroom.assignments_url();
         let body = if network {
-            cache.get_text(http, &url, MANIFEST_MAX_AGE).await
+            cache.get_text_or_cached(http, &url, MANIFEST_MAX_AGE).await
         } else {
             cache.cached_text(&url).ok_or(Error::Offline)
         };
