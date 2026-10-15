@@ -10,7 +10,7 @@ use tauri_plugin_autostart::ManagerExt;
 use crate::clones::{self, CloneStore};
 use crate::error::{Error, Result};
 use crate::login::{self, LoginState};
-use crate::platform::{self, CommandSpec, Os};
+use crate::platform::{self, Os};
 use crate::popover::{self, PopoverState};
 use crate::projects::{self, ProjectsState, Snapshot, SyncProgress};
 use crate::pull;
@@ -51,8 +51,8 @@ pub async fn tool_statuses() -> Vec<ToolStatus> {
 
 /// What `install_tool` will run, so the UI can show it before asking for elevation.
 #[tauri::command]
-pub fn install_command(tool: Tool) -> Result<CommandSpec> {
-    tools::install_command(tool)
+pub fn install_command(tool: Tool) -> Result<platform::InstallPlan> {
+    tools::install_plan(tool)
 }
 
 /// Installs `tool` (`tool-jobs` events report its output) and returns every tool's status:

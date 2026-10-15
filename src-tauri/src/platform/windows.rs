@@ -1,6 +1,6 @@
 use std::path::{Path, PathBuf};
 
-use super::{CommandSpec, Os};
+use super::{CommandSpec, InstallPlan, Os, install};
 use crate::error::{Error, Result};
 use crate::process;
 use crate::tools::Tool;
@@ -83,9 +83,8 @@ fn expand_env(value: &str, lookup: impl Fn(&str) -> Option<String>) -> String {
     out
 }
 
-pub const INSTALL_ENV: &[(&str, &str)] = &[];
-
-/// Lines `winget install` prints at each step.
+/// Lines `winget install` prints at each step, in English: on another display language only
+/// the download sizes move the bar (`tools::progress_of`).
 pub const INSTALL_STEPS: &[(&str, f32)] = &[
     ("Found ", 0.1),
     ("Downloading", 0.15),
@@ -94,36 +93,19 @@ pub const INSTALL_STEPS: &[(&str, f32)] = &[
     ("Successfully installed", 0.95),
 ];
 
-pub fn install_command(tool: Tool) -> Result<CommandSpec> {
-    let id = match tool {
-        Tool::Git => "Git.Git",
-        Tool::Gh => "GitHub.cli",
-        Tool::GhStudent => {
-            return Err(Error::Unsupported(
-                "gh-student is installed through gh".into(),
-            ));
-        }
-    };
-    if process::find_in_path("winget").is_none() {
-        return Err(Error::Unsupported(
-            "winget (App Installer) is required; install it from the Microsoft Store".into(),
-        ));
-    }
-    Ok(CommandSpec::new(
-        "winget",
-        &[
-            "install",
-            "--id",
-            id,
-            "--exact",
-            "--source",
-            "winget",
-            "--accept-package-agreements",
-            "--accept-source-agreements",
-            // No prompt can be answered without a console: fail instead of waiting.
-            "--disable-interactivity",
-        ],
-    ))
+pub fn install_plan(tool: Tool) -> Result<InstallPlan> {
+    let has = |program: &str| process::find_in_path(program).is_some();
+    install::windows(
+        tool,
+        &install::Probe {
+            has: &has,
+            immutable: false,
+        },
+    )
+}
+
+pub fn is_stub(_program: &str, _path: &Path) -> bool {
+    false
 }
 
 /// Where editors keep their settings (JetBrains, VS Code and its forks all use it).

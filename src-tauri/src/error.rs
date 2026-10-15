@@ -25,6 +25,15 @@ pub enum Error {
     #[error("{0}")]
     Unsupported(String),
 
+    /// The app can't install a tool here (no package manager, no way to ask for a password);
+    /// the user does it by hand, from `url` or with `command` in a terminal.
+    #[error("{reason}")]
+    ManualInstall {
+        reason: String,
+        url: Option<String>,
+        command: Option<String>,
+    },
+
     #[error("`{0}` is disabled in development builds")]
     BlockedInDev(String),
 
@@ -118,6 +127,7 @@ impl Error {
             Error::CommandFailed { .. } => "commandFailed",
             Error::TimedOut { .. } => "timedOut",
             Error::Unsupported(_) => "unsupported",
+            Error::ManualInstall { .. } => "manualInstall",
             Error::BlockedInDev(_) => "blockedInDev",
             Error::Cancelled => "cancelled",
             Error::Busy => "busy",
@@ -151,10 +161,20 @@ impl Serialize for Error {
         struct Payload<'a> {
             kind: &'a str,
             message: String,
+            #[serde(skip_serializing_if = "Option::is_none")]
+            url: Option<&'a str>,
+            #[serde(skip_serializing_if = "Option::is_none")]
+            command: Option<&'a str>,
         }
+        let (url, command) = match self {
+            Error::ManualInstall { url, command, .. } => (url.as_deref(), command.as_deref()),
+            _ => (None, None),
+        };
         Payload {
             kind: self.kind(),
             message: self.to_string(),
+            url,
+            command,
         }
         .serialize(serializer)
     }

@@ -30,7 +30,7 @@ where
     S: AsRef<OsStr>,
 {
     let args = checked_args(program, args)?;
-    let mut cmd = command(program);
+    let mut cmd = command(program)?;
     cmd.args(args)
         .stdin(Stdio::null())
         .stdout(Stdio::piped())
@@ -99,7 +99,7 @@ where
     F: FnMut(&str),
 {
     let args = checked_args(program, args)?;
-    let mut cmd = command(program);
+    let mut cmd = command(program)?;
     cmd.args(args)
         .envs(opts.envs.iter().copied())
         .stdin(Stdio::null())
@@ -227,16 +227,34 @@ fn abort(readers: &[Option<tokio::task::JoinHandle<()>>]) {
     }
 }
 
-/// Kills the program and, on Unix, its process group. A program that became root
-/// (`pkexec`) can't be killed; it is left to finish on its own.
+/// Kills the program and what it started: its process group on Unix, its process tree on
+/// Windows (winget runs the package's own installer, which would otherwise carry on). A
+/// program that became root (`pkexec`) or was elevated (UAC) can't be killed; it is left to
+/// finish on its own.
 async fn kill(child: &mut tokio::process::Child, pid: Option<u32>) {
-    #[cfg(unix)]
     if let Some(pid) = pid {
-        kill_group(pid);
+        kill_tree(pid);
     }
-    #[cfg(not(unix))]
-    let _ = pid;
     let _ = child.kill().await;
+}
+
+/// `taskkill /T` walks the tree from `pid` (it ships with every Windows, in System32).
+#[cfg(windows)]
+fn kill_tree(pid: u32) {
+    use std::os::windows::process::CommandExt;
+    const CREATE_NO_WINDOW: u32 = 0x0800_0000;
+    let _ = std::process::Command::new("taskkill")
+        .args(["/PID", &pid.to_string(), "/T", "/F"])
+        .stdin(Stdio::null())
+        .stdout(Stdio::null())
+        .stderr(Stdio::null())
+        .creation_flags(CREATE_NO_WINDOW)
+        .status();
+}
+
+#[cfg(unix)]
+fn kill_tree(pid: u32) {
+    kill_group(pid);
 }
 
 /// The group's id is the program's pid (`process_group(0)`).
@@ -343,7 +361,7 @@ where
     S: AsRef<OsStr>,
 {
     let args = checked_args(program, args)?;
-    let mut cmd = command(program);
+    let mut cmd = command(program)?;
     cmd.args(args)
         .stdin(Stdio::null())
         .stdout(Stdio::piped())
@@ -419,7 +437,8 @@ pub(crate) fn writes_to_github(program: &str, args: &[OsString]) -> bool {
     }
 }
 
-/// Looks `program` up on the augmented search path, like `which`.
+/// Looks `program` up on the augmented search path, like `which`. A stand-in that would only
+/// offer to install the program (`platform::is_stub`) doesn't count.
 pub fn find_in_path(program: &str) -> Option<PathBuf> {
     let candidates: Vec<String> = if cfg!(windows) {
         vec![format!("{program}.exe"), format!("{program}.cmd")]
@@ -430,12 +449,33 @@ pub fn find_in_path(program: &str) -> Option<PathBuf> {
         candidates
             .iter()
             .map(|name| dir.join(name))
-            .find(|path| path.is_file())
+            .find(|path| is_program(path) && !platform::is_stub(program, path))
     })
 }
 
-fn command(program: &str) -> Command {
-    let mut cmd = Command::new(program);
+/// A file, or on Windows an app execution alias (`winget.exe` in `WindowsApps`): a reparse
+/// point that `metadata` can't follow, so `is_file` says no although it runs.
+fn is_program(path: &Path) -> bool {
+    path.is_file()
+        || (cfg!(windows)
+            && std::fs::symlink_metadata(path).is_ok_and(|meta| !meta.file_type().is_dir()))
+}
+
+/// The command for `program`, looked up on the augmented search path. A program found only as
+/// a stand-in (`platform::is_stub`) is `NotInstalled`: running it would pop up an installer.
+fn command(program: &str) -> Result<Command> {
+    let mut resolved = OsString::from(program);
+    if !program.contains(['/', '\\']) && platform::may_be_stubbed(program) {
+        match find_in_path(program) {
+            Some(path) => resolved = path.into_os_string(),
+            None => {
+                return Err(Error::NotInstalled {
+                    program: program.to_owned(),
+                });
+            }
+        }
+    }
+    let mut cmd = Command::new(resolved);
     cmd.env("PATH", search_path())
         // gh must never block on an interactive prompt or print an upgrade banner.
         .env("GH_PROMPT_DISABLED", "1")
@@ -448,7 +488,7 @@ fn command(program: &str) -> Command {
         const CREATE_NO_WINDOW: u32 = 0x0800_0000;
         cmd.creation_flags(CREATE_NO_WINDOW);
     }
-    cmd
+    Ok(cmd)
 }
 
 /// GUI apps don't inherit the login shell's PATH (a Finder-launched macOS app has no

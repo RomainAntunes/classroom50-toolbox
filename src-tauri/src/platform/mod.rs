@@ -10,6 +10,7 @@ use serde::{Deserialize, Serialize};
 use crate::error::Result;
 use crate::tools::Tool;
 
+mod install;
 #[cfg(target_os = "linux")]
 mod linux;
 #[cfg(target_os = "macos")]
@@ -57,16 +58,25 @@ pub fn extra_path_dirs() -> Vec<PathBuf> {
     imp::extra_path_dirs()
 }
 
-/// How to install `tool` with this OS's package manager. `GhStudent` is the same everywhere
-/// and is handled by the caller.
-pub fn install_command(tool: Tool) -> Result<CommandSpec> {
-    imp::install_command(tool)
+pub use install::{InstallPlan, interpret_failure};
+
+/// How to install `tool` with this OS's package manager (see `install`). `GhStudent` is the
+/// same everywhere and is handled by the caller.
+pub fn install_plan(tool: Tool) -> Result<InstallPlan> {
+    imp::install_plan(tool)
 }
 
-/// Environment for `install_command` that keeps the package manager from doing slow,
-/// unrelated work first (Homebrew updating itself and every tap).
-pub fn install_env() -> &'static [(&'static str, &'static str)] {
-    imp::INSTALL_ENV
+/// Whether `path`, found on the search path for `program`, is a stand-in that would ask to
+/// install the real program instead of running it (macOS's `/usr/bin/git` without the
+/// Command Line Tools opens Apple's install dialog). Such a program counts as missing.
+pub fn is_stub(program: &str, path: &Path) -> bool {
+    imp::is_stub(program, path)
+}
+
+/// Whether `program` has such a stand-in on this OS, so running it by name needs a lookup
+/// first (cheap file checks, but git runs often).
+pub fn may_be_stubbed(program: &str) -> bool {
+    cfg!(target_os = "macos") && program == "git"
 }
 
 /// How far along an install is (0 to 1) when `line` is one of the package manager's step
