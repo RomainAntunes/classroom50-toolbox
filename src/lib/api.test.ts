@@ -19,6 +19,11 @@ describe("errorMessage", () => {
     expect(errorMessage(err)).toBe("le clone n'est pas sur main");
   });
 
+  it("keeps Rust's message when a param is missing", () => {
+    const err = { kind: "notInstalled", message: "`gh` is not installed or not on PATH" };
+    expect(errorMessage(err)).toBe("`gh` is not installed or not on PATH");
+  });
+
   it("keeps Rust's message for kinds the UI doesn't word", () => {
     const err = { kind: "commandFailed", message: "`gh` exited with code Some(1): boom" };
     expect(errorMessage(err)).toBe("`gh` exited with code Some(1): boom");

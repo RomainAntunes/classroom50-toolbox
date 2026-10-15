@@ -491,7 +491,10 @@ export function errorMessage(err: unknown): string {
   if (typeof err === "object" && err !== null && "message" in err) {
     const { kind, message, params } = err as CommandError;
     const key = `error.${kind}`;
-    return hasKey(key) ? t(key, params ?? {}) : String(message);
+    if (!hasKey(key)) return String(message);
+    // A param missing (a sync issue saved by an older version): Rust's words are complete.
+    const text = t(key, params ?? {});
+    return /\{\w+\}/.test(text) ? String(message) : text;
   }
   return String(err);
 }
