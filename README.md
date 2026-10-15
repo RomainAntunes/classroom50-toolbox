@@ -17,10 +17,11 @@ notification area.
 - **Lists your assignments**, from GitHub and from the folders on your disk (including the
   projects your editor opened recently: JetBrains IDEs, VS Code and its forks such as Cursor,
   Zed, Sublime Text, Eclipse, NetBeans or Visual Studio): due dates, late work, uncommitted or
-  unsubmitted changes, branches not merged yet, grades with the tests that failed, the
-  autograder running or failing, and teacher feedback.
-- **Shows your group** on team assignments, with who is in it. Search finds assignments by
-  teammate too.
+  unsubmitted changes, branches not merged yet, grades with the tests that failed and your
+  earlier grades, the autograder running or failing, and teacher feedback.
+- **Shows your group** on team assignments, with who is in it, even before you accept. Add a
+  classmate to your group, or invite one to your repository, from the app. Search finds
+  assignments by teammate too.
 - **Shows the assignments you haven't accepted yet**, and accepts them for you.
 - **Clones, pulls and submits** your work, and opens a project in the editor you last used for
   it, your terminal, your file manager or on GitHub.
