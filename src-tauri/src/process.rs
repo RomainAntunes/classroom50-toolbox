@@ -7,7 +7,6 @@ use std::future::Future;
 use std::io::ErrorKind;
 use std::path::{Path, PathBuf};
 use std::process::Stdio;
-use std::sync::OnceLock;
 use std::time::Duration;
 
 use tokio::io::{AsyncRead, AsyncReadExt};
@@ -454,19 +453,18 @@ fn command(program: &str) -> Command {
 
 /// GUI apps don't inherit the login shell's PATH (a Finder-launched macOS app has no
 /// `/opt/homebrew/bin`), so the inherited PATH is extended with the usual install locations.
-fn search_path() -> &'static OsString {
-    static PATH: OnceLock<OsString> = OnceLock::new();
-    PATH.get_or_init(|| {
-        let mut dirs: Vec<PathBuf> = std::env::var_os("PATH")
-            .map(|p| std::env::split_paths(&p).collect())
-            .unwrap_or_default();
-        for extra in platform::extra_path_dirs() {
-            if !dirs.contains(&extra) {
-                dirs.push(extra);
-            }
+/// Built again for each program: a tool installed while the app runs (on Windows its folder
+/// only lands in the registry) is found without a restart.
+fn search_path() -> OsString {
+    let mut dirs: Vec<PathBuf> = std::env::var_os("PATH")
+        .map(|p| std::env::split_paths(&p).collect())
+        .unwrap_or_default();
+    for extra in platform::extra_path_dirs() {
+        if !dirs.contains(&extra) {
+            dirs.push(extra);
         }
-        std::env::join_paths(dirs).unwrap_or_default()
-    })
+    }
+    std::env::join_paths(dirs).unwrap_or_default()
 }
 
 #[cfg(test)]

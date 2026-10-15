@@ -1,0 +1,49 @@
+name: Preview build
+
+# Test installers for a branch, without a release: push it as `preview/<name>`
+# (`git push origin HEAD:preview/<name>`) and download them from the run's artifacts. They
+# carry no updater signature, so an install never updates itself to a preview.
+on:
+  push:
+    branches: ["preview/**"]
+  workflow_dispatch:
+
+concurrency:
+  group: preview-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: windows-latest
+            bundles: nsis
+          - platform: macos-latest
+            bundles: dmg
+    runs-on: ${{ matrix.platform }}
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v7
+        with:
+          node-version: lts/*
+          cache: pnpm
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm tauri build --bundles ${{ matrix.bundles }} --config '{"bundle":{"createUpdaterArtifacts":false}}'
+        shell: bash
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: classroom50-toolbox-${{ runner.os }}
+          path: |
+            src-tauri/target/release/bundle/nsis/*.exe
+            src-tauri/target/release/bundle/dmg/*.dmg
+          if-no-files-found: error
