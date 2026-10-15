@@ -92,6 +92,29 @@ pub async fn upgrade(tool: Tool) -> Result<()> {
     Ok(())
 }
 
+/// The newer gh-student version `upgrade` would install, if any (asks GitHub through
+/// gh's dry run). Always `None` for git and gh.
+pub async fn available_update(tool: Tool) -> Result<Option<String>> {
+    if tool != Tool::GhStudent {
+        return Ok(None);
+    }
+    let args = ["extension", "upgrade", "gh-student", "--dry-run"];
+    let out = process::run("gh", args, None).await?;
+    Ok(parse_dry_run(&out.stdout).or_else(|| parse_dry_run(&out.stderr)))
+}
+
+/// `[student]: would have upgraded from v1.52.2 to v1.58.1` -> `v1.58.1`;
+/// `[student]: already up to date` -> `None`.
+fn parse_dry_run(output: &str) -> Option<String> {
+    output.lines().find_map(|line| {
+        let (_, to) = line
+            .split_once("would have upgraded from ")?
+            .1
+            .split_once(" to ")?;
+        Some(to.trim().to_owned())
+    })
+}
+
 /// Reads gh's stored login. The token itself never leaves Rust.
 pub async fn auth_status() -> AuthStatus {
     let login = process::run("gh", ["api", "user", "--jq", ".login"], None)
@@ -176,6 +199,15 @@ mod tests {
         let out =
             "gh version 2.100.0 (2026-09-03)\nhttps://github.com/cli/cli/releases/tag/v2.100.0";
         assert_eq!(parse_gh_version(out).as_deref(), Some("2.100.0"));
+    }
+
+    #[test]
+    fn reads_the_upgrade_dry_run() {
+        assert_eq!(
+            parse_dry_run("[student]: would have upgraded from v1.52.2 to v1.58.1").as_deref(),
+            Some("v1.58.1")
+        );
+        assert_eq!(parse_dry_run("[student]: already up to date"), None);
     }
 
     #[test]

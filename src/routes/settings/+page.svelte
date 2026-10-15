@@ -179,7 +179,7 @@
       {/snippet}
       <p class="hint">{t("settings.tools.hint")}</p>
       {#each session.tools as status (status.tool)}
-        <ToolRow {status} onchange={replaceTool} />
+        <ToolRow {status} onchange={replaceTool} checkUpdates />
       {/each}
     </Section>
 

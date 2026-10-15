@@ -7,7 +7,7 @@
   "setup.installing": "Installing…",
   "setup.update": "Update",
   "setup.updating": "Updating…",
-  "setup.upToDate": "Up to date",
+  "setup.newVersion": "{current} → {latest}",
   "setup.recheck": "Check again",
   "settings.tools.title": "Tools",
   "settings.tools.hint": "The toolbox works through git, the GitHub CLI and its Classroom 50 extension. Missing ones install through your package manager (Homebrew, winget, apt, dnf or pacman); git and the GitHub CLI are updated by it too.",

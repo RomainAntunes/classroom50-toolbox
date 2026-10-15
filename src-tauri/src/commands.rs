@@ -54,6 +54,12 @@ pub async fn install_tool(tool: Tool) -> Result<ToolStatus> {
     Ok(tools::status(tool).await)
 }
 
+/// The newer version `upgrade_tool` would install, if any.
+#[tauri::command]
+pub async fn tool_update(tool: Tool) -> Result<Option<String>> {
+    tools::available_update(tool).await
+}
+
 /// Updates gh-student and returns its new status.
 #[tauri::command]
 pub async fn upgrade_tool(tool: Tool) -> Result<ToolStatus> {
