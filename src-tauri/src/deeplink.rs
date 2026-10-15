@@ -9,6 +9,7 @@
 //! UI to take it now.
 
 use std::sync::Mutex;
+use std::time::{Duration, Instant};
 
 use serde::{Deserialize, Serialize};
 use tauri::{AppHandle, Emitter, Manager};
@@ -139,8 +140,51 @@ pub enum Target {
     Missing { link: Link },
 }
 
+/// The same link again within this is dropped (a page firing it in a loop, a double click).
+const REPEAT: Duration = Duration::from_secs(3);
+/// A link being handled longer than this no longer blocks others (a UI that never said
+/// it was done).
+const BUSY_MAX: Duration = Duration::from_secs(30 * 60);
+
+/// Which links get through: none while the UI handles one (its dialogs are open), and not
+/// the same link twice within `REPEAT`. Dropped links are not queued.
+#[derive(Debug, Default)]
+struct Gate {
+    busy_since: Option<Instant>,
+    last: Option<(Link, Instant)>,
+}
+
+impl Gate {
+    fn admit(&mut self, link: &Link, now: Instant) -> bool {
+        if self
+            .busy_since
+            .is_some_and(|at| now.duration_since(at) < BUSY_MAX)
+        {
+            return false;
+        }
+        if self
+            .last
+            .as_ref()
+            .is_some_and(|(last, at)| last == link && now.duration_since(*at) < REPEAT)
+        {
+            return false;
+        }
+        self.last = Some((link.clone(), now));
+        true
+    }
+
+    fn start(&mut self, now: Instant) {
+        self.busy_since = Some(now);
+    }
+
+    fn finish(&mut self) {
+        self.busy_since = None;
+    }
+}
+
 #[derive(Default)]
 pub struct DeepLinkState {
+    gate: Mutex<Gate>,
     pending: Mutex<Option<Link>>,
     /// The `Unlisted` link the student is being asked about.
     unlisted: Mutex<Option<Link>>,
@@ -149,6 +193,20 @@ pub struct DeepLinkState {
 }
 
 impl DeepLinkState {
+    fn admit(&self, link: &Link) -> bool {
+        self.gate
+            .lock()
+            .map(|mut g| g.admit(link, Instant::now()))
+            .unwrap_or(false)
+    }
+
+    /// The UI is done with the link it took: dialogs closed, the next one may come.
+    pub fn finish(&self) {
+        if let Ok(mut gate) = self.gate.lock() {
+            gate.finish();
+        }
+    }
+
     fn set_pending(&self, link: Link) {
         if let Ok(mut pending) = self.pending.lock() {
             *pending = Some(link);
@@ -190,8 +248,16 @@ pub fn handle(app: &AppHandle, url: &str) {
         log::warn!("ignored an invalid link: {prefix:?}");
         return;
     };
+    let state = app.state::<DeepLinkState>();
+    if !state.admit(&link) {
+        log::info!(
+            "dropped link (one is open, or a repeat): {}",
+            describe(&link)
+        );
+        return;
+    }
     log::info!("link: {}", describe(&link));
-    app.state::<DeepLinkState>().set_pending(link);
+    state.set_pending(link);
     crate::popover::show(app);
     let _ = app.emit(DEEP_LINK_EVENT, ());
 }
@@ -328,10 +394,14 @@ fn link_classroom(known: Option<Classroom>, org: &str, slug: &str, key: Option<&
 }
 
 /// Takes the waiting link, if any, and works out where it leads from the list alone: no
-/// request is made before the student agrees.
+/// request is made before the student agrees. Until the UI calls `finish`, other links
+/// are dropped.
 pub fn take(app: &AppHandle) -> Option<Target> {
     let state = app.state::<DeepLinkState>();
     let link = state.take_pending()?;
+    if let Ok(mut gate) = state.gate.lock() {
+        gate.start(Instant::now());
+    }
     let projects = app.state::<ProjectsState>();
     let target = resolve_local(&projects.snapshot(), &link);
     state.set_unlisted(target.is_none().then(|| link.clone()));
@@ -498,6 +568,32 @@ mod tests {
             assert_eq!(parse(url), None, "{url}");
         }
         assert_eq!(parse(&"classroom50-toolbox://open/a/b".repeat(20)), None);
+    }
+
+    #[test]
+    fn drops_links_while_one_is_open_and_quick_repeats() {
+        let a = accept("cs50", "fall-2026", "hello", None);
+        let b = Link::Open {
+            owner: "cs50".to_owned(),
+            repo: "hello".to_owned(),
+        };
+        let t0 = Instant::now();
+        let at = |secs: u64| t0 + Duration::from_secs(secs);
+        let mut gate = Gate::default();
+        assert!(gate.admit(&a, t0));
+        // The same link again: dropped within 3 s, let through after.
+        assert!(!gate.admit(&a, t0 + Duration::from_millis(2900)));
+        assert!(gate.admit(&a, at(4)));
+        // While the UI handles one, nothing gets through, not even another link.
+        gate.start(at(5));
+        assert!(!gate.admit(&b, at(6)));
+        assert!(!gate.admit(&b, at(60)));
+        gate.finish();
+        assert!(gate.admit(&b, at(61)));
+        // A UI that never finished stops blocking after a while.
+        gate.start(at(100));
+        assert!(!gate.admit(&a, at(100) + BUSY_MAX - Duration::from_secs(1)));
+        assert!(gate.admit(&a, at(100) + BUSY_MAX));
     }
 
     #[test]

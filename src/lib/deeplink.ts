@@ -126,7 +126,10 @@ async function act(target: DeepLinkTarget): Promise<void> {
 let running = false;
 let again = false;
 
-/** Takes the waiting link, if any, and acts on it; links arriving meanwhile follow. */
+/**
+ * Takes the waiting link, if any, and acts on it. Rust drops other links until
+ * `deepLinkDone`; one let through just after is taken by the next round.
+ */
 export async function handleDeepLink(): Promise<void> {
   if (running) {
     again = true;
@@ -137,7 +140,12 @@ export async function handleDeepLink(): Promise<void> {
     do {
       again = false;
       const target = await api.takeDeepLink();
-      if (target && (await ready(target))) await act(target);
+      if (!target) continue;
+      try {
+        if (await ready(target)) await act(target);
+      } finally {
+        await api.deepLinkDone();
+      }
     } while (again);
   } finally {
     running = false;

@@ -467,6 +467,8 @@ export const api = {
   simulatedNetwork: () => invoke<SimulatedNetwork>("simulated_network"),
   /** The link the app was opened with, once, and where it leads. */
   takeDeepLink: () => invoke<DeepLinkTarget | null>("take_deep_link"),
+  /** Done with the link `takeDeepLink` gave; Rust drops new ones until then. */
+  deepLinkDone: () => invoke<void>("deep_link_done"),
   /** Reads the class's manifest for the `unlisted` link the student agreed to open. */
   fetchLinkedAssignment: () => invoke<DeepLinkTarget | null>("fetch_linked_assignment"),
   /** Dev builds only: handles `url` as if the OS had opened it. */

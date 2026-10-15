@@ -139,6 +139,7 @@ pub fn run() {
             commands::simulated_network,
             commands::take_deep_link,
             commands::fetch_linked_assignment,
+            commands::deep_link_done,
             commands::simulate_deep_link,
             commands::get_settings,
             commands::update_settings,
