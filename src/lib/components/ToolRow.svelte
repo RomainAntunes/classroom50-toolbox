@@ -2,6 +2,7 @@
   import { ask, message } from "@tauri-apps/plugin-dialog";
   import { api, errorMessage, withDialog, type ToolStatus } from "$lib/api";
   import { t } from "$lib/i18n";
+  import { session } from "$lib/session.svelte";
 
   let {
     status,
@@ -19,6 +20,12 @@
   /** The newer version an update would install. */
   let latest = $state<string | null>(null);
   const busy = $derived(installing || upgrading);
+  // gh-student is a gh extension: it can't be installed before gh. Follows the shared
+  // statuses, so the button enables as soon as gh is installed or found by Check again.
+  const needsGh = $derived(
+    status.tool === "gh-student" &&
+      !session.tools.some((tool) => tool.tool === "gh" && tool.installed),
+  );
 
   // git and gh are updated by the OS package manager; only gh-student is checked. Runs
   // again whenever the status is re-read (Check again, after an update).
@@ -82,7 +89,10 @@
         </button>
       {/if}
     {:else}
-      <button class="primary" disabled={busy} onclick={install}>
+      {#if needsGh}
+        <span class="meta">{t("setup.needsGh")}</span>
+      {/if}
+      <button class="primary" disabled={busy || needsGh} onclick={install}>
         {installing ? t("setup.installing") : t("setup.install")}
       </button>
     {/if}

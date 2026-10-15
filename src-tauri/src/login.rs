@@ -5,6 +5,7 @@
 //! and wait for gh to exit. The token stays in gh's own store (keychain where available).
 
 use serde::Serialize;
+use std::path::PathBuf;
 use std::sync::Mutex;
 use tauri::{AppHandle, Emitter};
 use tokio::io::{AsyncBufReadExt, BufReader};
@@ -55,6 +56,8 @@ pub async fn login(app: &AppHandle, state: &LoginState) -> Result<AuthStatus> {
 }
 
 async fn run(app: &AppHandle, state: &LoginState) -> Result<AuthStatus> {
+    // Checked before anything is spawned or a running sign-in is abandoned.
+    require_gh(process::find_in_path("gh"))?;
     let (cancel_tx, cancel_rx) = oneshot::channel();
     if let Ok(mut cancel) = state.cancel.lock() {
         // A sign-in still running from an earlier click is abandoned.
@@ -120,6 +123,16 @@ async fn run(app: &AppHandle, state: &LoginState) -> Result<AuthStatus> {
     Ok(tools::auth_status().await)
 }
 
+/// Sign-in is gh's device flow, so it needs gh on PATH.
+fn require_gh(found: Option<PathBuf>) -> Result<()> {
+    match found {
+        Some(_) => Ok(()),
+        None => Err(Error::NotInstalled {
+            program: "gh".into(),
+        }),
+    }
+}
+
 /// `! First copy your one-time code: ABCD-1234`
 fn parse_code(line: &str) -> Option<String> {
     let (_, rest) = line.split_once("one-time code:")?;
@@ -143,6 +156,15 @@ fn parse_url(line: &str) -> Option<String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn refuses_without_gh() {
+        assert!(matches!(
+            require_gh(None),
+            Err(Error::NotInstalled { program }) if program == "gh"
+        ));
+        assert!(require_gh(Some(PathBuf::from("/opt/homebrew/bin/gh"))).is_ok());
+    }
 
     #[test]
     fn parses_device_flow_output() {

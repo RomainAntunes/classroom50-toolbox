@@ -89,7 +89,9 @@
       {/each}
     </Section>
   {:else if STEPS[step] === "account"}
-    <p class="hint">{t("welcome.account.hint")}</p>
+    <p class="hint">
+      {ghInstalled ? t("welcome.account.hint") : t("welcome.account.needsGh")}
+    </p>
     <Section title={t("welcome.account.title")}>
       <div class="login">
         <LoginStatus auth={session.auth} {ghInstalled} onchange={signedIn} />
