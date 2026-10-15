@@ -23,6 +23,8 @@ pub fn extra_path_dirs() -> Vec<PathBuf> {
     dirs
 }
 
+pub const INSTALL_ENV: &[(&str, &str)] = &[];
+
 pub fn install_command(tool: Tool) -> Result<CommandSpec> {
     let id = match tool {
         Tool::Git => "Git.Git",
@@ -49,6 +51,8 @@ pub fn install_command(tool: Tool) -> Result<CommandSpec> {
             "winget",
             "--accept-package-agreements",
             "--accept-source-agreements",
+            // No prompt can be answered without a console: fail instead of waiting.
+            "--disable-interactivity",
         ],
     ))
 }

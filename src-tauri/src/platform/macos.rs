@@ -18,6 +18,17 @@ pub fn extra_path_dirs() -> Vec<PathBuf> {
     dirs
 }
 
+/// Without these, `brew install` first updates Homebrew and every tap (most of a 9 s
+/// install of a small formula, minutes on a slow link, all of it silent) and may upgrade
+/// other installed formulae that depend on the new one. The formula list itself still
+/// refreshes through Homebrew's API cache.
+pub const INSTALL_ENV: &[(&str, &str)] = &[
+    ("HOMEBREW_NO_AUTO_UPDATE", "1"),
+    ("HOMEBREW_NO_INSTALLED_DEPENDENTS_CHECK", "1"),
+    ("HOMEBREW_NO_INSTALL_CLEANUP", "1"),
+    ("HOMEBREW_NO_ENV_HINTS", "1"),
+];
+
 pub fn install_command(tool: Tool) -> Result<CommandSpec> {
     if process::find_in_path("brew").is_none() {
         return Err(Error::Unsupported(

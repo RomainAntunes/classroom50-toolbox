@@ -63,6 +63,12 @@ pub fn install_command(tool: Tool) -> Result<CommandSpec> {
     imp::install_command(tool)
 }
 
+/// Environment for `install_command` that keeps the package manager from doing slow,
+/// unrelated work first (Homebrew updating itself and every tap).
+pub fn install_env() -> &'static [(&'static str, &'static str)] {
+    imp::INSTALL_ENV
+}
+
 pub fn open_terminal(dir: &Path) -> Result<()> {
     imp::open_terminal(dir)
 }

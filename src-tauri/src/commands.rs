@@ -17,7 +17,7 @@ use crate::pull;
 use crate::settings::{Settings, SettingsStore};
 use crate::simulate;
 use crate::student;
-use crate::tools::{self, AuthStatus, Tool, ToolStatus};
+use crate::tools::{self, AuthStatus, Tool, ToolJob, ToolJobs, ToolStatus};
 use crate::updater::{self, UpdateInfo};
 
 #[derive(Serialize)]
@@ -55,10 +55,24 @@ pub fn install_command(tool: Tool) -> Result<CommandSpec> {
     tools::install_command(tool)
 }
 
+/// Installs `tool` (`tool-jobs` events report its output) and returns every tool's status:
+/// gh-student depends on gh, so installing gh changes what the other rows can do.
 #[tauri::command]
-pub async fn install_tool(tool: Tool) -> Result<ToolStatus> {
-    tools::install(tool).await?;
-    Ok(tools::status(tool).await)
+pub async fn install_tool(app: AppHandle, tool: Tool) -> Result<Vec<ToolStatus>> {
+    tools::install(&app, tool).await?;
+    Ok(tools::statuses().await)
+}
+
+/// The installs and updates still running, for a view opened after they started.
+#[tauri::command]
+pub fn tool_jobs(state: State<'_, ToolJobs>) -> Vec<ToolJob> {
+    state.list()
+}
+
+/// Stops the install or update of `tool`; its command then fails with `cancelled`.
+#[tauri::command]
+pub fn cancel_tool_job(state: State<'_, ToolJobs>, tool: Tool) {
+    state.cancel(tool);
 }
 
 /// The newer version `upgrade_tool` would install, if any.
@@ -69,8 +83,8 @@ pub async fn tool_update(tool: Tool) -> Result<Option<String>> {
 
 /// Updates gh-student and returns its new status.
 #[tauri::command]
-pub async fn upgrade_tool(tool: Tool) -> Result<ToolStatus> {
-    tools::upgrade(tool).await?;
+pub async fn upgrade_tool(app: AppHandle, tool: Tool) -> Result<ToolStatus> {
+    tools::upgrade(&app, tool).await?;
     Ok(tools::status(tool).await)
 }
 

@@ -18,7 +18,12 @@ pub fn extra_path_dirs() -> Vec<PathBuf> {
     dirs
 }
 
+/// `pkexec` doesn't pass the environment on.
+pub const INSTALL_ENV: &[(&str, &str)] = &[];
+
 /// Package-manager installs need root; `pkexec` shows the desktop's own polkit prompt.
+/// Without a desktop agent it would ask on a terminal the app doesn't have, so it is told
+/// to fail instead (`--disable-internal-agent`).
 pub fn install_command(tool: Tool) -> Result<CommandSpec> {
     let package = match tool {
         Tool::Git => "git",
@@ -49,7 +54,7 @@ pub fn install_command(tool: Tool) -> Result<CommandSpec> {
         package
     };
 
-    let mut args = vec![manager];
+    let mut args = vec!["--disable-internal-agent", manager];
     args.extend_from_slice(install_args);
     args.push(package);
     Ok(CommandSpec::new("pkexec", &args))

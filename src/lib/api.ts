@@ -26,6 +26,16 @@ export interface ToolStatus {
   version: string | null;
 }
 
+/** An install or update still running (`tool_jobs`, the `tool-jobs` event). */
+export interface ToolJob {
+  tool: Tool;
+  kind: "install" | "upgrade";
+  /** The command line, shown until it prints something. */
+  command: string;
+  /** The last line the command printed. */
+  line: string | null;
+}
+
 export interface AuthStatus {
   loggedIn: boolean;
   login: string | null;
@@ -307,6 +317,8 @@ export const DEVICE_CODE_EVENT = "login-device-code";
 /** However a sign-in ends (success, failure or cancel). */
 export const LOGIN_ENDED_EVENT = "login-ended";
 export const UPDATE_AVAILABLE_EVENT = "update-available";
+/** Payload: `ToolJob[]`, every install or update running. */
+export const TOOL_JOBS_EVENT = "tool-jobs";
 export const PROJECTS_UPDATED_EVENT = "projects-updated";
 export const SYNC_PROGRESS_EVENT = "sync-progress";
 /** Payload: `Notice`. The UI words it and sends the system notification. */
@@ -400,7 +412,11 @@ export const api = {
   toolUpdate: (tool: Tool) => invoke<string | null>("tool_update", { tool }),
   /** gh-student only; git and gh follow the OS package manager. */
   upgradeTool: (tool: Tool) => invoke<ToolStatus>("upgrade_tool", { tool }),
-  installTool: (tool: Tool) => invoke<ToolStatus>("install_tool", { tool }),
+  /** Every tool's status afterwards (gh-student depends on gh); `tool-jobs` reports output. */
+  installTool: (tool: Tool) => invoke<ToolStatus[]>("install_tool", { tool }),
+  toolJobs: () => invoke<ToolJob[]>("tool_jobs"),
+  /** Stops an install or update; its command then rejects with `cancelled`. */
+  cancelToolJob: (tool: Tool) => invoke<void>("cancel_tool_job", { tool }),
   authStatus: () => invoke<AuthStatus>("auth_status"),
   listProjects: () => invoke<Snapshot>("list_projects"),
   refreshProjects: () => invoke<Snapshot>("refresh_projects"),

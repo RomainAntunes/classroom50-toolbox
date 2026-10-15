@@ -14,6 +14,14 @@ pub enum Error {
         stderr: String,
     },
 
+    /// A long command (an install) ran past its time limit and was stopped.
+    #[error("`{program}` was stopped after {minutes} minutes without finishing: {output}")]
+    TimedOut {
+        program: String,
+        minutes: u64,
+        output: String,
+    },
+
     #[error("{0}")]
     Unsupported(String),
 
@@ -22,6 +30,10 @@ pub enum Error {
 
     #[error("cancelled")]
     Cancelled,
+
+    /// The same job (an install of the same tool) is already running.
+    #[error("already running")]
+    Busy,
 
     #[error("{} already exists", .0.display())]
     PathExists(std::path::PathBuf),
@@ -104,9 +116,11 @@ impl Error {
         match self {
             Error::NotInstalled { .. } => "notInstalled",
             Error::CommandFailed { .. } => "commandFailed",
+            Error::TimedOut { .. } => "timedOut",
             Error::Unsupported(_) => "unsupported",
             Error::BlockedInDev(_) => "blockedInDev",
             Error::Cancelled => "cancelled",
+            Error::Busy => "busy",
             Error::PathExists(_) => "pathExists",
             Error::SchemaMismatch { .. } => "schemaMismatch",
             Error::Student(_) => "student",

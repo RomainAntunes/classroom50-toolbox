@@ -1,8 +1,9 @@
 <script lang="ts">
   import { ask, message } from "@tauri-apps/plugin-dialog";
-  import { api, errorMessage, withDialog, type ToolStatus } from "$lib/api";
+  import { api, errorKind, errorMessage, withDialog, type ToolStatus } from "$lib/api";
   import { t } from "$lib/i18n";
   import { session } from "$lib/session.svelte";
+  import { toolJobs, watchToolJobs } from "$lib/toolJobs.svelte";
 
   let {
     status,
@@ -15,8 +16,15 @@
     checkUpdates?: boolean;
   } = $props();
 
-  let installing = $state(false);
-  let upgrading = $state(false);
+  watchToolJobs();
+
+  /** Set while this row's own request runs, before Rust reports the job and after it ends. */
+  let starting = $state<"install" | "upgrade" | null>(null);
+  /** The install or update Rust is running for this tool, maybe started from another view. */
+  const job = $derived(toolJobs.running[status.tool]);
+  const kind = $derived(job?.kind ?? starting);
+  const installing = $derived(kind === "install");
+  const upgrading = $derived(kind === "upgrade");
   /** The newer version an update would install. */
   let latest = $state<string | null>(null);
   const busy = $derived(installing || upgrading);
@@ -44,32 +52,50 @@
     };
   });
 
+  /** A failure says what went wrong (the command's last lines) and how to do it by hand. */
+  async function failed(err: unknown, key: string, command: string | null) {
+    if (errorKind(err) === "cancelled") return;
+    const tool = t(`setup.tool.${status.tool}`);
+    let text = t(key, { tool, error: errorMessage(err) });
+    if (command && errorKind(err) !== "busy") text += t("setup.runYourself", { command });
+    await withDialog(() => message(text, { kind: "error" }));
+  }
+
   async function upgrade() {
-    upgrading = true;
+    if (busy) return;
+    starting = "upgrade";
     try {
       onchange(await api.upgradeTool(status.tool));
     } catch (err) {
-      await withDialog(() => message(errorMessage(err), { kind: "error" }));
+      await failed(err, "setup.updateFailed", "gh extension upgrade gh-student");
     } finally {
-      upgrading = false;
+      starting = null;
     }
   }
 
   async function install() {
+    if (busy) return;
+    let command: string | null = null;
     try {
       const spec = await api.installCommand(status.tool);
-      const command = [spec.program, ...spec.args].join(" ");
+      command = [spec.program, ...spec.args].join(" ");
+      const shown = command;
       const confirmed = await withDialog(() =>
-        ask(t("setup.installConfirm", { command }), { kind: "info" }),
+        ask(t("setup.installConfirm", { command: shown }), { kind: "info" }),
       );
       if (!confirmed) return;
-      installing = true;
-      onchange(await api.installTool(status.tool));
+      starting = "install";
+      // gh-student depends on gh, so every row gets its fresh status.
+      for (const next of await api.installTool(status.tool)) onchange(next);
     } catch (err) {
-      await withDialog(() => message(errorMessage(err), { kind: "error" }));
+      await failed(err, "setup.installFailed", command);
     } finally {
-      installing = false;
+      starting = null;
     }
+  }
+
+  function cancel() {
+    void api.cancelToolJob(status.tool).catch(() => {});
   }
 </script>
 
@@ -98,7 +124,7 @@
     {/if}
   </div>
   {#if busy}
-    <!-- gh and the package managers report no progress, so the bar only shows it's working. -->
+    <!-- No percentage is reported, so the bar only shows it's working; the last line says what. -->
     <div
       class="progress"
       role="progressbar"
@@ -106,6 +132,12 @@
     >
       <div></div>
     </div>
+    {#if job}
+      <div class="output">
+        <span class="line" title={job.line ?? job.command}>{job.line ?? job.command}</span>
+        <button onclick={cancel}>{t("setup.cancel")}</button>
+      </div>
+    {/if}
   {/if}
 </div>
 
@@ -154,6 +186,23 @@
     height: 100%;
     background: var(--accent);
     animation: slide 1.2s ease-in-out infinite;
+  }
+
+  .output {
+    display: flex;
+    align-items: center;
+    gap: var(--space);
+    padding: 0 12px 8px;
+  }
+
+  .line {
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+    color: var(--fg-muted);
+    font-size: 0.9em;
   }
 
   @keyframes slide {
