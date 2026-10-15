@@ -33,6 +33,8 @@ pub struct Settings {
     /// Project and unaccepted-assignment ids the user hid: left out of the list unless a
     /// search matches them, and never notified about.
     pub hidden: Vec<String>,
+    /// The first-run guide was finished or skipped.
+    pub onboarded: bool,
 }
 
 /// The date filter above the project list.
@@ -60,6 +62,7 @@ impl Default for Settings {
             notify_hours_before: vec![24, 1],
             default_editor: None,
             hidden: Vec::new(),
+            onboarded: false,
         }
     }
 }
@@ -95,7 +98,13 @@ impl SettingsStore {
         let path = dir.join(FILE_NAME);
         let (settings, first_run) = match std::fs::read_to_string(&path) {
             Ok(json) => match serde_json::from_str::<Settings>(&json) {
-                Ok(settings) => (settings.normalized(), false),
+                Ok(mut settings) => {
+                    // Settings from before the guide existed: the app is set up already.
+                    if !json.contains("\"onboarded\"") {
+                        settings.onboarded = true;
+                    }
+                    (settings.normalized(), false)
+                }
                 Err(err) => {
                     log::warn!(
                         "unreadable {}: {err}; starting from defaults",
@@ -156,6 +165,7 @@ mod tests {
             notify_hours_before: vec![1, 24, 0, 1, 1000, 6],
             default_editor: None,
             hidden: vec!["a".into(), "a".into()],
+            onboarded: true,
         }
         .normalized();
         assert_eq!(
@@ -189,6 +199,20 @@ mod tests {
             reloaded.get().watched_folders,
             vec![PathBuf::from("/courses")]
         );
+        std::fs::remove_dir_all(&dir).unwrap();
+    }
+
+    #[test]
+    fn shows_the_guide_to_new_installs_only() {
+        let dir = temp_dir("settings-guide");
+        let (store, _) = SettingsStore::load(&dir);
+        assert!(!store.get().onboarded);
+        // Saved while the guide is still open: it shows again next time.
+        store.set(store.get()).unwrap();
+        assert!(!SettingsStore::load(&dir).0.get().onboarded);
+        // A file from before the guide existed: already set up.
+        std::fs::write(dir.join(FILE_NAME), r#"{"watchedFolders": []}"#).unwrap();
+        assert!(SettingsStore::load(&dir).0.get().onboarded);
         std::fs::remove_dir_all(&dir).unwrap();
     }
 

@@ -5,7 +5,6 @@
   import { exit } from "@tauri-apps/plugin-process";
   import { openUrl } from "@tauri-apps/plugin-opener";
   import { listen } from "@tauri-apps/api/event";
-  import { CheckMenuItem, Menu } from "@tauri-apps/api/menu";
   import {
     api,
     errorMessage,
@@ -20,11 +19,18 @@
   import { sampleNotices, showNotice } from "$lib/notices";
   import { loadSettings, pickWatchedFolder, saveSettings, settings } from "$lib/settings.svelte";
   import { pickCloneFolder } from "$lib/clone";
-  import { defaultEditor, editors, loadEditors } from "$lib/editor.svelte";
+  import { chooseDefaultEditor, defaultEditor, editors, loadEditors } from "$lib/editor.svelte";
   import Section from "$lib/components/Section.svelte";
   import Toggle from "$lib/components/Toggle.svelte";
   import ToolRow from "$lib/components/ToolRow.svelte";
   import { session } from "$lib/session.svelte";
+  import {
+    OS_CHOICES,
+    THEME_CHOICES,
+    preview,
+    setPreviewOs,
+    setPreviewTheme,
+  } from "$lib/theme/preview.svelte";
 
   const REMINDER_CHOICES = [72, 24, 6, 1];
   const REPO_URL = "https://github.com/RomainAntunes/classroom50-toolbox";
@@ -86,21 +92,6 @@
 
   const current = $derived(settings.current);
   const editor = $derived(current ? defaultEditor() : null);
-
-  /** A native menu of the installed editors, the default one checked. */
-  async function chooseEditor() {
-    const items = await Promise.all(
-      editors.installed.map((other) =>
-        CheckMenuItem.new({
-          text: other.name,
-          checked: other.id === editor?.id,
-          action: () => save({ defaultEditor: other.id }),
-        }),
-      ),
-    );
-    const menu = await Menu.new({ items });
-    await withDialog(() => menu.popup());
-  }
 
   async function save(patch: Parameters<typeof saveSettings>[0]) {
     try {
@@ -209,7 +200,7 @@
           >
         </span>
         {#if editor}
-          <button onclick={chooseEditor}>{editor.name}</button>
+          <button onclick={chooseDefaultEditor}>{editor.name}</button>
         {/if}
       </div>
       {#if current.hidden.length}
@@ -293,6 +284,26 @@
 
     {#if import.meta.env.DEV}
       <Section title={t("settings.dev.title")}>
+        <div class="row">
+          <span title={t("settings.dev.skinHint")}>{t("settings.dev.skin")}</span>
+          <div class="segmented">
+            {#each OS_CHOICES as os (os)}
+              <button aria-pressed={preview.os === os} onclick={() => setPreviewOs(os)}
+                >{t(`settings.dev.os.${os}`)}</button
+              >
+            {/each}
+          </div>
+        </div>
+        <div class="row">
+          <span>{t("settings.dev.appearance")}</span>
+          <div class="segmented">
+            {#each THEME_CHOICES as theme (theme)}
+              <button aria-pressed={preview.theme === theme} onclick={() => setPreviewTheme(theme)}
+                >{t(`settings.dev.theme.${theme}`)}</button
+              >
+            {/each}
+          </div>
+        </div>
         <button class="disclosure" aria-expanded={showDev} onclick={() => (showDev = !showDev)}>
           <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m9 18 6-6-6-6" /></svg>
           {t("settings.dev.notifications")}
@@ -316,6 +327,10 @@
     {/if}
 
     <Section title={t("settings.about.title")}>
+      <div class="row">
+        <span>{t("settings.about.guide")}</span>
+        <button onclick={() => goto("/welcome")}>{t("settings.about.openGuide")}</button>
+      </div>
       <div class="row">
         <span>{t("settings.about.updates")}</span>
         <button disabled={checking} onclick={checkUpdates}>
@@ -422,6 +437,25 @@
 
   .sync .issue {
     color: var(--warning);
+  }
+
+  .segmented {
+    display: flex;
+    gap: 2px;
+    padding: 2px;
+    border-radius: var(--radius-control);
+    background: var(--bg-control);
+  }
+
+  .segmented button {
+    padding: 2px 8px;
+    background: transparent;
+    font-size: 0.9em;
+  }
+
+  .segmented button[aria-pressed="true"] {
+    background: var(--bg-card);
+    box-shadow: 0 0 0 1px var(--border);
   }
 
   .row.nested {
