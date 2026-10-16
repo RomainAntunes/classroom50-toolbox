@@ -10,7 +10,7 @@ use crate::process;
 
 /// gh's credentials for github.com, as `gh auth setup-git` would configure them, so a
 /// private repo pulls without any git setup. Scoped to the command line; nothing is saved.
-const GH_CREDENTIALS: [&str; 4] = [
+pub(crate) const GH_CREDENTIALS: [&str; 4] = [
     "-c",
     "credential.https://github.com.helper=",
     "-c",

@@ -501,6 +501,16 @@ where
 
 /// Development builds run against the developer's real classes, so they never write to
 /// GitHub: submitting, accepting, inviting, joining a team and `git push` are refused.
+/// Fails with `Error::BlockedInDev` when running `program args` would be refused, so a
+/// write can stop before its local steps (a commit before the push) leave anything behind.
+pub fn ensure_allowed<I, S>(program: &str, args: I) -> Result<()>
+where
+    I: IntoIterator<Item = S>,
+    S: AsRef<OsStr>,
+{
+    checked_args(program, args).map(drop)
+}
+
 fn checked_args<I, S>(program: &str, args: I) -> Result<Vec<OsString>>
 where
     I: IntoIterator<Item = S>,

@@ -5,6 +5,7 @@
   import { cloneProject } from "$lib/clone";
   import { editorFor, editors, openInEditor } from "$lib/editor.svelte";
   import { pullProject } from "$lib/pull";
+  import { commitLocal, commitPush, gradedOnPush } from "$lib/push";
   import { submitProject } from "$lib/submit";
   import { addTeammate, joinsGroup } from "$lib/teammate";
   import { isHidden, setHidden } from "$lib/hidden";
@@ -114,6 +115,21 @@
         project.pending === "unsubmitted"),
   );
 
+  // Every-push assignments commit and push from the app; tag-mode ones submit.
+  const everyPush = $derived(gradedOnPush(project));
+  const pushable = $derived(submittable && everyPush);
+  // The button only shows when it can work: GitHub's data known, work to send on the default
+  // branch, and GitHub has nothing the clone lacks. The menu always offers it and explains a
+  // refusal.
+  const pushReady = $derived(
+    pushable &&
+      Boolean(project.remote) &&
+      project.local?.branch === defaultBranch &&
+      (project.local.changedFiles > 0 || (project.local.ahead ?? 0) > 0) &&
+      behind === 0 &&
+      !project.local.remoteAhead,
+  );
+
   // GitHub has commits the clone lacks. The button only shows when a fast-forward can work;
   // the menu always offers it and explains a refusal.
   const incoming = $derived(Boolean(path) && (behind > 0 || Boolean(project.local?.remoteAhead)));
@@ -133,6 +149,27 @@
       pulling = false;
     }
   }
+
+  // Set once the student picks an action in the prompt, so the status names what runs.
+  let pushing = $state(false);
+  let committing = $state(false);
+  let busy = $state(false);
+  async function runCommit(run: typeof commitPush) {
+    busy = true;
+    try {
+      await run(project, name, (push) => {
+        pushing = push;
+        committing = !push;
+      });
+    } finally {
+      busy = pushing = committing = false;
+    }
+  }
+  const push = () => runCommit(commitPush);
+  const commit = () => runCommit(commitLocal);
+
+  // A local commit works on any clone with changes, whatever the branch or submission mode.
+  const committable = $derived(Boolean(path) && (project.local?.changedFiles ?? 0) > 0);
 
   let submitting = $state(false);
   async function submit() {
@@ -253,6 +290,20 @@
         action: () => pull(),
       }),
       MenuItem.new({
+        text: t("commit.menu"),
+        enabled: committable && !busy,
+        action: () => commit(),
+      }),
+      ...(everyPush
+        ? [
+            MenuItem.new({
+              text: t("push.menu"),
+              enabled: pushable && !busy,
+              action: () => push(),
+            }),
+          ]
+        : []),
+      MenuItem.new({
         text: t("projects.submit"),
         enabled: submittable && !submitting,
         action: () => submit(),
@@ -342,6 +393,10 @@
         {/if}
         {#if submitting}
           <span class="status">{t("projects.submitting")}</span> ·
+        {:else if pushing}
+          <span class="status">{t("push.pushing")}</span> ·
+        {:else if committing}
+          <span class="status">{t("commit.committing")}</span> ·
         {:else if pulling}
           <span class="status">{t("projects.pulling")}</span> ·
         {:else if status}
@@ -383,7 +438,17 @@
         }}>{t("projects.pullAction")}</button
       >
     {/if}
-    {#if ready}
+    {#if pushReady}
+      <button
+        class="primary"
+        title={t("push.hint")}
+        disabled={busy}
+        onclick={(event) => {
+          event.stopPropagation();
+          push();
+        }}>{t("push.ok")}</button
+      >
+    {:else if ready && !everyPush}
       <button
         class="primary"
         disabled={submitting}

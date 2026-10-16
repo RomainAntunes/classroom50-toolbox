@@ -302,6 +302,39 @@ export interface Submitted {
   url: string | null;
 }
 
+/** What Commit & push would do (`push_check`). */
+export interface PushCheck {
+  /** Every changed path the commit will hold. */
+  files: string[];
+  /** The new ones among them. */
+  untracked: string[];
+  /** Over 50 MB: GitHub warns about them. */
+  large: string[];
+  /** Over 100 MB: GitHub refuses them, so nothing is committed. */
+  tooLarge: string[];
+  /** Local commits GitHub doesn't have yet. */
+  ahead: number;
+  /** git has a `user.name` and `user.email` for the clone. */
+  hasIdentity: boolean;
+}
+
+/** What Commit would do (`commit_check`), and whether Commit & push is offered with it. */
+export interface CommitCheck extends PushCheck {
+  /** Why push isn't offered (`tagMode`, `closed`, `notOnGitHub`, `otherBranch`, `remoteAhead`, ...); null when it is. */
+  pushBlocked: string | null;
+}
+
+export interface Pushed {
+  /** The new head commit (local only after `commitOnly`). */
+  commit: string;
+}
+
+/** Who to commit as: the signed-in account and its private GitHub address. */
+export interface GitIdentity {
+  name: string;
+  email: string;
+}
+
 export interface Snapshot {
   projects: Project[];
   unaccepted: Unaccepted[];
@@ -518,6 +551,19 @@ export const api = {
   cloneProject: (id: string, parent: string) => invoke<string>("clone_project", { id, parent }),
   /** Fast-forwards the clone's default branch; rejects with `localChanges`, `otherBranch` or `diverged`. */
   pullProject: (id: string) => invoke<void>("pull_project", { id }),
+  /** What Commit & push would send; rejects with `otherBranch`, `gitInProgress`, `remoteAhead` or `nothingToPush`. */
+  pushCheck: (id: string) => invoke<PushCheck>("push_check", { id }),
+  /** Commits every change with `message` (unless only commits are waiting) and pushes the default branch. */
+  commitPush: (id: string, message: string | null) =>
+    invoke<Pushed>("commit_push", { id, message }),
+  /** What a local commit would hold, on any branch; rejects with `gitInProgress` or `nothingToCommit`. */
+  commitCheck: (id: string) => invoke<CommitCheck>("commit_check", { id }),
+  /** Commits every change with `message` in the clone, without pushing. */
+  commitOnly: (id: string, message: string) => invoke<Pushed>("commit_only", { id, message }),
+  suggestedGitIdentity: () => invoke<GitIdentity>("suggested_git_identity"),
+  /** Writes `user.name` and `user.email` to the clone's own git config. */
+  setGitIdentity: (id: string, name: string, email: string) =>
+    invoke<void>("set_git_identity", { id, name, email }),
   checkUpdate: () => invoke<UpdateInfo | null>("check_update"),
   installUpdate: () => invoke<void>("install_update"),
 };

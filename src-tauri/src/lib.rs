@@ -17,6 +17,7 @@ mod popover;
 pub mod process;
 pub mod projects;
 pub mod pull;
+pub mod push;
 pub mod settings;
 mod simulate;
 pub mod status;
@@ -156,6 +157,12 @@ pub fn run() {
             commands::submit_check,
             commands::submit_project,
             commands::pull_project,
+            commands::push_check,
+            commands::commit_push,
+            commands::commit_check,
+            commands::commit_only,
+            commands::suggested_git_identity,
+            commands::set_git_identity,
             commands::check_update,
             commands::install_update,
         ])

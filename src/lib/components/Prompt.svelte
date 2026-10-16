@@ -12,8 +12,8 @@
     }
   });
 
-  function close(result: string | null) {
-    prompt.current?.resolve(result);
+  function close(result: string | null, alt = false) {
+    prompt.current?.resolve(result, alt);
   }
 </script>
 
@@ -49,6 +49,11 @@
         />
         <div class="buttons">
           <button type="button" onclick={() => close(null)}>{t("prompt.cancel")}</button>
+          {#if current.altLabel}
+            <button type="button" disabled={!value.trim()} onclick={() => close(value, true)}
+              >{current.altLabel}</button
+            >
+          {/if}
           <button type="submit" class="primary" disabled={!value.trim()}>{current.okLabel}</button>
         </div>
       </form>
@@ -70,7 +75,9 @@
 
   .card {
     width: 100%;
-    max-width: 320px;
+    /* Three buttons (Cancel, Commit only, Commit & push) fit on one line at 14px; the
+       380px popover minus the scrim's padding leaves 348px. */
+    max-width: 340px;
     padding: 14px;
     border: 1px solid var(--border);
     border-radius: var(--radius-card);
@@ -95,6 +102,8 @@
   p {
     margin: 0;
     color: var(--fg-muted);
+    white-space: pre-line;
+    overflow-wrap: anywhere;
   }
 
   input {

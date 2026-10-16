@@ -5,14 +5,8 @@ import { ask, message } from "@tauri-apps/plugin-dialog";
 import { openUrl } from "@tauri-apps/plugin-opener";
 import { api, errorMessage, withDialog, type Project } from "$lib/api";
 import { t } from "$lib/i18n";
-
-/** At most `max` names, then "and N more". */
-function fileList(files: string[], max = 5): string {
-  const shown = files.slice(0, max).join(", ");
-  return files.length > max
-    ? t("submit.andMore", { files: shown, count: files.length - max })
-    : shown;
-}
+import { fileList } from "$lib/files";
+import { commitPush, gradedOnPush } from "$lib/push";
 
 async function show(text: string, title: string, kind: "info" | "error" = "info") {
   await withDialog(() => message(text, { title, kind }));
@@ -23,8 +17,20 @@ export async function submitProject(project: Project, name: string): Promise<boo
   try {
     const check = await api.submitCheck(project.id);
     if (!check.hasMarker) {
-      await show(t("submit.noMarker"), name);
-      return false;
+      // No marker means no autograder setup for submit; every-push work is graded by a push.
+      if (!gradedOnPush(project)) {
+        await show(t("submit.noMarker"), name);
+        return false;
+      }
+      const push = await withDialog(() =>
+        ask(t("submit.noMarkerPush"), {
+          title: name,
+          kind: "info",
+          okLabel: t("push.menu"),
+          cancelLabel: t("accept.cancel"),
+        }),
+      );
+      return push && (await commitPush(project, name));
     }
     if (check.deleted.length) {
       await show(t("submit.deleted", { files: fileList(check.deleted) }), name, "error");
