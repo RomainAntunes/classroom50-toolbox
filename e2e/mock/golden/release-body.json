@@ -1,0 +1,7 @@
+{
+  "repository": {
+    "release": {
+      "description": "### classroom50 autograde: 7/10\n\n| Test | Result | Score |\n|---|---|---|\n| compiles | PASS | 3 / 3 |\n| prints hello | PASS | 4 / 4 |\n| prints goodbye | FAIL | 0 / 3 |\n\n<details><summary>Failure details</summary>\n\n**prints goodbye**\n\n```\nexit 0; comparison=exact\n--- expected\n+++ actual stdout\n@@ -1 +1 @@\n-goodbye, world\n+hello, world\n```\n\n</details>\n\nStatus: classroom50 autograde: 7/10 (2/3 tests passed)\n"
+    }
+  }
+}

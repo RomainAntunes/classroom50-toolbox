@@ -530,4 +530,23 @@ mod tests {
         assert_eq!(restored.available_from, upstream.available_from);
         assert_eq!(restored.repo_visibility.as_deref(), Some("public"));
     }
+
+    /// The mock's manifests (`testenv::golden`) read like published ones.
+    #[test]
+    fn reads_the_suites_mock_manifests() {
+        let algo = parse_assignments("algo", &crate::testenv::golden("manifest-algo")).unwrap();
+        let slugs: Vec<&str> = algo.iter().map(|a| a.slug.as_str()).collect();
+        assert_eq!(slugs, ["hello", "sorting", "graphs"]);
+        assert_eq!(algo[0].submission_mode, Some(SubmissionMode::Tag));
+        assert!(algo.iter().all(|a| a.due.is_some()));
+        let web = parse_assignments("web", &crate::testenv::golden("manifest-web")).unwrap();
+        assert_eq!(
+            assignment_for_repo(
+                "web-portfolio-ada-e2e",
+                "web",
+                web.iter().map(|a| a.slug.as_str())
+            ),
+            Some("portfolio")
+        );
+    }
 }

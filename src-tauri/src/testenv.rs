@@ -110,6 +110,18 @@ pub(crate) fn fake_gh(args: &[&str]) -> String {
         .to_owned()
 }
 
+/// An answer of the suite's mock GitHub (`e2e/mock/golden/<name>.json`, which
+/// `e2e/mock/github.test.js` keeps equal to what the mock sends), for Rust to read as it
+/// reads GitHub's.
+#[cfg(test)]
+pub(crate) fn golden(name: &str) -> String {
+    let path = format!(
+        "{}/../e2e/mock/golden/{name}.json",
+        env!("CARGO_MANIFEST_DIR")
+    );
+    std::fs::read_to_string(&path).unwrap_or_else(|err| panic!("{path}: {err}"))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

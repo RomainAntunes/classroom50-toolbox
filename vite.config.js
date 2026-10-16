@@ -24,9 +24,10 @@ export default defineConfig(() => ({
   define: {
     __COMMIT__: JSON.stringify(commit()),
   },
-  // Unit tests for the UI's own logic (`pnpm test`); runes compile through the plugin.
+  // Unit tests for the UI's own logic (`pnpm test`); runes compile through the plugin. The
+  // WebDriver suite's mock GitHub is checked here too, without the suite's dependencies.
   test: {
-    include: ["src/**/*.test.ts", "scripts/**/*.test.mjs"],
+    include: ["src/**/*.test.ts", "scripts/**/*.test.mjs", "e2e/mock/**/*.test.js"],
     environment: "node",
   },
 

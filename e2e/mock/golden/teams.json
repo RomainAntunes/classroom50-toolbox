@@ -1,0 +1,34 @@
+{
+  "viewer": {
+    "organizations": {
+      "pageInfo": {
+        "hasNextPage": false,
+        "endCursor": null
+      },
+      "nodes": [
+        {
+          "login": "c50-e2e-school",
+          "teams": {
+            "nodes": [
+              {
+                "slug": "classroom50-algo",
+                "description": "{\"schema\":\"classroom50/team/v1\",\"name\":\"Algorithms\",\"term\":\"2026-S1\",\"active\":true}"
+              }
+            ]
+          }
+        },
+        {
+          "login": "c50-e2e-lab",
+          "teams": {
+            "nodes": [
+              {
+                "slug": "classroom50-web",
+                "description": "{\"schema\":\"classroom50/team/v1\",\"name\":\"Web Programming\",\"term\":\"2026-S1\",\"active\":true}"
+              }
+            ]
+          }
+        }
+      ]
+    }
+  }
+}

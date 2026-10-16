@@ -1,0 +1,121 @@
+{
+  "r0": {
+    "name": "algo-hello-ada-e2e",
+    "owner": {
+      "login": "c50-e2e-school"
+    },
+    "url": "https://github.com/c50-e2e-school/algo-hello-ada-e2e",
+    "isArchived": false,
+    "viewerPermission": "ADMIN",
+    "defaultBranchRef": {
+      "name": "main",
+      "target": {
+        "oid": "cccccccccccccccccccccccccccccccccccccccc",
+        "committedDate": "2026-10-16T11:00:00Z",
+        "author": {
+          "name": "Ada E2E",
+          "user": {
+            "login": "ada-e2e"
+          }
+        }
+      }
+    },
+    "config": {
+      "text": "classroom: algo\nassignment: hello\n"
+    },
+    "submissions": {
+      "nodes": [
+        {
+          "name": "2026-10-15T12-00-00Z-bbbbbbb",
+          "target": {
+            "oid": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "target": {
+              "oid": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+            }
+          }
+        }
+      ]
+    }
+  },
+  "r1": {
+    "name": "algo-sorting-ada-e2e",
+    "owner": {
+      "login": "c50-e2e-school"
+    },
+    "url": "https://github.com/c50-e2e-school/algo-sorting-ada-e2e",
+    "isArchived": false,
+    "viewerPermission": "ADMIN",
+    "defaultBranchRef": {
+      "name": "main",
+      "target": {
+        "oid": "3333333333333333333333333333333333333333",
+        "committedDate": "2026-10-15T12:00:00Z",
+        "author": {
+          "name": "Ada E2E",
+          "user": {
+            "login": "ada-e2e"
+          }
+        }
+      }
+    },
+    "config": {
+      "text": "classroom: algo\nassignment: sorting\n"
+    },
+    "submissions": {
+      "nodes": []
+    }
+  },
+  "r2": {
+    "name": "web-portfolio-ada-e2e",
+    "owner": {
+      "login": "c50-e2e-lab"
+    },
+    "url": "https://github.com/c50-e2e-lab/web-portfolio-ada-e2e",
+    "isArchived": false,
+    "viewerPermission": "ADMIN",
+    "defaultBranchRef": {
+      "name": "main",
+      "target": {
+        "oid": "4444444444444444444444444444444444444444",
+        "committedDate": "2026-10-14T12:00:00Z",
+        "author": {
+          "name": "Ada E2E",
+          "user": {
+            "login": "ada-e2e"
+          }
+        }
+      }
+    },
+    "config": null,
+    "submissions": {
+      "nodes": []
+    }
+  },
+  "r3": {
+    "name": "dotfiles",
+    "owner": {
+      "login": "ada-e2e"
+    },
+    "url": "https://github.com/ada-e2e/dotfiles",
+    "isArchived": false,
+    "viewerPermission": "ADMIN",
+    "defaultBranchRef": {
+      "name": "main",
+      "target": {
+        "oid": "5555555555555555555555555555555555555555",
+        "committedDate": "2026-10-11T12:00:00Z",
+        "author": {
+          "name": "Ada E2E",
+          "user": {
+            "login": "ada-e2e"
+          }
+        }
+      }
+    },
+    "config": null,
+    "submissions": {
+      "nodes": []
+    }
+  },
+  "r4": null
+}

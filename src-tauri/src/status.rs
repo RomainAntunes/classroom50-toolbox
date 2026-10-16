@@ -728,4 +728,39 @@ mod tests {
         passed.tests_passed = 4;
         assert!(!passed.needs_release_notes());
     }
+
+    /// The mock's grade reads like a real one, and its release body names the failed
+    /// test's output (`testenv::golden`).
+    #[test]
+    fn reads_the_suites_mock_grade() {
+        use crate::testenv::golden;
+        let result: GradeResult = serde_json::from_str(&golden("result-hello")).unwrap();
+        let release = GradedRelease {
+            tag: result.submission.clone(),
+            published_at: None,
+            url: result.release.clone(),
+            result_url: String::new(),
+        };
+        let mut grade = grade_from(&release, &result);
+        assert_eq!((grade.score, grade.max_score), (7, 10));
+        assert!(grade.needs_release_notes());
+        let body: BodyData = serde_json::from_str(&golden("release-body")).unwrap();
+        let body = body
+            .repository
+            .and_then(|r| r.release)
+            .and_then(|r| r.description);
+        grade.apply_release_body(body.as_deref());
+        let failed: Vec<_> = grade.tests.iter().filter(|t| !t.passed).collect();
+        assert_eq!(failed.len(), 1);
+        assert_eq!(failed[0].name, "prints goodbye");
+        assert!(
+            failed[0]
+                .output
+                .as_deref()
+                .unwrap()
+                .contains("-goodbye, world"),
+            "{:?}",
+            failed[0].output
+        );
+    }
 }
