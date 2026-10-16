@@ -52,6 +52,19 @@ pub struct Settings {
     pub native_calendar: Option<String>,
     /// The first-run guide was finished or skipped.
     pub onboarded: bool,
+    /// What the app may do with a clone's changes: nothing (git and the editor do it),
+    /// commit only, or commit and push.
+    pub commit_actions: CommitActions,
+}
+
+/// The git writes the app offers on a clone.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub enum CommitActions {
+    #[default]
+    None,
+    Commit,
+    Push,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
@@ -95,6 +108,7 @@ impl Default for Settings {
             calendar_file: None,
             native_calendar: None,
             onboarded: false,
+            commit_actions: CommitActions::None,
         }
     }
 }
@@ -224,6 +238,7 @@ mod tests {
             calendar_file: None,
             native_calendar: None,
             onboarded: true,
+            commit_actions: CommitActions::Push,
         }
         .normalized();
         assert_eq!(settings.hidden, vec!["a".to_owned()]);
@@ -251,6 +266,7 @@ mod tests {
         assert!(settings.scan_editor_projects);
         assert_eq!(settings.notify_hours_before, vec![24, 1]);
         assert_eq!(settings.language, SYSTEM_LANGUAGE);
+        assert_eq!(settings.commit_actions, CommitActions::None);
     }
 
     #[test]

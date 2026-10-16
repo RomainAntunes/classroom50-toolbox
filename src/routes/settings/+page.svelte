@@ -9,6 +9,7 @@
     api,
     errorMessage,
     APPEARANCES,
+    COMMIT_ACTIONS,
     PROJECTS_UPDATED_EVENT,
     SIMULATED_NETWORKS,
     withDialog,
@@ -196,6 +197,22 @@
     await withDialog(() => menu.popup());
   }
 
+  /** Off, Commit or Commit & push, as a native menu. */
+  async function chooseCommitActions() {
+    const chosen = settings.current?.commitActions ?? "none";
+    const items = await Promise.all(
+      COMMIT_ACTIONS.map((choice) =>
+        CheckMenuItem.new({
+          text: t(`settings.commitActions.${choice}`),
+          checked: choice === chosen,
+          action: () => void save({ commitActions: choice }),
+        }),
+      ),
+    );
+    const menu = await Menu.new({ items });
+    await withDialog(() => menu.popup());
+  }
+
   async function clearCache() {
     clearing = true;
     try {
@@ -323,6 +340,15 @@
         {#if editor}
           <button onclick={chooseDefaultEditor}>{editor.name}</button>
         {/if}
+      </div>
+      <div class="row">
+        <span class="text">
+          <span>{t("settings.commitActions")}</span>
+          <span class="sub">{t(`settings.commitActions.${current.commitActions}Hint`)}</span>
+        </span>
+        <button onclick={chooseCommitActions}
+          >{t(`settings.commitActions.${current.commitActions}`)}</button
+        >
       </div>
       {#if current.hidden.length || current.hiddenClasses.length}
         <div class="row">

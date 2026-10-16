@@ -7,6 +7,7 @@ import { api, errorMessage, withDialog, type Project } from "$lib/api";
 import { t } from "$lib/i18n";
 import { fileList } from "$lib/files";
 import { commitPush, gradedOnPush } from "$lib/push";
+import { settings } from "$lib/settings.svelte";
 
 async function show(text: string, title: string, kind: "info" | "error" = "info") {
   await withDialog(() => message(text, { title, kind }));
@@ -17,8 +18,9 @@ export async function submitProject(project: Project, name: string): Promise<boo
   try {
     const check = await api.submitCheck(project.id);
     if (!check.hasMarker) {
-      // No marker means no autograder setup for submit; every-push work is graded by a push.
-      if (!gradedOnPush(project)) {
+      // No marker means no autograder setup for submit; every-push work is graded by a push,
+      // offered here unless the `commitActions` setting leaves pushing to git.
+      if (!gradedOnPush(project) || settings.current?.commitActions !== "push") {
         await show(t("submit.noMarker"), name);
         return false;
       }

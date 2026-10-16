@@ -13,6 +13,7 @@
   import { tildify } from "$lib/paths.svelte";
   import { groupDetails } from "$lib/group";
   import { session } from "$lib/session.svelte";
+  import { settings } from "$lib/settings.svelte";
   import { copyLink, openLink } from "$lib/links";
   import Details from "./Details.svelte";
 
@@ -115,9 +116,12 @@
         project.pending === "unsubmitted"),
   );
 
-  // Every-push assignments commit and push from the app; tag-mode ones submit.
+  // Every-push assignments commit and push from the app; tag-mode ones submit. The
+  // `commitActions` setting may leave either to git and the editor.
+  const commitActions = $derived(settings.current?.commitActions ?? "none");
   const everyPush = $derived(gradedOnPush(project));
-  const pushable = $derived(submittable && everyPush);
+  const offersPush = $derived(everyPush && commitActions === "push");
+  const pushable = $derived(submittable && offersPush);
   // The button only shows when it can work: GitHub's data known, work to send on the default
   // branch, and GitHub has nothing the clone lacks. The menu always offers it and explains a
   // refusal.
@@ -289,12 +293,16 @@
         enabled: incoming && !pulling,
         action: () => pull(),
       }),
-      MenuItem.new({
-        text: t("commit.menu"),
-        enabled: committable && !busy,
-        action: () => commit(),
-      }),
-      ...(everyPush
+      ...(commitActions !== "none"
+        ? [
+            MenuItem.new({
+              text: t("commit.menu"),
+              enabled: committable && !busy,
+              action: () => commit(),
+            }),
+          ]
+        : []),
+      ...(offersPush
         ? [
             MenuItem.new({
               text: t("push.menu"),

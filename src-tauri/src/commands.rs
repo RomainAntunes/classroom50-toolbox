@@ -16,7 +16,7 @@ use crate::popover::{self, PopoverState};
 use crate::projects::{self, Project, ProjectsState, Snapshot, SyncProgress};
 use crate::pull;
 use crate::push;
-use crate::settings::{Settings, SettingsStore};
+use crate::settings::{CommitActions, Settings, SettingsStore};
 use crate::simulate;
 use crate::student;
 use crate::tools::{self, AuthStatus, Tool, ToolJob, ToolJobs, ToolStatus};
@@ -687,9 +687,36 @@ fn push_blocked(err: &Error, on_github: bool) -> String {
     .into()
 }
 
+/// Refuses what the `commitActions` setting leaves out of the app: any commit when it is
+/// `none`, a push unless it is `push`.
+fn allow_commit(actions: CommitActions, push: bool) -> Result<()> {
+    let allowed = match actions {
+        CommitActions::None => false,
+        CommitActions::Commit => !push,
+        CommitActions::Push => true,
+    };
+    if allowed {
+        Ok(())
+    } else {
+        Err(Error::Unsupported(
+            if push {
+                "push is turned off in Settings"
+            } else {
+                "commit is turned off in Settings"
+            }
+            .into(),
+        ))
+    }
+}
+
 /// What Commit & push would send for project `id`, or why it can't (`push.rs`).
 #[tauri::command]
-pub async fn push_check(state: State<'_, ProjectsState>, id: String) -> Result<push::PushCheck> {
+pub async fn push_check(
+    state: State<'_, ProjectsState>,
+    settings: State<'_, SettingsStore>,
+    id: String,
+) -> Result<push::PushCheck> {
+    allow_commit(settings.get().commit_actions, true)?;
     let (path, branch, head) = pushable(&state, &id)?;
     push::check(&path, &branch, head.as_deref()).await
 }
@@ -700,9 +727,11 @@ pub async fn push_check(state: State<'_, ProjectsState>, id: String) -> Result<p
 pub async fn commit_push(
     app: AppHandle,
     state: State<'_, ProjectsState>,
+    settings: State<'_, SettingsStore>,
     id: String,
     message: Option<String>,
 ) -> Result<push::Pushed> {
+    allow_commit(settings.get().commit_actions, true)?;
     let (path, branch, head) = pushable(&state, &id)?;
     let pushed = push::commit_and_push(&path, &branch, head.as_deref(), message.as_deref()).await?;
     projects::refresh_local(&app, false).await;
@@ -730,16 +759,28 @@ fn local_clone(state: &ProjectsState, id: &str) -> Result<PathBuf> {
 pub struct CommitCheck {
     #[serde(flatten)]
     pub check: push::PushCheck,
-    /// Why push isn't offered (an error kind, or `tagMode`); none when it is.
+    /// Why push isn't offered (an error kind, `tagMode`, or `disabled` by the `commitActions`
+    /// setting); none when it is.
     pub push_blocked: Option<String>,
 }
 
 /// What Commit (and Commit & push, when it applies) would do for project `id`. Refuses
 /// only what blocks a local commit (`push::commit_check`).
 #[tauri::command]
-pub async fn commit_check(state: State<'_, ProjectsState>, id: String) -> Result<CommitCheck> {
+pub async fn commit_check(
+    state: State<'_, ProjectsState>,
+    settings: State<'_, SettingsStore>,
+    id: String,
+) -> Result<CommitCheck> {
+    allow_commit(settings.get().commit_actions, false)?;
     let path = local_clone(&state, &id)?;
     let changes = push::commit_check(&path).await?;
+    if allow_commit(settings.get().commit_actions, true).is_err() {
+        return Ok(CommitCheck {
+            check: changes,
+            push_blocked: Some("disabled".into()),
+        });
+    }
     let snapshot = state.snapshot();
     let project = snapshot.projects.iter().find(|p| p.id == id);
     let tag_mode = project.is_some_and(|p| {
@@ -776,9 +817,11 @@ pub async fn commit_check(state: State<'_, ProjectsState>, id: String) -> Result
 pub async fn commit_only(
     app: AppHandle,
     state: State<'_, ProjectsState>,
+    settings: State<'_, SettingsStore>,
     id: String,
     message: String,
 ) -> Result<push::Pushed> {
+    allow_commit(settings.get().commit_actions, false)?;
     let path = local_clone(&state, &id)?;
     let committed = push::commit(&path, &message).await?;
     projects::refresh_local(&app, false).await;
@@ -1022,5 +1065,15 @@ mod tests {
             push_blocked(&Error::Unsupported("x".into()), true),
             "unsupported"
         );
+    }
+
+    #[test]
+    fn commit_actions_gate_commit_and_push() {
+        assert!(allow_commit(CommitActions::None, false).is_err());
+        assert!(allow_commit(CommitActions::None, true).is_err());
+        assert!(allow_commit(CommitActions::Commit, false).is_ok());
+        assert!(allow_commit(CommitActions::Commit, true).is_err());
+        assert!(allow_commit(CommitActions::Push, false).is_ok());
+        assert!(allow_commit(CommitActions::Push, true).is_ok());
     }
 }
