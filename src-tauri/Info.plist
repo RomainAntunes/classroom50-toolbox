@@ -8,6 +8,17 @@
 		<string>fr</string>
 		<string>es</string>
 		<string>de</string>
+		<string>it</string>
+		<string>pt-BR</string>
+		<string>pt-PT</string>
+		<string>nl</string>
+		<string>pl</string>
+		<string>tr</string>
+		<string>ar</string>
+		<string>he</string>
+		<string>zh-Hans</string>
+		<string>ja</string>
+		<string>ko</string>
 	</array>
 	<key>NSCalendarsUsageDescription</key>
 	<string>Adds your assignment due dates to the calendar you pick, and keeps them up to date.</string>
