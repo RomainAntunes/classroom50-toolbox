@@ -43,7 +43,7 @@ async function main() {
   });
   const os = await detectOs();
   const mine = files.find((f) => f.os === os);
-  const date = new Date(release.published_at).toLocaleDateString(undefined, {
+  const date = new Date(release.published_at).toLocaleDateString(document.documentElement.lang, {
     dateStyle: "long",
   });
 
@@ -51,7 +51,7 @@ async function main() {
     primary.href = mine.url;
     primary.textContent = `Download for ${mine.label}`;
   }
-  version.textContent = `Version ${release.tag_name.replace(/^v/, "")}, ${date}`;
+  version.textContent = `Version ${release.tag_name.replace(/^v/, "")}, ${date}. Free and open source.`;
 
   const list = document.getElementById("files");
   for (const file of files.filter((f) => f !== mine)) {
@@ -66,3 +66,15 @@ async function main() {
 }
 
 main().catch(() => {});
+
+// The menu bar's clock, in the visitor's own time, like the one beside the real icon.
+function tick() {
+  const clock = document.getElementById("clock");
+  const now = new Date();
+  const day = now.toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" });
+  const time = now.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" });
+  clock.textContent = `${day.replace(",", "")}  ${time}`;
+}
+
+tick();
+setInterval(tick, 15_000);
