@@ -6,7 +6,10 @@ import en from "./en.json";
 import fr from "./fr.json";
 import es from "./es.json";
 import de from "./de.json";
+import { textDirection, type Direction } from "./direction";
 import { locale } from "./locale.svelte";
+
+export { textDirection, type Direction } from "./direction";
 
 type Catalog = Record<string, string>;
 
@@ -57,6 +60,11 @@ export function setLocale(language: string, preferred: readonly string[] = []): 
 /** The active catalog's code, e.g. for `<html lang>`. */
 export function currentLocale(): string {
   return locale.code;
+}
+
+/** Which way the UI reads, for `<html dir>`: the catalog's, or `rtl` in the dev preview. */
+export function currentDirection(): Direction {
+  return locale.rtlPreview ? "rtl" : textDirection(locale.code);
 }
 
 /** `key` in one catalog: its plural form for `count` first, then `.other`, then `key`. */

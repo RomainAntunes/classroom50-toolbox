@@ -15,7 +15,7 @@
     type UpdateStatus,
   } from "$lib/api";
   import { handleDeepLink, linkActive } from "$lib/deeplink";
-  import { currentLocale, setLocale, t } from "$lib/i18n";
+  import { currentDirection, currentLocale, setLocale, t } from "$lib/i18n";
   import { showNotice } from "$lib/notices";
   import { loadEditors } from "$lib/editor.svelte";
   import { initTheme } from "$lib/theme/preview.svelte";
@@ -52,14 +52,17 @@
     void api.hidePopover();
   }
 
-  // The `language` setting, live: `t` is reactive, so the whole UI follows at once.
-  // "System" reads the OS's languages from Rust: WKWebView's `navigator.languages` holds
-  // the app bundle's localizations, not the user's. They stand in until Rust answers.
+  // The `language` setting, live: `t` is reactive, so the whole UI follows at once, and
+  // `dir` lays it out right to left for Arabic, Hebrew... (components use logical CSS
+  // properties only, so they follow). "System" reads the OS's languages from Rust:
+  // WKWebView's `navigator.languages` holds the app bundle's localizations, not the
+  // user's. They stand in until Rust answers.
   const language = $derived(settings.current?.language ?? "system");
   let systemLanguages = $state<readonly string[]>(navigator.languages);
   $effect(() => {
     setLocale(language, systemLanguages);
     document.documentElement.lang = currentLocale();
+    document.documentElement.dir = currentDirection();
   });
 
   // Rust writes calendar notes and the tray menu with these words (placeholders filled
