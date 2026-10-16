@@ -66,13 +66,15 @@ async function accept(item: Unaccepted): Promise<void> {
     await withDialog(() => message(t("accept.done", { repo }), { title: name }));
     return;
   }
-  const clone = await withDialog(() =>
-    ask(t("accept.cloneNow", { repo }), {
+  await cloneProject(
+    projectId,
+    "ask",
+    {
       title: name,
-      kind: "info",
-      okLabel: t("projects.clone"),
+      message: (folder) =>
+        folder ? t("accept.cloneNowTo", { repo, folder }) : t("accept.cloneNow", { repo }),
       cancelLabel: t("accept.later"),
-    }),
+    },
+    repo.split("/").pop(),
   );
-  if (clone) await cloneProject(projectId);
 }

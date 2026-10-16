@@ -248,6 +248,12 @@ pub fn system_languages() -> Vec<String> {
     sys_locale::get_locales().collect()
 }
 
+/// How gh clones github.com repos, so the row's clone URLs lead with the one it uses.
+#[tauri::command]
+pub async fn git_protocol() -> crate::tools::GitProtocol {
+    crate::tools::git_protocol().await
+}
+
 /// The words of the tray menu, from the UI's i18n.
 #[tauri::command]
 pub fn set_tray_labels(app: AppHandle, labels: crate::tray::Labels) {

@@ -622,6 +622,35 @@ pub async fn active_login() -> Option<String> {
         .filter(|login| !login.is_empty())
 }
 
+/// How gh clones github.com repos (`git_protocol`).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "lowercase")]
+pub enum GitProtocol {
+    Https,
+    Ssh,
+}
+
+/// gh's `git_protocol` for github.com, read from its local config (no network): the host's
+/// value, else the global one. HTTPS, gh's default, when unset or gh can't say.
+pub async fn git_protocol() -> GitProtocol {
+    process::run(
+        "gh",
+        ["config", "get", "git_protocol", "--host", "github.com"],
+        None,
+    )
+    .await
+    .map_or(GitProtocol::Https, |out| parse_git_protocol(&out.stdout))
+}
+
+/// `ssh` -> `Ssh`; anything else is gh's default, HTTPS.
+fn parse_git_protocol(stdout: &str) -> GitProtocol {
+    if stdout.trim().eq_ignore_ascii_case("ssh") {
+        GitProtocol::Ssh
+    } else {
+        GitProtocol::Https
+    }
+}
+
 /// gh's token for github.com, read fresh for each use and kept only in memory.
 pub async fn gh_token() -> Result<String> {
     match process::run("gh", ["auth", "token", "--hostname", "github.com"], None).await {
@@ -664,6 +693,14 @@ fn parse_extension_version(stdout: &str, repo: &str) -> Option<String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn reads_gh_git_protocol() {
+        assert_eq!(parse_git_protocol("ssh"), GitProtocol::Ssh);
+        assert_eq!(parse_git_protocol("ssh\n"), GitProtocol::Ssh);
+        assert_eq!(parse_git_protocol("https"), GitProtocol::Https);
+        assert_eq!(parse_git_protocol(""), GitProtocol::Https);
+    }
 
     #[test]
     fn one_job_per_tool_and_cancel_reaches_it() {

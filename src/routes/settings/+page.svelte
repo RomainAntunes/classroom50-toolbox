@@ -147,7 +147,9 @@
 
   async function chooseCalendar(anchor: HTMLElement) {
     try {
-      calendars = await api.nativeCalendars();
+      // The first call raises macOS's access prompt, which takes focus: pinned, the popover
+      // stays on Settings for the menu that follows.
+      calendars = await withDialog(() => api.nativeCalendars());
     } catch (err) {
       await calendarError(err);
       return;

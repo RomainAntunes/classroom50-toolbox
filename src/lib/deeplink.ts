@@ -97,15 +97,12 @@ async function act(target: DeepLinkTarget): Promise<void> {
       const project = session.snapshot?.projects.find((p) => p.id === target.id);
       if (!project || project.path || !project.owner || !project.repo) return;
       const repo = `${project.owner}/${project.repo}`;
-      const clone = await withDialog(() =>
-        ask(t("link.cloneNow", { repo }), {
-          title: project.assignment?.name ?? repo,
-          kind: "info",
-          okLabel: t("projects.clone"),
-          cancelLabel: t("accept.later"),
-        }),
-      );
-      if (clone) await cloneProject(project.id);
+      await cloneProject(project.id, "ask", {
+        title: project.assignment?.name ?? repo,
+        message: (folder) =>
+          folder ? t("link.cloneNowTo", { repo, folder }) : t("link.cloneNow", { repo }),
+        cancelLabel: t("accept.later"),
+      });
       return;
     }
     case "accept": {
