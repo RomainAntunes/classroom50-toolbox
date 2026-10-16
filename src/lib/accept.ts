@@ -3,9 +3,10 @@
 import { ask, message } from "@tauri-apps/plugin-dialog";
 import { api, errorKind, errorMessage, withDialog, type Accepted, type Unaccepted } from "$lib/api";
 import { cloneProject } from "$lib/clone";
-import { t } from "$lib/i18n";
+import { formatDate, t } from "$lib/i18n";
+import { groupName } from "$lib/group";
 import { announce } from "$lib/announce.svelte";
-import { busy } from "$lib/session.svelte";
+import { busy, session } from "$lib/session.svelte";
 import { askText } from "$lib/prompt.svelte";
 
 /** The longest group name, as `student::MAX_TEAM_NAME` (upstream's web app) allows. */
@@ -24,15 +25,36 @@ function confirm(text: string, title: string, okLabel: string): Promise<boolean>
   );
 }
 
-function notes(item: Unaccepted): string {
+/** The repo accept creates: `<org>/<classroom>-<assignment>-<login>`, or `group-<n>` in the
+ *  login's place on a team assignment (`<n>` until the group exists). All lowercase. */
+export function repoName(item: Unaccepted, login: string | null): string {
+  const owner =
+    item.assignment.mode === "team" ? `group-${item.group?.number ?? "<n>"}` : (login ?? "<login>");
+  const name = `${item.classroom.slug}-${item.assignment.slug}-${owner}`.toLowerCase();
+  return `${item.classroom.org}/${name}`;
+}
+
+/** What accepting does, one point per line: the repo, who sees and owns it, the Feedback
+ *  PR, how submitting works, the due date, groups, and the clone offer that follows. */
+export function notes(item: Unaccepted, login: string | null): string {
   const a = item.assignment;
-  const lines = [t("accept.confirm", { classroom: item.classroom.name ?? item.classroom.slug })];
-  if (a.repoVisibility === "public") lines.push(t("accept.public"));
-  if (a.mode === "group") lines.push(t("accept.group"));
+  const repo = repoName(item, login);
+  const org = item.classroom.org;
+  const points = [
+    t(a.repoVisibility === "public" ? "accept.repoPublic" : "accept.repoPrivate", { repo, org }),
+  ];
+  if (a.feedbackPr) points.push(t("accept.feedbackPr"));
+  points.push(t(a.submissionMode === "tag" ? "accept.tagMode" : "accept.everyPush"));
+  if (a.due) points.push(t("accept.due", { date: formatDate(new Date(a.due)) }));
+  if (a.mode === "group") points.push(t("accept.group"));
   if (a.mode === "team") {
-    lines.push(t(a.teamFormation === "teacher" ? "accept.teamTeacher" : "accept.teamStudent"));
+    if (item.group) points.push(t("accept.inGroup", { group: groupName(item.group) }));
+    else if (a.teamFormation === "teacher") points.push(t("accept.teamTeacher"));
+    else points.push(t("accept.teamStudent"));
   }
-  return lines.join("\n\n");
+  points.push(t("accept.thenClone"));
+  const intro = t("accept.confirm", { classroom: item.classroom.name ?? item.classroom.slug });
+  return [intro, ...points.map((point) => `• ${point}`)].join("\n");
 }
 
 /** Asks the new group's name (required: OK stays disabled while it's blank). Null when
@@ -65,7 +87,7 @@ export function acceptAssignment(item: Unaccepted): Promise<void> {
 
 async function accept(item: Unaccepted): Promise<void> {
   const name = item.assignment.name;
-  if (!(await confirm(notes(item), name, t("accept.ok")))) return;
+  if (!(await confirm(notes(item, session.snapshot?.login ?? null), name, t("accept.ok")))) return;
   let accepted: Accepted | null;
   try {
     accepted = await run(item);
