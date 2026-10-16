@@ -392,7 +392,9 @@
         <span class="text">
           <span>{t("settings.folders.cloneInto")}</span>
           <span class="sub path" title={current.cloneFolder ?? undefined}
-            >{current.cloneFolder ?? t("settings.folders.cloneUnset")}</span
+            >{#if current.cloneFolder}<bdi dir="ltr">{current.cloneFolder}</bdi>{:else}<bdi
+                >{t("settings.folders.cloneUnset")}</bdi
+              >{/if}</span
           >
         </span>
         <button onclick={pickCloneFolder}>{t("settings.folders.change")}</button>
@@ -406,7 +408,7 @@
       </div>
       {#each current.watchedFolders as folder (folder)}
         <div class="row nested">
-          <span class="path" title={folder}>{folder}</span>
+          <span class="path" title={folder}><bdi dir="ltr">{folder}</bdi></span>
           <button onclick={() => removeFolder(folder)}>{t("settings.folders.remove")}</button>
         </div>
       {/each}
@@ -579,7 +581,9 @@
         <div class="row">
           <span class="text">
             <span>{t("settings.calendar.kept")}</span>
-            <span class="sub path" title={current.calendarFile}>{current.calendarFile}</span>
+            <span class="sub path" title={current.calendarFile}
+              ><bdi dir="ltr">{current.calendarFile}</bdi></span
+            >
           </span>
           <button onclick={() => save({ calendarFile: null })}>{t("settings.calendar.stop")}</button
           >
@@ -927,6 +931,8 @@
     color: var(--fg-muted);
   }
 
+  /* A path cut short at its start (`direction: rtl` puts the ellipsis there), the path
+     itself kept left to right by its `<bdi dir="ltr">` so its leading `/` stays put. */
   .path {
     min-width: 0;
     overflow: hidden;
