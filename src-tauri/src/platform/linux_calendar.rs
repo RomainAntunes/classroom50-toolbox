@@ -109,9 +109,15 @@ pub fn plan(target: Option<Target>, registered: impl Fn(Target) -> bool) -> Vec<
     steps
 }
 
+/// XDG paths are POSIX paths. `Path::is_absolute` says no to `/usr/share` on Windows, where these
+/// pure functions are unit-tested too, so the check is spelled out.
+fn absolute(dir: &str) -> bool {
+    dir.starts_with('/')
+}
+
 /// `$XDG_CONFIG_HOME/evolution/sources`, or `~/.config/...` when unset or not absolute.
 pub fn eds_sources_dir(config_home: Option<&str>, home: Option<&Path>) -> Option<PathBuf> {
-    let base = match config_home.filter(|d| Path::new(d).is_absolute()) {
+    let base = match config_home.filter(|d| absolute(d)) {
         Some(dir) => PathBuf::from(dir),
         None => home?.join(".config"),
     };
@@ -126,19 +132,14 @@ pub fn data_dirs(
     home: Option<&Path>,
 ) -> Vec<PathBuf> {
     let mut dirs = Vec::new();
-    match data_home.filter(|d| Path::new(d).is_absolute()) {
+    match data_home.filter(|d| absolute(d)) {
         Some(dir) => dirs.push(PathBuf::from(dir)),
         None => dirs.extend(home.map(|h| h.join(".local/share"))),
     }
     let system = data_dirs
         .filter(|d| !d.is_empty())
         .unwrap_or("/usr/local/share:/usr/share");
-    dirs.extend(
-        system
-            .split(':')
-            .filter(|d| Path::new(d).is_absolute())
-            .map(PathBuf::from),
-    );
+    dirs.extend(system.split(':').filter(|d| absolute(d)).map(PathBuf::from));
     dirs
 }
 
