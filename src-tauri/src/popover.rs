@@ -13,6 +13,8 @@ use crate::settings::{Appearance, SettingsStore};
 pub const LABEL: &str = "main";
 /// Sent when the popover hides, so the UI drops what it only showed for the moment.
 pub const HIDDEN_EVENT: &str = "popover-hidden";
+/// Sent when the global shortcut showed the popover, so the list takes the keyboard focus.
+pub const SHORTCUT_EVENT: &str = "popover-shortcut";
 
 /// Clicking the tray icon while the popover is open first blurs (hides) it, then delivers
 /// the click; without this guard that click would immediately reopen it.
@@ -87,6 +89,21 @@ pub fn toggle(app: &AppHandle) {
     if !recently_hidden {
         show(app);
     }
+}
+
+/// The global shortcut: hides the popover when it has the keyboard, else shows it as a tray
+/// click would and lets the UI focus the list. No reopen guard: a key press elsewhere
+/// doesn't blur the popover first.
+pub fn toggle_from_shortcut(app: &AppHandle) {
+    let Some(window) = app.get_webview_window(LABEL) else {
+        return;
+    };
+    if window.is_visible().unwrap_or(false) && window.is_focused().unwrap_or(false) {
+        hide(app);
+        return;
+    }
+    show(app);
+    let _ = app.emit(SHORTCUT_EVENT, ());
 }
 
 pub fn show(app: &AppHandle) {

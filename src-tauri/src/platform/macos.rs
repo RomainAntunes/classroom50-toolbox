@@ -180,6 +180,10 @@ mod tests {
 
 mod calendar;
 
+pub fn global_shortcuts_supported() -> bool {
+    true
+}
+
 pub fn has_native_calendar() -> bool {
     true
 }

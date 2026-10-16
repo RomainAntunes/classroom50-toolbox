@@ -41,6 +41,7 @@
   import Toggle from "$lib/components/Toggle.svelte";
   import ToolRow from "$lib/components/ToolRow.svelte";
   import UpdateBanner from "$lib/components/UpdateBanner.svelte";
+  import ShortcutRecorder from "$lib/components/ShortcutRecorder.svelte";
   import { popupMenu } from "$lib/keyboard";
   import { session } from "$lib/session.svelte";
   import { showText } from "$lib/prompt.svelte";
@@ -491,6 +492,9 @@
             : languageName(current.language)}</button
         >
       </div>
+      {#if info}
+        <ShortcutRecorder os={info.os} supported={info.globalShortcuts} />
+      {/if}
       <Toggle
         label={t("settings.launchAtLogin")}
         checked={current.launchAtLogin}
