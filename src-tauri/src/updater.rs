@@ -545,12 +545,15 @@ pub async fn check(app: &AppHandle, quiet: bool) -> Result<UpdateStatus> {
             Ok(state.status())
         }
         Ok(Some(update)) => {
-            state.checked(version, channel);
+            // Counted as done once the download succeeds, so a failed download is retried
+            // after `RETRY`, not the next day.
             log::info!("update {} found; downloading", update.version);
             if state.with(|machine| machine.found(generation, update.version.clone())) {
                 emit(app);
                 let app = app.clone();
-                tauri::async_runtime::spawn(async move { download(app, generation, update).await });
+                tauri::async_runtime::spawn(async move {
+                    download(app, generation, update, version, channel).await
+                });
             }
             Ok(state.status())
         }
@@ -564,7 +567,15 @@ pub async fn check(app: &AppHandle, quiet: bool) -> Result<UpdateStatus> {
     }
 }
 
-async fn download(app: AppHandle, generation: u64, update: Update) {
+/// Downloads `update`; `version` and `channel` are the running app's, remembered as
+/// checked once the bytes are in.
+async fn download(
+    app: AppHandle,
+    generation: u64,
+    update: Update,
+    version: String,
+    channel: UpdateChannel,
+) {
     let state = app.state::<UpdaterState>();
     let result = update
         .download(
@@ -581,6 +592,7 @@ async fn download(app: AppHandle, generation: u64, update: Update) {
         .await;
     match result {
         Ok(bytes) => {
+            state.checked(version, channel);
             let version = update.version.clone();
             let notes = update.body.clone();
             let pending = Pending {
