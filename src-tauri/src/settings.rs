@@ -55,6 +55,17 @@ pub struct Settings {
     /// What the app may do with a clone's changes: nothing (git and the editor do it),
     /// commit only, or commit and push.
     pub commit_actions: CommitActions,
+    /// Which releases self-update follows (`updater.rs`).
+    pub update_channel: UpdateChannel,
+}
+
+/// Releases the app updates to: published stable ones, or also pre-releases.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub enum UpdateChannel {
+    #[default]
+    Stable,
+    Beta,
 }
 
 /// The git writes the app offers on a clone.
@@ -109,6 +120,7 @@ impl Default for Settings {
             native_calendar: None,
             onboarded: false,
             commit_actions: CommitActions::None,
+            update_channel: UpdateChannel::Stable,
         }
     }
 }
@@ -239,6 +251,7 @@ mod tests {
             native_calendar: None,
             onboarded: true,
             commit_actions: CommitActions::Push,
+            update_channel: UpdateChannel::Beta,
         }
         .normalized();
         assert_eq!(settings.hidden, vec!["a".to_owned()]);
@@ -267,6 +280,7 @@ mod tests {
         assert_eq!(settings.notify_hours_before, vec![24, 1]);
         assert_eq!(settings.language, SYSTEM_LANGUAGE);
         assert_eq!(settings.commit_actions, CommitActions::None);
+        assert_eq!(settings.update_channel, UpdateChannel::Stable);
     }
 
     #[test]

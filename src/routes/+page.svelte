@@ -10,7 +10,6 @@
     errorMessage,
     PROJECTS_UPDATED_EVENT,
     SYNC_PROGRESS_EVENT,
-    UPDATE_AVAILABLE_EVENT,
     type AuthStatus,
     type Project,
     type Snapshot,
@@ -18,7 +17,6 @@
     type ListFilter,
     type Unaccepted,
     type ToolStatus,
-    type UpdateInfo,
   } from "$lib/api";
   import { announce } from "$lib/announce.svelte";
   import { menuKey, onContextMenu, popupMenu, rovingList } from "$lib/keyboard";
@@ -33,6 +31,7 @@
   import { isClassHidden, isCollapsed, setClassHidden, setCollapsed } from "$lib/hidden";
   import UnacceptedRow from "$lib/components/UnacceptedRow.svelte";
   import LoginStatus from "$lib/components/LoginStatus.svelte";
+  import UpdateBanner from "$lib/components/UpdateBanner.svelte";
 
   interface ClassGroup {
     key: string;
@@ -263,9 +262,6 @@
   onMount(() => {
     load();
     const unlisteners = [
-      listen<UpdateInfo>(UPDATE_AVAILABLE_EVENT, (event) => {
-        session.update = event.payload;
-      }),
       listen<SyncProgress>(SYNC_PROGRESS_EVENT, (event) => {
         session.progress = event.payload;
       }),
@@ -365,10 +361,7 @@
 
 <main>
   {#if session.update}
-    <div class="banner">
-      <span>{t("update.available", { version: session.update.version })}</span>
-      <button class="primary" onclick={() => api.installUpdate()}>{t("update.install")}</button>
-    </div>
+    <UpdateBanner status={session.update} />
   {/if}
 
   {#if missingTool}
@@ -583,17 +576,6 @@
     flex-direction: column;
     gap: calc(var(--space) * 2);
     padding: var(--space) 12px;
-  }
-
-  .banner {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: var(--space);
-    padding: 8px 12px;
-    border-radius: var(--radius-card);
-    background: var(--bg-card);
-    border: 1px solid var(--border);
   }
 
   .issue {

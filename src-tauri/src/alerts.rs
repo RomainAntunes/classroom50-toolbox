@@ -73,6 +73,10 @@ pub enum Notice {
     Closed {
         assignment: String,
     },
+    /// A new version of the app is downloaded and installs on restart (`updater.rs`).
+    UpdateReady {
+        version: String,
+    },
 }
 
 #[derive(Debug, Default, Serialize, Deserialize)]

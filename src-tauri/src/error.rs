@@ -141,6 +141,11 @@ pub enum Error {
     #[error("calendar access isn't allowed")]
     CalendarAccess,
 
+    /// This copy wasn't installed from a release bundle (built from source, a bare binary),
+    /// so the updater has nothing to replace.
+    #[error("this copy of the toolbox can't update itself; download new versions from GitHub")]
+    NoSelfUpdate,
+
     /// The calendar service didn't answer (Akonadi not running and not starting, no D-Bus).
     #[error("the calendar service isn't responding")]
     CalendarUnavailable,
@@ -286,6 +291,7 @@ impl Error {
             Error::RateLimited { .. } => "rateLimited",
             Error::GitHub(_) => "github",
             Error::Offline => "offline",
+            Error::NoSelfUpdate => "noSelfUpdate",
             Error::CalendarAccess => "calendarAccess",
             Error::CalendarUnavailable => "calendarUnavailable",
             Error::RepoConfig(_) => "repoConfig",
@@ -358,6 +364,7 @@ mod tests {
             Error::Offline,
             Error::CalendarAccess,
             Error::CalendarUnavailable,
+            Error::NoSelfUpdate,
         ];
         for err in errors {
             let key = format!("error.{}", err.kind());
