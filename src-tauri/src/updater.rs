@@ -1,7 +1,7 @@
 //! Self-update from GitHub Releases (`latest.json`, signed with the Tauri updater key).
 //!
 //! One state machine (`Machine`) goes idle, checking, downloading, ready (or error) and is
-//! sent as `update-state` on every change. Checks run at startup, daily while the app runs
+//! sent as `update-state` on every change. Checks run at every start, daily while the app runs
 //! and from Settings; a newer version downloads at once, in memory, and installs on
 //! "Restart now" or, where the platform allows it, when the user quits.
 
@@ -34,8 +34,6 @@ const STARTUP_DELAY: Duration = Duration::from_secs(20);
 const TICK: Duration = Duration::from_secs(60);
 /// Checks while the app runs.
 const DAILY: chrono::TimeDelta = chrono::TimeDelta::hours(24);
-/// A start this soon after a check of the same version and channel doesn't check again.
-const STARTUP_GAP: chrono::TimeDelta = chrono::TimeDelta::hours(1);
 /// After a failed check (offline, GitHub down), the next background one waits this long.
 const RETRY: chrono::TimeDelta = chrono::TimeDelta::hours(1);
 /// Progress events at most this often (about 10 a second).
@@ -340,18 +338,12 @@ impl Memory {
     }
 }
 
-/// Whether a background check is due. At startup: unless one ran under `STARTUP_GAP` ago
-/// for this version and channel. While running: once `DAILY` has passed, measured on the
-/// wall clock so the time a laptop slept counts, and not within `RETRY` of a failure.
-fn due(
-    memory: &Memory,
-    now: DateTime<Utc>,
-    version: &str,
-    channel: UpdateChannel,
-    startup: bool,
-) -> bool {
+/// Whether the daily check is due (every start checks anyway): once `DAILY` has passed
+/// since the last one, measured on the wall clock so the time a laptop slept counts, and
+/// not within `RETRY` of a failure. Another version or channel checks at once.
+fn due(memory: &Memory, now: DateTime<Utc>, version: &str, channel: UpdateChannel) -> bool {
     let Some(checked_at) = memory.checked_at else {
-        return startup || memory.failed_at.is_none_or(|at| now - at >= RETRY);
+        return memory.failed_at.is_none_or(|at| now - at >= RETRY);
     };
     if memory.version.as_deref() != Some(version) || memory.channel != Some(channel) {
         return true;
@@ -359,9 +351,6 @@ fn due(
     // The clock went back: the stored time means nothing.
     if checked_at > now + chrono::TimeDelta::minutes(5) {
         return true;
-    }
-    if startup {
-        return now - checked_at >= STARTUP_GAP;
     }
     now - checked_at >= DAILY && memory.failed_at.is_none_or(|at| now - at >= RETRY)
 }
@@ -474,7 +463,7 @@ fn classify(err: tauri_plugin_updater::Error) -> Error {
     }
 }
 
-/// Background checks: one shortly after startup, then whenever one is due. Release builds
+/// Background checks: one shortly after every start, then whenever one is due. Release builds
 /// only; dev builds have "Simulate update".
 pub fn start(app: AppHandle) {
     if cfg!(debug_assertions) || !app.state::<UpdaterState>().bundle.can_update() {
@@ -482,7 +471,9 @@ pub fn start(app: AppHandle) {
     }
     tauri::async_runtime::spawn(async move {
         tokio::time::sleep(STARTUP_DELAY).await;
-        check_if_due(&app, true).await;
+        if let Err(err) = check(&app, true).await {
+            log::info!("update check at startup failed: {err}");
+        }
         let mut last = (Utc::now(), Instant::now());
         loop {
             tokio::time::sleep(TICK).await;
@@ -493,19 +484,19 @@ pub fn start(app: AppHandle) {
                 log::info!("woke from sleep; the update check waits a minute");
                 continue;
             }
-            check_if_due(&app, false).await;
+            check_if_due(&app).await;
         }
     });
 }
 
-async fn check_if_due(app: &AppHandle, startup: bool) {
+async fn check_if_due(app: &AppHandle) {
     let version = app.package_info().version.to_string();
     let channel = channel(app);
     let is_due = app
         .state::<UpdaterState>()
         .memory
         .lock()
-        .map(|memory| due(&memory, Utc::now(), &version, channel, startup))
+        .map(|memory| due(&memory, Utc::now(), &version, channel))
         .unwrap_or(false);
     if is_due && let Err(err) = check(app, true).await {
         log::info!("background update check failed: {err}");
@@ -904,58 +895,26 @@ mod tests {
     }
 
     #[test]
-    fn startup_checks_unless_one_just_ran() {
+    fn another_version_or_channel_checks_at_once() {
         let stable = UpdateChannel::Stable;
         let now = at("2026-10-16T12:00:00Z");
-        assert!(due(&Memory::default(), now, "0.10.0", stable, true));
+        assert!(due(&Memory::default(), now, "0.10.0", stable));
         let recent = checked("2026-10-16T11:30:00Z");
-        assert!(!due(&recent, now, "0.10.0", stable, true));
-        // Updated since, or another channel: check at once.
-        assert!(due(&recent, now, "0.11.0", stable, true));
-        assert!(due(&recent, now, "0.10.0", UpdateChannel::Beta, true));
-        assert!(due(
-            &checked("2026-10-16T10:30:00Z"),
-            now,
-            "0.10.0",
-            stable,
-            true
-        ));
+        assert!(!due(&recent, now, "0.10.0", stable));
+        assert!(due(&recent, now, "0.11.0", stable));
+        assert!(due(&recent, now, "0.10.0", UpdateChannel::Beta));
     }
 
     #[test]
     fn checks_daily_and_catches_up_after_sleep() {
         let stable = UpdateChannel::Stable;
         let memory = checked("2026-10-15T12:00:00Z");
-        assert!(!due(
-            &memory,
-            at("2026-10-16T11:59:00Z"),
-            "0.10.0",
-            stable,
-            false
-        ));
-        assert!(due(
-            &memory,
-            at("2026-10-16T12:00:00Z"),
-            "0.10.0",
-            stable,
-            false
-        ));
+        assert!(!due(&memory, at("2026-10-16T11:59:00Z"), "0.10.0", stable));
+        assert!(due(&memory, at("2026-10-16T12:00:00Z"), "0.10.0", stable));
         // A laptop that slept for three days checks on the first tick after waking.
-        assert!(due(
-            &memory,
-            at("2026-10-18T08:00:00Z"),
-            "0.10.0",
-            stable,
-            false
-        ));
+        assert!(due(&memory, at("2026-10-18T08:00:00Z"), "0.10.0", stable));
         // A clock set back.
-        assert!(due(
-            &memory,
-            at("2026-10-14T08:00:00Z"),
-            "0.10.0",
-            stable,
-            false
-        ));
+        assert!(due(&memory, at("2026-10-14T08:00:00Z"), "0.10.0", stable));
     }
 
     #[test]
@@ -963,39 +922,15 @@ mod tests {
         let stable = UpdateChannel::Stable;
         let mut memory = checked("2026-10-14T12:00:00Z");
         memory.failed_at = Some(at("2026-10-16T11:30:00Z"));
-        assert!(!due(
-            &memory,
-            at("2026-10-16T12:00:00Z"),
-            "0.10.0",
-            stable,
-            false
-        ));
-        assert!(due(
-            &memory,
-            at("2026-10-16T12:30:00Z"),
-            "0.10.0",
-            stable,
-            false
-        ));
-        // Never checked, failed just now: the tick waits, a restart tries.
+        assert!(!due(&memory, at("2026-10-16T12:00:00Z"), "0.10.0", stable));
+        assert!(due(&memory, at("2026-10-16T12:30:00Z"), "0.10.0", stable));
+        // Never checked, failed just now: the tick waits (the next start checks anyway).
         let memory = Memory {
             failed_at: Some(at("2026-10-16T11:50:00Z")),
             ..Memory::default()
         };
-        assert!(!due(
-            &memory,
-            at("2026-10-16T12:00:00Z"),
-            "0.10.0",
-            stable,
-            false
-        ));
-        assert!(due(
-            &memory,
-            at("2026-10-16T12:00:00Z"),
-            "0.10.0",
-            stable,
-            true
-        ));
+        assert!(!due(&memory, at("2026-10-16T12:00:00Z"), "0.10.0", stable));
+        assert!(due(&memory, at("2026-10-16T13:00:00Z"), "0.10.0", stable));
     }
 
     #[test]
