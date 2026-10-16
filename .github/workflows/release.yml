@@ -25,6 +25,7 @@ jobs:
       version: ${{ steps.check.outputs.version }}
       release: ${{ steps.check.outputs.release }}
       prerelease: ${{ steps.check.outputs.prerelease }}
+      body: ${{ steps.notes.outputs.body }}
     steps:
       - uses: actions/checkout@v7
       - id: check
@@ -53,6 +54,17 @@ jobs:
           else
             echo "release=true" >> "$GITHUB_OUTPUT"
           fi
+      # The release body (and latest.json's `notes`, which tauri-action takes from it): the
+      # version's changelog in English, written in the bump PR, then where to download.
+      - id: notes
+        env:
+          VERSION: ${{ steps.check.outputs.version }}
+        run: |
+          {
+            echo "body<<RELEASE_NOTES_EOF"
+            node scripts/release-notes.mjs "$VERSION"
+            echo "RELEASE_NOTES_EOF"
+          } >> "$GITHUB_OUTPUT"
 
   build:
     needs: version
@@ -116,7 +128,7 @@ jobs:
           tagName: v${{ needs.version.outputs.version }}
           releaseCommitish: ${{ github.sha }}
           releaseName: Classroom 50 Toolbox v${{ needs.version.outputs.version }}
-          releaseBody: See the assets below to download and install this version.
+          releaseBody: ${{ needs.version.outputs.body }}
           releaseDraft: true
           prerelease: ${{ needs.version.outputs.prerelease == 'true' }}
           # Pre-releases: NSIS only on Windows. Their latest.json then has no
