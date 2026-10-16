@@ -1,8 +1,6 @@
 import { defineConfig } from "vite";
 import { sveltekit } from "@sveltejs/kit/vite";
-// @ts-expect-error type error without @types/node package
 import process from "node:process";
-// @ts-expect-error type error without @types/node package
 import { execSync } from "node:child_process";
 const host = process.env.TAURI_DEV_HOST;
 

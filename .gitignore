@@ -20,3 +20,8 @@ vite.config.ts.timestamp-*
 *.key
 *.key.password
 site/icon.svg
+
+# Playwright
+/test-results
+/playwright-report
+/e2e-shots
