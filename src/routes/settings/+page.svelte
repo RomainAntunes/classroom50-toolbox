@@ -2,7 +2,6 @@
   import { onMount } from "svelte";
   import { goto } from "$app/navigation";
   import { message, save as saveDialog } from "@tauri-apps/plugin-dialog";
-  import { exit } from "@tauri-apps/plugin-process";
   import { openUrl } from "@tauri-apps/plugin-opener";
   import { listen } from "@tauri-apps/api/event";
   import {
@@ -12,6 +11,7 @@
     COMMIT_ACTIONS,
     PROJECTS_UPDATED_EVENT,
     SIMULATED_NETWORKS,
+    UPDATE_CHANNELS,
     withDialog,
     type AppInfo,
     type LastRun,
@@ -40,6 +40,7 @@
   import Section from "$lib/components/Section.svelte";
   import Toggle from "$lib/components/Toggle.svelte";
   import ToolRow from "$lib/components/ToolRow.svelte";
+  import UpdateBanner from "$lib/components/UpdateBanner.svelte";
   import { popupMenu } from "$lib/keyboard";
   import { session } from "$lib/session.svelte";
   import { showText } from "$lib/prompt.svelte";
@@ -218,6 +219,22 @@
     await popupMenu(menu, anchor);
   }
 
+  /** Stable or Beta, as a native menu. */
+  async function chooseUpdateChannel(anchor: HTMLElement) {
+    const chosen = settings.current?.updateChannel ?? "stable";
+    const items = await Promise.all(
+      UPDATE_CHANNELS.map((choice) =>
+        CheckMenuItem.new({
+          text: t(`settings.updates.${choice}`),
+          checked: choice === chosen,
+          action: () => void save({ updateChannel: choice }),
+        }),
+      ),
+    );
+    const menu = await Menu.new({ items });
+    await popupMenu(menu, anchor);
+  }
+
   /** Off, Commit or Commit & push, as a native menu. */
   async function chooseCommitActions(anchor: HTMLElement) {
     const chosen = settings.current?.commitActions ?? "none";
@@ -264,19 +281,42 @@
     save({ notifyHoursBefore: on ? [...rest, hours] : rest });
   }
 
+  // A newer version downloads at once; the banner below the row shows it (`update-state`).
   async function checkUpdates() {
     checking = true;
     upToDate = false;
     try {
-      const update = await api.checkUpdate();
-      if (update) await api.installUpdate();
-      else upToDate = true;
+      const status = await api.checkUpdate();
+      upToDate = status.state.phase === "idle";
     } catch (err) {
       await withDialog(() => message(errorMessage(err), { kind: "error" }));
     } finally {
       checking = false;
     }
   }
+
+  const update = $derived(session.update);
+  const updateBusy = $derived(
+    checking ||
+      update?.state.phase === "checking" ||
+      update?.state.phase === "downloading" ||
+      update?.state.phase === "ready",
+  );
+  const updateNote = $derived.by(() => {
+    if (!update) return null;
+    if (!update.canUpdate) return t("error.noSelfUpdate");
+    if (update.state.phase === "checking") return t("settings.about.checking");
+    if (update.state.phase === "error") return errorMessage(update.state.error);
+    if (update.lastCheck) {
+      return t("settings.about.lastCheck", { when: fromNow(new Date(update.lastCheck)) });
+    }
+    return null;
+  });
+
+  // MSI installs stay on stable (pre-releases ship no MSI).
+  const channel = $derived(
+    update?.hasBeta === false ? "stable" : (current?.updateChannel ?? "stable"),
+  );
 
   // Copy diagnostics: built in Rust with names masked, previewed, then copied.
   let diagnosing = $state(false);
@@ -456,6 +496,23 @@
         checked={current.launchAtLogin}
         onchange={(on) => save({ launchAtLogin: on })}
       />
+      <div class="row">
+        <span class="text">
+          <span>{t("settings.updates.channel")}</span>
+          <span class="sub"
+            >{update?.hasBeta === false
+              ? t("settings.updates.msiHint")
+              : t(`settings.updates.${channel}Hint`)}</span
+          >
+        </span>
+        <button
+          aria-haspopup="menu"
+          disabled={update?.hasBeta === false}
+          aria-label={`${t("settings.updates.channel")}: ${t(`settings.updates.${channel}`)}`}
+          onclick={(event) => chooseUpdateChannel(event.currentTarget)}
+          >{t(`settings.updates.${channel}`)}</button
+        >
+      </div>
     </Section>
 
     <Section title={t("settings.reminders.title")}>
@@ -621,6 +678,10 @@
           />
           <button type="submit" disabled={!devLink.trim()}>{t("settings.dev.linkOpen")}</button>
         </form>
+        <div class="row">
+          <span title={t("settings.dev.updateHint")}>{t("settings.dev.update")}</span>
+          <button onclick={() => api.simulateUpdate()}>{t("settings.dev.updateRun")}</button>
+        </div>
         <button class="disclosure" aria-expanded={showDev} onclick={() => (showDev = !showDev)}>
           <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m9 18 6-6-6-6" /></svg>
           {t("settings.dev.notifications")}
@@ -649,11 +710,19 @@
         <button onclick={() => goto("/welcome")}>{t("settings.about.openGuide")}</button>
       </div>
       <div class="row">
-        <span>{t("settings.about.updates")}</span>
-        <button disabled={checking} onclick={checkUpdates}>
+        <span class="text">
+          <span>{t("settings.about.updates")}</span>
+          {#if updateNote}
+            <span class="sub" class:issue={update?.state.phase === "error"}>{updateNote}</span>
+          {/if}
+        </span>
+        <button disabled={updateBusy || update?.canUpdate === false} onclick={checkUpdates}>
           {upToDate ? t("settings.about.upToDate") : t("settings.about.checkUpdates")}
         </button>
       </div>
+      {#if update}
+        <UpdateBanner status={update} compact />
+      {/if}
       <div class="row">
         <span class="text">
           <span>{t("settings.diagnostics.label")}</span>
@@ -668,7 +737,7 @@
           <span>{t("settings.quit.label")}</span>
           <span class="sub">{t("settings.quit.hint")}</span>
         </span>
-        <button onclick={() => exit(0)}>{t("settings.quit.action")}</button>
+        <button onclick={() => api.quitApp()}>{t("settings.quit.action")}</button>
       </div>
     </Section>
 
@@ -781,7 +850,8 @@
     white-space: nowrap;
   }
 
-  .sync .issue {
+  .sync .issue,
+  .sub.issue {
     color: var(--warning);
   }
 

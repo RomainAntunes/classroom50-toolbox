@@ -26,7 +26,7 @@ export default defineConfig(() => ({
   },
   // Unit tests for the UI's own logic (`pnpm test`); runes compile through the plugin.
   test: {
-    include: ["src/**/*.test.ts"],
+    include: ["src/**/*.test.ts", "scripts/**/*.test.mjs"],
     environment: "node",
   },
 

@@ -45,5 +45,6 @@ export function sampleNotices(now = Date.now()): Notice[] {
     { kind: "groupJoined", assignment, members: ["Alice Martin"] },
     { kind: "deadlineChanged", assignment, due: new Date(now + 48 * HOUR).toISOString() },
     { kind: "closed", assignment },
+    { kind: "updateReady", version: "0.11.0" },
   ];
 }

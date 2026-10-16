@@ -1,10 +1,12 @@
 // Sets the app version everywhere it lives: package.json (read by tauri.conf.json and the
-// release workflow) and src-tauri/Cargo.toml. Usage: pnpm bump 0.2.0
+// release workflow) and src-tauri/Cargo.toml. Usage: pnpm bump 0.2.0, or pnpm bump
+// 0.3.0-beta.1 for a pre-release (beta channel only; the release workflow accepts no other
+// pre-release label).
 import { readFileSync, writeFileSync } from "node:fs";
 
 const version = process.argv[2];
-if (!/^\d+\.\d+\.\d+(-[0-9A-Za-z.-]+)?$/.test(version ?? "")) {
-  console.error("usage: pnpm bump <major.minor.patch>");
+if (!/^\d+\.\d+\.\d+(-beta\.\d+)?$/.test(version ?? "")) {
+  console.error("usage: pnpm bump <major.minor.patch>[-beta.<n>]");
   process.exit(1);
 }
 

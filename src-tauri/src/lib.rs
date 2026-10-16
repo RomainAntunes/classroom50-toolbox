@@ -103,15 +103,14 @@ pub fn run() {
             let cache_dir = app.path().app_cache_dir()?;
             app.manage(projects::ProjectsState::load(&cache_dir));
             app.manage(alerts::AlertsState::load(&cache_dir));
+            app.manage(updater::UpdaterState::load(&cache_dir));
 
             popover::setup(handle)?;
             tray::setup(handle)?;
             alerts::restore_badge(handle);
             projects::start_background_sync(handle.clone());
             deeplink::setup(handle);
-            if !cfg!(debug_assertions) {
-                updater::check_in_background(handle.clone());
-            }
+            updater::start(handle.clone());
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
@@ -173,8 +172,12 @@ pub fn run() {
             commands::commit_only,
             commands::suggested_git_identity,
             commands::set_git_identity,
+            commands::update_status,
             commands::check_update,
             commands::install_update,
+            commands::defer_update,
+            commands::quit_app,
+            commands::simulate_update,
         ])
         .build(tauri::generate_context!())
         .expect("error while building tauri application")

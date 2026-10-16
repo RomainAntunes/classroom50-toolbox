@@ -3,7 +3,9 @@ name: Release
 # Runs on every merge into main, but only builds when package.json carries a version that
 # has no release yet (bump it in the PR with `pnpm bump X.Y.Z`). The result is a draft
 # release with installers and latest.json; publishing the draft ships the update to
-# installed apps.
+# installed apps. A version like 0.11.0-beta.1 makes a draft pre-release instead, without
+# the MSI (WiX only takes numeric pre-release labels): publishing it reaches the beta
+# channel only (beta-channel.yml), since GitHub's "latest" never points at a pre-release.
 on:
   push:
     branches: [main]
@@ -22,6 +24,7 @@ jobs:
     outputs:
       version: ${{ steps.check.outputs.version }}
       release: ${{ steps.check.outputs.release }}
+      prerelease: ${{ steps.check.outputs.prerelease }}
     steps:
       - uses: actions/checkout@v7
       - id: check
@@ -34,7 +37,15 @@ jobs:
             echo "::error::package.json ($version) and src-tauri/Cargo.toml ($cargo_version) disagree; use pnpm bump"
             exit 1
           fi
+          if ! echo "$version" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+(-beta\.[0-9]+)?$'; then
+            echo "::error::$version is neither X.Y.Z nor X.Y.Z-beta.N; use pnpm bump"
+            exit 1
+          fi
           echo "version=$version" >> "$GITHUB_OUTPUT"
+          case "$version" in
+            *-*) echo "prerelease=true" >> "$GITHUB_OUTPUT" ;;
+            *) echo "prerelease=false" >> "$GITHUB_OUTPUT" ;;
+          esac
           # Drafts have no git tag yet, so ask the releases API (it sees drafts with this token).
           if gh release view "v$version" --repo "$GITHUB_REPOSITORY" > /dev/null 2>&1; then
             echo "v$version already released; nothing to build"
@@ -107,8 +118,11 @@ jobs:
           releaseName: Classroom 50 Toolbox v${{ needs.version.outputs.version }}
           releaseBody: See the assets below to download and install this version.
           releaseDraft: true
-          prerelease: false
-          args: ${{ matrix.args }}
+          prerelease: ${{ needs.version.outputs.prerelease == 'true' }}
+          # Pre-releases: NSIS only on Windows. Their latest.json then has no
+          # windows-x86_64-msi entry, and MSI installs never read the beta channel anyway
+          # (updater.rs keeps them on stable).
+          args: ${{ matrix.args }}${{ runner.os == 'Windows' && needs.version.outputs.prerelease == 'true' && ' --bundles nsis' || '' }}
 
   # tauri-action points latest.json at api.github.com asset URLs, which allow 60
   # unauthenticated requests an hour per IP: on a campus network every student shares one,

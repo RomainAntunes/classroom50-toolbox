@@ -108,6 +108,16 @@ export function formatNumber(value: number, digits = 0): string {
   }).format(value);
 }
 
+/** 12400000 -> "12.4 MB" in the UI's language: download sizes. */
+export function formatMegabytes(bytes: number): string {
+  return new Intl.NumberFormat(locale.code, {
+    style: "unit",
+    unit: "megabyte",
+    minimumFractionDigits: 1,
+    maximumFractionDigits: 1,
+  }).format(bytes / 1_000_000);
+}
+
 export function formatDate(date: Date): string {
   return new Intl.DateTimeFormat(locale.code, {
     weekday: "short",

@@ -393,6 +393,10 @@ export type Appearance = (typeof APPEARANCES)[number];
 export const COMMIT_ACTIONS = ["none", "commit", "push"] as const;
 export type CommitActions = (typeof COMMIT_ACTIONS)[number];
 
+/** Which releases self-update follows: published stable ones, or pre-releases too. */
+export const UPDATE_CHANNELS = ["stable", "beta"] as const;
+export type UpdateChannel = (typeof UPDATE_CHANNELS)[number];
+
 export interface Settings {
   watchedFolders: string[];
   scanEditorProjects: boolean;
@@ -420,6 +424,7 @@ export interface Settings {
   onboarded: boolean;
   /** Commit, or commit and push, from the app; `none` leaves it to git and the editor. */
   commitActions: CommitActions;
+  updateChannel: UpdateChannel;
 }
 
 /** An editor installed here that can open a folder. */
@@ -440,7 +445,8 @@ export interface DeviceCode {
 export const DEVICE_CODE_EVENT = "login-device-code";
 /** However a sign-in ends (success, failure or cancel). */
 export const LOGIN_ENDED_EVENT = "login-ended";
-export const UPDATE_AVAILABLE_EVENT = "update-available";
+/** Payload: `UpdateStatus`, on every change of the self-update state. */
+export const UPDATE_STATE_EVENT = "update-state";
 /** Payload: `ToolJob[]`, every install or update running. */
 export const TOOL_JOBS_EVENT = "tool-jobs";
 export const PROJECTS_UPDATED_EVENT = "projects-updated";
@@ -463,7 +469,8 @@ export type Notice =
   | { kind: "teammatePush"; assignment: string; author: string }
   | { kind: "groupJoined"; assignment: string; members: string[] }
   | { kind: "deadlineChanged"; assignment: string; due: string | null }
-  | { kind: "closed"; assignment: string };
+  | { kind: "closed"; assignment: string }
+  | { kind: "updateReady"; version: string };
 
 export const SIMULATED_NETWORKS = ["normal", "githubDown", "noInternet"] as const;
 export type SimulatedNetwork = (typeof SIMULATED_NETWORKS)[number];
@@ -508,9 +515,36 @@ export interface SyncDetails {
   clones: number;
 }
 
-export interface UpdateInfo {
-  version: string;
-  notes: string | null;
+/** Where self-update stands (`updater.rs`). */
+export type UpdateState =
+  | { phase: "idle" }
+  | { phase: "checking" }
+  /** `total` is null when the server sent no length: the bar is indeterminate. */
+  | { phase: "downloading"; version: string; downloaded: number; total: number | null }
+  | { phase: "ready"; version: string; notes: string | null }
+  | { phase: "error"; error: CommandError };
+
+/** How the app was installed, which decides what updating can do. */
+export type Bundle = "app" | "msi" | "nsis" | "appImage" | "deb" | "rpm" | "unbundled";
+
+/** Payload of `update-state` and `update_status`. */
+export interface UpdateStatus {
+  state: UpdateState;
+  /** "Later" was chosen: the banner stays, without the question. */
+  deferred: boolean;
+  /** "Restart now" is running. */
+  installing: boolean;
+  /** The dev build's fake update: Restart only logs. */
+  simulated: boolean;
+  lastCheck: string | null;
+  bundle: Bundle;
+  canUpdate: boolean;
+  /** Quitting installs a downloaded update (not deb or rpm, which ask for a password). */
+  installOnQuit: boolean;
+  /** Installing asks for the password (deb, rpm). */
+  asksPassword: boolean;
+  /** MSI installs stay on stable: pre-releases ship no MSI. */
+  hasBeta: boolean;
 }
 
 /** Shape of every error a command rejects with (see `Error` in src-tauri/src/error.rs). */
@@ -620,8 +654,17 @@ export const api = {
   /** Writes `user.name` and `user.email` to the clone's own git config. */
   setGitIdentity: (id: string, name: string, email: string) =>
     invoke<void>("set_git_identity", { id, name, email }),
-  checkUpdate: () => invoke<UpdateInfo | null>("check_update"),
+  updateStatus: () => invoke<UpdateStatus>("update_status"),
+  /** Checks now; a newer version starts downloading (`update-state` follows). */
+  checkUpdate: () => invoke<UpdateStatus>("check_update"),
+  /** Installs the downloaded update and relaunches ("Restart now"). */
   installUpdate: () => invoke<void>("install_update"),
+  /** "Later": the banner stays, without the question. */
+  deferUpdate: () => invoke<void>("defer_update"),
+  /** Quits, installing a downloaded update first where the platform allows it. */
+  quitApp: () => invoke<void>("quit_app"),
+  /** Dev builds only: a fake update, from the check to the ready banner. */
+  simulateUpdate: () => invoke<void>("simulate_update"),
 };
 
 export function errorKind(err: unknown): string | null {

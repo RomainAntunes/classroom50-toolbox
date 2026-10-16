@@ -1,0 +1,45 @@
+name: Beta channel
+
+# Apps on the Beta update channel read the latest.json attached to the `beta-channel`
+# release. It must point at the newest published release, pre-release or stable, so beta
+# users also move onto the stable that follows their beta. Releases are drafts until
+# published by hand, so the file is rewritten whenever one is published, unpublished or
+# deleted (so the feed never points at a release that's gone), or by hand.
+on:
+  release:
+    types: [published, unpublished, deleted]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: beta-channel
+  cancel-in-progress: false
+
+jobs:
+  channel:
+    if: github.event_name == 'workflow_dispatch' || github.event.release.tag_name != 'beta-channel'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: lts/*
+      - env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh api "repos/$GITHUB_REPOSITORY/releases" --paginate --slurp > releases.json
+          tag=$(node scripts/beta-channel.mjs releases.json)
+          echo "beta channel: $tag"
+          gh release download "$tag" --repo "$GITHUB_REPOSITORY" --pattern latest.json --dir channel
+          cat channel/latest.json
+          # First use: a published pre-release, never marked latest, so the download page
+          # and the stable channel (releases/latest) never see it.
+          if ! gh release view beta-channel --repo "$GITHUB_REPOSITORY" > /dev/null 2>&1; then
+            gh release create beta-channel --repo "$GITHUB_REPOSITORY" \
+              --prerelease --latest=false --target "$GITHUB_SHA" \
+              --title "Beta channel" \
+              --notes "Update feed for the app's Beta setting, not a version: download installers from the releases below."
+          fi
+          gh release upload beta-channel channel/latest.json --clobber --repo "$GITHUB_REPOSITORY"

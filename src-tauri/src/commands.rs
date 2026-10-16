@@ -20,7 +20,7 @@ use crate::settings::{CommitActions, Settings, SettingsStore};
 use crate::simulate;
 use crate::student;
 use crate::tools::{self, AuthStatus, Tool, ToolJob, ToolJobs, ToolStatus};
-use crate::updater::{self, UpdateInfo};
+use crate::updater::{self, UpdateStatus, UpdaterState};
 
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -362,6 +362,9 @@ pub fn update_settings(
     }
     if saved.appearance != previous.appearance {
         popover::apply_appearance(&app, saved.appearance);
+    }
+    if saved.update_channel != previous.update_channel {
+        updater::channel_changed(&app);
     }
     if saved.watched_folders != previous.watched_folders
         || saved.scan_editor_projects != previous.scan_editor_projects
@@ -979,14 +982,41 @@ pub async fn set_git_identity(
     push::set_identity(&path, &name, &email).await
 }
 
+/// Where self-update stands; `update-state` follows every change.
 #[tauri::command]
-pub async fn check_update(app: AppHandle) -> Result<Option<UpdateInfo>> {
-    updater::check(&app).await
+pub fn update_status(state: State<'_, UpdaterState>) -> UpdateStatus {
+    state.status()
 }
 
+/// Settings > About: checks now and starts the download when there is a newer version.
+/// Unlike background checks, a failure rejects.
+#[tauri::command]
+pub async fn check_update(app: AppHandle) -> Result<UpdateStatus> {
+    updater::check(&app, false).await
+}
+
+/// "Restart now": installs the downloaded update and relaunches.
 #[tauri::command]
 pub async fn install_update(app: AppHandle) -> Result<()> {
-    updater::install_and_restart(&app).await
+    updater::install_now(&app).await
+}
+
+/// "Later": keeps the banner without the question.
+#[tauri::command]
+pub fn defer_update(app: AppHandle) {
+    updater::defer(&app);
+}
+
+/// Quits the app, installing a downloaded update first where the platform allows it.
+#[tauri::command]
+pub fn quit_app(app: AppHandle) {
+    updater::quit(&app);
+}
+
+/// Dev builds only: a fake update, from the check to the ready banner.
+#[tauri::command]
+pub async fn simulate_update(app: AppHandle) -> Result<()> {
+    updater::simulate(&app).await
 }
 
 /// Dev builds only: lights the tray badge after a few seconds, once the popover has

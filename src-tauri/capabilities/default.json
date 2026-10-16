@@ -18,8 +18,6 @@
     "clipboard-manager:allow-write-text",
     "notification:default",
     "autostart:default",
-    "process:allow-restart",
-    "process:allow-exit",
     "log:default"
   ]
 }

@@ -5,6 +5,7 @@ use tauri::tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent}
 use tauri::{AppHandle, Wry};
 
 use crate::popover;
+use crate::updater;
 
 pub const ID: &str = "main";
 
@@ -57,7 +58,7 @@ pub fn setup(app: &AppHandle) -> tauri::Result<()> {
         .show_menu_on_left_click(false)
         .on_menu_event(|app, event| match event.id().as_ref() {
             "open" => popover::show(app),
-            "quit" => app.exit(0),
+            "quit" => updater::quit(app),
             _ => {}
         })
         .on_tray_icon_event(|tray, event| {

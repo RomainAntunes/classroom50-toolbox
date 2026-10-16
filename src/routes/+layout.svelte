@@ -10,7 +10,9 @@
     NOTIFY_EVENT,
     POPOVER_HIDDEN_EVENT,
     UNSEEN_EVENT,
+    UPDATE_STATE_EVENT,
     type Notice,
+    type UpdateStatus,
   } from "$lib/api";
   import { handleDeepLink } from "$lib/deeplink";
   import { currentLocale, setLocale, t } from "$lib/i18n";
@@ -18,7 +20,7 @@
   import { loadEditors } from "$lib/editor.svelte";
   import { initTheme } from "$lib/theme/preview.svelte";
   import Prompt from "$lib/components/Prompt.svelte";
-  import { announcer } from "$lib/announce.svelte";
+  import { announce, announcer } from "$lib/announce.svelte";
   import { prompt } from "$lib/prompt.svelte";
   import { session } from "$lib/session.svelte";
   import { loadSettings, settings } from "$lib/settings.svelte";
@@ -73,6 +75,16 @@
     void api.setTrayLabels({ open: t("tray.open"), quit: t("tray.quit") });
   });
 
+  // Self-update, for the main page's banner and Settings > About. A screen reader hears
+  // when a download finishes (the system notification comes from Rust's `notify`).
+  function setUpdate(next: UpdateStatus) {
+    const before = session.update?.state.phase;
+    session.update = next;
+    if (next.state.phase === "ready" && before && before !== "ready") {
+      announce(t("update.readyAnnounce", { version: next.state.version }));
+    }
+  }
+
   // Lives in the layout so notices arrive whichever page is shown, and while hidden.
   onMount(() => {
     void loadSettings();
@@ -84,11 +96,14 @@
     void api.unseen().then((ids) => {
       session.unseen = ids;
     });
+    // A popover opened mid-download shows where it stands.
+    void api.updateStatus().then(setUpdate);
     const unlisteners = [
       listen<Notice>(NOTIFY_EVENT, (event) => void showNotice(event.payload)),
       listen<string[]>(UNSEEN_EVENT, (event) => {
         session.unseen = event.payload;
       }),
+      listen<UpdateStatus>(UPDATE_STATE_EVENT, (event) => setUpdate(event.payload)),
       listen(DEEP_LINK_EVENT, () => void handleDeepLink()),
       listen(POPOVER_HIDDEN_EVENT, () => {
         session.focus = null;
