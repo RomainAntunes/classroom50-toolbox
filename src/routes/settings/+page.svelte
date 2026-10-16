@@ -20,8 +20,10 @@
     type SyncDetails,
     type ToolStatus,
   } from "$lib/api";
+  import { writeText } from "@tauri-apps/plugin-clipboard-manager";
   import {
     catalogs,
+    currentLocale,
     formatDate,
     formatNumber,
     fromNow,
@@ -38,6 +40,7 @@
   import Toggle from "$lib/components/Toggle.svelte";
   import ToolRow from "$lib/components/ToolRow.svelte";
   import { session } from "$lib/session.svelte";
+  import { showText } from "$lib/prompt.svelte";
   import { OS_CHOICES, preview, setPreviewOs } from "$lib/theme/preview.svelte";
 
   const REMINDER_CHOICES = [72, 24, 6, 1];
@@ -254,6 +257,36 @@
       await withDialog(() => message(errorMessage(err), { kind: "error" }));
     } finally {
       checking = false;
+    }
+  }
+
+  // Copy diagnostics: built in Rust with names masked, previewed, then copied.
+  let diagnosing = $state(false);
+  let diagnosticsCopied = $state(false);
+  async function copyDiagnostics() {
+    diagnosing = true;
+    diagnosticsCopied = false;
+    try {
+      const report = await api.diagnosticsReport({
+        commit: __COMMIT__ || null,
+        skin: document.documentElement.dataset.os ?? info?.os ?? "",
+        locale: currentLocale(),
+      });
+      diagnosing = false;
+      const copy = await showText({
+        title: t("settings.diagnostics.previewTitle"),
+        message: t("settings.diagnostics.masked"),
+        text: report.text,
+        okLabel: t("settings.diagnostics.copy"),
+      });
+      if (!copy) return;
+      await writeText(report.text);
+      diagnosticsCopied = true;
+      setTimeout(() => (diagnosticsCopied = false), 2500);
+    } catch (err) {
+      await withDialog(() => message(errorMessage(err), { kind: "error" }));
+    } finally {
+      diagnosing = false;
     }
   }
 
@@ -571,6 +604,15 @@
         <span>{t("settings.about.updates")}</span>
         <button disabled={checking} onclick={checkUpdates}>
           {upToDate ? t("settings.about.upToDate") : t("settings.about.checkUpdates")}
+        </button>
+      </div>
+      <div class="row">
+        <span class="text">
+          <span>{t("settings.diagnostics.label")}</span>
+          <span class="sub">{t("settings.diagnostics.hint")}</span>
+        </span>
+        <button disabled={diagnosing} onclick={copyDiagnostics}>
+          {diagnosticsCopied ? t("settings.diagnostics.copied") : t("settings.diagnostics.action")}
         </button>
       </div>
       <div class="row">
