@@ -145,7 +145,7 @@
   }
 
   .link {
-    margin-right: auto;
+    margin-inline-end: auto;
     padding: 0;
     background: transparent;
     color: var(--accent-text);
@@ -169,7 +169,8 @@
 
   .bar > div {
     position: absolute;
-    inset: 0 auto 0 0;
+    inset-block: 0;
+    inset-inline: 0 auto;
     width: 30%;
     border-radius: 2px;
     background: var(--accent);
@@ -195,6 +196,20 @@
     }
     to {
       transform: translateX(340%);
+    }
+  }
+
+  :global(:root[dir="rtl"]) .bar:not(.known) > div {
+    animation-name: slide-rtl;
+  }
+
+  /* Right to left the bar starts at the right edge and slides leftward. */
+  @keyframes slide-rtl {
+    from {
+      transform: translateX(100%);
+    }
+    to {
+      transform: translateX(-340%);
     }
   }
 </style>
