@@ -370,13 +370,23 @@ pub fn update_settings(
     if next.global_shortcut != previous.global_shortcut {
         crate::shortcut::apply(&app, next.global_shortcut.as_deref())?;
     }
-    if next.launch_at_login != previous.launch_at_login {
-        apply_launch_at_login(&app, next.launch_at_login)?;
+    let shortcut_changed = next.global_shortcut != previous.global_shortcut;
+    // Any later failure saves nothing, so the OS gets the saved shortcut back.
+    let restore_shortcut = || {
+        if shortcut_changed {
+            let _ = crate::shortcut::apply(&app, previous.global_shortcut.as_deref());
+        }
+    };
+    if next.launch_at_login != previous.launch_at_login
+        && let Err(err) = apply_launch_at_login(&app, next.launch_at_login)
+    {
+        restore_shortcut();
+        return Err(err);
     }
     let saved = match settings.set(next) {
         Ok(saved) => saved,
         Err(err) => {
-            let _ = crate::shortcut::apply(&app, previous.global_shortcut.as_deref());
+            restore_shortcut();
             return Err(err);
         }
     };
