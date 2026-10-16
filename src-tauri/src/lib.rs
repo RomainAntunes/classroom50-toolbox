@@ -5,6 +5,7 @@ pub mod classroom50;
 pub mod clones;
 mod commands;
 mod deeplink;
+mod diagnostics;
 pub mod discovery;
 pub mod editors;
 pub mod error;
@@ -110,6 +111,7 @@ pub fn run() {
         })
         .invoke_handler(tauri::generate_handler![
             commands::app_info,
+            commands::diagnostics_report,
             commands::set_popover_pinned,
             commands::tool_statuses,
             commands::install_command,

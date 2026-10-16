@@ -188,6 +188,13 @@ pub struct SyncIssue {
     retry_after: Option<DateTime<Utc>>,
 }
 
+impl SyncIssue {
+    /// When GitHub said to try again, on a rate limit.
+    pub fn retry_after(&self) -> Option<DateTime<Utc>> {
+        self.retry_after
+    }
+}
+
 impl From<&Error> for SyncIssue {
     fn from(err: &Error) -> Self {
         Self {
@@ -402,6 +409,28 @@ impl ProjectsState {
 
     fn remote(&self) -> RemoteCache {
         self.remote.lock().map(|r| r.clone()).unwrap_or_default()
+    }
+
+    /// The names the last discovery knew, for the diagnostics report to mask: classroom
+    /// teams, groups, and the repos of a classroom's org or holding a marker file.
+    pub fn discovery_names(&self) -> crate::diagnostics::Discovery {
+        let cache = self.remote();
+        let orgs: HashSet<String> = cache
+            .classrooms
+            .iter()
+            .map(|c| c.org.to_lowercase())
+            .collect();
+        let repos = cache
+            .repos
+            .values()
+            .filter(|r| r.config.is_some() || orgs.contains(&r.owner.to_lowercase()))
+            .map(|r| (r.owner.clone(), r.name.clone(), r.config.clone()))
+            .collect();
+        crate::diagnostics::Discovery {
+            classrooms: cache.classrooms,
+            groups: cache.groups,
+            repos,
+        }
     }
 
     /// A classroom of the user's, as the last full sync read it (name, key, Pages host).
@@ -1432,12 +1461,15 @@ async fn fetch_manifests(
         } else {
             cache.cached_text(&url).ok_or(Error::Offline)
         };
+        // Logged without the key of an unlisted class, which the URL (and a request
+        // error quoting it) holds.
         let manifest = match body {
             Ok(body) => classroom50::parse_assignments(&url, &body)
-                .inspect_err(|err| log::warn!("{err}"))
+                .inspect_err(|err| log::warn!("{}", classroom.hide_key(&err.to_string())))
                 .ok(),
             Err(err) => {
-                log::warn!("could not fetch {url}: {err}");
+                let message = format!("could not fetch {url}: {err}");
+                log::warn!("{}", classroom.hide_key(&message));
                 None
             }
         };

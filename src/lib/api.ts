@@ -13,6 +13,24 @@ export interface AppInfo {
   nativeCalendar: boolean;
 }
 
+/** What the UI tells `diagnostics_report` about itself. */
+export interface DiagnosticsUi {
+  /** `__COMMIT__`. */
+  commit: string | null;
+  /** The `data-os` skin in use. */
+  skin: string;
+  /** The catalog in use. */
+  locale: string;
+}
+
+/** The "Copy diagnostics" report, names already masked. */
+export interface DiagnosticsReport {
+  /** Markdown, for a GitHub issue. */
+  text: string;
+  /** Distinct names, keys, emails and tokens the report held, replaced with placeholders. */
+  masked: number;
+}
+
 /** A calendar of the OS's calendar app the user can write to. */
 export interface NativeCalendar {
   id: string;
@@ -489,6 +507,8 @@ export interface CommandError {
 
 export const api = {
   appInfo: () => invoke<AppInfo>("app_info"),
+  /** A support report with logins, orgs, classes, keys, repos, emails and home paths masked. */
+  diagnosticsReport: (ui: DiagnosticsUi) => invoke<DiagnosticsReport>("diagnostics_report", { ui }),
   /** Dev builds only: lights the tray badge 3 s from now. */
   previewBadge: () => invoke<void>("preview_badge"),
   /** Writes the due dates as an `.ics` file; returns the number of events. */

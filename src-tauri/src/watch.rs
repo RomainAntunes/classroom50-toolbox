@@ -95,13 +95,13 @@ pub fn rewatch(app: &AppHandle, targets: Vec<WatchTarget>) {
                 pushed |= is_remote_ref(&path);
             }
             if pushed {
-                log::info!("remote refs changed in {}; checking GitHub", path.display());
+                log::info!("remote refs changed in {path:?}; checking GitHub");
                 let app = app.clone();
                 tauri::async_runtime::spawn(async move {
                     projects::refresh_after_push(&app).await;
                 });
             } else {
-                log::info!("rescanning after a change in {}", path.display());
+                log::info!("rescanning after a change in {path:?}");
                 projects::refresh_local(&app, false).await;
             }
         }

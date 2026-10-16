@@ -71,7 +71,7 @@ const JETBRAINS_PRODUCTS: &[(&str, Editor)] = &[
 ];
 
 /// Default "new project" folders in the home dir, with the editor that makes them.
-const DEFAULT_ROOTS: &[(&str, Option<Editor>)] = &[
+pub(crate) const DEFAULT_ROOTS: &[(&str, Option<Editor>)] = &[
     ("IdeaProjects", Some(IDEA)),
     ("CLionProjects", Some(CLION)),
     ("PycharmProjects", Some(PYCHARM)),

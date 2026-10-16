@@ -241,11 +241,18 @@ impl DeepLinkState {
 }
 
 /// A link the OS handed over (or the dev field): kept for the UI, which is shown. Invalid
-/// ones are logged, without the link itself past a short prefix, and dropped.
+/// ones are logged by length only, and dropped.
 pub fn handle(app: &AppHandle, url: &str) {
     let Some(link) = parse(url) else {
-        let prefix: String = url.chars().take(40).collect();
-        log::warn!("ignored an invalid link: {prefix:?}");
+        log::warn!(
+            "ignored an invalid link ({} chars{})",
+            url.chars().count(),
+            if url.starts_with(&format!("{SCHEME}:")) {
+                ""
+            } else {
+                ", another scheme"
+            }
+        );
         return;
     };
     let state = app.state::<DeepLinkState>();
@@ -262,16 +269,13 @@ pub fn handle(app: &AppHandle, url: &str) {
     let _ = app.emit(DEEP_LINK_EVENT, ());
 }
 
-/// The link for the log, without the classroom key.
-fn describe(link: &Link) -> String {
+/// The link for the log: its action only. The names it holds may be a class the
+/// diagnostics report doesn't know yet, so they would survive its masking.
+fn describe(link: &Link) -> &'static str {
     match link {
-        Link::Accept {
-            org,
-            classroom,
-            assignment,
-            ..
-        } => format!("accept {org}/{classroom}/{assignment}"),
-        Link::Open { owner, repo } => format!("open {owner}/{repo}"),
+        Link::Accept { key: Some(_), .. } => "accept, with a key",
+        Link::Accept { .. } => "accept",
+        Link::Open { .. } => "open",
     }
 }
 

@@ -230,6 +230,15 @@ impl Classroom {
         )
     }
 
+    /// `text` with this classroom's key, when it has one, replaced by `<key>`: for log
+    /// lines that quote its Pages URL or accept link.
+    pub fn hide_key(&self, text: &str) -> String {
+        match self.secret.as_deref().filter(|s| !s.is_empty()) {
+            Some(secret) => text.replace(secret, "<key>"),
+            None => text.to_owned(),
+        }
+    }
+
     pub fn assignments_url(&self) -> String {
         assignments_url(
             &self.org,
@@ -337,6 +346,25 @@ pub fn parse_assignments(url: &str, json: &str) -> Result<Vec<Assignment>> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn hides_the_key_in_log_lines() {
+        let mut classroom = Classroom::from_config(
+            "cs-school",
+            &RepoConfig {
+                classroom: "cs50".into(),
+                assignment: "hello".into(),
+                secret: Some("s3cr3t".into()),
+            },
+        );
+        let line = format!("could not fetch {}: 404", classroom.assignments_url());
+        assert_eq!(
+            classroom.hide_key(&line),
+            "could not fetch https://cs-school.github.io/classroom50/cs50/<key>/assignments.json: 404"
+        );
+        classroom.secret = None;
+        assert_eq!(classroom.hide_key("s3cr3t"), "s3cr3t");
+    }
 
     #[test]
     fn checks_slugs_and_secrets_like_the_schemas() {
