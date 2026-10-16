@@ -27,6 +27,7 @@
     formatDate,
     formatNumber,
     fromNow,
+    hasKey,
     hoursLabel,
     languageName,
     t,
@@ -98,6 +99,21 @@
     }
   }
 
+  // Worded per kind; anything else (a D-Bus call that failed on Linux) adds the details.
+  async function calendarError(err: unknown) {
+    const key = `calendar.error.${(err as { kind?: string }).kind}`;
+    const text = hasKey(key) ? t(key) : `${t("calendar.error.fallback")}\n\n${errorMessage(err)}`;
+    await withDialog(() => message(text, { kind: "error" }));
+  }
+
+  /** "Classroom 50 (GNOME Calendar)" on Linux, "Work (iCloud)" on macOS. */
+  function calendarLabel(calendar: NativeCalendar): string {
+    const account = calendar.kind
+      ? t(`settings.calendar.store.${calendar.kind}`)
+      : calendar.account;
+    return account ? `${calendar.title} (${account})` : calendar.title;
+  }
+
   let calendars = $state<NativeCalendar[]>([]);
   let writing = $state(false);
   const chosenCalendar = $derived(
@@ -109,14 +125,7 @@
     try {
       settings.current = await api.setNativeCalendar(id);
     } catch (err) {
-      await withDialog(() =>
-        message(
-          t(`calendar.error.${(err as { kind?: string }).kind}`, {}, "calendar.error.fallback"),
-          {
-            kind: "error",
-          },
-        ),
-      );
+      await calendarError(err);
     } finally {
       writing = false;
     }
@@ -126,21 +135,14 @@
     try {
       calendars = await api.nativeCalendars();
     } catch (err) {
-      await withDialog(() =>
-        message(
-          t(`calendar.error.${(err as { kind?: string }).kind}`, {}, "calendar.error.fallback"),
-          {
-            kind: "error",
-          },
-        ),
-      );
+      await calendarError(err);
       return;
     }
     const current = settings.current?.nativeCalendar ?? null;
     const items: (MenuItem | PredefinedMenuItem)[] = await Promise.all(
       calendars.map((calendar) =>
         MenuItem.new({
-          text: calendar.account ? `${calendar.title} (${calendar.account})` : calendar.title,
+          text: calendarLabel(calendar),
           enabled: calendar.id !== current,
           action: () => setNativeCalendar(calendar.id),
         }),
@@ -444,7 +446,9 @@
             <span class="sub"
               >{current.nativeCalendar
                 ? t("settings.calendar.syncing", {
-                    calendar: chosenCalendar?.title ?? t("settings.calendar.unknown"),
+                    calendar: chosenCalendar
+                      ? calendarLabel(chosenCalendar)
+                      : t("settings.calendar.unknown"),
                   })
                 : t("settings.calendar.appHint")}</span
             >

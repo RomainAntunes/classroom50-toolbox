@@ -71,6 +71,7 @@ pub fn native_calendars(ask: bool) -> Result<Vec<NativeCalendar>> {
             account: unsafe { c.source() }
                 .map(|s| unsafe { s.title() }.to_string())
                 .unwrap_or_default(),
+            kind: None,
         })
         .collect();
     list.sort_by(|a, b| (&a.account, &a.title).cmp(&(&b.account, &b.title)));
@@ -119,6 +120,7 @@ pub fn write_calendar(
     calendar_id: &str,
     events: &[CalendarEvent],
     written: &mut WrittenEvents,
+    _dir: &std::path::Path,
 ) -> Result<()> {
     let store = store(false)?;
     let calendar = if events.is_empty() {

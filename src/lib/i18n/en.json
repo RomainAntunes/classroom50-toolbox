@@ -72,7 +72,10 @@
   "settings.calendar.choose": "Choose...",
   "settings.calendar.change": "Change...",
   "settings.calendar.stopSync": "Stop and remove the due dates",
+  "settings.calendar.store.gnome": "GNOME Calendar",
+  "settings.calendar.store.kde": "KDE calendar",
   "calendar.error.calendarAccess": "The toolbox isn't allowed to use your calendars. Allow it in System Settings > Privacy & Security > Calendars.",
+  "calendar.error.calendarUnavailable": "Your calendar service didn't respond. Open your calendar app once, then try again.",
   "calendar.error.fallback": "Couldn't update the calendar.",
   "calendar.notes.class": "Class: {name}",
   "calendar.notes.group": "Group: {name}",
@@ -467,5 +470,6 @@
   "error.notSignedIn": "not signed in to GitHub",
   "error.tokenFromEnv": "the GitHub CLI is using the {var} environment variable; unset it to sign in here",
   "error.offline": "can't reach GitHub",
-  "error.calendarAccess": "calendar access isn't allowed"
+  "error.calendarAccess": "calendar access isn't allowed",
+  "error.calendarUnavailable": "the calendar service isn't responding"
 }

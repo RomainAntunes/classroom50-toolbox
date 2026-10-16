@@ -6,6 +6,7 @@
 use std::hash::{Hash, Hasher};
 use std::path::{Path, PathBuf};
 use std::sync::Mutex;
+use std::sync::atomic::{AtomicBool, Ordering};
 
 use chrono::{DateTime, Utc};
 use tauri::{AppHandle, Manager};
@@ -220,6 +221,11 @@ pub fn ics(
     now: DateTime<Utc>,
 ) -> (String, usize) {
     let events = events(snapshot, hidden, hidden_classes, reminder_hours, labels);
+    (ics_for_events(&events, now), events.len())
+}
+
+/// The iCalendar text of `events`, stamped `now`.
+pub fn ics_for_events(events: &[CalendarEvent], now: DateTime<Utc>) -> String {
     let mut out = String::new();
     line(&mut out, "BEGIN:VCALENDAR");
     line(&mut out, "VERSION:2.0");
@@ -227,7 +233,7 @@ pub fn ics(
     line(&mut out, "CALSCALE:GREGORIAN");
     line(&mut out, "METHOD:PUBLISH");
     let stamp = utc(now);
-    for event in &events {
+    for event in events {
         let (start, due) = (utc(event.start), utc(event.due));
         line(&mut out, "BEGIN:VEVENT");
         line(
@@ -256,7 +262,7 @@ pub fn ics(
         line(&mut out, "END:VEVENT");
     }
     line(&mut out, "END:VCALENDAR");
-    (out, events.len())
+    out
 }
 
 /// Writes the calendar of `snapshot` to `path`; returns the number of events.
@@ -285,12 +291,18 @@ fn for_settings(snapshot: &Snapshot, settings: &Settings, labels: &Labels) -> (S
 /// The events written into the OS calendar, persisted so later syncs update them in place.
 pub struct CalendarState {
     path: PathBuf,
+    /// The app data dir, for a file the OS calendar reads (Linux).
+    data_dir: PathBuf,
     written: Mutex<WrittenEvents>,
     labels: Mutex<Labels>,
+    /// A background write is running (`sync`); another sync then only asks it to go again
+    /// (`again`), so writes behind a slow calendar (Akonadi starting) never pile up.
+    busy: AtomicBool,
+    again: AtomicBool,
 }
 
 impl CalendarState {
-    pub fn load(config_dir: &Path) -> Self {
+    pub fn load(config_dir: &Path, data_dir: &Path) -> Self {
         let path = config_dir.join(WRITTEN_FILE);
         let written = std::fs::read_to_string(&path)
             .ok()
@@ -298,8 +310,11 @@ impl CalendarState {
             .unwrap_or_default();
         Self {
             path,
+            data_dir: data_dir.to_owned(),
             written: Mutex::new(written),
             labels: Mutex::default(),
+            busy: AtomicBool::new(false),
+            again: AtomicBool::new(false),
         }
     }
 
@@ -349,9 +364,9 @@ pub async fn write_native(app: &AppHandle, calendar_id: Option<String>) -> Resul
                     &settings.notify_hours_before,
                     &state.labels(),
                 );
-                platform::write_calendar(&id, &events, &mut written)
+                platform::write_calendar(&id, &events, &mut written, &state.data_dir)
             }
-            None => platform::clear_calendar(&mut written),
+            None => platform::clear_calendar(&mut written, &state.data_dir),
         };
         state.save(&written);
         result
@@ -366,13 +381,33 @@ pub async fn write_native(app: &AppHandle, calendar_id: Option<String>) -> Resul
 pub fn sync(app: &AppHandle) {
     let settings = app.state::<SettingsStore>().get();
     let snapshot = app.state::<ProjectsState>().snapshot();
-    if let Some(id) = settings.native_calendar.clone() {
-        let app = app.clone();
-        tauri::async_runtime::spawn(async move {
-            if let Err(err) = write_native(&app, Some(id)).await {
-                log::warn!("could not update the calendar: {err}");
-            }
-        });
+    if settings.native_calendar.is_some() {
+        let state = app.state::<CalendarState>();
+        state.again.store(true, Ordering::SeqCst);
+        if !state.busy.swap(true, Ordering::SeqCst) {
+            let app = app.clone();
+            tauri::async_runtime::spawn(async move {
+                let state = app.state::<CalendarState>();
+                loop {
+                    while state.again.swap(false, Ordering::SeqCst) {
+                        // Read again each round: the setting may have changed meanwhile.
+                        let Some(id) = app.state::<SettingsStore>().get().native_calendar else {
+                            break;
+                        };
+                        if let Err(err) = write_native(&app, Some(id)).await {
+                            log::warn!("could not update the calendar: {err}");
+                        }
+                    }
+                    state.busy.store(false, Ordering::SeqCst);
+                    // A sync that came in between the last check and now.
+                    if !state.again.load(Ordering::SeqCst)
+                        || state.busy.swap(true, Ordering::SeqCst)
+                    {
+                        break;
+                    }
+                }
+            });
+        }
     }
     if let Some(path) = &settings.calendar_file {
         let labels = app.state::<CalendarState>().labels();

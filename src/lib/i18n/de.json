@@ -72,7 +72,10 @@
   "settings.calendar.choose": "Auswählen...",
   "settings.calendar.change": "Ändern...",
   "settings.calendar.stopSync": "Beenden und Abgabetermine entfernen",
+  "settings.calendar.store.gnome": "GNOME Kalender",
+  "settings.calendar.store.kde": "KDE-Kalender",
   "calendar.error.calendarAccess": "Die Toolbox darf deine Kalender nicht verwenden. Erlaube es unter Systemeinstellungen > Datenschutz & Sicherheit > Kalender.",
+  "calendar.error.calendarUnavailable": "Dein Kalenderdienst hat nicht geantwortet. Öffne deine Kalender-App einmal und versuche es dann erneut.",
   "calendar.error.fallback": "Der Kalender konnte nicht aktualisiert werden.",
   "calendar.notes.class": "Kurs: {name}",
   "calendar.notes.group": "Gruppe: {name}",
@@ -467,5 +470,6 @@
   "error.notSignedIn": "nicht bei GitHub angemeldet",
   "error.tokenFromEnv": "die GitHub CLI verwendet die Umgebungsvariable {var}; entferne sie, um dich hier anzumelden",
   "error.offline": "GitHub ist nicht erreichbar",
-  "error.calendarAccess": "der Kalenderzugriff ist nicht erlaubt"
+  "error.calendarAccess": "der Kalenderzugriff ist nicht erlaubt",
+  "error.calendarUnavailable": "der Kalenderdienst antwortet nicht"
 }

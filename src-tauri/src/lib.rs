@@ -94,7 +94,10 @@ pub fn run() {
             }
             app.manage(settings);
             app.manage(clones::CloneStore::load(&app.path().app_config_dir()?));
-            app.manage(calendar::CalendarState::load(&app.path().app_config_dir()?));
+            app.manage(calendar::CalendarState::load(
+                &app.path().app_config_dir()?,
+                &app.path().app_data_dir()?,
+            ));
             let cache_dir = app.path().app_cache_dir()?;
             app.manage(projects::ProjectsState::load(&cache_dir));
             app.manage(alerts::AlertsState::load(&cache_dir));

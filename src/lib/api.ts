@@ -9,7 +9,7 @@ export type Tool = "git" | "gh" | "gh-student";
 export interface AppInfo {
   os: Os;
   version: string;
-  /** The OS has a calendar store the app can write into (macOS). */
+  /** The OS has a calendar store the app can write into (macOS; Linux with GNOME's or KDE's). */
   nativeCalendar: boolean;
 }
 
@@ -37,6 +37,8 @@ export interface NativeCalendar {
   title: string;
   /** The account holding it (iCloud, Google, On My Mac...). */
   account: string;
+  /** Linux: the store, worded by the UI (`settings.calendar.store.<kind>`) instead of `account`. */
+  kind?: "gnome" | "kde";
 }
 
 export interface ToolStatus {

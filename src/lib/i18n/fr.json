@@ -73,7 +73,10 @@
   "settings.calendar.choose": "Choisir...",
   "settings.calendar.change": "Changer...",
   "settings.calendar.stopSync": "Arrêter et retirer les échéances",
+  "settings.calendar.store.gnome": "Agenda GNOME",
+  "settings.calendar.store.kde": "Agenda KDE",
   "calendar.error.calendarAccess": "La toolbox n'a pas accès à vos calendriers. Autorisez-la dans Réglages Système > Confidentialité et sécurité > Calendriers.",
+  "calendar.error.calendarUnavailable": "Votre service de calendrier n'a pas répondu. Ouvrez une fois votre app de calendrier, puis réessayez.",
   "calendar.error.fallback": "Impossible de mettre à jour le calendrier.",
   "calendar.notes.class": "Cours : {name}",
   "calendar.notes.group": "Groupe : {name}",
@@ -484,5 +487,6 @@
   "error.notSignedIn": "non connecté à GitHub",
   "error.tokenFromEnv": "GitHub CLI utilise la variable d'environnement {var} ; retirez-la pour vous connecter ici",
   "error.offline": "impossible de joindre GitHub",
-  "error.calendarAccess": "l'accès au calendrier n'est pas autorisé"
+  "error.calendarAccess": "l'accès au calendrier n'est pas autorisé",
+  "error.calendarUnavailable": "le service de calendrier ne répond pas"
 }
