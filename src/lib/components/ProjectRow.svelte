@@ -132,18 +132,9 @@
   const commitActions = $derived(settings.current?.commitActions ?? "none");
   const everyPush = $derived(gradedOnPush(project));
   const offersPush = $derived(everyPush && commitActions === "push");
+  // No row button: the row shows where the work stands and the student picks Commit or
+  // Commit & push from the menu, which explains a refusal.
   const pushable = $derived(submittable && offersPush);
-  // The button only shows when it can work: GitHub's data known, work to send on the default
-  // branch, and GitHub has nothing the clone lacks. The menu always offers it and explains a
-  // refusal.
-  const pushReady = $derived(
-    pushable &&
-      Boolean(project.remote) &&
-      project.local?.branch === defaultBranch &&
-      (project.local.changedFiles > 0 || (project.local.ahead ?? 0) > 0) &&
-      behind === 0 &&
-      !project.local.remoteAhead,
-  );
 
   // GitHub has commits the clone lacks. The button only shows when a fast-forward can work;
   // the menu always offers it and explains a refusal.
@@ -474,11 +465,7 @@
         >{t("projects.pullAction")}</button
       >
     {/if}
-    {#if pushReady}
-      <button class="primary" title={t("push.hint")} disabled={busy} onclick={push}
-        >{t("push.ok")}</button
-      >
-    {:else if ready && !everyPush}
+    {#if ready && !everyPush}
       <button class="primary" disabled={submitting} onclick={submit}>{t("submit.ok")}</button>
     {/if}
     {#if cloneable}

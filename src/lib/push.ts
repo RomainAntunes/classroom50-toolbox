@@ -55,7 +55,7 @@ async function setIdentity(project: Project, name: string): Promise<boolean> {
   return true;
 }
 
-/** Commit & push (row button, menu): pushing is the main action, "Commit only" the second. */
+/** Commit & push (the menu): pushing is the main action, "Commit only" the second. */
 export function commitPush(
   project: Project,
   name: string,

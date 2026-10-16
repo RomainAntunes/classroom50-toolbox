@@ -244,7 +244,6 @@
   "push.ok": "Commit et push",
   "push.pushOk": "Push",
   "push.pushing": "Push en cours…",
-  "push.hint": "Faites un commit de vos modifications et poussez-les sur GitHub, où chaque push est noté.",
   "push.title": "Commit et push",
   "push.placeholder": "Qu'avez-vous modifié ?",
   "push.files.one": "{count} fichier modifié : {files}.",

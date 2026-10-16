@@ -240,7 +240,6 @@
   "push.ok": "Commit & Push",
   "push.pushOk": "Push",
   "push.pushing": "Wird gepusht…",
-  "push.hint": "Committe deine Änderungen und pushe sie zu GitHub, wo jeder Push bewertet wird.",
   "push.title": "Commit & Push",
   "push.placeholder": "Was hast du geändert?",
   "push.files.one": "{count} geänderte Datei: {files}.",
