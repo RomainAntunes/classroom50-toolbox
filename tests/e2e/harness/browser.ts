@@ -166,6 +166,8 @@ export function install(scenario: Scenario): E2E {
         return state.tools;
       case "tool_jobs":
         return [];
+      case "tool_update":
+        return null;
       case "install_command":
         return {
           program: "brew",
