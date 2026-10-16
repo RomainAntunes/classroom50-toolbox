@@ -1,0 +1,8 @@
+blank_issues_enabled: true
+contact_links:
+  - name: Report a security vulnerability
+    url: https://github.com/RomainAntunes/classroom50-toolbox/security/advisories/new
+    about: Report it privately, never in a public issue.
+  - name: A problem with gh student or Classroom 50 itself
+    url: https://github.com/foundation50/classroom50/issues
+    about: When gh student fails the same way in a terminal, or the problem is in the Classroom 50 web app.

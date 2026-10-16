@@ -1,0 +1,29 @@
+name: Feature request
+description: Suggest something the toolbox could do for students.
+labels: [enhancement]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        The toolbox is for students. Teacher and TA tooling (creating classrooms, grading, closing submissions) stays in the Classroom 50 web app and `gh teacher`.
+  - type: textarea
+    id: problem
+    attributes:
+      label: What problem would it solve?
+      description: What you're trying to do, and what gets in the way today.
+    validations:
+      required: true
+  - type: textarea
+    id: solution
+    attributes:
+      label: What would you like to happen?
+      description: How it could work in the app.
+    validations:
+      required: false
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: What do you do today instead?
+      description: A workaround, a command in the terminal, another tool.
+    validations:
+      required: false
