@@ -166,6 +166,12 @@ export function install(scenario: Scenario): E2E {
         return state.tools;
       case "tool_jobs":
         return [];
+      case "install_command":
+        return {
+          program: "brew",
+          args: ["install", args.tool],
+          manual: `brew install ${args.tool}`,
+        };
       case "auth_status":
         return state.auth;
       case "list_projects":
