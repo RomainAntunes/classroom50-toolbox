@@ -47,12 +47,12 @@ export function cloneTarget(parent: string, repo: string): string {
 
 /**
  * Asks before cloning into `<cloneFolder>/<repo>`: Clone, Choose another folder… (picked and
- * remembered) or Cancel. With no clone folder yet the folder picker is the question, after the
- * caller's own question when it has one. Resolves to the parent folder, or null when
- * cancelled.
+ * remembered) or Cancel. With no clone folder yet the folder picker comes first, then this
+ * question naming the destination; a caller's own question (already a yes to cloning) is
+ * asked before the picker instead. Resolves to the parent folder, or null when cancelled.
  */
 async function askParent(repo: string, question?: CloneQuestion): Promise<string | null> {
-  const saved = await cloneFolder();
+  let saved = await cloneFolder();
   if (!saved) {
     if (question) {
       const yes = await withDialog(() =>
@@ -64,8 +64,10 @@ async function askParent(repo: string, question?: CloneQuestion): Promise<string
         }),
       );
       if (!yes) return null;
+      return pickCloneFolder();
     }
-    return pickCloneFolder();
+    saved = await pickCloneFolder();
+    if (!saved) return null;
   }
   const target = tildify(cloneTarget(saved, repo));
   const yes = t("projects.clone");
