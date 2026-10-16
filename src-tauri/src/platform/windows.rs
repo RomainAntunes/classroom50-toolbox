@@ -7,6 +7,19 @@ use crate::tools::Tool;
 
 pub const OS: Os = Os::Windows;
 
+pub fn os_version() -> Option<String> {
+    use windows_registry::LOCAL_MACHINE;
+    let key = LOCAL_MACHINE
+        .open(r"SOFTWARE\Microsoft\Windows NT\CurrentVersion")
+        .ok()?;
+    let display = key.get_string("DisplayVersion").ok();
+    let build = key.get_string("CurrentBuildNumber").ok();
+    Some(super::os_version::windows(
+        display.as_deref(),
+        build.as_deref(),
+    ))
+}
+
 /// Where gh and git may be when the PATH the app started with doesn't list them. An
 /// installer writes the new folder to PATH in the registry, which an already-running
 /// process (or one started by an Explorer that missed the change) never sees, so PATH is

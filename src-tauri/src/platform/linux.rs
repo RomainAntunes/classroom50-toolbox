@@ -7,6 +7,13 @@ use crate::tools::Tool;
 
 pub const OS: Os = Os::Linux;
 
+pub fn os_version() -> Option<String> {
+    ["/etc/os-release", "/usr/lib/os-release"]
+        .iter()
+        .find_map(|path| std::fs::read_to_string(path).ok())
+        .and_then(|text| super::os_version::linux(&text))
+}
+
 pub fn extra_path_dirs() -> Vec<PathBuf> {
     let mut dirs = vec![
         PathBuf::from("/usr/local/bin"),
