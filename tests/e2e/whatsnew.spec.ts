@@ -13,6 +13,8 @@ const NOTES = readdirSync(DIR)
   .map((file) => file.slice(0, -".json".length))
   .sort((a, b) => compareVersions(b, a));
 const NEWEST = NOTES[0];
+/** The version before the newest, so only the newest notes are unread. */
+const BEFORE = NOTES[1] ?? "0.9.0";
 const FIRST_ENTRY: string = JSON.parse(readFileSync(new URL(`${NEWEST}.json`, DIR), "utf8")).notes
   .en[0].text;
 const at = (version: string) => ({
@@ -28,7 +30,7 @@ test("after an update the notes show once, and Got it records them as read", asy
 }) => {
   await app.start(
     scenario({
-      settings: settings({ lastSeenVersion: "0.9.0" }),
+      settings: settings({ lastSeenVersion: BEFORE }),
       appInfo: at(NEWEST),
     }),
   );
@@ -105,7 +107,7 @@ test("a link being handled goes before the notes", async ({ app, page }) => {
   };
   await app.start(
     scenario({
-      settings: settings({ lastSeenVersion: "0.9.0" }),
+      settings: settings({ lastSeenVersion: BEFORE }),
       appInfo: at(NEWEST),
       deepLink: unlisted,
     }),
@@ -113,7 +115,7 @@ test("a link being handled goes before the notes", async ({ app, page }) => {
   await app.expectDialog([/Open the assignment lab9/], "cancel");
   await expect(page).not.toHaveURL(/whats-new/);
   // The notes stay unread: they come back once the popover reopens.
-  expect((await app.settings()).lastSeenVersion).toBe("0.9.0");
+  expect((await app.settings()).lastSeenVersion).toBe(BEFORE);
   await app.emit("popover-hidden", null);
   await expect(page).toHaveURL(/\/whats-new$/);
 });
