@@ -27,9 +27,16 @@
   --fg-muted: rgb(0 0 0 / 0.62);
   --accent: #007aff;
   --accent-fg: #fff;
+  /* The accent as text (links, counts), where it needs 4.5:1 on the card; a skin whose
+     button blue is too dark or too light for that sets its own. */
+  --accent-text: var(--accent);
+  /* Status colors are text first (due soon, late, a full grade), so each is dark enough
+     for 4.5:1 on the card and the window, not the paler native fill. */
   --danger: #d70015;
-  --warning: #c27c00;
-  --success: #248a3d;
+  --warning: #9b6300;
+  --success: #217f38;
+  /* The keyboard focus ring: 3:1 against every surface it sits on. */
+  --focus-ring: var(--accent);
 
   color-scheme: light dark;
 }
@@ -41,9 +48,10 @@
     --bg-control-hover: rgb(255 255 255 / 0.14);
     --border: rgb(255 255 255 / 0.1);
     --fg: rgb(255 255 255 / 0.9);
-    --fg-muted: rgb(255 255 255 / 0.5);
+    /* macOS's own secondary label; 50% fell under 4.5:1 on the cards. */
+    --fg-muted: rgb(255 255 255 / 0.55);
     --accent: #0a84ff;
-    --danger: #ff453a;
+    --danger: #ff7b63;
     --warning: #ffb340;
     --success: #32d74b;
   }
@@ -56,6 +64,7 @@
   --radius-window: 12px;
   --radius-control: 6px;
   --radius-card: 10px;
+  /* The user's own accent, unchanged: the native look wins over 4.5:1 for accent text. */
   --accent: AccentColor;
 }
 
@@ -75,6 +84,9 @@
   --radius-card: 8px;
   --accent: #005fb8;
   --bg-card: rgb(255 255 255 / 0.78);
+  /* Fluent's caution and success text colors. */
+  --warning: #9d5d00;
+  --success: #0f7b0f;
 }
 
 /* Mica's light base (#f3f3f3), laid over the backdrop so text keeps its contrast whatever
@@ -90,6 +102,8 @@
     --accent: #60cdff;
     --accent-fg: #000;
     --bg-card: rgb(255 255 255 / 0.05);
+    --warning: #ffb340;
+    --success: #32d74b;
   }
 }
 
@@ -104,7 +118,12 @@
   --bg-card: #ffffff;
   --border: rgb(0 0 6 / 0.07);
   --fg: rgb(0 0 6 / 0.8);
-  --accent: #3584e4;
+  /* libadwaita's darker blue (its accent as text), so white labels on suggested buttons
+     reach 4.5:1; warning and success are libadwaita's text colors, a shade darker. */
+  --accent: #1c71d8;
+  --danger: #c01c28;
+  --warning: #966a03;
+  --success: #1a8251;
 }
 
 @media (prefers-color-scheme: dark) {
@@ -115,6 +134,9 @@
     --fg: #ffffff;
     --accent: #78aeed;
     --accent-fg: #000;
+    --danger: #ff7b63;
+    --warning: #ffb340;
+    --success: #32d74b;
   }
 }
 
@@ -186,9 +208,23 @@ button.icon svg {
   stroke-linejoin: round;
 }
 
-button:focus-visible {
-  outline: 2px solid var(--accent);
+/* Every focusable element shows where the keyboard is; components only move the offset. */
+:focus-visible {
+  outline: 2px solid var(--focus-ring);
   outline-offset: 1px;
+}
+
+/* Read by screen readers, not shown: what a color, an icon or a symbol says on screen. */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+  border: 0;
 }
 
 /* Thin and quiet, like the JetBrains Toolbox: a 4px rounded thumb on no track, inset from
@@ -214,9 +250,17 @@ button:focus-visible {
   background-color: color-mix(in srgb, var(--fg) 40%, transparent);
 }
 
+/* Reduced motion: nothing slides, spins, pulses or scrolls smoothly. Progress bars that
+   only move while they don't know how far along they are stand still at full width,
+   faded (`.indeterminate`). Svelte transitions, should any be added, take `duration()`
+   from `src/lib/motion.ts`. */
 @media (prefers-reduced-motion: reduce) {
-  * {
-    transition: none !important;
+  *,
+  *::before,
+  *::after {
+    transition-duration: 0s !important;
+    transition-delay: 0s !important;
     animation: none !important;
+    scroll-behavior: auto !important;
   }
 }

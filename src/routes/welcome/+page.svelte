@@ -4,6 +4,7 @@
   import { goto } from "$app/navigation";
   import { api, type AuthStatus, type ToolStatus } from "$lib/api";
   import { t } from "$lib/i18n";
+  import { announce } from "$lib/announce.svelte";
   import { chooseDefaultEditor, defaultEditor, editors, loadEditors } from "$lib/editor.svelte";
   import { pickCloneFolder } from "$lib/clone";
   import { loadSettings, saveSettings, settings } from "$lib/settings.svelte";
@@ -17,6 +18,7 @@
   // skipped; Settings has all of it later.
   const STEPS = ["welcome", "tools", "account", "folders"] as const;
   let step = $state(0);
+  let primary = $state<HTMLButtonElement | null>(null);
   const current = $derived(settings.current);
   const editor = $derived(current ? defaultEditor() : null);
   const ghInstalled = $derived(session.tools.some((tool) => tool.tool === "gh" && tool.installed));
@@ -28,6 +30,14 @@
 
   async function signedIn(next: AuthStatus) {
     session.auth = next;
+  }
+
+  /** Moves to another step and says so, since the focus stays on the buttons. */
+  function go(next: number) {
+    step = next;
+    announce(t("welcome.step", { step: next + 1, total: STEPS.length }));
+    // Back vanishes on the first step; the main button takes the focus it had.
+    if (next === 0) primary?.focus();
   }
 
   async function finish() {
@@ -48,6 +58,7 @@
 </script>
 
 <header class="titlebar">
+  <!-- The first step's title is the page heading; later steps keep it up here. -->
   {#if step > 0}<h1>{t("welcome.title")}</h1>{:else}<span></span>{/if}
   <button class="skip" onclick={finish}>{t("welcome.skip")}</button>
 </header>
@@ -56,7 +67,7 @@
   {#if STEPS[step] === "welcome"}
     <section class="hero">
       <img class="hero-logo" src={logo} alt="" />
-      <h2>{t("welcome.title")}</h2>
+      <h1 class="hero-title">{t("welcome.title")}</h1>
       <p class="lead">{t("welcome.lead")}</p>
     </section>
     <ul class="points">
@@ -118,7 +129,11 @@
           >
         </span>
         {#if editor}
-          <button onclick={chooseDefaultEditor}>{editor.name}</button>
+          <button
+            aria-haspopup="menu"
+            aria-label={`${t("settings.editor.label")}: ${editor.name}`}
+            onclick={(event) => chooseDefaultEditor(event.currentTarget)}>{editor.name}</button
+          >
         {/if}
       </div>
       <Toggle
@@ -137,17 +152,18 @@
       <span class:active={i === step}></span>
     {/each}
   </div>
+  <!-- One button for Get started, Next and Done, so the focus stays on it. -->
   <div class="nav">
     {#if step > 0}
-      <button onclick={() => (step -= 1)}>{t("welcome.back")}</button>
+      <button onclick={() => go(step - 1)}>{t("welcome.back")}</button>
     {/if}
-    {#if step < STEPS.length - 1}
-      <button class="primary" onclick={() => (step += 1)}>
-        {t(step === 0 ? "welcome.start" : "welcome.next")}
-      </button>
-    {:else}
-      <button class="primary" onclick={finish}>{t("welcome.done")}</button>
-    {/if}
+    <button
+      class="primary"
+      bind:this={primary}
+      onclick={() => (step < STEPS.length - 1 ? go(step + 1) : finish())}
+    >
+      {t(step === 0 ? "welcome.start" : step < STEPS.length - 1 ? "welcome.next" : "welcome.done")}
+    </button>
   </div>
 </footer>
 
@@ -195,10 +211,8 @@
     margin-bottom: 4px;
   }
 
-  h2 {
-    margin: 0;
+  .hero-title {
     font-size: 1.2em;
-    font-weight: 600;
   }
 
   .lead {

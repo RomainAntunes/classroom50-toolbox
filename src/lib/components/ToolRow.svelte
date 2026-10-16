@@ -10,6 +10,7 @@
     type ToolStatus,
   } from "$lib/api";
   import { hasKey, t } from "$lib/i18n";
+  import { announce } from "$lib/announce.svelte";
   import { session } from "$lib/session.svelte";
   import { toolJobs, watchToolJobs } from "$lib/toolJobs.svelte";
 
@@ -101,6 +102,7 @@
     starting = "upgrade";
     try {
       onchange(await api.upgradeTool(status.tool));
+      announce(t("a11y.toolUpdated", { tool: t(`setup.tool.${status.tool}`) }));
     } catch (err) {
       await failed(err, "setup.updateFailed", "gh extension upgrade gh-student");
     } finally {
@@ -116,6 +118,7 @@
     try {
       // gh-student depends on gh, so every row gets its fresh status.
       for (const next of await api.installTool(status.tool)) onchange(next);
+      announce(t("a11y.toolInstalled", { tool: t(`setup.tool.${status.tool}`) }));
     } catch (err) {
       const plan = await api.installCommand(status.tool).catch(() => null);
       await failed(err, "setup.installFailed", plan?.manual ?? null);
@@ -131,8 +134,12 @@
 
 <div class="tool">
   <div class="row">
-    <span class="dot" class:ok={status.installed && !status.outdated}></span>
-    <span class="name">{t(`setup.tool.${status.tool}`)}</span>
+    <span class="dot" class:ok={status.installed && !status.outdated} aria-hidden="true"></span>
+    <span class="name"
+      >{t(`setup.tool.${status.tool}`)}{#if !status.outdated}<span class="sr-only"
+          >, {t(status.installed ? "setup.installed" : "setup.notInstalled")}</span
+        >{/if}</span
+    >
     {#if status.installed}
       <span
         class="meta"
@@ -171,6 +178,8 @@
       class:known={job?.progress != null}
       role="progressbar"
       aria-label={t(upgrading ? "setup.updating" : "setup.installing")}
+      aria-valuemin="0"
+      aria-valuemax="100"
       aria-valuenow={job?.progress != null ? Math.round(job.progress * 100) : undefined}
     >
       <div style:width={job?.progress != null ? `${job.progress * 100}%` : undefined}></div>
@@ -196,7 +205,7 @@
   }
 
   .meta.update {
-    color: var(--accent);
+    color: var(--accent-text);
   }
 
   .meta.outdated {
@@ -227,6 +236,13 @@
     height: 100%;
     background: var(--accent);
     animation: slide 1.2s ease-in-out infinite;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .progress:not(.known) > div {
+      width: 100%;
+      opacity: 0.4;
+    }
   }
 
   .progress.known > div {

@@ -1,12 +1,14 @@
 <script lang="ts">
   import type { Snippet } from "svelte";
   import { t } from "$lib/i18n";
+  import { menuKey, onContextMenu } from "$lib/keyboard";
 
   let {
     title,
     actions,
     children,
     collapsed = false,
+    list = false,
     ontoggle,
     onmenu,
     note,
@@ -15,10 +17,13 @@
     actions?: Snippet;
     children: Snippet;
     collapsed?: boolean;
+    /** The rows are list items (`<li>`), announced as a list. */
+    list?: boolean;
     /** Makes the title fold and unfold the section. */
     ontoggle?: () => void;
-    /** Adds a "..." button (and the title's context menu) opening a menu. */
-    onmenu?: (event: MouseEvent) => void;
+    /** Adds a "..." button (and the title's context menu) opening a menu, under `anchor`
+     *  when given, else at the pointer. */
+    onmenu?: (anchor?: HTMLElement) => void;
     /** Shown after the title, muted (a count while folded, "Hidden"). */
     note?: string;
   } = $props();
@@ -26,26 +31,34 @@
 
 <section>
   <header>
-    {#if ontoggle}
-      <button class="title" aria-expanded={!collapsed} onclick={ontoggle} oncontextmenu={onmenu}>
-        <svg class:open={!collapsed} viewBox="0 0 24 24" aria-hidden="true"
-          ><path d="m9 18 6-6-6-6" /></svg
+    <!-- The fold button sits inside the heading, so the heading stays one for screen readers. -->
+    <h2>
+      {#if ontoggle}
+        <button
+          class="title"
+          aria-expanded={!collapsed}
+          onclick={ontoggle}
+          oncontextmenu={onmenu && onContextMenu(() => onmenu())}
+          onkeydown={onmenu && menuKey(onmenu)}
         >
-        <h2>{title}</h2>
-        {#if note}<span class="note">{note}</span>{/if}
-      </button>
-    {:else}
-      <h2>
-        {title}{#if note}<span class="note">{note}</span>{/if}
-      </h2>
-    {/if}
+          <svg class:open={!collapsed} viewBox="0 0 24 24" aria-hidden="true"
+            ><path d="m9 18 6-6-6-6" /></svg
+          >
+          <span class="label">{title}</span>
+          {#if note}<span class="note">{note}</span>{/if}
+        </button>
+      {:else}
+        <span class="label">{title}</span>{#if note}<span class="note">{note}</span>{/if}
+      {/if}
+    </h2>
     {@render actions?.()}
     {#if onmenu}
       <button
         class="more"
-        aria-label={t("section.more")}
-        title={t("section.more")}
-        onclick={onmenu}
+        aria-label={t("section.more", { title })}
+        aria-haspopup="menu"
+        title={t("section.more", { title })}
+        onclick={(event) => onmenu(event.currentTarget)}
       >
         <svg viewBox="0 0 24 24" aria-hidden="true">
           <circle cx="5" cy="12" r="1.6" /><circle cx="12" cy="12" r="1.6" /><circle
@@ -58,9 +71,17 @@
     {/if}
   </header>
   {#if !collapsed}
-    <div class="card">
-      {@render children()}
-    </div>
+    {#if list}
+      <!-- An explicit role: WebKit drops the list semantics of a list without bullets. -->
+      <!-- svelte-ignore a11y_no_redundant_roles -->
+      <ul class="card" role="list">
+        {@render children()}
+      </ul>
+    {:else}
+      <div class="card">
+        {@render children()}
+      </div>
+    {/if}
   {/if}
 </section>
 
@@ -80,7 +101,15 @@
   }
 
   h2 {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    align-items: baseline;
     margin: 0;
+    font: inherit;
+  }
+
+  .label {
     font-size: 0.85em;
     font-weight: 600;
     color: var(--fg-muted);
@@ -91,10 +120,14 @@
 
   .note {
     margin-left: 6px;
-    font-size: 0.85em;
+    font-size: 0.72em;
     font-weight: 400;
     color: var(--fg-muted);
     white-space: nowrap;
+  }
+
+  .title .note {
+    font-size: 0.85em;
   }
 
   .title {
@@ -156,6 +189,8 @@
   }
 
   .card {
+    margin: 0;
+    padding: 0;
     background: var(--bg-card);
     border: 1px solid var(--border);
     border-radius: var(--radius-card);

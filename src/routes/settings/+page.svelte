@@ -40,6 +40,7 @@
   import Section from "$lib/components/Section.svelte";
   import Toggle from "$lib/components/Toggle.svelte";
   import ToolRow from "$lib/components/ToolRow.svelte";
+  import { popupMenu } from "$lib/keyboard";
   import { session } from "$lib/session.svelte";
   import { showText } from "$lib/prompt.svelte";
   import { OS_CHOICES, preview, setPreviewOs } from "$lib/theme/preview.svelte";
@@ -144,7 +145,7 @@
     }
   }
 
-  async function chooseCalendar() {
+  async function chooseCalendar(anchor: HTMLElement) {
     try {
       calendars = await api.nativeCalendars();
     } catch (err) {
@@ -171,7 +172,7 @@
       );
     }
     const menu = await Menu.new({ items });
-    await withDialog(() => menu.popup());
+    await popupMenu(menu, anchor);
   }
 
   let checkingTools = $state(false);
@@ -199,7 +200,7 @@
   }
 
   /** "System", then each catalog named in its own language, as a native menu. */
-  async function chooseLanguage() {
+  async function chooseLanguage(anchor: HTMLElement) {
     const chosen = settings.current?.language ?? "system";
     const codes = ["system", ...Object.keys(catalogs)];
     const items = await Promise.all(
@@ -212,11 +213,11 @@
       ),
     );
     const menu = await Menu.new({ items });
-    await withDialog(() => menu.popup());
+    await popupMenu(menu, anchor);
   }
 
   /** Off, Commit or Commit & push, as a native menu. */
-  async function chooseCommitActions() {
+  async function chooseCommitActions(anchor: HTMLElement) {
     const chosen = settings.current?.commitActions ?? "none";
     const items = await Promise.all(
       COMMIT_ACTIONS.map((choice) =>
@@ -228,7 +229,7 @@
       ),
     );
     const menu = await Menu.new({ items });
-    await withDialog(() => menu.popup());
+    await popupMenu(menu, anchor);
   }
 
   async function clearCache() {
@@ -386,7 +387,11 @@
           >
         </span>
         {#if editor}
-          <button onclick={chooseDefaultEditor}>{editor.name}</button>
+          <button
+            aria-haspopup="menu"
+            aria-label={`${t("settings.editor.label")}: ${editor.name}`}
+            onclick={(event) => chooseDefaultEditor(event.currentTarget)}>{editor.name}</button
+          >
         {/if}
       </div>
       <div class="row">
@@ -394,7 +399,10 @@
           <span>{t("settings.commitActions")}</span>
           <span class="sub">{t(`settings.commitActions.${current.commitActions}Hint`)}</span>
         </span>
-        <button onclick={chooseCommitActions}
+        <button
+          aria-haspopup="menu"
+          aria-label={`${t("settings.commitActions")}: ${t(`settings.commitActions.${current.commitActions}`)}`}
+          onclick={(event) => chooseCommitActions(event.currentTarget)}
           >{t(`settings.commitActions.${current.commitActions}`)}</button
         >
       </div>
@@ -415,8 +423,8 @@
         </div>
       {/if}
       <div class="row">
-        <span>{t("settings.appearance")}</span>
-        <div class="segmented">
+        <span id="appearance-label">{t("settings.appearance")}</span>
+        <div class="segmented" role="group" aria-labelledby="appearance-label">
           {#each APPEARANCES as choice (choice)}
             <button
               aria-pressed={current.appearance === choice}
@@ -428,7 +436,14 @@
       </div>
       <div class="row">
         <span>{t("settings.language")}</span>
-        <button onclick={chooseLanguage}
+        <button
+          aria-haspopup="menu"
+          aria-label={`${t("settings.language")}: ${
+            current.language === "system"
+              ? t("settings.language.system")
+              : languageName(current.language)
+          }`}
+          onclick={(event) => chooseLanguage(event.currentTarget)}
           >{current.language === "system"
             ? t("settings.language.system")
             : languageName(current.language)}</button
@@ -466,7 +481,10 @@
                 : t("settings.calendar.appHint")}</span
             >
           </span>
-          <button disabled={writing} onclick={chooseCalendar}
+          <button
+            disabled={writing}
+            aria-haspopup="menu"
+            onclick={(event) => chooseCalendar(event.currentTarget)}
             >{t(
               current.nativeCalendar ? "settings.calendar.change" : "settings.calendar.choose",
             )}</button
@@ -561,8 +579,8 @@
     {#if import.meta.env.DEV}
       <Section title={t("settings.dev.title")}>
         <div class="row">
-          <span title={t("settings.dev.skinHint")}>{t("settings.dev.skin")}</span>
-          <div class="segmented">
+          <span id="skin-label" title={t("settings.dev.skinHint")}>{t("settings.dev.skin")}</span>
+          <div class="segmented" role="group" aria-labelledby="skin-label">
             {#each OS_CHOICES as os (os)}
               <button aria-pressed={preview.os === os} onclick={() => setPreviewOs(os)}
                 >{t(`settings.dev.os.${os}`)}</button
@@ -571,8 +589,10 @@
           </div>
         </div>
         <div class="row">
-          <span title={t("settings.dev.networkHint")}>{t("settings.dev.network")}</span>
-          <div class="segmented">
+          <span id="network-label" title={t("settings.dev.networkHint")}
+            >{t("settings.dev.network")}</span
+          >
+          <div class="segmented" role="group" aria-labelledby="network-label">
             {#each SIMULATED_NETWORKS as choice (choice)}
               <button aria-pressed={network === choice} onclick={() => simulateNetwork(choice)}
                 >{t(`settings.dev.network.${choice}`)}</button
@@ -683,7 +703,8 @@
   }
 
   .dev-link:focus-visible {
-    border-color: var(--accent);
+    border-color: var(--focus-ring);
+    box-shadow: 0 0 0 1px var(--focus-ring);
   }
 
   .titlebar {

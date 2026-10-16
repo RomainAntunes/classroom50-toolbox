@@ -16,6 +16,8 @@
   import { loadEditors } from "$lib/editor.svelte";
   import { initTheme } from "$lib/theme/preview.svelte";
   import Prompt from "$lib/components/Prompt.svelte";
+  import { announcer } from "$lib/announce.svelte";
+  import { prompt } from "$lib/prompt.svelte";
   import { session } from "$lib/session.svelte";
   import { loadSettings, settings } from "$lib/settings.svelte";
 
@@ -28,6 +30,21 @@
     if (!target?.closest("input, textarea, [contenteditable]")) {
       event.preventDefault();
     }
+  }
+
+  // Escape closes what is open, innermost first: the prompt and a row's details handle it
+  // (and mark it handled); with nothing left to close it hides the popover, like a click
+  // outside. A text field with text clears it first; a switch or checkbox (whose `value`
+  // is "on") doesn't count.
+  const TEXT_INPUTS = ["text", "search", "email", "url", "tel", "password", "number"];
+  function onKeyDown(event: KeyboardEvent) {
+    if (event.key !== "Escape" || event.defaultPrevented || prompt.current) return;
+    const target = event.target;
+    if (target instanceof HTMLInputElement && TEXT_INPUTS.includes(target.type) && target.value) {
+      return;
+    }
+    event.preventDefault();
+    void api.hidePopover();
   }
 
   // The `language` setting, live: `t` is reactive, so the whole UI follows at once.
@@ -83,11 +100,12 @@
   });
 </script>
 
-<svelte:document oncontextmenu={onContextMenu} />
+<svelte:document oncontextmenu={onContextMenu} onkeydown={onKeyDown} />
 
 <div class="popover">
   {@render children()}
   <Prompt />
+  <div class="sr-only" role="status">{announcer.text}</div>
 </div>
 
 <style>

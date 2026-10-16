@@ -19,6 +19,8 @@
     type AuthStatus,
     type DeviceCode,
   } from "$lib/api";
+  import { announce } from "$lib/announce.svelte";
+  import { popupMenu } from "$lib/keyboard";
   import { session } from "$lib/session.svelte";
   import { t } from "$lib/i18n";
 
@@ -123,6 +125,7 @@
   /** Native menu (arrow keys and Enter work): the accounts, then "Add another account". */
   async function showAccounts(event: MouseEvent) {
     event.preventDefault();
+    const anchor = event.currentTarget as HTMLElement;
     const accounts = await api.listAccounts().catch(() => []);
     const envToken = auth?.envToken;
     // A token from the environment overrides gh's accounts: switching, adding or signing
@@ -156,7 +159,7 @@
           ],
     );
     const menu = await Menu.new({ items });
-    await withDialog(() => menu.popup());
+    await popupMenu(menu, anchor);
   }
 
   async function switchTo(next: string, active: boolean) {
@@ -210,6 +213,7 @@
     const unlisteners = [
       listen<DeviceCode>(DEVICE_CODE_EVENT, (event) => {
         device = event.payload;
+        announce(`${t("auth.waiting")} ${event.payload.code}`);
       }),
       // Also resets a view that didn't start the sign-in (e.g. after a reload).
       listen(LOGIN_ENDED_EVENT, () => {
@@ -262,7 +266,7 @@
       <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6" /></svg>
     </button>
     {#if error}
-      <p class="error">{error}</p>
+      <p class="error" role="alert">{error}</p>
     {/if}
   </div>
 {:else if auth}
@@ -273,7 +277,7 @@
     </button>
   </div>
   {#if error}
-    <p class="error">{error}</p>
+    <p class="error" role="alert">{error}</p>
   {/if}
 {/if}
 

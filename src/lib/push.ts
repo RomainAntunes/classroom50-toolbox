@@ -5,6 +5,7 @@
 import { ask, message } from "@tauri-apps/plugin-dialog";
 import { api, errorKind, errorMessage, withDialog, type Project } from "$lib/api";
 import { t } from "$lib/i18n";
+import { announce } from "$lib/announce.svelte";
 import { askTextAction } from "$lib/prompt.svelte";
 import { fileList } from "$lib/files";
 
@@ -129,9 +130,11 @@ async function commitWork(
       }
       onChoice?.(true);
       await api.commitPush(project.id, answer.text);
+      announce(t("a11y.pushed", { name }));
     } else {
       onChoice?.(false);
       await api.commitOnly(project.id, answer.text);
+      announce(t("a11y.committed", { name }));
     }
     return true;
   } catch (err) {
@@ -158,6 +161,7 @@ async function pushOnly(
   if (!(await confirm(lines.join("\n\n"), name, t("push.pushOk")))) return false;
   onChoice?.(true);
   await api.commitPush(project.id, null);
+  announce(t("a11y.pushed", { name }));
   return true;
 }
 

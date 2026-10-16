@@ -103,6 +103,12 @@ pub fn set_popover_pinned(state: State<'_, PopoverState>, pinned: bool) {
     state.set_pinned(pinned);
 }
 
+/// Hides the popover, as a click outside it would (Escape with nothing else to close).
+#[tauri::command]
+pub fn hide_popover(app: AppHandle) {
+    popover::hide(&app);
+}
+
 #[tauri::command]
 pub async fn tool_statuses() -> Vec<ToolStatus> {
     tools::statuses().await

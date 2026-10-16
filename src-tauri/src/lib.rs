@@ -116,6 +116,7 @@ pub fn run() {
             commands::app_info,
             commands::diagnostics_report,
             commands::set_popover_pinned,
+            commands::hide_popover,
             commands::tool_statuses,
             commands::install_command,
             commands::install_tool,
