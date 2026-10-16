@@ -4,11 +4,15 @@
 
   let value = $state("");
   let input = $state<HTMLInputElement | null>(null);
+  let pre = $state<HTMLPreElement | null>(null);
+  // A read-only preview (`showText`) has no input; its main action is always available.
+  const preview = $derived(prompt.current?.text !== undefined);
+  const ready = $derived(preview || value.trim() !== "");
 
   $effect(() => {
     if (prompt.current) {
       value = "";
-      input?.focus();
+      (input ?? pre)?.focus();
     }
   });
 
@@ -34,19 +38,24 @@
       <form
         onsubmit={(event) => {
           event.preventDefault();
-          close(value);
+          if (ready) close(preview ? "ok" : value);
         }}
       >
         <h2 id="prompt-title">{current.title}</h2>
         {#if current.message}<p>{current.message}</p>{/if}
-        <input
-          bind:this={input}
-          bind:value
-          placeholder={current.placeholder}
-          autocomplete="off"
-          autocapitalize="off"
-          spellcheck="false"
-        />
+        {#if current.text !== undefined}
+          <!-- svelte-ignore a11y_no_noninteractive_tabindex -->
+          <pre bind:this={pre} tabindex="0">{current.text}</pre>
+        {:else}
+          <input
+            bind:this={input}
+            bind:value
+            placeholder={current.placeholder}
+            autocomplete="off"
+            autocapitalize="off"
+            spellcheck="false"
+          />
+        {/if}
         <div class="buttons">
           <button type="button" onclick={() => close(null)}>{t("prompt.cancel")}</button>
           {#if current.altLabel}
@@ -54,7 +63,7 @@
               >{current.altLabel}</button
             >
           {/if}
-          <button type="submit" class="primary" disabled={!value.trim()}>{current.okLabel}</button>
+          <button type="submit" class="primary" disabled={!ready}>{current.okLabel}</button>
         </div>
       </form>
     </div>
@@ -119,6 +128,27 @@
   }
 
   input:focus-visible {
+    border-color: var(--accent);
+  }
+
+  pre {
+    margin: 0;
+    max-height: 240px;
+    overflow: auto;
+    padding: 8px;
+    font-family: var(--font-mono);
+    font-size: 0.8em;
+    line-height: 1.4;
+    white-space: pre;
+    user-select: text;
+    -webkit-user-select: text;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-control);
+    background: var(--bg-control);
+    outline: none;
+  }
+
+  pre:focus-visible {
     border-color: var(--accent);
   }
 

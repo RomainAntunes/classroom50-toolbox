@@ -8,6 +8,8 @@ export interface PromptOptions {
   okLabel: string;
   /** A second action next to the main one (`askTextAction` only). */
   altLabel?: string;
+  /** Read-only text shown instead of the input (`showText` only). */
+  text?: string;
 }
 
 export const prompt = $state<{
@@ -36,4 +38,20 @@ export function askTextAction(
 export async function askText(options: PromptOptions): Promise<string | null> {
   const answer = await askTextAction({ ...options, altLabel: undefined });
   return answer?.text ?? null;
+}
+
+/** Shows read-only text (monospace, scrollable) with Cancel and `okLabel`; resolves to
+ *  whether the main action was chosen. */
+export function showText(options: PromptOptions & { text: string }): Promise<boolean> {
+  prompt.current?.resolve(null);
+  return new Promise((resolve) => {
+    prompt.current = {
+      ...options,
+      altLabel: undefined,
+      resolve: (value) => {
+        prompt.current = null;
+        resolve(value !== null);
+      },
+    };
+  });
 }
