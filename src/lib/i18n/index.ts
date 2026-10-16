@@ -67,20 +67,27 @@ export function currentDirection(): Direction {
   return locale.rtlPreview ? "rtl" : textDirection(locale.code);
 }
 
+// A bare number (a count, a score, `12.5%`): left alone, so `{score}/{max}` stays one
+// European-number run that reads "8/10" right to left; isolating each half made it "10/8".
+const NUMBER = /^[+-]?\d+(?:[.,]\d+)*%?$/;
+
 /**
  * `template` with each `{name}` replaced by `params.name`; an unknown one stays visible.
- * In a right-to-left UI each value is isolated (`isolate`), since it is usually data (a
- * login, repo, path, branch or URL) that the sentence around it would otherwise reorder.
+ * In a right-to-left UI each text value is isolated (`isolate`), since it is usually data
+ * (a login, repo, path, branch or URL) that the sentence around it would otherwise
+ * reorder; a bare number isn't (`NUMBER`). A value holding more than a number (`"7/10"`)
+ * is isolated whole, as one left-to-right unit.
  */
 export function fill(
   template: string,
   params: Record<string, string | number>,
   direction: Direction = "ltr",
 ): string {
-  const wrap = direction === "rtl" ? isolate : String;
-  return template.replace(/\{(\w+)\}/g, (match, name: string) =>
-    name in params ? wrap(String(params[name])) : match,
-  );
+  return template.replace(/\{(\w+)\}/g, (match, name: string) => {
+    if (!(name in params)) return match;
+    const value = String(params[name]);
+    return direction === "rtl" && !NUMBER.test(value) ? isolate(value) : value;
+  });
 }
 
 /**

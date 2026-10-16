@@ -45,7 +45,20 @@ describe("fill", () => {
     expect(fill("افتح في {editor} {missing}", { editor: "VS Code" }, "rtl")).toBe(
       `افتح في ${FSI}VS Code${PDI} {missing}`,
     );
-    expect(fill("{a}/{b}", { a: 3, b: 4 }, "rtl")).toBe(`${FSI}3${PDI}/${FSI}4${PDI}`);
+  });
+
+  it("leaves bare numbers alone right to left, so a score stays one number run", () => {
+    expect(fill("الدرجة: {score}/{max}", { score: 8, max: 10 }, "rtl")).toBe("الدرجة: 8/10");
+    expect(fill("{score}/{max}", { score: "8", max: "10" }, "rtl")).toBe("8/10");
+    for (const value of [0, -3, 12.5, "1,5", "75%", "2.50.1"]) {
+      expect(fill("{n}", { n: value }, "rtl"), String(value)).toBe(String(value));
+    }
+  });
+
+  it("isolates a value holding more than a number as one unit", () => {
+    expect(fill("{score} · {tests}", { score: "7/10", tests: "v1.4.0" }, "rtl")).toBe(
+      `${FSI}7/10${PDI} · ${FSI}v1.4.0${PDI}`,
+    );
   });
 
   it("lets a placeholder pass through for Rust to fill, isolated when right to left", () => {

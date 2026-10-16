@@ -66,14 +66,15 @@
   });
 
   // Rust writes calendar notes and the tray menu with these words (placeholders filled
-  // there, so they pass through `t` as themselves: isolated in a right-to-left language);
-  // sent again when the language changes.
+  // there; names pass through `t` as themselves, so they are isolated in a right-to-left
+  // language, numbers stay bare as `fill` leaves them); sent again when the language
+  // changes.
   $effect(() => {
     void api.setCalendarLabels({
       class: t("calendar.notes.class", { name: "{name}" }),
       group: t("calendar.notes.group", { name: "{name}" }),
-      groupNumber: t("calendar.notes.groupNumber", { n: "{n}" }),
-      graded: t("calendar.notes.graded", { score: "{score}", max: "{max}" }),
+      groupNumber: t("calendar.notes.groupNumber"),
+      graded: t("calendar.notes.graded"),
       submitted: t("calendar.notes.submitted"),
       notAccepted: t("calendar.notes.notAccepted"),
     });
