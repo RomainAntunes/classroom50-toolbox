@@ -6,6 +6,17 @@ import en from "./en.json";
 import fr from "./fr.json";
 import es from "./es.json";
 import de from "./de.json";
+import it from "./it.json";
+import ptBR from "./pt-BR.json";
+import ptPT from "./pt-PT.json";
+import nl from "./nl.json";
+import pl from "./pl.json";
+import tr from "./tr.json";
+import ar from "./ar.json";
+import he from "./he.json";
+import zhHans from "./zh-Hans.json";
+import ja from "./ja.json";
+import ko from "./ko.json";
 import { isolate, textDirection, type Direction } from "./direction";
 import { locale } from "./locale.svelte";
 
@@ -13,8 +24,27 @@ export { isolate, textDirection, type Direction } from "./direction";
 
 type Catalog = Record<string, string>;
 
-/** Every catalog, by BCP 47 code. Adding a language: import its JSON and list it here. */
-export const catalogs: Record<string, Catalog> = { en, fr, es, de };
+/**
+ * Every catalog, by BCP 47 code, in the order the language menu lists them. Adding a
+ * language: import its JSON and list it here.
+ */
+export const catalogs: Record<string, Catalog> = {
+  en,
+  fr,
+  es,
+  de,
+  it,
+  "pt-BR": ptBR,
+  "pt-PT": ptPT,
+  nl,
+  pl,
+  tr,
+  ar,
+  he,
+  "zh-Hans": zhHans,
+  ja,
+  ko,
+};
 const fallback = "en";
 
 /** The language each catalog is written in, named in itself ("English", "Français"). */
@@ -38,10 +68,36 @@ export function resolveLocale(
   for (const raw of wanted) {
     // POSIX spellings too: `fr_CH.UTF-8@euro`.
     const tag = raw.split(/[.@]/)[0].replace(/_/g, "-").toLowerCase();
-    const match = find(tag) ?? find(tag.split("-")[0]);
-    if (match) return match;
+    for (const candidate of [tag, tag.split("-")[0], ...aliases(tag)]) {
+      const match = find(candidate);
+      if (match) return match;
+    }
   }
   return fallback;
+}
+
+// Portuguese outside Brazil follows Portugal's norm (Africa, Timor-Leste, Macau).
+const EUROPEAN_PORTUGUESE = new Set(["ao", "mz", "cv", "gw", "st", "tl", "mo", "gq", "lu", "ch"]);
+// Chinese written in Traditional characters, which the Simplified catalog doesn't serve.
+const TRADITIONAL_CHINESE = new Set(["tw", "hk", "mo"]);
+
+/**
+ * Catalogs a lowercased tag stands for when neither its exact name nor its base language has one: a Portuguese region to
+ * `pt-PT` or `pt-BR`, Simplified Chinese (`zh`, `zh-CN`, `zh-Hans-SG`) to `zh-Hans` but not
+ * Traditional (`zh-TW`, `zh-Hant`, which go on to the next preferred language), and Hebrew's
+ * old code `iw` to `he`.
+ */
+function aliases(tag: string): string[] {
+  const [language, ...rest] = tag.split("-");
+  const script = rest.find((part) => part.length === 4);
+  const region = rest.find((part) => part.length === 2 || /^\d{3}$/.test(part));
+  if (language === "pt") return [EUROPEAN_PORTUGUESE.has(region ?? "") ? "pt-pt" : "pt-br"];
+  if (language === "zh") {
+    const traditional = script === "hant" || (!script && TRADITIONAL_CHINESE.has(region ?? ""));
+    return traditional ? [] : ["zh-hans"];
+  }
+  if (language === "iw") return ["he"];
+  return [];
 }
 
 // Plural rules per catalog, built on first use.

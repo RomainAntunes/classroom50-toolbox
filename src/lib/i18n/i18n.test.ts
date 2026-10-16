@@ -70,16 +70,11 @@ describe("plurals", () => {
 });
 
 describe("locales", () => {
-  afterEach(() => {
-    delete catalogs["pt-BR"];
-  });
-
   it("resolves the system language to the best catalog, else English", () => {
-    catalogs["pt-BR"] = { "language.name": "Português (Brasil)" };
     expect(resolveLocale("system", ["fr-CH", "en"])).toBe("fr");
-    expect(resolveLocale("system", ["it-IT", "FR"])).toBe("fr");
+    expect(resolveLocale("system", ["sv-SE", "FR"])).toBe("fr");
     expect(resolveLocale("system", ["pt-br"])).toBe("pt-BR");
-    expect(resolveLocale("system", ["it", "ja"])).toBe("en");
+    expect(resolveLocale("system", ["sv", "fi"])).toBe("en");
     expect(resolveLocale("system", [])).toBe("en");
     expect(resolveLocale("fr", ["en"])).toBe("fr");
     expect(resolveLocale("xx", ["fr"])).toBe("en");
@@ -102,8 +97,27 @@ describe("locales", () => {
   });
 
   it("only offers registered catalogs", () => {
-    expect(resolveLocale("system", ["pt-PT", "it"])).toBe("en");
-    expect(resolveLocale("ja")).toBe("en");
+    expect(resolveLocale("system", ["pt-PT", "it"], ["en", "fr"])).toBe("en");
+    expect(resolveLocale("ja", [], ["en", "fr"])).toBe("en");
+    expect(resolveLocale("sv")).toBe("en");
+  });
+
+  it("maps regions and scripts to the catalog that serves them", () => {
+    const pick = (...preferred: string[]) => resolveLocale("system", preferred);
+    expect(pick("pt")).toBe("pt-BR");
+    expect(pick("pt-BR")).toBe("pt-BR");
+    expect(pick("pt-PT")).toBe("pt-PT");
+    expect(pick("pt-AO")).toBe("pt-PT");
+    expect(pick("pt_MZ.UTF-8")).toBe("pt-PT");
+    expect(pick("zh")).toBe("zh-Hans");
+    expect(pick("zh-CN")).toBe("zh-Hans");
+    expect(pick("zh-Hans-SG")).toBe("zh-Hans");
+    // Traditional Chinese readers get their next language, not Simplified.
+    expect(pick("zh-TW", "ja")).toBe("ja");
+    expect(pick("zh-Hant-HK")).toBe("en");
+    expect(pick("iw-IL")).toBe("he");
+    expect(pick("ar-EG")).toBe("ar");
+    expect(pick("ko-KR")).toBe("ko");
   });
 
   it("formats numbers in the UI's language", () => {
@@ -118,6 +132,9 @@ describe("locales", () => {
     expect(languageName("fr")).toBe("Français");
     expect(languageName("es")).toBe("Español");
     expect(languageName("de")).toBe("Deutsch");
+    for (const code of Object.keys(catalogs)) {
+      expect(languageName(code), code).not.toBe(code);
+    }
   });
 });
 
