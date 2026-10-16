@@ -12,4 +12,6 @@ export default defineConfig({
   retries: 0,
   reporter: [["list"]],
   use: { ...base.use, trace: "off", screenshot: "off" },
+  // The production build only; the suite's dev-build project matches its own specs.
+  projects: base.projects?.filter((project) => project.name === "webkit"),
 });
