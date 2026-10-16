@@ -1,0 +1,515 @@
+{
+  "date": "2026-10-16",
+  "notes": {
+    "en": [
+      {
+        "kind": "new",
+        "text": "Updates download on their own with a progress bar, then ask before restarting. The app looks for one at every start and once a day."
+      },
+      {
+        "kind": "new",
+        "text": "Try new versions early: pick the Beta channel in Settings."
+      },
+      {
+        "kind": "new",
+        "text": "After an update, this page shows what changed, in your language."
+      },
+      {
+        "kind": "new",
+        "text": "Open or hide the window from any app with a keyboard shortcut you choose in Settings."
+      },
+      {
+        "kind": "new",
+        "text": "The app now speaks Portuguese (Brazil and Portugal), Italian, Dutch, Polish, Turkish, Chinese, Japanese, Korean, Arabic and Hebrew."
+      },
+      {
+        "kind": "improved",
+        "text": "Arabic and Hebrew read right to left, and names, paths and test output stay readable inside them."
+      },
+      {
+        "kind": "fixed",
+        "text": "The window opens next to the tray icon even before your first click on it."
+      },
+      {
+        "kind": "fixed",
+        "text": "Shortened folder paths keep their leading slash in place."
+      }
+    ],
+    "fr": [
+      {
+        "kind": "new",
+        "text": "Les mises à jour se téléchargent seules avec une barre de progression, puis demandent avant de redémarrer. L'app en cherche une à chaque démarrage et une fois par jour."
+      },
+      {
+        "kind": "new",
+        "text": "Essayez les nouvelles versions en avance : choisissez le canal Bêta dans les réglages."
+      },
+      {
+        "kind": "new",
+        "text": "Après une mise à jour, cette page montre ce qui a changé, dans votre langue."
+      },
+      {
+        "kind": "new",
+        "text": "Ouvrez ou masquez la fenêtre depuis n'importe quelle app avec un raccourci clavier choisi dans les réglages."
+      },
+      {
+        "kind": "new",
+        "text": "L'app parle maintenant portugais (Brésil et Portugal), italien, néerlandais, polonais, turc, chinois, japonais, coréen, arabe et hébreu."
+      },
+      {
+        "kind": "improved",
+        "text": "L'arabe et l'hébreu se lisent de droite à gauche, et les noms, chemins et sorties de tests y restent lisibles."
+      },
+      {
+        "kind": "fixed",
+        "text": "La fenêtre s'ouvre à côté de l'icône de l'app, même avant votre premier clic dessus."
+      },
+      {
+        "kind": "fixed",
+        "text": "Les chemins de dossiers raccourcis gardent leur barre oblique initiale à sa place."
+      }
+    ],
+    "es": [
+      {
+        "kind": "new",
+        "text": "Las actualizaciones se descargan solas con una barra de progreso y preguntan antes de reiniciar. La app busca una en cada inicio y una vez al día."
+      },
+      {
+        "kind": "new",
+        "text": "Prueba las versiones nuevas antes: elige el canal Beta en Ajustes."
+      },
+      {
+        "kind": "new",
+        "text": "Después de una actualización, esta página muestra qué cambió, en tu idioma."
+      },
+      {
+        "kind": "new",
+        "text": "Abre u oculta la ventana desde cualquier app con un atajo de teclado que eliges en Ajustes."
+      },
+      {
+        "kind": "new",
+        "text": "La app ahora habla portugués (Brasil y Portugal), italiano, neerlandés, polaco, turco, chino, japonés, coreano, árabe y hebreo."
+      },
+      {
+        "kind": "improved",
+        "text": "El árabe y el hebreo se leen de derecha a izquierda, y los nombres, rutas y salidas de las pruebas siguen siendo legibles dentro de ellos."
+      },
+      {
+        "kind": "fixed",
+        "text": "La ventana se abre junto al icono de la app incluso antes de tu primer clic en él."
+      },
+      {
+        "kind": "fixed",
+        "text": "Las rutas de carpetas acortadas mantienen su barra inicial en su sitio."
+      }
+    ],
+    "de": [
+      {
+        "kind": "new",
+        "text": "Updates laden sich selbst mit einem Fortschrittsbalken herunter und fragen vor dem Neustart. Die App sucht bei jedem Start und einmal am Tag danach."
+      },
+      {
+        "kind": "new",
+        "text": "Probiere neue Versionen früher aus: Wähle in den Einstellungen den Beta-Kanal."
+      },
+      {
+        "kind": "new",
+        "text": "Nach einem Update zeigt diese Seite, was sich geändert hat, in deiner Sprache."
+      },
+      {
+        "kind": "new",
+        "text": "Öffne oder verstecke das Fenster aus jeder App mit einem Tastenkürzel, das du in den Einstellungen wählst."
+      },
+      {
+        "kind": "new",
+        "text": "Die App spricht jetzt Portugiesisch (Brasilien und Portugal), Italienisch, Niederländisch, Polnisch, Türkisch, Chinesisch, Japanisch, Koreanisch, Arabisch und Hebräisch."
+      },
+      {
+        "kind": "improved",
+        "text": "Arabisch und Hebräisch laufen von rechts nach links, und Namen, Pfade und Testausgaben bleiben darin lesbar."
+      },
+      {
+        "kind": "fixed",
+        "text": "Das Fenster öffnet sich neben dem Symbol der App, auch schon vor deinem ersten Klick darauf."
+      },
+      {
+        "kind": "fixed",
+        "text": "Gekürzte Ordnerpfade behalten ihren führenden Schrägstrich an der richtigen Stelle."
+      }
+    ],
+    "it": [
+      {
+        "kind": "new",
+        "text": "Gli aggiornamenti si scaricano da soli con una barra di avanzamento, poi chiedono prima di riavviare. L'app ne cerca uno a ogni avvio e una volta al giorno."
+      },
+      {
+        "kind": "new",
+        "text": "Prova le nuove versioni in anticipo: scegli il canale Beta nelle Impostazioni."
+      },
+      {
+        "kind": "new",
+        "text": "Dopo un aggiornamento, questa pagina mostra cosa è cambiato, nella tua lingua."
+      },
+      {
+        "kind": "new",
+        "text": "Apri o nascondi la finestra da qualsiasi app con una scorciatoia da tastiera che scegli nelle Impostazioni."
+      },
+      {
+        "kind": "new",
+        "text": "L'app ora parla portoghese (Brasile e Portogallo), italiano, olandese, polacco, turco, cinese, giapponese, coreano, arabo ed ebraico."
+      },
+      {
+        "kind": "improved",
+        "text": "L'arabo e l'ebraico si leggono da destra a sinistra, e nomi, percorsi e output dei test restano leggibili al loro interno."
+      },
+      {
+        "kind": "fixed",
+        "text": "La finestra si apre accanto all'icona dell'app anche prima del tuo primo clic su di essa."
+      },
+      {
+        "kind": "fixed",
+        "text": "I percorsi delle cartelle accorciati tengono la barra iniziale al suo posto."
+      }
+    ],
+    "pt-BR": [
+      {
+        "kind": "new",
+        "text": "As atualizações são baixadas sozinhas com uma barra de progresso e perguntam antes de reiniciar. O app procura uma a cada início e uma vez por dia."
+      },
+      {
+        "kind": "new",
+        "text": "Experimente as novas versões antes: escolha o canal Beta nas Configurações."
+      },
+      {
+        "kind": "new",
+        "text": "Depois de uma atualização, esta página mostra o que mudou, no seu idioma."
+      },
+      {
+        "kind": "new",
+        "text": "Abra ou esconda a janela de qualquer app com um atalho de teclado que você escolhe nas Configurações."
+      },
+      {
+        "kind": "new",
+        "text": "O app agora fala português (Brasil e Portugal), italiano, holandês, polonês, turco, chinês, japonês, coreano, árabe e hebraico."
+      },
+      {
+        "kind": "improved",
+        "text": "Árabe e hebraico são lidos da direita para a esquerda, e nomes, caminhos e saídas dos testes continuam legíveis dentro deles."
+      },
+      {
+        "kind": "fixed",
+        "text": "A janela abre ao lado do ícone do app mesmo antes do seu primeiro clique nele."
+      },
+      {
+        "kind": "fixed",
+        "text": "Caminhos de pastas encurtados mantêm a barra inicial no lugar certo."
+      }
+    ],
+    "pt-PT": [
+      {
+        "kind": "new",
+        "text": "As atualizações são transferidas sozinhas com uma barra de progresso e perguntam antes de reiniciar. A app procura uma em cada arranque e uma vez por dia."
+      },
+      {
+        "kind": "new",
+        "text": "Experimenta as novas versões mais cedo: escolhe o canal Beta nas Definições."
+      },
+      {
+        "kind": "new",
+        "text": "Depois de uma atualização, esta página mostra o que mudou, no teu idioma."
+      },
+      {
+        "kind": "new",
+        "text": "Abre ou oculta a janela a partir de qualquer app com um atalho de teclado que escolhes nas Definições."
+      },
+      {
+        "kind": "new",
+        "text": "A app agora fala português (Brasil e Portugal), italiano, neerlandês, polaco, turco, chinês, japonês, coreano, árabe e hebraico."
+      },
+      {
+        "kind": "improved",
+        "text": "O árabe e o hebraico leem-se da direita para a esquerda, e os nomes, caminhos e resultados dos testes continuam legíveis dentro deles."
+      },
+      {
+        "kind": "fixed",
+        "text": "A janela abre ao lado do ícone da app mesmo antes do teu primeiro clique nele."
+      },
+      {
+        "kind": "fixed",
+        "text": "Os caminhos de pastas encurtados mantêm a barra inicial no sítio certo."
+      }
+    ],
+    "nl": [
+      {
+        "kind": "new",
+        "text": "Updates downloaden vanzelf met een voortgangsbalk en vragen het eerst voordat de app herstart. De app zoekt er een bij elke start en één keer per dag."
+      },
+      {
+        "kind": "new",
+        "text": "Probeer nieuwe versies eerder uit: kies het Bèta-kanaal in Instellingen."
+      },
+      {
+        "kind": "new",
+        "text": "Na een update laat deze pagina zien wat er veranderd is, in jouw taal."
+      },
+      {
+        "kind": "new",
+        "text": "Open of verberg het venster vanuit elke app met een sneltoets die je kiest in Instellingen."
+      },
+      {
+        "kind": "new",
+        "text": "De app spreekt nu Portugees (Brazilië en Portugal), Italiaans, Nederlands, Pools, Turks, Chinees, Japans, Koreaans, Arabisch en Hebreeuws."
+      },
+      {
+        "kind": "improved",
+        "text": "Arabisch en Hebreeuws lees je van rechts naar links, en namen, paden en testuitvoer blijven daarin leesbaar."
+      },
+      {
+        "kind": "fixed",
+        "text": "Het venster opent naast het pictogram van de app, ook al voor je eerste klik erop."
+      },
+      {
+        "kind": "fixed",
+        "text": "Ingekorte mappaden houden hun schuine streep aan het begin op de juiste plek."
+      }
+    ],
+    "pl": [
+      {
+        "kind": "new",
+        "text": "Aktualizacje pobierają się same z paskiem postępu, a przed ponownym uruchomieniem pytają o zgodę. Aplikacja szuka ich przy każdym starcie i raz dziennie."
+      },
+      {
+        "kind": "new",
+        "text": "Wypróbuj nowe wersje wcześniej: wybierz kanał Beta w Ustawieniach."
+      },
+      {
+        "kind": "new",
+        "text": "Po aktualizacji ta strona pokazuje, co się zmieniło, w twoim języku."
+      },
+      {
+        "kind": "new",
+        "text": "Otwieraj i ukrywaj okno z dowolnej aplikacji skrótem klawiszowym wybranym w Ustawieniach."
+      },
+      {
+        "kind": "new",
+        "text": "Aplikacja mówi teraz po portugalsku (Brazylia i Portugalia), włosku, niderlandzku, polsku, turecku, chińsku, japońsku, koreańsku, arabsku i hebrajsku."
+      },
+      {
+        "kind": "improved",
+        "text": "Arabski i hebrajski czyta się od prawej do lewej, a nazwy, ścieżki i wyniki testów pozostają w nich czytelne."
+      },
+      {
+        "kind": "fixed",
+        "text": "Okno otwiera się obok ikony aplikacji nawet przed twoim pierwszym kliknięciem w nią."
+      },
+      {
+        "kind": "fixed",
+        "text": "Skrócone ścieżki folderów zachowują początkowy ukośnik na swoim miejscu."
+      }
+    ],
+    "tr": [
+      {
+        "kind": "new",
+        "text": "Güncellemeler bir ilerleme çubuğuyla kendiliğinden iner, yeniden başlatmadan önce size sorar. Uygulama her açılışta ve günde bir kez güncelleme arar."
+      },
+      {
+        "kind": "new",
+        "text": "Yeni sürümleri erken deneyin: Ayarlar'da Beta kanalını seçin."
+      },
+      {
+        "kind": "new",
+        "text": "Bir güncellemeden sonra bu sayfa, nelerin değiştiğini kendi dilinizde gösterir."
+      },
+      {
+        "kind": "new",
+        "text": "Ayarlar'da seçtiğiniz bir klavye kısayoluyla pencereyi herhangi bir uygulamadan açın veya gizleyin."
+      },
+      {
+        "kind": "new",
+        "text": "Uygulama artık Portekizce (Brezilya ve Portekiz), İtalyanca, Felemenkçe, Lehçe, Türkçe, Çince, Japonca, Korece, Arapça ve İbranice konuşuyor."
+      },
+      {
+        "kind": "improved",
+        "text": "Arapça ve İbranice sağdan sola okunur; adlar, yollar ve test çıktıları bu dillerde de okunaklı kalır."
+      },
+      {
+        "kind": "fixed",
+        "text": "Pencere, simgesine ilk tıklamanızdan önce bile uygulama simgesinin yanında açılır."
+      },
+      {
+        "kind": "fixed",
+        "text": "Kısaltılmış klasör yolları baştaki eğik çizgiyi yerinde tutar."
+      }
+    ],
+    "ar": [
+      {
+        "kind": "new",
+        "text": "تُنزَّل التحديثات تلقائيًا مع شريط تقدّم، ثم يُطلب الإذن قبل إعادة التشغيل. يبحث التطبيق عن تحديث عند كل تشغيل ومرة كل يوم."
+      },
+      {
+        "kind": "new",
+        "text": "لتجربة الإصدارات الجديدة مبكرًا: يكفي اختيار القناة التجريبية في الإعدادات."
+      },
+      {
+        "kind": "new",
+        "text": "بعد كل تحديث، تعرض هذه الصفحة ما تغيّر، باللغة المختارة."
+      },
+      {
+        "kind": "new",
+        "text": "فتح النافذة أو إخفاؤها من أي تطبيق باختصار لوحة مفاتيح يُختار في الإعدادات."
+      },
+      {
+        "kind": "new",
+        "text": "أصبح التطبيق متاحًا بالبرتغالية (البرازيل والبرتغال) والإيطالية والهولندية والبولندية والتركية والصينية واليابانية والكورية والعربية والعبرية."
+      },
+      {
+        "kind": "improved",
+        "text": "تُقرأ العربية والعبرية من اليمين إلى اليسار، وتبقى الأسماء والمسارات ومخرجات الاختبارات واضحة داخلها."
+      },
+      {
+        "kind": "fixed",
+        "text": "تُفتح النافذة بجوار أيقونة شريط النظام حتى قبل أول نقرة عليها."
+      },
+      {
+        "kind": "fixed",
+        "text": "تبقى الشرطة المائلة في بداية مسارات المجلدات المختصرة في مكانها الصحيح."
+      }
+    ],
+    "he": [
+      {
+        "kind": "new",
+        "text": "עדכונים יורדים לבד עם סרגל התקדמות, ואז מופיעה שאלה לפני ההפעלה מחדש. האפליקציה בודקת אם יש עדכון בכל הפעלה ופעם ביום."
+      },
+      {
+        "kind": "new",
+        "text": "אפשר לנסות גרסאות חדשות מוקדם: בוחרים בערוץ בטא בהגדרות."
+      },
+      {
+        "kind": "new",
+        "text": "אחרי עדכון, הדף הזה מציג מה השתנה, בשפה שנבחרה."
+      },
+      {
+        "kind": "new",
+        "text": "פתיחה או הסתרה של החלון מכל אפליקציה עם קיצור מקלדת שבוחרים בהגדרות."
+      },
+      {
+        "kind": "new",
+        "text": "האפליקציה מדברת עכשיו פורטוגזית (ברזיל ופורטוגל), איטלקית, הולנדית, פולנית, טורקית, סינית, יפנית, קוריאנית, ערבית ועברית."
+      },
+      {
+        "kind": "improved",
+        "text": "ערבית ועברית נקראות מימין לשמאל, ושמות, נתיבים ופלט בדיקות נשארים קריאים בתוכן."
+      },
+      {
+        "kind": "fixed",
+        "text": "החלון נפתח ליד סמל מגש המערכת גם לפני הלחיצה הראשונה עליו."
+      },
+      {
+        "kind": "fixed",
+        "text": "בנתיבי תיקיות מקוצרים, הלוכסן שבהתחלה נשאר במקומו."
+      }
+    ],
+    "zh-Hans": [
+      {
+        "kind": "new",
+        "text": "更新会自动下载并显示进度条，重启前会先询问你。应用每次启动时以及每天都会检查一次更新。"
+      },
+      {
+        "kind": "new",
+        "text": "抢先试用新版本：在“设置”中选择测试版渠道。"
+      },
+      {
+        "kind": "new",
+        "text": "更新后，此页面会用你的语言显示有哪些变化。"
+      },
+      {
+        "kind": "new",
+        "text": "在“设置”中选择一个键盘快捷键，就能在任何应用中打开或隐藏窗口。"
+      },
+      {
+        "kind": "new",
+        "text": "应用现在支持葡萄牙语（巴西和葡萄牙）、意大利语、荷兰语、波兰语、土耳其语、中文、日语、韩语、阿拉伯语和希伯来语。"
+      },
+      {
+        "kind": "improved",
+        "text": "阿拉伯语和希伯来语从右向左显示，其中的名称、路径和测试输出依然清晰易读。"
+      },
+      {
+        "kind": "fixed",
+        "text": "即使你还没点击过托盘图标，窗口也会在它旁边打开。"
+      },
+      {
+        "kind": "fixed",
+        "text": "缩短后的文件夹路径，开头的斜杠会保持在正确位置。"
+      }
+    ],
+    "ja": [
+      {
+        "kind": "new",
+        "text": "アップデートは進行状況バー付きで自動的にダウンロードされ、再起動の前に確認します。アプリは起動するたびと1日1回、アップデートを確認します。"
+      },
+      {
+        "kind": "new",
+        "text": "新しいバージョンをいち早く試すには、「設定」でベータ版のチャンネルを選んでください。"
+      },
+      {
+        "kind": "new",
+        "text": "アップデートの後、このページで変更点をあなたの言語で確認できます。"
+      },
+      {
+        "kind": "new",
+        "text": "「設定」で選んだキーボードショートカットで、どのアプリからでもウインドウを開いたり隠したりできます。"
+      },
+      {
+        "kind": "new",
+        "text": "アプリがポルトガル語（ブラジルとポルトガル）、イタリア語、オランダ語、ポーランド語、トルコ語、中国語、日本語、韓国語、アラビア語、ヘブライ語に対応しました。"
+      },
+      {
+        "kind": "improved",
+        "text": "アラビア語とヘブライ語は右から左に表示され、その中の名前、パス、テスト出力も読みやすいままです。"
+      },
+      {
+        "kind": "fixed",
+        "text": "トレイアイコンを一度もクリックしていなくても、ウインドウがアイコンの隣に開くようになりました。"
+      },
+      {
+        "kind": "fixed",
+        "text": "短縮されたフォルダーのパスで、先頭のスラッシュが正しい位置に表示されるようになりました。"
+      }
+    ],
+    "ko": [
+      {
+        "kind": "new",
+        "text": "업데이트가 진행률 표시줄과 함께 알아서 다운로드되고, 다시 시작하기 전에 물어봐요. 앱은 시작할 때마다, 그리고 하루에 한 번 업데이트를 확인해요."
+      },
+      {
+        "kind": "new",
+        "text": "새 버전을 먼저 써 보고 싶다면 설정에서 베타 채널을 고르세요."
+      },
+      {
+        "kind": "new",
+        "text": "업데이트한 뒤에는 이 페이지에서 바뀐 점을 내 언어로 볼 수 있어요."
+      },
+      {
+        "kind": "new",
+        "text": "설정에서 고른 키보드 단축키로 어느 앱에서든 창을 열거나 숨길 수 있어요."
+      },
+      {
+        "kind": "new",
+        "text": "이제 앱이 포르투갈어(브라질, 포르투갈), 이탈리아어, 네덜란드어, 폴란드어, 튀르키예어, 중국어, 일본어, 한국어, 아랍어, 히브리어를 지원해요."
+      },
+      {
+        "kind": "improved",
+        "text": "아랍어와 히브리어는 오른쪽에서 왼쪽으로 읽히고, 그 안의 이름, 경로, 테스트 출력도 잘 읽혀요."
+      },
+      {
+        "kind": "fixed",
+        "text": "트레이 아이콘을 처음 클릭하기 전에도 창이 아이콘 옆에 열려요."
+      },
+      {
+        "kind": "fixed",
+        "text": "줄여서 보여 주는 폴더 경로에서 맨 앞의 슬래시가 제자리에 있어요."
+      }
+    ]
+  }
+}
