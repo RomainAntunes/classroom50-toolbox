@@ -6,10 +6,10 @@ import en from "./en.json";
 import fr from "./fr.json";
 import es from "./es.json";
 import de from "./de.json";
-import { textDirection, type Direction } from "./direction";
+import { isolate, textDirection, type Direction } from "./direction";
 import { locale } from "./locale.svelte";
 
-export { textDirection, type Direction } from "./direction";
+export { isolate, textDirection, type Direction } from "./direction";
 
 type Catalog = Record<string, string>;
 
@@ -67,6 +67,30 @@ export function currentDirection(): Direction {
   return locale.rtlPreview ? "rtl" : textDirection(locale.code);
 }
 
+/**
+ * `template` with each `{name}` replaced by `params.name`; an unknown one stays visible.
+ * In a right-to-left UI each value is isolated (`isolate`), since it is usually data (a
+ * login, repo, path, branch or URL) that the sentence around it would otherwise reorder.
+ */
+export function fill(
+  template: string,
+  params: Record<string, string | number>,
+  direction: Direction = "ltr",
+): string {
+  const wrap = direction === "rtl" ? isolate : String;
+  return template.replace(/\{(\w+)\}/g, (match, name: string) =>
+    name in params ? wrap(String(params[name])) : match,
+  );
+}
+
+/**
+ * A value inside text built in code (`${author}, ${when}`): isolated in a right-to-left UI,
+ * as `t` does with its parameters, else as it is.
+ */
+export function isolated(value: string): string {
+  return currentDirection() === "rtl" ? isolate(value) : value;
+}
+
 /** `key` in one catalog: its plural form for `count` first, then `.other`, then `key`. */
 function lookup(code: string, key: string, count: number | undefined): string | undefined {
   const catalog = catalogs[code];
@@ -97,14 +121,16 @@ export function t(
   const count = typeof params.count === "number" ? params.count : undefined;
   const find = (k: string) => lookup(code, k, count) ?? lookup(fallback, k, count);
   const template = find(key) ?? (fallbackKey && find(fallbackKey)) ?? key;
-  return template.replace(/\{(\w+)\}/g, (match, name: string) =>
-    name in params ? String(params[name]) : match,
-  );
+  const text = fill(template, params, currentDirection());
+  // The dev preview lays a left-to-right language out right to left: each sentence is one
+  // island that reads in order, as a right-to-left catalog's own sentences would.
+  return locale.rtlPreview && textDirection(code) === "ltr" ? isolate(text) : text;
 }
 
-/** "Ada, Bob and Carol" in the catalog's language, so a sentence never mixes two. */
+/** "Ada, Bob and Carol" in the catalog's language, so a sentence never mixes two. Each
+ *  item (a name, a login) is `isolated`. */
 export function formatList(items: string[]): string {
-  return new Intl.ListFormat(locale.code, { type: "conjunction" }).format(items);
+  return new Intl.ListFormat(locale.code, { type: "conjunction" }).format(items.map(isolated));
 }
 
 /** "Fri 17 Oct, 23:59" in the catalog's language: for exact dates in details. */

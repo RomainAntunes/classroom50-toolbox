@@ -33,9 +33,11 @@
   const explained = $derived(failed.some((test) => test.output !== null) || !!notes?.notes);
 </script>
 
-{#snippet output(text: string, clipped: boolean)}
+<!-- Test output is code, left to right whatever the UI; the autograder's report follows its
+     own words line by line. -->
+{#snippet output(text: string, clipped: boolean, report = false)}
   <div class="output">
-    {#if text}<pre>{text}</pre>{/if}
+    {#if text}<pre class:report dir={report ? null : "ltr"}>{text}</pre>{/if}
     {#if clipped && gradeUrl}
       <button class="link" onclick={() => gradeUrl && openUrl(gradeUrl)}
         >{t("details.seeOnGitHub")}</button
@@ -51,7 +53,7 @@
   <dl>
     {#each items as [label, value] (label)}
       <dt>{label}</dt>
-      <dd title={value} class:lines={value.includes("\n")}>{value}</dd>
+      <dd title={value} class:lines={value.includes("\n")}><bdi>{value}</bdi></dd>
     {/each}
   </dl>
   {#if failed.length}
@@ -71,7 +73,7 @@
               <span class="chevron mirror-rtl" class:open={opened[i]} dir="ltr" aria-hidden="true"
                 >›</span
               >
-              <span class="name">{test.name}</span>
+              <span class="name"><bdi>{test.name}</bdi></span>
               <span class="points">{test.score}/{test.maxScore}</span>
             </button>
             {#if opened[i]}
@@ -80,7 +82,7 @@
           {:else}
             <div class="test">
               {#if explained}<span class="chevron" aria-hidden="true"></span>{/if}
-              <span class="name" title={test.name}>{test.name}</span>
+              <span class="name" title={test.name}><bdi>{test.name}</bdi></span>
               <span class="points">{test.score}/{test.maxScore}</span>
             </div>
           {/if}
@@ -97,7 +99,7 @@
         <span class="name">{t("details.releaseNotes")}</span>
       </button>
       {#if notesOpen}
-        {@render output(notes.notes, notes.notesClipped)}
+        {@render output(notes.notes, notes.notesClipped, true)}
       {/if}
     {/if}
   {/if}
@@ -222,6 +224,10 @@
     line-height: 1.35;
     white-space: pre;
     tab-size: 4;
+  }
+
+  pre.report {
+    unicode-bidi: plaintext;
   }
 
   .link {

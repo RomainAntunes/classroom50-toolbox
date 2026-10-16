@@ -1,4 +1,4 @@
-// Which way a language is written.
+// Which way a language is written, and how data keeps its own order inside a sentence.
 
 export type Direction = "ltr" | "rtl";
 
@@ -19,4 +19,16 @@ export function textDirection(code: string): Direction {
   const script = rest.find((part) => /^[a-z]{4}$/.test(part));
   if (script) return RTL_SCRIPTS.has(script) ? "rtl" : "ltr";
   return RTL_LANGUAGES.has(language) ? "rtl" : "ltr";
+}
+
+const FSI = "\u2068";
+const PDI = "\u2069";
+
+/**
+ * `value` between FIRST STRONG ISOLATE and POP DIRECTIONAL ISOLATE: it takes the direction
+ * of its own first letter and can't reorder the sentence around it, so `repo-name.` or
+ * `~/code/cs50` stays as typed inside a right-to-left sentence.
+ */
+export function isolate(value: string): string {
+  return `${FSI}${value}${PDI}`;
 }

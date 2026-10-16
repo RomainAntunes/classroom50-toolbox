@@ -44,11 +44,11 @@
           <svg class="mirror-rtl" class:open={!collapsed} viewBox="0 0 24 24" aria-hidden="true"
             ><path d="m9 18 6-6-6-6" /></svg
           >
-          <span class="label">{title}</span>
+          <span class="label"><bdi>{title}</bdi></span>
           {#if note}<span class="note">{note}</span>{/if}
         </button>
       {:else}
-        <span class="label">{title}</span>{#if note}<span class="note">{note}</span>{/if}
+        <span class="label"><bdi>{title}</bdi></span>{#if note}<span class="note">{note}</span>{/if}
       {/if}
     </h2>
     {@render actions?.()}

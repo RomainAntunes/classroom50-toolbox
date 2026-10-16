@@ -189,6 +189,19 @@ button.primary {
   color: var(--accent-fg);
 }
 
+/* WebKit's `li { text-align: match-parent }` hands its content a physical `left` or `right`,
+   which a left-to-right `<pre>` in a right-to-left list would keep. */
+li {
+  text-align: start;
+}
+
+/* A text field takes the direction of what is typed in it (a repo name in a right-to-left
+   UI, a right-to-left name in an English one); empty, it follows the UI, and so does its
+   placeholder (`dir="auto"` would turn an empty field left to right). */
+input:where(:not([type]), [type="text"], [type="search"]) {
+  unicode-bidi: plaintext;
+}
+
 /* Square icon buttons; the SVGs are from Lucide (ISC). */
 button.icon {
   display: grid;

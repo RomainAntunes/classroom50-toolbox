@@ -110,8 +110,9 @@
     >
       <span class="text">
         <span class="name" id="{uid}-name">
-          {#if unseen}<span class="dot" aria-hidden="true"></span>{/if}{item.assignment
-            .name}{#if unseen}<span class="sr-only">, {t("projects.new")}</span>{/if}
+          {#if unseen}<span class="dot" aria-hidden="true"></span>{/if}<bdi
+            >{item.assignment.name}</bdi
+          >{#if unseen}<span class="sr-only">, {t("projects.new")}</span>{/if}
         </span>
         <span class="meta" id="{uid}-meta">
           {#if hidden}

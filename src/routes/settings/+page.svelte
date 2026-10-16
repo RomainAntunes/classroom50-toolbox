@@ -605,7 +605,7 @@
         {#if showSync}
           <dl class="sync">
             <dt>{t("settings.sync.account")}</dt>
-            <dd>{sync.login ?? t("settings.sync.none")}</dd>
+            <dd><bdi>{sync.login ?? t("settings.sync.none")}</bdi></dd>
             <dt>{t("settings.sync.full")}</dt>
             <dd>{lastRun(sync.stats.full)}</dd>
             <dt>{t("settings.sync.status")}</dt>
@@ -639,7 +639,9 @@
             </dd>
             {#if sync.issue}
               <dt>{t("settings.sync.issue")}</dt>
-              <dd class="issue" title={errorMessage(sync.issue)}>{errorMessage(sync.issue)}</dd>
+              <dd class="issue" title={errorMessage(sync.issue)}>
+                <bdi>{errorMessage(sync.issue)}</bdi>
+              </dd>
             {/if}
           </dl>
         {/if}

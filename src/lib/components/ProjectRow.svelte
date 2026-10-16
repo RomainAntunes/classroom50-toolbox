@@ -9,7 +9,7 @@
   import { submitProject } from "$lib/submit";
   import { addTeammate, joinsGroup } from "$lib/teammate";
   import { isHidden, setHidden } from "$lib/hidden";
-  import { durationLabel, formatDate, fromNow, t } from "$lib/i18n";
+  import { durationLabel, formatDate, fromNow, isolated, t } from "$lib/i18n";
   import { tildify } from "$lib/paths.svelte";
   import { groupDetails } from "$lib/group";
   import { session } from "$lib/session.svelte";
@@ -219,7 +219,7 @@
     if (due) add("due", formatDate(due));
     if (remote?.head?.at) {
       const when = fromNow(new Date(remote.head.at), now);
-      add("lastPush", remote.head.author ? `${remote.head.author}, ${when}` : when);
+      add("lastPush", remote.head.author ? `${isolated(remote.head.author)}, ${when}` : when);
     }
     // With every-push grading the last submission is the last push.
     if (a?.submissionMode === "tag" && remote?.lastSubmission?.at) {
@@ -409,9 +409,8 @@
     >
       <span class="text">
         <span class="name" id="{uid}-name" title={project.repo ?? path ?? undefined}>
-          {#if unseen}<span class="dot" aria-hidden="true"></span>{/if}{name}{#if unseen}<span
-              class="sr-only">, {t("projects.new")}</span
-            >{/if}
+          {#if unseen}<span class="dot" aria-hidden="true"></span>{/if}<bdi>{name}</bdi
+          >{#if unseen}<span class="sr-only">, {t("projects.new")}</span>{/if}
         </span>
         <span class="meta" id="{uid}-meta">
           {#if hidden}
@@ -439,9 +438,9 @@
               >{t("projects.late", { duration: durationLabel(project.lateSeconds) })}</span
             > ·
           {/if}
-          {path
-            ? (project.repo ?? project.config.assignment)
-            : t(cloning ? "projects.cloning" : "projects.notCloned")}
+          {#if path}<bdi>{project.repo ?? project.config.assignment}</bdi>{:else}{t(
+              cloning ? "projects.cloning" : "projects.notCloned",
+            )}{/if}
         </span>
       </span>
       {#if grading?.state === "running"}
