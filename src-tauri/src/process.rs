@@ -604,9 +604,11 @@ fn command(program: &str) -> Result<Command> {
 /// Built again for each program: a tool installed while the app runs (on Windows its folder
 /// only lands in the registry) is found without a restart.
 fn search_path() -> OsString {
-    let mut dirs: Vec<PathBuf> = std::env::var_os("PATH")
-        .map(|p| std::env::split_paths(&p).collect())
-        .unwrap_or_default();
+    // The WebDriver suite's fake programs come first (`testenv`, development builds only).
+    let mut dirs: Vec<PathBuf> = crate::testenv::bin_dir().into_iter().collect();
+    if let Some(path) = std::env::var_os("PATH") {
+        dirs.extend(std::env::split_paths(&path));
+    }
     for extra in platform::extra_path_dirs() {
         if !dirs.contains(&extra) {
             dirs.push(extra);

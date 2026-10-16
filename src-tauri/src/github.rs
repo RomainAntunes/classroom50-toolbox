@@ -46,7 +46,7 @@ pub async fn graphql<T: DeserializeOwned>(
 ) -> Result<T> {
     crate::simulate::check()?;
     let request = http
-        .post(GRAPHQL_URL)
+        .post(crate::testenv::github_url(GRAPHQL_URL).as_ref())
         .bearer_auth(token)
         .json(&json!({ "query": query, "variables": variables }));
     let response = request.send().await.map_err(Error::network)?;
@@ -209,9 +209,10 @@ impl HttpCache {
             return Ok(entry.body.clone());
         }
         crate::simulate::check()?;
+        let target = crate::testenv::github_url(url);
         let request = match token {
-            Some(token) => http.get(url).bearer_auth(token),
-            None => http.get(url),
+            Some(token) => http.get(target.as_ref()).bearer_auth(token),
+            None => http.get(target.as_ref()),
         };
         let request = match &cached {
             Some(entry) => request.header(header::IF_NONE_MATCH, &entry.etag),

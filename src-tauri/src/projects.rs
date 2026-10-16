@@ -926,7 +926,9 @@ async fn github_reachable() -> bool {
     if !crate::simulate::reachable() {
         return false;
     }
-    let connect = tokio::net::TcpStream::connect(("api.github.com", 443));
+    let (host, port) =
+        crate::testenv::probe_addr().unwrap_or_else(|| ("api.github.com".to_owned(), 443));
+    let connect = tokio::net::TcpStream::connect((host.as_str(), port));
     matches!(
         tokio::time::timeout(Duration::from_secs(3), connect).await,
         Ok(Ok(_))

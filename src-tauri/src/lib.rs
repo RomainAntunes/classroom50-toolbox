@@ -26,6 +26,7 @@ mod simulate;
 pub mod status;
 pub mod student;
 mod sync_progress;
+mod testenv;
 pub mod tools;
 mod tray;
 mod updater;
@@ -113,6 +114,9 @@ pub fn run() {
             alerts::restore_badge(handle);
             projects::start_background_sync(handle.clone());
             deeplink::setup(handle);
+            if testenv::keep_open() {
+                popover::show(handle);
+            }
             updater::start(handle.clone());
             Ok(())
         })
