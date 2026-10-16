@@ -13,6 +13,9 @@ use crate::tools::Tool;
 mod install;
 #[cfg(target_os = "linux")]
 mod linux;
+// Pure (paths, file text, D-Bus command lines), so it is tested on every OS.
+#[cfg_attr(not(target_os = "linux"), allow(dead_code))]
+mod linux_calendar;
 #[cfg(target_os = "macos")]
 mod macos;
 mod os_version;
@@ -198,6 +201,9 @@ pub struct NativeCalendar {
     pub title: String,
     /// The account holding it (iCloud, Google, On My Mac...).
     pub account: String,
+    /// The store the UI names itself instead of `account` (Linux: `gnome`, `kde`).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub kind: Option<&'static str>,
 }
 
 /// An event the app wrote, by `CalendarEvent::uid`.
@@ -212,8 +218,9 @@ pub struct Written {
 pub type WrittenEvents = BTreeMap<String, Written>;
 
 /// Whether this OS has a calendar store the app can write to (else: the `.ics` file only).
+/// On Linux, whether Evolution Data Server or Akonadi is installed.
 pub fn has_native_calendar() -> bool {
-    imp::NATIVE_CALENDAR
+    imp::has_native_calendar()
 }
 
 /// The writable calendars. With `ask`, asks for access first when it was never asked;
@@ -224,16 +231,18 @@ pub fn native_calendars(ask: bool) -> Result<Vec<NativeCalendar>> {
 
 /// Makes `calendar_id` hold exactly `events`: adds and updates what changed, removes events
 /// the app wrote earlier that are gone (or sit in another calendar). `written` is updated
-/// as it goes, so a failure halfway loses nothing.
+/// as it goes, so a failure halfway loses nothing. `dir` (the app data dir) holds what the
+/// store reads, if anything: Linux's calendars read an `.ics` file there.
 pub fn write_calendar(
     calendar_id: &str,
     events: &[CalendarEvent],
     written: &mut WrittenEvents,
+    dir: &Path,
 ) -> Result<()> {
-    imp::write_calendar(calendar_id, events, written)
+    imp::write_calendar(calendar_id, events, written, dir)
 }
 
 /// Removes every event the app wrote (the user turned the sync off).
-pub fn clear_calendar(written: &mut WrittenEvents) -> Result<()> {
-    imp::write_calendar("", &[], written)
+pub fn clear_calendar(written: &mut WrittenEvents, dir: &Path) -> Result<()> {
+    imp::write_calendar("", &[], written, dir)
 }

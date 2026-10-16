@@ -27,6 +27,7 @@
     formatDate,
     formatNumber,
     fromNow,
+    hasKey,
     hoursLabel,
     languageName,
     t,
@@ -81,21 +82,49 @@
   }
 
   let exported = $state<number | null>(null);
-  async function exportCalendar() {
+  async function exportCalendar(): Promise<boolean> {
     const path = await withDialog(() =>
       saveDialog({
         defaultPath: "classroom50.ics",
         filters: [{ name: t("settings.calendar.fileType"), extensions: ["ics"] }],
       }),
     );
-    if (!path) return;
+    if (!path) return false;
     try {
       exported = await api.exportCalendar(path);
       // Rust now keeps that file updated (`calendarFile`).
       await loadSettings();
+      return true;
+    } catch (err) {
+      await withDialog(() => message(errorMessage(err), { kind: "error" }));
+      return false;
+    }
+  }
+
+  // No calendar store to write into (Windows, Linux without GNOME's or KDE's): the calendar
+  // app imports the file, and importing it again updates the events (stable UIDs).
+  async function openInCalendar() {
+    if (!settings.current?.calendarFile && !(await exportCalendar())) return;
+    try {
+      await api.openCalendarFile();
     } catch (err) {
       await withDialog(() => message(errorMessage(err), { kind: "error" }));
     }
+  }
+
+  // Worded per kind; anything else (a D-Bus call that failed on Linux) adds the details.
+  async function calendarError(err: unknown) {
+    const key = `calendar.error.${(err as { kind?: string }).kind}`;
+    const text = hasKey(key) ? t(key) : `${t("calendar.error.fallback")}\n\n${errorMessage(err)}`;
+    await withDialog(() => message(text, { kind: "error" }));
+  }
+
+  /** "Classroom 50 (GNOME Calendar)" on Linux, "Work (iCloud)" on macOS. */
+  function calendarLabel(calendar: NativeCalendar): string {
+    const account = calendar.kind
+      ? t(`settings.calendar.store.${calendar.kind}`)
+      : calendar.account;
+    return account ? `${calendar.title} (${account})` : calendar.title;
   }
 
   let calendars = $state<NativeCalendar[]>([]);
@@ -109,14 +138,7 @@
     try {
       settings.current = await api.setNativeCalendar(id);
     } catch (err) {
-      await withDialog(() =>
-        message(
-          t(`calendar.error.${(err as { kind?: string }).kind}`, {}, "calendar.error.fallback"),
-          {
-            kind: "error",
-          },
-        ),
-      );
+      await calendarError(err);
     } finally {
       writing = false;
     }
@@ -126,21 +148,14 @@
     try {
       calendars = await api.nativeCalendars();
     } catch (err) {
-      await withDialog(() =>
-        message(
-          t(`calendar.error.${(err as { kind?: string }).kind}`, {}, "calendar.error.fallback"),
-          {
-            kind: "error",
-          },
-        ),
-      );
+      await calendarError(err);
       return;
     }
     const current = settings.current?.nativeCalendar ?? null;
     const items: (MenuItem | PredefinedMenuItem)[] = await Promise.all(
       calendars.map((calendar) =>
         MenuItem.new({
-          text: calendar.account ? `${calendar.title} (${calendar.account})` : calendar.title,
+          text: calendarLabel(calendar),
           enabled: calendar.id !== current,
           action: () => setNativeCalendar(calendar.id),
         }),
@@ -444,7 +459,9 @@
             <span class="sub"
               >{current.nativeCalendar
                 ? t("settings.calendar.syncing", {
-                    calendar: chosenCalendar?.title ?? t("settings.calendar.unknown"),
+                    calendar: chosenCalendar
+                      ? calendarLabel(chosenCalendar)
+                      : t("settings.calendar.unknown"),
                   })
                 : t("settings.calendar.appHint")}</span
             >
@@ -467,6 +484,15 @@
         </span>
         <button onclick={exportCalendar}>{t("settings.calendar.export")}</button>
       </div>
+      {#if info && !info.nativeCalendar}
+        <div class="row">
+          <span class="text">
+            <span>{t("settings.calendar.openLabel")}</span>
+            <span class="sub">{t("settings.calendar.openHint")}</span>
+          </span>
+          <button onclick={openInCalendar}>{t("settings.calendar.open")}</button>
+        </div>
+      {/if}
       {#if current.calendarFile}
         <div class="row">
           <span class="text">

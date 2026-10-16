@@ -137,6 +137,10 @@ pub enum Error {
     #[error("calendar access isn't allowed")]
     CalendarAccess,
 
+    /// The calendar service didn't answer (Akonadi not running and not starting, no D-Bus).
+    #[error("the calendar service isn't responding")]
+    CalendarUnavailable,
+
     #[error("invalid .classroom50.yaml: {0}")]
     RepoConfig(#[from] serde_norway::Error),
 
@@ -278,6 +282,7 @@ impl Error {
             Error::GitHub(_) => "github",
             Error::Offline => "offline",
             Error::CalendarAccess => "calendarAccess",
+            Error::CalendarUnavailable => "calendarUnavailable",
             Error::RepoConfig(_) => "repoConfig",
             Error::Io(_) => "io",
             Error::Http(_) => "http",
@@ -346,6 +351,7 @@ mod tests {
             Error::TokenFromEnv("GH_TOKEN".into()),
             Error::Offline,
             Error::CalendarAccess,
+            Error::CalendarUnavailable,
         ];
         for err in errors {
             let key = format!("error.{}", err.kind());

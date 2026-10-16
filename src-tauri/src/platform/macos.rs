@@ -180,6 +180,8 @@ mod tests {
 
 mod calendar;
 
-pub const NATIVE_CALENDAR: bool = true;
+pub fn has_native_calendar() -> bool {
+    true
+}
 
 pub use calendar::{native_calendars, write_calendar};

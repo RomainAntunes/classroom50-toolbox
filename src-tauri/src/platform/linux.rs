@@ -154,19 +154,9 @@ pub fn open_terminal(dir: &Path) -> Result<()> {
     Err(Error::NoTerminal)
 }
 
-pub const NATIVE_CALENDAR: bool = false;
+mod calendar;
 
-pub fn native_calendars(_ask: bool) -> Result<Vec<super::NativeCalendar>> {
-    Err(Error::Unsupported("no calendar store on this OS".into()))
-}
-
-pub fn write_calendar(
-    _calendar_id: &str,
-    _events: &[super::CalendarEvent],
-    _written: &mut super::WrittenEvents,
-) -> Result<()> {
-    Err(Error::Unsupported("no calendar store on this OS".into()))
-}
+pub use calendar::{has_native_calendar, native_calendars, write_calendar};
 
 #[cfg(test)]
 mod tests {

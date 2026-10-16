@@ -73,7 +73,13 @@
   "settings.calendar.choose": "Elegir...",
   "settings.calendar.change": "Cambiar...",
   "settings.calendar.stopSync": "Detener y quitar las fechas de entrega",
+  "settings.calendar.store.gnome": "Calendario de GNOME",
+  "settings.calendar.store.kde": "Calendario de KDE",
+  "settings.calendar.openLabel": "Añadir a tu app de calendario",
+  "settings.calendar.openHint": "Abre el archivo de fechas de entrega en tu app de calendario para importarlo. Vuelve a abrirlo después de un cambio para importar las nuevas fechas; la mayoría de las apps de calendario actualizan los eventos en lugar de duplicarlos.",
+  "settings.calendar.open": "Abrir en Calendario",
   "calendar.error.calendarAccess": "La toolbox no tiene permiso para usar tus calendarios. Permítelo en Ajustes del Sistema > Privacidad y seguridad > Calendarios.",
+  "calendar.error.calendarUnavailable": "Tu servicio de calendario no respondió. Abre tu app de calendario una vez y vuelve a intentarlo.",
   "calendar.error.fallback": "No se pudo actualizar el calendario.",
   "calendar.notes.class": "Clase: {name}",
   "calendar.notes.group": "Grupo: {name}",
@@ -484,5 +490,6 @@
   "error.notSignedIn": "sin sesión en GitHub",
   "error.tokenFromEnv": "GitHub CLI está usando la variable de entorno {var}; quítala para iniciar sesión aquí",
   "error.offline": "no se puede conectar con GitHub",
-  "error.calendarAccess": "no se permite el acceso al calendario"
+  "error.calendarAccess": "no se permite el acceso al calendario",
+  "error.calendarUnavailable": "el servicio de calendario no responde"
 }

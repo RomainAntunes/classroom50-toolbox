@@ -94,7 +94,10 @@ pub fn run() {
             }
             app.manage(settings);
             app.manage(clones::CloneStore::load(&app.path().app_config_dir()?));
-            app.manage(calendar::CalendarState::load(&app.path().app_config_dir()?));
+            app.manage(calendar::CalendarState::load(
+                &app.path().app_config_dir()?,
+                &app.path().app_data_dir()?,
+            ));
             let cache_dir = app.path().app_cache_dir()?;
             app.manage(projects::ProjectsState::load(&cache_dir));
             app.manage(alerts::AlertsState::load(&cache_dir));
@@ -134,6 +137,7 @@ pub fn run() {
             commands::preview_badge,
             commands::export_calendar,
             commands::native_calendars,
+            commands::open_calendar_file,
             commands::set_calendar_labels,
             commands::set_tray_labels,
             commands::system_languages,

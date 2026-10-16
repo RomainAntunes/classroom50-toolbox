@@ -27,16 +27,22 @@ use crate::updater::{self, UpdateInfo};
 pub struct AppInfo {
     os: Os,
     version: String,
-    /// The OS has a calendar store the app can write into (macOS).
+    /// The OS has a calendar store the app can write into (macOS; Linux with Evolution Data
+    /// Server or Akonadi).
     native_calendar: bool,
 }
 
+/// Async, so detecting a calendar store (Linux reads the XDG data dirs and PATH) runs off
+/// the main thread.
 #[tauri::command]
-pub fn app_info(app: AppHandle) -> AppInfo {
+pub async fn app_info(app: AppHandle) -> AppInfo {
+    let native_calendar = tauri::async_runtime::spawn_blocking(platform::has_native_calendar)
+        .await
+        .unwrap_or(false);
     AppInfo {
         os: platform::os(),
         version: app.package_info().version.to_string(),
-        native_calendar: platform::has_native_calendar(),
+        native_calendar,
     }
 }
 
@@ -198,6 +204,21 @@ pub fn export_calendar(
     Ok(count)
 }
 
+/// Opens the exported `.ics` file with the default app (Calendar, Outlook...), which
+/// imports it; importing again updates the events (stable UIDs). Only that file: the path
+/// comes from the settings, not the UI.
+#[tauri::command]
+pub fn open_calendar_file(app: AppHandle, settings: State<'_, SettingsStore>) -> Result<()> {
+    use tauri_plugin_opener::OpenerExt;
+    let path = settings
+        .get()
+        .calendar_file
+        .ok_or_else(|| Error::Unsupported("no calendar file exported yet".into()))?;
+    app.opener()
+        .open_path(path.to_string_lossy(), None::<&str>)
+        .map_err(|err| Error::Unsupported(err.to_string()))
+}
+
 /// The words of calendar event notes, from the UI's i18n.
 #[tauri::command]
 pub fn set_calendar_labels(
@@ -244,9 +265,15 @@ pub async fn set_native_calendar(
     id: Option<String>,
 ) -> Result<Settings> {
     let current = settings.get();
-    // Writing to a new calendar also removes what sits in the old one.
+    // Writing to a new calendar also removes what sits in the old one (best effort on
+    // Linux, where a store may have gone). Turning the sync off always works: what
+    // couldn't be removed is logged, and the setting is saved anyway.
     if id.is_some() || current.native_calendar.is_some() {
-        crate::calendar::write_native(&app, id.clone()).await?;
+        let written = crate::calendar::write_native(&app, id.clone()).await;
+        match written {
+            Err(err) if id.is_none() => log::warn!("could not clear the calendar: {err}"),
+            other => other?,
+        }
     }
     settings.set(Settings {
         native_calendar: id,
