@@ -5,6 +5,8 @@ export interface MoveOptions {
   horizontal?: boolean;
   /** Past the last item comes the first, and the other way round. */
   wrap?: boolean;
+  /** Laid out right to left: Left moves to the next item, Right to the previous one. */
+  rtl?: boolean;
 }
 
 /**
@@ -15,7 +17,7 @@ export function moveIndex(
   key: string,
   current: number,
   count: number,
-  { horizontal = false, wrap = false }: MoveOptions = {},
+  { horizontal = false, wrap = false, rtl = false }: MoveOptions = {},
 ): number | null {
   if (count <= 0) return null;
   const last = count - 1;
@@ -32,10 +34,10 @@ export function moveIndex(
       step = -1;
       break;
     case "ArrowRight":
-      step = horizontal ? 1 : 0;
+      step = horizontal ? (rtl ? -1 : 1) : 0;
       break;
     case "ArrowLeft":
-      step = horizontal ? -1 : 0;
+      step = horizontal ? (rtl ? 1 : -1) : 0;
       break;
   }
   if (step === 0) return null;

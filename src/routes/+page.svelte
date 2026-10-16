@@ -22,7 +22,7 @@
   import { announce } from "$lib/announce.svelte";
   import { menuKey, onContextMenu, popupMenu, rovingList } from "$lib/keyboard";
   import { moveIndex } from "$lib/keys";
-  import { fromNow, t } from "$lib/i18n";
+  import { currentDirection, fromNow, t } from "$lib/i18n";
   import { session } from "$lib/session.svelte";
   import { loadSettings, saveSettings, settings } from "$lib/settings.svelte";
   import Section from "$lib/components/Section.svelte";
@@ -251,6 +251,7 @@
     const next = moveIndex(event.key, current, FILTERS.length, {
       horizontal: true,
       wrap: true,
+      rtl: currentDirection() === "rtl",
     });
     if (next === null) return;
     event.preventDefault();

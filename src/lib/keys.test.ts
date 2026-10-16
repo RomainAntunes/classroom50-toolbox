@@ -31,6 +31,15 @@ describe("moveIndex", () => {
     expect(moveIndex("ArrowLeft", 0, 4, radios)).toBe(3);
     expect(moveIndex("ArrowDown", 1, 4, radios)).toBe(2);
   });
+
+  it("moves the way the arrow points when laid out right to left", () => {
+    const radios = { horizontal: true, wrap: true, rtl: true };
+    expect(moveIndex("ArrowLeft", 1, 4, radios)).toBe(2);
+    expect(moveIndex("ArrowRight", 1, 4, radios)).toBe(0);
+    expect(moveIndex("ArrowLeft", 3, 4, radios)).toBe(0);
+    expect(moveIndex("ArrowDown", 1, 4, radios)).toBe(2);
+    expect(moveIndex("ArrowLeft", 1, 4, { rtl: true })).toBeNull();
+  });
 });
 
 describe("isMenuKey", () => {
