@@ -476,6 +476,15 @@
     animation: slide 1.2s ease-in-out infinite;
   }
 
+  /* No sliding: a still, faded bar says it is working without moving. */
+  @media (prefers-reduced-motion: reduce) {
+    .progress.indeterminate > div,
+    .first-bar.indeterminate > div {
+      width: 100%;
+      opacity: 0.4;
+    }
+  }
+
   @keyframes slide {
     from {
       transform: translateX(-100%);

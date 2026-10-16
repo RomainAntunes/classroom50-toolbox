@@ -16,6 +16,7 @@
   import { settings } from "$lib/settings.svelte";
   import { copyLink, openLink } from "$lib/links";
   import { menuKey, onContextMenu, popupMenu } from "$lib/keyboard";
+  import { scrollBehavior } from "$lib/motion";
   import Details from "./Details.svelte";
 
   let { project, now, unseen }: { project: Project; now: Date; unseen: boolean } = $props();
@@ -200,7 +201,7 @@
   $effect(() => {
     if (linked === null) return;
     open = true;
-    element?.scrollIntoView({ block: "nearest", behavior: "smooth" });
+    element?.scrollIntoView({ block: "nearest", behavior: scrollBehavior() });
   });
   const details = $derived.by(() => {
     const a = project.assignment;

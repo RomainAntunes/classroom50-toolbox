@@ -3,6 +3,7 @@
   import { openUrl } from "@tauri-apps/plugin-opener";
   import type { Unaccepted } from "$lib/api";
   import { menuKey, onContextMenu, popupMenu } from "$lib/keyboard";
+  import { scrollBehavior } from "$lib/motion";
   import { isHidden, setHidden } from "$lib/hidden";
   import { acceptAssignment, acceptBlocked } from "$lib/accept";
   import { session } from "$lib/session.svelte";
@@ -68,7 +69,7 @@
   $effect(() => {
     if (linked === null) return;
     open = true;
-    element?.scrollIntoView({ block: "nearest", behavior: "smooth" });
+    element?.scrollIntoView({ block: "nearest", behavior: scrollBehavior() });
   });
   const details = $derived.by(() => {
     const a = item.assignment;

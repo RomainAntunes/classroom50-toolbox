@@ -230,9 +230,17 @@ button.icon svg {
   background-color: color-mix(in srgb, var(--fg) 40%, transparent);
 }
 
+/* Reduced motion: nothing slides, spins, pulses or scrolls smoothly. Progress bars that
+   only move while they don't know how far along they are stand still at full width,
+   faded (`.indeterminate`). Svelte transitions, should any be added, take `duration()`
+   from `src/lib/motion.ts`. */
 @media (prefers-reduced-motion: reduce) {
-  * {
-    transition: none !important;
+  *,
+  *::before,
+  *::after {
+    transition-duration: 0s !important;
+    transition-delay: 0s !important;
     animation: none !important;
+    scroll-behavior: auto !important;
   }
 }

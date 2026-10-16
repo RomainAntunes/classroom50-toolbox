@@ -238,6 +238,13 @@
     animation: slide 1.2s ease-in-out infinite;
   }
 
+  @media (prefers-reduced-motion: reduce) {
+    .progress:not(.known) > div {
+      width: 100%;
+      opacity: 0.4;
+    }
+  }
+
   .progress.known > div {
     animation: none;
     transition: width 0.4s ease;
