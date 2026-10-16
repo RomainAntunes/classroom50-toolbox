@@ -3,6 +3,7 @@
 import { message, open } from "@tauri-apps/plugin-dialog";
 import { api, errorKind, errorMessage, withDialog } from "$lib/api";
 import { t } from "$lib/i18n";
+import { announce } from "$lib/announce.svelte";
 import { defaultEditor, loadEditors, openInEditor } from "$lib/editor.svelte";
 import { loadSettings, saveSettings, settings } from "$lib/settings.svelte";
 import { busy } from "$lib/session.svelte";
@@ -37,6 +38,7 @@ async function clone(id: string, choose: boolean): Promise<string | null> {
     const parent = choose || !saved ? await pickCloneFolder() : saved;
     if (!parent) return null;
     const dir = await api.cloneProject(id, parent);
+    announce(t("a11y.cloned", { folder: dir.split(/[\\/]/).pop() ?? dir }));
     await loadEditors();
     const editor = defaultEditor();
     if (editor) await openInEditor(dir, editor);

@@ -423,8 +423,8 @@
         </div>
       {/if}
       <div class="row">
-        <span>{t("settings.appearance")}</span>
-        <div class="segmented">
+        <span id="appearance-label">{t("settings.appearance")}</span>
+        <div class="segmented" role="group" aria-labelledby="appearance-label">
           {#each APPEARANCES as choice (choice)}
             <button
               aria-pressed={current.appearance === choice}
@@ -579,8 +579,8 @@
     {#if import.meta.env.DEV}
       <Section title={t("settings.dev.title")}>
         <div class="row">
-          <span title={t("settings.dev.skinHint")}>{t("settings.dev.skin")}</span>
-          <div class="segmented">
+          <span id="skin-label" title={t("settings.dev.skinHint")}>{t("settings.dev.skin")}</span>
+          <div class="segmented" role="group" aria-labelledby="skin-label">
             {#each OS_CHOICES as os (os)}
               <button aria-pressed={preview.os === os} onclick={() => setPreviewOs(os)}
                 >{t(`settings.dev.os.${os}`)}</button
@@ -589,8 +589,10 @@
           </div>
         </div>
         <div class="row">
-          <span title={t("settings.dev.networkHint")}>{t("settings.dev.network")}</span>
-          <div class="segmented">
+          <span id="network-label" title={t("settings.dev.networkHint")}
+            >{t("settings.dev.network")}</span
+          >
+          <div class="segmented" role="group" aria-labelledby="network-label">
             {#each SIMULATED_NETWORKS as choice (choice)}
               <button aria-pressed={network === choice} onclick={() => simulateNetwork(choice)}
                 >{t(`settings.dev.network.${choice}`)}</button

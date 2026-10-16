@@ -56,7 +56,9 @@
   </dl>
   {#if failed.length}
     <p class="heading">{t(explained ? "details.failedTests" : "details.failedTestsHint")}</p>
-    <ul class="tests">
+    <!-- An explicit role: WebKit drops the list semantics of a list without bullets. -->
+    <!-- svelte-ignore a11y_no_redundant_roles -->
+    <ul class="tests" role="list">
       {#each failed.slice(0, MAX_TESTS) as test, i (i)}
         <li>
           {#if test.output !== null || test.outputClipped}

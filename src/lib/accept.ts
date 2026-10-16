@@ -4,6 +4,7 @@ import { ask, message } from "@tauri-apps/plugin-dialog";
 import { api, errorKind, errorMessage, withDialog, type Accepted, type Unaccepted } from "$lib/api";
 import { cloneProject } from "$lib/clone";
 import { t } from "$lib/i18n";
+import { announce } from "$lib/announce.svelte";
 import { busy } from "$lib/session.svelte";
 
 /** Why `item` can't be accepted from the app now (locked, or not open yet), else null. */
@@ -59,6 +60,7 @@ async function accept(item: Unaccepted): Promise<void> {
     return;
   }
   if (!accepted) return;
+  announce(t("a11y.accepted", { name }));
   const { repo, projectId } = accepted;
   if (!projectId) {
     await withDialog(() => message(t("accept.done", { repo }), { title: name }));

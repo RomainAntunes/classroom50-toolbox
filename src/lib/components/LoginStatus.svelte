@@ -19,6 +19,7 @@
     type AuthStatus,
     type DeviceCode,
   } from "$lib/api";
+  import { announce } from "$lib/announce.svelte";
   import { popupMenu } from "$lib/keyboard";
   import { session } from "$lib/session.svelte";
   import { t } from "$lib/i18n";
@@ -212,6 +213,7 @@
     const unlisteners = [
       listen<DeviceCode>(DEVICE_CODE_EVENT, (event) => {
         device = event.payload;
+        announce(`${t("auth.waiting")} ${event.payload.code}`);
       }),
       // Also resets a view that didn't start the sign-in (e.g. after a reload).
       listen(LOGIN_ENDED_EVENT, () => {
@@ -264,7 +266,7 @@
       <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6" /></svg>
     </button>
     {#if error}
-      <p class="error">{error}</p>
+      <p class="error" role="alert">{error}</p>
     {/if}
   </div>
 {:else if auth}
@@ -275,7 +277,7 @@
     </button>
   </div>
   {#if error}
-    <p class="error">{error}</p>
+    <p class="error" role="alert">{error}</p>
   {/if}
 {/if}
 

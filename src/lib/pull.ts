@@ -3,6 +3,7 @@
 import { message } from "@tauri-apps/plugin-dialog";
 import { api, errorKind, errorMessage, withDialog, type Project } from "$lib/api";
 import { t } from "$lib/i18n";
+import { announce } from "$lib/announce.svelte";
 
 const REASONS = ["localChanges", "otherBranch", "diverged"];
 
@@ -10,6 +11,7 @@ const REASONS = ["localChanges", "otherBranch", "diverged"];
 export async function pullProject(project: Project, name: string): Promise<boolean> {
   try {
     await api.pullProject(project.id);
+    announce(t("a11y.pulled", { name }));
     return true;
   } catch (err) {
     const kind = errorKind(err) ?? "";
