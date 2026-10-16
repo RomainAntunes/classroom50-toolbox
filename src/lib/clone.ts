@@ -27,14 +27,19 @@ async function cloneFolder(): Promise<string | null> {
   return (settings.current ?? (await loadSettings())).cloneFolder;
 }
 
-/** Asks where clones go and remembers the answer. Null when cancelled. */
-export async function pickCloneFolder(): Promise<string | null> {
+/** Asks where clones go. Null when cancelled. */
+async function pickFolder(): Promise<string | null> {
   const current = await cloneFolder();
   const picked = await withDialog(() =>
     open({ directory: true, title: t("clone.pick"), defaultPath: current ?? undefined }),
   );
-  if (typeof picked !== "string") return null;
-  await saveSettings({ cloneFolder: picked });
+  return typeof picked === "string" ? picked : null;
+}
+
+/** Asks where clones go and remembers the answer. Null when cancelled. */
+export async function pickCloneFolder(): Promise<string | null> {
+  const picked = await pickFolder();
+  if (picked) await saveSettings({ cloneFolder: picked });
   return picked;
 }
 
@@ -48,12 +53,14 @@ export function cloneTarget(parent: string, repo: string): string {
 /**
  * Asks before cloning into `<cloneFolder>/<repo>`: Clone, Choose another folder… (picked and
  * remembered) or Cancel. With no clone folder yet the folder picker comes first, then this
- * question naming the destination; a caller's own question (already a yes to cloning) is
- * asked before the picker instead. Resolves to the parent folder, or null when cancelled.
+ * question naming the destination, and the folder is only remembered once the student
+ * confirms; a caller's own question (already a yes to cloning) is asked before the picker
+ * instead. Resolves to the parent folder, or null when cancelled.
  */
 async function askParent(repo: string, question?: CloneQuestion): Promise<string | null> {
-  let saved = await cloneFolder();
-  if (!saved) {
+  const saved = await cloneFolder();
+  let parent = saved;
+  if (!parent) {
     if (question) {
       const yes = await withDialog(() =>
         ask(question.message(null), {
@@ -66,10 +73,10 @@ async function askParent(repo: string, question?: CloneQuestion): Promise<string
       if (!yes) return null;
       return pickCloneFolder();
     }
-    saved = await pickCloneFolder();
-    if (!saved) return null;
+    parent = await pickFolder();
+    if (!parent) return null;
   }
-  const target = tildify(cloneTarget(saved, repo));
+  const target = tildify(cloneTarget(parent, repo));
   const yes = t("projects.clone");
   const no = t("clone.chooseOther");
   const answer = await withDialog(() =>
@@ -80,7 +87,10 @@ async function askParent(repo: string, question?: CloneQuestion): Promise<string
     }),
   );
   // Custom buttons resolve to their label on every OS; anything else (Escape) is a cancel.
-  if (answer === yes) return saved;
+  if (answer === yes) {
+    if (parent !== saved) await saveSettings({ cloneFolder: parent });
+    return parent;
+  }
   if (answer === no) return pickCloneFolder();
   return null;
 }
