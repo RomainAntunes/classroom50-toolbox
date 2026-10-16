@@ -62,6 +62,18 @@ After that the app updates itself.
    from then on. Projects you already cloned are found in the folders your editor opened
    recently; add other folders in Settings.
 
+## Languages
+
+The app follows your system's language, or the one you pick in Settings: English, French,
+Spanish, German, Italian, Portuguese (Brazil and Portugal), Dutch, Polish, Turkish, Arabic,
+Hebrew, Simplified Chinese, Japanese and Korean.
+
+The Japanese, Korean, Turkish, Chinese, Arabic and Hebrew translations were made with AI and
+haven't been reviewed by native speakers yet, so some wording may sound off. Corrections are
+welcome: each language is one file in [`src/lib/i18n/`](src/lib/i18n) (`ja.json`, `ko.json`,
+`tr.json`, `zh-Hans.json`, `ar.json`, `he.json`). Open a pull request with your changes, or an
+issue quoting the text and what it should say.
+
 ## Privacy
 
 The app talks to GitHub only, with the token `gh` already holds, and never sends data anywhere
