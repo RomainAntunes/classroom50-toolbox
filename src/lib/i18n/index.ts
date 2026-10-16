@@ -3,12 +3,15 @@
 // A string with a count is stored per CLDR plural category (`foo.one`, `foo.other`, plus
 // `few`/`many`/... where the language has them) and called as `t("foo", { count })`.
 import en from "./en.json";
+import fr from "./fr.json";
+import es from "./es.json";
+import de from "./de.json";
 import { locale } from "./locale.svelte";
 
 type Catalog = Record<string, string>;
 
 /** Every catalog, by BCP 47 code. Adding a language: import its JSON and list it here. */
-export const catalogs: Record<string, Catalog> = { en };
+export const catalogs: Record<string, Catalog> = { en, fr, es, de };
 const fallback = "en";
 
 /** The language each catalog is written in, named in itself ("English", "Français"). */
@@ -97,6 +100,14 @@ export function formatList(items: string[]): string {
 }
 
 /** "Fri 17 Oct, 23:59" in the catalog's language: for exact dates in details. */
+/** A number in the UI's language, with exactly `digits` decimals: 1.5 -> "1,5" in French. */
+export function formatNumber(value: number, digits = 0): string {
+  return new Intl.NumberFormat(locale.code, {
+    minimumFractionDigits: digits,
+    maximumFractionDigits: digits,
+  }).format(value);
+}
+
 export function formatDate(date: Date): string {
   return new Intl.DateTimeFormat(locale.code, {
     weekday: "short",

@@ -64,7 +64,12 @@
     "macOS": {
       "minimumSystemVersion": "11.0",
       "entitlements": "Entitlements.plist",
-      "signingIdentity": "-"
+      "signingIdentity": "-",
+      "files": {
+        "Resources/fr.lproj/InfoPlist.strings": "./infoplist/fr.lproj/InfoPlist.strings",
+        "Resources/es.lproj/InfoPlist.strings": "./infoplist/es.lproj/InfoPlist.strings",
+        "Resources/de.lproj/InfoPlist.strings": "./infoplist/de.lproj/InfoPlist.strings"
+      }
     },
     "windows": {
       "nsis": {
