@@ -137,6 +137,7 @@ pub fn run() {
             commands::preview_badge,
             commands::export_calendar,
             commands::native_calendars,
+            commands::open_calendar_file,
             commands::set_calendar_labels,
             commands::set_tray_labels,
             commands::system_languages,

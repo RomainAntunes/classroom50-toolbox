@@ -204,6 +204,21 @@ pub fn export_calendar(
     Ok(count)
 }
 
+/// Opens the exported `.ics` file with the default app (Calendar, Outlook...), which
+/// imports it; importing again updates the events (stable UIDs). Only that file: the path
+/// comes from the settings, not the UI.
+#[tauri::command]
+pub fn open_calendar_file(app: AppHandle, settings: State<'_, SettingsStore>) -> Result<()> {
+    use tauri_plugin_opener::OpenerExt;
+    let path = settings
+        .get()
+        .calendar_file
+        .ok_or_else(|| Error::Unsupported("no calendar file exported yet".into()))?;
+    app.opener()
+        .open_path(path.to_string_lossy(), None::<&str>)
+        .map_err(|err| Error::Unsupported(err.to_string()))
+}
+
 /// The words of calendar event notes, from the UI's i18n.
 #[tauri::command]
 pub fn set_calendar_labels(

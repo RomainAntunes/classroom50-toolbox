@@ -515,6 +515,8 @@ export const api = {
   previewBadge: () => invoke<void>("preview_badge"),
   /** Writes the due dates as an `.ics` file; returns the number of events. */
   exportCalendar: (path: string) => invoke<number>("export_calendar", { path }),
+  /** Opens the exported `.ics` file (`calendarFile`) with the default app, which imports it. */
+  openCalendarFile: () => invoke<void>("open_calendar_file"),
   setCalendarLabels: (labels: CalendarLabels) => invoke<void>("set_calendar_labels", { labels }),
   setTrayLabels: (labels: TrayLabels) => invoke<void>("set_tray_labels", { labels }),
   /** The OS's preferred languages, most wanted first (BCP 47). */

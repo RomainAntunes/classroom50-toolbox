@@ -82,18 +82,31 @@
   }
 
   let exported = $state<number | null>(null);
-  async function exportCalendar() {
+  async function exportCalendar(): Promise<boolean> {
     const path = await withDialog(() =>
       saveDialog({
         defaultPath: "classroom50.ics",
         filters: [{ name: t("settings.calendar.fileType"), extensions: ["ics"] }],
       }),
     );
-    if (!path) return;
+    if (!path) return false;
     try {
       exported = await api.exportCalendar(path);
       // Rust now keeps that file updated (`calendarFile`).
       await loadSettings();
+      return true;
+    } catch (err) {
+      await withDialog(() => message(errorMessage(err), { kind: "error" }));
+      return false;
+    }
+  }
+
+  // No calendar store to write into (Windows, Linux without GNOME's or KDE's): the calendar
+  // app imports the file, and importing it again updates the events (stable UIDs).
+  async function openInCalendar() {
+    if (!settings.current?.calendarFile && !(await exportCalendar())) return;
+    try {
+      await api.openCalendarFile();
     } catch (err) {
       await withDialog(() => message(errorMessage(err), { kind: "error" }));
     }
@@ -471,6 +484,15 @@
         </span>
         <button onclick={exportCalendar}>{t("settings.calendar.export")}</button>
       </div>
+      {#if info && !info.nativeCalendar}
+        <div class="row">
+          <span class="text">
+            <span>{t("settings.calendar.openLabel")}</span>
+            <span class="sub">{t("settings.calendar.openHint")}</span>
+          </span>
+          <button onclick={openInCalendar}>{t("settings.calendar.open")}</button>
+        </div>
+      {/if}
       {#if current.calendarFile}
         <div class="row">
           <span class="text">
