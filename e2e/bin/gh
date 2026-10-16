@@ -1,0 +1,54 @@
+#!/bin/sh
+# A stand-in for the GitHub CLI, for the WebDriver suite: answers what the app asks gh at
+# startup, in a sync and in Settings, as gh 2.100 prints it, for one signed-in student.
+# It never touches GitHub. Every call is appended to $C50_FAKE_GH_LOG when set, so a spec
+# can check what reached gh (a write the dev guard stops never does). Writes fail anyway.
+
+login="${C50_FAKE_GH_LOGIN:-ada-e2e}"
+
+if [ -n "$C50_FAKE_GH_LOG" ]; then
+  printf '%s\n' "$*" >>"$C50_FAKE_GH_LOG"
+fi
+
+case "$*" in
+"--version")
+  echo "gh version 2.100.0 (2026-09-03)"
+  echo "https://github.com/cli/cli/releases/tag/v2.100.0"
+  ;;
+"auth status --json hosts")
+  printf '{"hosts":{"github.com":[{"state":"success","active":true,"host":"github.com","login":"%s","tokenSource":"keyring","scopes":"admin:org, repo, user:email, workflow","gitProtocol":"https"}]}}\n' "$login"
+  ;;
+"auth token --hostname github.com")
+  echo "gho_e2eFakeTokenNotARealOne000000000000"
+  ;;
+"api --include user")
+  echo "HTTP/2.0 200 OK"
+  echo "Content-Type: application/json; charset=utf-8"
+  echo "X-Oauth-Scopes: admin:org, repo, user:email, workflow"
+  echo ""
+  printf '{"login":"%s","id":4242,"name":"Ada E2E","email":null}\n' "$login"
+  ;;
+"api user")
+  printf '{"login":"%s","id":4242,"name":"Ada E2E","email":null}\n' "$login"
+  ;;
+"config get user -h github.com")
+  echo "$login"
+  ;;
+"config get git_protocol --host github.com")
+  echo "https"
+  ;;
+"extension list")
+  printf 'gh student\tfoundation50/gh-student\tv1.58.1\n'
+  ;;
+"extension upgrade gh-student --dry-run")
+  echo "[student]: already up to date" >&2
+  ;;
+student\ *)
+  echo "gh-student: the WebDriver suite's fake gh refuses '$*'" >&2
+  exit 1
+  ;;
+*)
+  echo "fake gh: unsupported command: $*" >&2
+  exit 1
+  ;;
+esac

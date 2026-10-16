@@ -91,6 +91,25 @@ fn rewrite(base: &str, url: &str) -> String {
     }
 }
 
+/// Runs the suite's fake gh (`e2e/bin/gh`), so unit tests can check that it prints what the
+/// parsers read: the suite itself only runs in CI. Its standard output, or a panic.
+#[cfg(all(test, unix))]
+pub(crate) fn fake_gh(args: &[&str]) -> String {
+    let script = concat!(env!("CARGO_MANIFEST_DIR"), "/../e2e/bin/gh");
+    let out = std::process::Command::new("sh")
+        .arg(script)
+        .args(args)
+        .env_remove("C50_FAKE_GH_LOG")
+        .env_remove("C50_FAKE_GH_LOGIN")
+        .output()
+        .expect("sh runs the fake gh");
+    assert!(out.status.success(), "fake gh {args:?}: {out:?}");
+    String::from_utf8(out.stdout)
+        .expect("UTF-8")
+        .trim_end()
+        .to_owned()
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

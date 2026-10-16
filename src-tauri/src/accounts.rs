@@ -162,4 +162,17 @@ mod tests {
         assert!(valid_login("-x").is_err());
         assert!(valid_login("").is_err());
     }
+
+    #[cfg(unix)]
+    #[test]
+    fn the_suites_fake_gh_lists_one_account() {
+        let json = crate::testenv::fake_gh(&["auth", "status", "--json", "hosts"]);
+        assert_eq!(
+            parse_status(&json).unwrap(),
+            vec![Account {
+                login: "ada-e2e".into(),
+                active: true
+            }]
+        );
+    }
 }

@@ -878,4 +878,45 @@ mod tests {
         );
         assert_eq!(parse_extension_version("", GH_STUDENT_REPO), None);
     }
+
+    /// The WebDriver suite's fake gh answers like gh does, for every parser it feeds.
+    #[cfg(unix)]
+    #[test]
+    fn the_suites_fake_gh_reads_like_gh() {
+        use crate::testenv::fake_gh;
+        let version = parse_gh_version(&fake_gh(&["--version"])).unwrap();
+        assert!(parse_semver(&version).unwrap() >= MIN_GH, "{version}");
+        assert_eq!(
+            parse_extension_version(&fake_gh(&["extension", "list"]), GH_STUDENT_REPO).as_deref(),
+            Some("v1.58.1")
+        );
+        let (login, scopes) = parse_user_response(&fake_gh(&["api", "--include", "user"]));
+        assert_eq!(login.as_deref(), Some("ada-e2e"));
+        assert_eq!(missing_scopes(&scopes.unwrap()), Vec::<String>::new());
+        assert_eq!(
+            fake_gh(&["config", "get", "user", "-h", "github.com"]),
+            "ada-e2e"
+        );
+        assert_eq!(
+            parse_git_protocol(&fake_gh(&[
+                "config",
+                "get",
+                "git_protocol",
+                "--host",
+                "github.com"
+            ])),
+            GitProtocol::Https
+        );
+        assert!(!fake_gh(&["auth", "token", "--hostname", "github.com"]).is_empty());
+        // The dry run says "already up to date" on stderr: no update to offer.
+        assert_eq!(
+            parse_dry_run(&fake_gh(&[
+                "extension",
+                "upgrade",
+                "gh-student",
+                "--dry-run"
+            ])),
+            None
+        );
+    }
 }
