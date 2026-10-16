@@ -7,6 +7,7 @@ mod commands;
 pub mod discovery;
 pub mod editors;
 pub mod error;
+mod failures;
 pub mod github;
 pub mod groups;
 mod login;

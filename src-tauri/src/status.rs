@@ -8,6 +8,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::classroom50::GradeResult;
 use crate::error::{Error, Result};
+use crate::failures::{self, ReleaseNotes};
 
 /// Extends the discovery fragment (`Repo`). `compare(headRef: "HEAD")` is taken from each
 /// branch, so `behindBy` counts the branch's commits missing from the default branch.
@@ -71,17 +72,50 @@ pub struct Grade {
     pub tests_passed: u32,
     pub tests_total: u32,
     /// Each test, in the autograder's order. Why one failed is only in the release body
-    /// (`url`); `result.json` doesn't carry it.
+    /// (`url`); `result.json` doesn't carry it, so the body is read once per tag
+    /// (`apply_release_body`).
     #[serde(default)]
     pub tests: Vec<GradeTest>,
     pub published_at: Option<DateTime<Utc>>,
     pub url: String,
+    /// What the release body says beyond each test's output; `None` until the body was
+    /// read, which only happens when a test failed.
+    #[serde(default)]
+    pub release_notes: Option<ReleaseNotes>,
 }
 
 impl Grade {
     /// Grades cached before the test list was kept have none: download them again.
     pub fn has_tests(&self) -> bool {
         self.tests.len() == self.tests_total as usize
+    }
+
+    /// A test failed and the release body, which says why, hasn't been read yet. Grades
+    /// cached before the body was read have no `release_notes` and are read once too.
+    pub fn needs_release_notes(&self) -> bool {
+        self.release_notes.is_none() && self.tests_passed < self.tests_total
+    }
+
+    /// Hands each failed test its output from the release body (`None`: the release or its
+    /// body is gone), matched by name in order, so two tests of the same name each get
+    /// their own.
+    pub fn apply_release_body(&mut self, body: Option<&str>) {
+        let parsed = failures::parse(body.unwrap_or_default());
+        let mut outputs = failures::cap_outputs(parsed.tests);
+        for test in self.tests.iter_mut().filter(|t| !t.passed) {
+            let Some(i) = outputs.iter().position(|(name, _)| *name == test.name) else {
+                continue;
+            };
+            let (_, output) = outputs.remove(i);
+            test.output_clipped = output.clipped;
+            test.output = (!output.text.is_empty()).then_some(output.text);
+        }
+        let notes =
+            (!parsed.notes.is_empty()).then(|| failures::clip(&parsed.notes, failures::NOTES_CAP));
+        self.release_notes = Some(ReleaseNotes {
+            notes_clipped: notes.as_ref().is_some_and(|n| n.clipped),
+            notes: notes.map(|n| n.text),
+        });
     }
 }
 
@@ -121,6 +155,12 @@ pub struct GradeTest {
     pub passed: bool,
     pub score: u32,
     pub max_score: u32,
+    /// Why it failed, from the release body: the runner's captured output, capped
+    /// (`output_clipped`: the release has more).
+    #[serde(default)]
+    pub output: Option<String>,
+    #[serde(default)]
+    pub output_clipped: bool,
 }
 
 /// The autograder's run on the head commit, while it says something the grade doesn't.
@@ -408,11 +448,57 @@ fn grade_from(release: &GradedRelease, result: &GradeResult) -> Grade {
                 passed: t.passed,
                 score: t.score,
                 max_score: t.max_score,
+                output: None,
+                output_clipped: false,
             })
             .collect(),
         published_at: release.published_at,
         url: release.url.clone(),
+        release_notes: None,
     }
+}
+
+/// A release's body by tag, read once per graded tag with a failed test. Not part of
+/// `FRAGMENT`, which runs for ten releases on every status check.
+const RELEASE_BODY: &str = r#"
+query($owner: String!, $name: String!, $tag: String!) {
+  repository(owner: $owner, name: $name) { release(tagName: $tag) { description } }
+}"#;
+
+#[derive(Deserialize)]
+struct BodyData {
+    repository: Option<BodyRepo>,
+}
+
+#[derive(Deserialize)]
+struct BodyRepo {
+    release: Option<BodyRelease>,
+}
+
+#[derive(Deserialize)]
+struct BodyRelease {
+    description: Option<String>,
+}
+
+/// The body of `owner/name`'s release `tag`; `None` when the release or its body is gone.
+pub async fn release_body(
+    http: &reqwest::Client,
+    token: &str,
+    owner: &str,
+    name: &str,
+    tag: &str,
+) -> Result<Option<String>> {
+    let data: BodyData = crate::github::graphql(
+        http,
+        token,
+        RELEASE_BODY,
+        serde_json::json!({ "owner": owner, "name": name, "tag": tag }),
+    )
+    .await?;
+    Ok(data
+        .repository
+        .and_then(|r| r.release)
+        .and_then(|r| r.description))
 }
 
 #[cfg(test)]
@@ -570,10 +656,13 @@ mod tests {
                 name: "t2".into(),
                 passed: false,
                 score: 0,
-                max_score: 3
+                max_score: 3,
+                output: None,
+                output_clipped: false,
             }
         );
         assert!(grade.has_tests());
+        assert!(grade.needs_release_notes());
 
         // The saved snapshot reads back.
         let saved: Grade = serde_json::from_str(&serde_json::to_string(&grade).unwrap()).unwrap();
@@ -584,5 +673,59 @@ mod tests {
         )
         .unwrap();
         assert!(!old.has_tests());
+        assert!(old.needs_release_notes());
+    }
+
+    fn test(name: &str, passed: bool) -> GradeTest {
+        GradeTest {
+            name: name.into(),
+            passed,
+            score: u32::from(passed),
+            max_score: 1,
+            output: None,
+            output_clipped: false,
+        }
+    }
+
+    #[test]
+    fn hands_each_failed_test_its_output() {
+        let mut grade = Grade {
+            tag: "submit/x".into(),
+            score: 1,
+            max_score: 4,
+            tests_passed: 1,
+            tests_total: 4,
+            tests: vec![
+                test("ok", true),
+                test("same", false),
+                test("same", false),
+                test("silent", false),
+            ],
+            published_at: None,
+            url: "u".into(),
+            release_notes: None,
+        };
+        let body = "### classroom50 autograde: 1/4\n\n\
+                    <details><summary>Failure details</summary>\n\n**same**\n\n```\nfirst\n```\n\n\
+                    **same**\n\n```\nsecond\n```\n\n**ok**\n\n```\nnot this one\n```\n</details>\n";
+        grade.apply_release_body(Some(body));
+        let outputs: Vec<Option<&str>> = grade.tests.iter().map(|t| t.output.as_deref()).collect();
+        assert_eq!(outputs, [None, Some("first"), Some("second"), None]);
+        assert_eq!(grade.release_notes, Some(ReleaseNotes::default()));
+        assert!(!grade.needs_release_notes());
+
+        // A release gone: read, nothing to show, not asked again.
+        let mut gone = grade.clone();
+        gone.release_notes = None;
+        gone.tests[1].output = None;
+        gone.apply_release_body(None);
+        assert_eq!(gone.tests[1].output, None);
+        assert!(!gone.needs_release_notes());
+
+        // All passed: nothing to read.
+        let mut passed = grade.clone();
+        passed.release_notes = None;
+        passed.tests_passed = 4;
+        assert!(!passed.needs_release_notes());
     }
 }
