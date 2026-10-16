@@ -66,7 +66,7 @@
     content: "";
     position: absolute;
     top: 2px;
-    left: 2px;
+    inset-inline-start: 2px;
     width: calc(var(--h) - 4px);
     height: calc(var(--h) - 4px);
     border-radius: 50%;
@@ -96,7 +96,7 @@
 
   :global(:root[data-os="windows"]) input::after {
     top: 3px;
-    left: 3px;
+    inset-inline-start: 3px;
     width: 12px;
     height: 12px;
     background: var(--fg-muted);

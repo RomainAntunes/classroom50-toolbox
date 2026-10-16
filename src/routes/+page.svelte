@@ -473,8 +473,7 @@
   /* A hairline under the titlebar; the spinning refresh icon stays the main cue. */
   .progress {
     position: absolute;
-    left: 14px;
-    right: 14px;
+    inset-inline: 14px;
     bottom: -4px;
     height: 2px;
     border-radius: 1px;
@@ -688,7 +687,7 @@
 
   .synced {
     flex-shrink: 0;
-    padding-right: 4px;
+    padding-inline-end: 4px;
     white-space: nowrap;
   }
 </style>

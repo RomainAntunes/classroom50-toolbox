@@ -809,13 +809,15 @@
 
   main {
     flex: 1;
-    /* The 10px track is always there (and invisible), so the right margin is 2px plus the
-       track and matches the left one whether or not the page scrolls. */
+    /* The 10px track is always there (and invisible), on the inline-end side (left when
+       right to left), so that margin is 2px plus the track and matches the start one
+       whether or not the page scrolls. */
     overflow-y: scroll;
     display: flex;
     flex-direction: column;
     gap: calc(var(--space) * 2);
-    padding: var(--space) 2px 14px 12px;
+    padding-block: var(--space) 14px;
+    padding-inline: 12px 2px;
   }
 
   .disclosure {
@@ -826,7 +828,7 @@
     padding: 8px 12px;
     border-radius: 0;
     background: transparent;
-    text-align: left;
+    text-align: start;
     color: var(--fg-muted);
   }
 
@@ -891,7 +893,7 @@
   }
 
   .row.nested {
-    padding-left: 24px;
+    padding-inline-start: 24px;
   }
 
   .row {

@@ -164,7 +164,7 @@
   }
 
   .test .points {
-    margin-left: 8px;
+    margin-inline-start: 8px;
   }
 
   button.test {
@@ -174,7 +174,7 @@
     background: none;
     color: inherit;
     font: inherit;
-    text-align: left;
+    text-align: start;
     cursor: pointer;
     white-space: normal;
     flex-shrink: 1;

@@ -172,7 +172,7 @@
     display: flex;
     align-items: center;
     gap: calc(var(--space) / 2);
-    padding-right: 12px;
+    padding-inline-end: 12px;
     transition: background-color 0.12s;
   }
 
@@ -185,10 +185,11 @@
     min-width: 0;
     display: flex;
     align-items: center;
-    padding: 8px 0 8px 12px;
+    padding-block: 8px;
+    padding-inline: 12px 0;
     border-radius: 0;
     background: none;
-    text-align: left;
+    text-align: start;
     white-space: normal;
   }
 
@@ -237,7 +238,7 @@
     display: inline-block;
     width: 7px;
     height: 7px;
-    margin-right: 6px;
+    margin-inline-end: 6px;
     border-radius: 50%;
     background: var(--accent);
     vertical-align: 1px;
