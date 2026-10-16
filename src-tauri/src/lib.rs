@@ -177,6 +177,7 @@ pub fn run() {
             commands::install_update,
             commands::defer_update,
             commands::quit_app,
+            commands::simulate_update,
         ])
         .build(tauri::generate_context!())
         .expect("error while building tauri application")

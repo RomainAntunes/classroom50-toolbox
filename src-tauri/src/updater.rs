@@ -737,6 +737,54 @@ pub fn channel_changed(app: &AppHandle) {
     });
 }
 
+/// Dev builds only: runs the whole UI path with a fake download of a few seconds, up to
+/// the ready banner and its notification. Restart then only logs.
+pub async fn simulate(app: &AppHandle) -> Result<()> {
+    if !cfg!(debug_assertions) {
+        return Err(Error::Unsupported(
+            "the update simulation is for dev builds".into(),
+        ));
+    }
+    const TOTAL: u64 = 12_400_000;
+    const STEPS: u64 = 40;
+    let state = app.state::<UpdaterState>();
+    let current = &app.package_info().version;
+    let version = format!("{}.{}.0", current.major, current.minor + 1);
+    let generation = state.with(|machine| {
+        machine.reset();
+        machine.simulated = true;
+        machine.begin_check()
+    });
+    let Some(generation) = generation else {
+        return Ok(());
+    };
+    emit(app);
+    tokio::time::sleep(Duration::from_millis(800)).await;
+    if !state.with(|machine| machine.found(generation, version.clone())) {
+        return Ok(());
+    }
+    emit(app);
+    for _ in 0..STEPS {
+        tokio::time::sleep(Duration::from_millis(100)).await;
+        let tell = state.with(|machine| {
+            machine.progress(generation, TOTAL / STEPS, Some(TOTAL), Instant::now())
+        });
+        if tell {
+            emit(app);
+        }
+    }
+    let pending = Pending {
+        update: None,
+        bytes: Vec::new(),
+    };
+    let notes = Some("Simulated release notes.".to_owned());
+    if state.with(|machine| machine.downloaded(generation, version.clone(), notes, pending)) {
+        emit(app);
+        announce_ready(app, version);
+    }
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

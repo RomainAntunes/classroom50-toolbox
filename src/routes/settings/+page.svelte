@@ -678,6 +678,10 @@
           />
           <button type="submit" disabled={!devLink.trim()}>{t("settings.dev.linkOpen")}</button>
         </form>
+        <div class="row">
+          <span title={t("settings.dev.updateHint")}>{t("settings.dev.update")}</span>
+          <button onclick={() => api.simulateUpdate()}>{t("settings.dev.updateRun")}</button>
+        </div>
         <button class="disclosure" aria-expanded={showDev} onclick={() => (showDev = !showDev)}>
           <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m9 18 6-6-6-6" /></svg>
           {t("settings.dev.notifications")}

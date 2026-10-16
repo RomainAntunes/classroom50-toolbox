@@ -1013,6 +1013,12 @@ pub fn quit_app(app: AppHandle) {
     updater::quit(&app);
 }
 
+/// Dev builds only: a fake update, from the check to the ready banner.
+#[tauri::command]
+pub async fn simulate_update(app: AppHandle) -> Result<()> {
+    updater::simulate(&app).await
+}
+
 /// Dev builds only: lights the tray badge after a few seconds, once the popover has
 /// closed (closing it clears the badge). The next open and close clears it again.
 #[tauri::command]

@@ -663,6 +663,8 @@ export const api = {
   deferUpdate: () => invoke<void>("defer_update"),
   /** Quits, installing a downloaded update first where the platform allows it. */
   quitApp: () => invoke<void>("quit_app"),
+  /** Dev builds only: a fake update, from the check to the ready banner. */
+  simulateUpdate: () => invoke<void>("simulate_update"),
 };
 
 export function errorKind(err: unknown): string | null {
