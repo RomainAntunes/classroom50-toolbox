@@ -188,7 +188,10 @@ export interface LocalState {
   head: string | null;
   ahead: number | null;
   behind: number | null;
+  /** Changes git reports, untracked editor and OS files aside. */
   changedFiles: number;
+  /** The first 20 of them (a new folder once, ending with `/`). */
+  changedPaths: string[];
   /** Local branches with commits missing from the local default branch. */
   unmerged: string[];
   /** GitHub has commits the clone doesn't (someone pushed since the last pull). */

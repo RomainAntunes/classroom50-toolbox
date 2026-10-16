@@ -17,6 +17,7 @@
   import { cloneUrls, copyLink, gitProtocol, openLink } from "$lib/links";
   import { menuKey, onContextMenu, popupMenu } from "$lib/keyboard";
   import { scrollBehavior } from "$lib/motion";
+  import { changedLines } from "$lib/files";
   import Details from "./Details.svelte";
 
   let { project, now, unseen }: { project: Project; now: Date; unseen: boolean } = $props();
@@ -68,6 +69,13 @@
         label: t("projects.pending.conflict"),
         warn: true,
         hint: t("projects.conflictHint"),
+      };
+    }
+    if (project.pending === "uncommitted" && project.local) {
+      return {
+        label: t("projects.pending.uncommitted"),
+        warn: true,
+        hint: t("projects.uncommittedHint", { files: changedLines(project.local) }),
       };
     }
     if (project.pending) {
@@ -241,7 +249,7 @@
       const local = project.local;
       // Only the default branch is graded, so another one is worth pointing out.
       if (local.branch !== defaultBranch) add("branch", local.branch);
-      if (local.changedFiles) add("changes", String(local.changedFiles));
+      if (local.changedFiles) add("changes", changedLines(local, 10));
     }
     add("folder", path ? tildify(path) : null);
     return items;

@@ -116,6 +116,9 @@ pub struct RemoteRepo {
     pub feedback: Option<Feedback>,
 }
 
+/// How many changed paths `LocalState` names; `changed_files` counts them all.
+pub const MAX_CHANGED_PATHS: usize = 20;
+
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct LocalState {
@@ -125,6 +128,10 @@ pub struct LocalState {
     pub ahead: Option<u32>,
     pub behind: Option<u32>,
     pub changed_files: u32,
+    /// The first `MAX_CHANGED_PATHS` of them, in git's order: a folder git collapsed (all
+    /// new) once, with its trailing `/`.
+    #[serde(default)]
+    pub changed_paths: Vec<String>,
     /// Local branches with commits missing from the local default branch.
     pub unmerged: Vec<String>,
     /// GitHub's default-branch head isn't in the clone: someone pushed since the last pull.
@@ -2422,6 +2429,9 @@ fn parse_status(porcelain: &str, real_folder: impl Fn(&str) -> bool) -> LocalSta
                 || entry.path.ends_with('/') && !real_folder(entry.path));
         if counts {
             state.changed_files += 1;
+            if state.changed_paths.len() < MAX_CHANGED_PATHS {
+                state.changed_paths.push(entry.path.to_owned());
+            }
         }
     }
     state
@@ -2680,6 +2690,22 @@ mod tests {
         // Tracked files count even in a noise folder; untracked noise and the folder holding
         // only noise don't.
         assert_eq!(state.changed_files, 6);
+        assert_eq!(
+            state.changed_paths,
+            [
+                "src/my file.c",
+                "new name.c",
+                "both.c",
+                "notes.txt",
+                "work/",
+                ".vscode/settings.json",
+            ]
+        );
+        let many: String = (0..25).map(|i| format!("? f{i}.c\0")).collect();
+        let state = parse_status(&many, |_| true);
+        assert_eq!(state.changed_files, 25);
+        assert_eq!(state.changed_paths.len(), MAX_CHANGED_PATHS);
+        assert_eq!(state.changed_paths[19], "f19.c");
 
         let fresh = parse_status("# branch.oid (initial)\0# branch.head (detached)\0", |_| {
             true
