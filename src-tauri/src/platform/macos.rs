@@ -7,6 +7,11 @@ use crate::tools::Tool;
 
 pub const OS: Os = Os::Macos;
 
+pub fn os_version() -> Option<String> {
+    let plist = std::fs::read_to_string("/System/Library/CoreServices/SystemVersion.plist").ok()?;
+    super::os_version::macos(&plist)
+}
+
 pub fn extra_path_dirs() -> Vec<PathBuf> {
     let mut dirs = vec![
         PathBuf::from("/opt/homebrew/bin"),

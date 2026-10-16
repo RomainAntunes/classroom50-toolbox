@@ -15,6 +15,7 @@ mod install;
 mod linux;
 #[cfg(target_os = "macos")]
 mod macos;
+mod os_version;
 #[cfg(target_os = "windows")]
 mod windows;
 
@@ -51,6 +52,12 @@ impl CommandSpec {
 
 pub fn os() -> Os {
     imp::OS
+}
+
+/// The OS release as people name it ("macOS 26.5", "Windows 11 24H2 (build 26100)",
+/// "Ubuntu 24.04.1 LTS"), read from a file or the registry, never by running a program.
+pub fn os_version() -> Option<String> {
+    imp::os_version()
 }
 
 /// Directories appended to PATH for child processes (see `process::search_path`).
