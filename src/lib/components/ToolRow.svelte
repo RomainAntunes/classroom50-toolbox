@@ -258,4 +258,18 @@
       transform: translateX(340%);
     }
   }
+
+  :global(:root[dir="rtl"]) .progress:not(.known) > div {
+    animation-name: slide-rtl;
+  }
+
+  /* Right to left the bar starts at the right edge and slides leftward. */
+  @keyframes slide-rtl {
+    from {
+      transform: translateX(100%);
+    }
+    to {
+      transform: translateX(-340%);
+    }
+  }
 </style>

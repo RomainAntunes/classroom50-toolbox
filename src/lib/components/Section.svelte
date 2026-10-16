@@ -41,7 +41,7 @@
           oncontextmenu={onmenu && onContextMenu(() => onmenu())}
           onkeydown={onmenu && menuKey(onmenu)}
         >
-          <svg class:open={!collapsed} viewBox="0 0 24 24" aria-hidden="true"
+          <svg class="mirror-rtl" class:open={!collapsed} viewBox="0 0 24 24" aria-hidden="true"
             ><path d="m9 18 6-6-6-6" /></svg
           >
           <span class="label">{title}</span>

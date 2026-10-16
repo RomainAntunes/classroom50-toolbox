@@ -208,6 +208,18 @@ button.icon svg {
   stroke-linejoin: round;
 }
 
+/* Icons that point along the reading direction (back, chevrons, "open in" arrows, a list's
+   bullets) face the other way right to left. `scale` mirrors on top of any `transform`, so
+   an open chevron's rotation still points it down. Never on logos, checkmarks or clocks.
+   A glyph in running text takes it as an inline block. */
+:root[dir="rtl"] .mirror-rtl {
+  scale: -1 1;
+}
+
+:root[dir="rtl"] span.mirror-rtl {
+  display: inline-block;
+}
+
 /* Every focusable element shows where the keyboard is; components only move the offset. */
 :focus-visible {
   outline: 2px solid var(--focus-ring);

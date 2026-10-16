@@ -479,7 +479,7 @@
     {#if openTarget}
       {@const openLabel = t(project.webUrl ? "projects.openClassroom50" : "projects.openGitHub")}
       <button title={openLabel} aria-label={openLabel} onclick={() => openUrl(openTarget)}
-        ><span aria-hidden="true">↗</span></button
+        ><span class="mirror-rtl" aria-hidden="true">↗</span></button
       >
     {/if}
   </div>
@@ -499,6 +499,10 @@
   .item.linked {
     background: color-mix(in srgb, var(--accent) 12%, transparent);
     box-shadow: inset 3px 0 0 var(--accent);
+  }
+
+  :global(:root[dir="rtl"]) .item.linked {
+    box-shadow: inset -3px 0 0 var(--accent);
   }
 
   .item {

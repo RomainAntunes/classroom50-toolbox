@@ -83,6 +83,11 @@
     transform: translateX(calc(var(--w) - var(--h)));
   }
 
+  /* The knob starts at the inline start and slides toward the end, leftward right to left. */
+  :global(:root[dir="rtl"]) input:checked::after {
+    transform: translateX(calc(var(--h) - var(--w)));
+  }
+
   input:focus-visible {
     outline-offset: 2px;
   }

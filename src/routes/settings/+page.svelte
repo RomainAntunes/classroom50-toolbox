@@ -374,7 +374,7 @@
 
 <header class="titlebar">
   <button class="icon" onclick={() => goto("/")} title={t("app.back")} aria-label={t("app.back")}>
-    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m15 18-6-6 6-6" /></svg>
+    <svg class="mirror-rtl" viewBox="0 0 24 24" aria-hidden="true"><path d="m15 18-6-6 6-6" /></svg>
   </button>
   <h1>{t("app.settings")}</h1>
 </header>
@@ -593,7 +593,9 @@
           <button disabled={clearing} onclick={clearCache}>{t("settings.sync.clear")}</button>
         {/snippet}
         <button class="disclosure" aria-expanded={showSync} onclick={() => (showSync = !showSync)}>
-          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m9 18 6-6-6-6" /></svg>
+          <svg class="mirror-rtl" viewBox="0 0 24 24" aria-hidden="true"
+            ><path d="m9 18 6-6-6-6" /></svg
+          >
           {t(showSync ? "settings.sync.hide" : "settings.sync.show")}
         </button>
         {#if showSync}
@@ -700,7 +702,9 @@
           >
         </div>
         <button class="disclosure" aria-expanded={showDev} onclick={() => (showDev = !showDev)}>
-          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m9 18 6-6-6-6" /></svg>
+          <svg class="mirror-rtl" viewBox="0 0 24 24" aria-hidden="true"
+            ><path d="m9 18 6-6-6-6" /></svg
+          >
           {t("settings.dev.notifications")}
         </button>
         {#if showDev}
@@ -930,6 +934,12 @@
     white-space: nowrap;
     direction: rtl;
     text-align: left;
+  }
+
+  /* `direction: rtl` above only puts the ellipsis at the path's start; the text still lines
+     up with the UI's start edge. */
+  :global(:root[dir="rtl"]) .path {
+    text-align: right;
   }
 
   .hint {

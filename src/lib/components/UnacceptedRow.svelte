@@ -144,7 +144,8 @@
     <button
       title={t("projects.openAcceptPage")}
       aria-label={t("projects.openAcceptPage")}
-      onclick={() => openUrl(item.acceptUrl)}><span aria-hidden="true">↗</span></button
+      onclick={() => openUrl(item.acceptUrl)}
+      ><span class="mirror-rtl" aria-hidden="true">↗</span></button
     >
   </div>
   {#if open}
@@ -157,6 +158,10 @@
   .item.linked {
     background: color-mix(in srgb, var(--accent) 12%, transparent);
     box-shadow: inset 3px 0 0 var(--accent);
+  }
+
+  :global(:root[dir="rtl"]) .item.linked {
+    box-shadow: inset -3px 0 0 var(--accent);
   }
 
   .hidden-tag {

@@ -510,6 +510,21 @@
     }
   }
 
+  :global(:root[dir="rtl"]) .progress.indeterminate > div,
+  :global(:root[dir="rtl"]) .first-bar.indeterminate > div {
+    animation-name: slide-rtl;
+  }
+
+  /* Right to left the bar starts at the right edge and slides leftward. */
+  @keyframes slide-rtl {
+    from {
+      transform: translateX(100%);
+    }
+    to {
+      transform: translateX(-340%);
+    }
+  }
+
   /* A segmented control, like the native ones: a track with the chosen segment raised. */
   .filters {
     display: flex;

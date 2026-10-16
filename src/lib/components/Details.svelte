@@ -68,7 +68,9 @@
               title={test.name}
               onclick={() => (opened[i] = !opened[i])}
             >
-              <span class="chevron" class:open={opened[i]} aria-hidden="true">›</span>
+              <span class="chevron mirror-rtl" class:open={opened[i]} dir="ltr" aria-hidden="true"
+                >›</span
+              >
               <span class="name">{test.name}</span>
               <span class="points">{test.score}/{test.maxScore}</span>
             </button>
@@ -90,7 +92,8 @@
     {/if}
     {#if notes?.notes}
       <button class="test" aria-expanded={notesOpen} onclick={() => (notesOpen = !notesOpen)}>
-        <span class="chevron" class:open={notesOpen} aria-hidden="true">›</span>
+        <span class="chevron mirror-rtl" class:open={notesOpen} dir="ltr" aria-hidden="true">›</span
+        >
         <span class="name">{t("details.releaseNotes")}</span>
       </button>
       {#if notesOpen}

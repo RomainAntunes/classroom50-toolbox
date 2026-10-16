@@ -74,7 +74,7 @@
     </section>
     <ul class="points">
       <li>
-        <svg viewBox="0 0 24 24" aria-hidden="true"
+        <svg class="mirror-rtl" viewBox="0 0 24 24" aria-hidden="true"
           ><path d="M8 6h13M8 12h13M8 18h13M3.5 6h.01M3.5 12h.01M3.5 18h.01" /></svg
         >
         <span>{t("welcome.point.list")}</span>
@@ -289,6 +289,12 @@
     white-space: nowrap;
     direction: rtl;
     text-align: left;
+  }
+
+  /* `direction: rtl` above only puts the ellipsis at the path's start; the text still lines
+     up with the UI's start edge. */
+  :global(:root[dir="rtl"]) .path {
+    text-align: right;
   }
 
   footer {
