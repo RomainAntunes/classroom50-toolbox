@@ -213,6 +213,7 @@
   "copy.ssh": "Clone URL (SSH)",
   "copy.gh": "gh repo clone command",
   "projects.openAcceptPage": "Open on Classroom 50",
+  "projects.createGroup": "Create a group…",
   "projects.lockedHint": "Your teacher locked this assignment for now",
   "projects.upcomingHint": "Your teacher hasn't released this assignment yet",
   "projects.submit": "Submit…",

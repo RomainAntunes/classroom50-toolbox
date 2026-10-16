@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { Assignment, Classroom, Group, Unaccepted } from "$lib/api";
-import { notes, repoName } from "$lib/accept";
+import { canFoundGroup, notes, repoName } from "$lib/accept";
 
 const item = (assignment: Partial<Assignment>, group: Group | null = null): Unaccepted => ({
   id: "heigvd-poo/26-poo-c/labo-3",
@@ -62,5 +62,15 @@ describe("notes", () => {
     expect(text).toContain("marked late, never refused");
     expect(text).toContain("you name a new group");
     expect(text).not.toMatch(/[{}]/);
+  });
+});
+
+describe("canFoundGroup", () => {
+  it("offers to found a group only on student-formed team assignments without one", () => {
+    expect(canFoundGroup(item({ mode: "team", teamFormation: "student" }))).toBe(true);
+    expect(canFoundGroup(item({ mode: "team", teamFormation: "teacher" }))).toBe(false);
+    expect(canFoundGroup(item({ mode: "team" }, { number: 1 } as Group))).toBe(false);
+    expect(canFoundGroup(item({ mode: "group" }))).toBe(false);
+    expect(canFoundGroup(item({}))).toBe(false);
   });
 });

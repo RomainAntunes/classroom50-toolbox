@@ -216,6 +216,7 @@
   "copy.ssh": "URL de clonación (SSH)",
   "copy.gh": "Comando gh repo clone",
   "projects.openAcceptPage": "Abrir en Classroom 50",
+  "projects.createGroup": "Crear un grupo…",
   "projects.lockedHint": "Tu docente bloqueó esta tarea por ahora",
   "projects.upcomingHint": "Tu docente aún no ha publicado esta tarea",
   "projects.submit": "Entregar…",

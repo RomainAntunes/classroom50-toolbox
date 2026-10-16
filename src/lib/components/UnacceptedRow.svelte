@@ -5,7 +5,7 @@
   import { menuKey, onContextMenu, popupMenu } from "$lib/keyboard";
   import { scrollBehavior } from "$lib/motion";
   import { isHidden, setHidden } from "$lib/hidden";
-  import { acceptAssignment, acceptBlocked } from "$lib/accept";
+  import { acceptAssignment, acceptBlocked, canFoundGroup } from "$lib/accept";
   import { session } from "$lib/session.svelte";
   import { acceptLink, copyLink } from "$lib/links";
   import { groupDetails, groupName } from "$lib/group";
@@ -29,8 +29,8 @@
   const blocked = $derived(acceptBlocked(item, now));
 
   const accepting = $derived(session.accepting.includes(item.id));
-  function accept() {
-    void acceptAssignment(item);
+  function accept(newGroup = false) {
+    void acceptAssignment(item, newGroup);
   }
 
   const hidden = $derived(isHidden(item.id));
@@ -43,6 +43,15 @@
         enabled: !accepting && blocked === null,
         action: () => accept(),
       }),
+      ...(canFoundGroup(item)
+        ? [
+            MenuItem.new({
+              text: t("projects.createGroup"),
+              enabled: !accepting && blocked === null,
+              action: () => accept(true),
+            }),
+          ]
+        : []),
       MenuItem.new({
         text: t("projects.openAcceptPage"),
         action: () => openUrl(item.acceptUrl),
@@ -130,7 +139,7 @@
       class="primary"
       title={blocked ?? undefined}
       disabled={accepting || blocked !== null}
-      onclick={accept}>{t("projects.accept")}</button
+      onclick={() => accept()}>{t("projects.accept")}</button
     >
     <button
       title={t("projects.openAcceptPage")}
