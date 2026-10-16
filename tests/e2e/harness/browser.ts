@@ -338,7 +338,10 @@ export function install(scenario: Scenario): E2E {
       const menu = popups[popups.length - 1];
       if (!menu) throw new Error("No menu is open");
       const item = findItem(menu.items, key);
-      if (!item) throw new Error(`No menu item "${key}"`);
+      if (!item) {
+        const texts = describe(menu).items.map((i) => i.text);
+        throw new Error(`No menu item "${key}" in ${JSON.stringify(texts)}`);
+      }
       if (item.options.enabled === false) throw new Error(`Menu item "${key}" is disabled`);
       if (!item.handler) throw new Error(`Menu item "${key}" has no action`);
       popups = [];
