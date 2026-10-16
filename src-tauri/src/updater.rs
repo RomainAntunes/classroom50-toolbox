@@ -73,11 +73,12 @@ impl Bundle {
     }
 
     /// Installing needs no prompt, so it can run while the app quits: the `.app` swap,
-    /// the Windows installer (passive, it shows its own progress) or the AppImage rewrite.
-    /// A deb or rpm goes through `pkexec`, and a password prompt popping up after Quit
-    /// would be a surprise, so those install on "Restart now" only.
+    /// the NSIS installer (per user, passive, it shows its own progress) or the AppImage
+    /// rewrite. A deb or rpm goes through `pkexec`, and the MSI installs for all users, so
+    /// Windows asks for administrator rights; a prompt popping up after Quit would be a
+    /// surprise, so those install on "Restart now" only.
     pub fn installs_on_quit(self) -> bool {
-        matches!(self, Self::App | Self::Msi | Self::Nsis | Self::AppImage)
+        matches!(self, Self::App | Self::Nsis | Self::AppImage)
     }
 
     /// `pkexec dpkg -i` / `pkexec rpm -U` (the updater plugin's own deb and rpm support).
@@ -960,7 +961,7 @@ mod tests {
     #[test]
     fn knows_what_each_install_can_do() {
         assert!(Bundle::App.installs_on_quit() && !Bundle::App.asks_password());
-        assert!(Bundle::Nsis.installs_on_quit() && Bundle::Msi.installs_on_quit());
+        assert!(Bundle::Nsis.installs_on_quit() && !Bundle::Msi.installs_on_quit());
         assert!(Bundle::AppImage.installs_on_quit());
         assert!(!Bundle::Deb.installs_on_quit() && Bundle::Deb.asks_password());
         assert!(!Bundle::Rpm.installs_on_quit() && Bundle::Rpm.asks_password());
