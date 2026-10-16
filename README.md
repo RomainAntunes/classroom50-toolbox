@@ -1,36 +1,118 @@
+<div align="center">
+
+<img src="assets/icon.svg" alt="" width="96" height="96" />
+
 # Classroom 50 Toolbox
 
-A tray app for [Classroom 50](https://github.com/foundation50/classroom50) students on macOS,
-Windows and Linux, in the spirit of JetBrains Toolbox. It installs what Classroom 50 needs, finds
-your assignments, and keeps due dates, submissions and grades one click away in the menu bar or
-notification area.
+**Your [Classroom 50](https://github.com/foundation50/classroom50) assignments, one click away.**<br />
+Due dates, grades and the tests that failed, in your menu bar or notification area.<br />
+Accept, clone, commit and submit with a button instead of a command.
 
-> Early development. Not affiliated with the Fifty Foundation.
+[**Download**](https://romainantunes.github.io/classroom50-toolbox/) ·
+[Latest release](https://github.com/RomainAntunes/classroom50-toolbox/releases/latest) ·
+[Report a problem](https://github.com/RomainAntunes/classroom50-toolbox/issues)
+
+[![Latest release](https://img.shields.io/github/v/release/RomainAntunes/classroom50-toolbox?label=release&color=1d1d1f)](https://github.com/RomainAntunes/classroom50-toolbox/releases/latest)
+![macOS, Windows, Linux](https://img.shields.io/badge/macOS%20%C2%B7%20Windows%20%C2%B7%20Linux-6e6e73)
+[![License: GPL-3.0](https://img.shields.io/badge/license-GPL--3.0-6e6e73)](LICENSE)
+
+<picture>
+  <source srcset="site/screenshots/list-macos-dark.webp" media="(prefers-color-scheme: dark)" />
+  <img src="site/screenshots/list-macos-light.webp" width="420" alt="The toolbox open under its menu bar icon: two classes, each assignment with its due date, grade, uncommitted work or an Accept button." />
+</picture>
+
+</div>
+
+A tray app for Classroom 50 students, in the spirit of JetBrains Toolbox. It installs what
+Classroom 50 needs, finds your assignments, and runs the `gh student`, `gh` and `git` commands
+for you when you click. Free, open source and not affiliated with the Fifty Foundation.
+
+## A quick tour
+
+<table>
+  <tr>
+    <td width="33%" valign="top">
+      <picture>
+        <source srcset="site/screenshots/popover-details-dark.webp" media="(prefers-color-scheme: dark)" />
+        <img src="site/screenshots/popover-details-light.webp" alt="An assignment's details: a grade of 8 out of 10 and the output of the test that failed." />
+      </picture>
+      <p><b>See why a test failed.</b> The score, every test, and the autograder's output for
+      the ones that didn't pass.</p>
+    </td>
+    <td width="33%" valign="top">
+      <picture>
+        <source srcset="site/screenshots/popover-commit-dark.webp" media="(prefers-color-scheme: dark)" />
+        <img src="site/screenshots/popover-commit-light.webp" alt="The Commit and push prompt, with the changed files and a message." />
+      </picture>
+      <p><b>Commit and push from the list.</b> It names the files and leaves out
+      <code>.DS_Store</code> and editor folders. Off until you turn it on.</p>
+    </td>
+    <td width="33%" valign="top">
+      <picture>
+        <source srcset="site/screenshots/popover-setup-dark.webp" media="(prefers-color-scheme: dark)" />
+        <img src="site/screenshots/popover-setup-light.webp" alt="The first-run guide installing the GitHub CLI." />
+      </picture>
+      <p><b>Ready in a minute.</b> The first launch installs git, the GitHub CLI and
+      <code>gh student</code>, then signs you in.</p>
+    </td>
+  </tr>
+</table>
+
+It follows each system's look, in light and dark:
+
+<table>
+  <tr>
+    <td width="33%" align="center">
+      <picture>
+        <source srcset="site/screenshots/list-macos-dark.webp" media="(prefers-color-scheme: dark)" />
+        <img src="site/screenshots/list-macos-light.webp" alt="The toolbox on macOS." />
+      </picture>
+      macOS
+    </td>
+    <td width="33%" align="center">
+      <picture>
+        <source srcset="site/screenshots/list-windows-dark.webp" media="(prefers-color-scheme: dark)" />
+        <img src="site/screenshots/list-windows-light.webp" alt="The toolbox on Windows." />
+      </picture>
+      Windows
+    </td>
+    <td width="33%" align="center">
+      <picture>
+        <source srcset="site/screenshots/list-linux-dark.webp" media="(prefers-color-scheme: dark)" />
+        <img src="site/screenshots/list-linux-light.webp" alt="The toolbox on Linux." />
+      </picture>
+      Linux
+    </td>
+  </tr>
+</table>
+
+<sub>Screenshots show made-up classes; `pnpm site:shots` makes them from the app's own UI.</sub>
 
 ## What it does
 
 - **Sets up your machine.** Checks for git, the GitHub CLI (`gh`) and the `gh student`
   extension, installs whichever is missing through your package manager (Homebrew, winget,
-  apt/dnf/pacman), and updates `gh student` when a new version is out.
+  apt/dnf/pacman/zypper), and updates `gh student` when a new version is out.
 - **Signs you in** to GitHub through `gh`, with a one-time code in your browser. Several
   accounts are supported; the app never keeps its own copy of your token.
-- **Lists your assignments**, from GitHub and from the folders on your disk (including the
-  projects your editor opened recently: JetBrains IDEs, VS Code and its forks such as Cursor,
+- **Lists your assignments**, from GitHub and from the folders on your disk, including the
+  projects your editor opened recently (JetBrains IDEs, VS Code and its forks such as Cursor,
   Zed, Sublime Text, Eclipse, NetBeans or Visual Studio): due dates, late work, uncommitted or
   unsubmitted changes, branches not merged yet, grades with the tests that failed and your
   earlier grades, the autograder running or failing, and teacher feedback.
+- **Accepts, clones, pulls, commits, pushes and submits** your work, and opens a project in
+  the editor you last used for it, your terminal, your file manager or on GitHub.
 - **Shows your group** on team assignments, with who is in it, even before you accept. Add a
   classmate to your group, or invite one to your repository, from the app. Search finds
   assignments by teammate too.
-- **Shows the assignments you haven't accepted yet**, and accepts them for you.
-- **Clones, pulls and submits** your work, and opens a project in the editor you last used for
-  it, your terminal, your file manager or on GitHub.
 - **Notifies you** before a deadline, when a grade or feedback arrives, when a new assignment is
   published, when a teammate pushes, and when a classmate joins your group.
+- **Puts your due dates in your calendar**: the Calendar app on macOS, GNOME Calendar or
+  KOrganizer on Linux, or an `.ics` file anywhere.
 - **Hides what you don't need**: a hidden assignment leaves the list and sends no
   notifications, and search still finds it.
-- Starts at login, hidden in the tray, and updates itself. The first launch walks you through
-  setup.
+- Works with the keyboard and screen readers, starts at login hidden in the tray, and updates
+  itself. The first launch walks you through setup.
 
 ## Install
 
@@ -97,6 +179,8 @@ Requirements: [Rust](https://rustup.rs), Node.js LTS, pnpm, and the
 pnpm install
 pnpm tauri dev      # run the app
 pnpm lint           # prettier + svelte-check
+pnpm test:e2e       # UI flows in WebKit, with Rust mocked
+pnpm site:shots     # the screenshots above (needs cwebp)
 cd src-tauri && cargo test && cargo clippy --all-targets -- -D warnings
 ```
 
