@@ -537,6 +537,8 @@ export const api = {
   /** Dev builds only: handles `url` as if the OS had opened it. */
   simulateDeepLink: (url: string) => invoke<void>("simulate_deep_link", { url }),
   setPopoverPinned: (pinned: boolean) => invoke<void>("set_popover_pinned", { pinned }),
+  /** Hides the popover, like a click outside it. */
+  hidePopover: () => invoke<void>("hide_popover"),
   toolStatuses: () => invoke<ToolStatus[]>("tool_statuses"),
   installCommand: (tool: Tool) => invoke<InstallPlan>("install_command", { tool }),
   /** The newer version `upgradeTool` would install; always null for git and gh. */

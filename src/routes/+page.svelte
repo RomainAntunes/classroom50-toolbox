@@ -19,8 +19,10 @@
     type Unaccepted,
     type ToolStatus,
     type UpdateInfo,
-    withDialog,
   } from "$lib/api";
+  import { announce } from "$lib/announce.svelte";
+  import { menuKey, onContextMenu, popupMenu, rovingList } from "$lib/keyboard";
+  import { moveIndex } from "$lib/keys";
   import { fromNow, t } from "$lib/i18n";
   import { session } from "$lib/session.svelte";
   import { loadSettings, saveSettings, settings } from "$lib/settings.svelte";
@@ -159,6 +161,10 @@
       ]);
       Object.assign(session, { tools, auth, snapshot });
       now = new Date();
+      announce(snapshot.issue ? t("a11y.syncFailed") : t("a11y.synced"));
+    } catch (err) {
+      announce(t("a11y.syncFailed"));
+      throw err;
     } finally {
       loading = false;
     }
@@ -170,19 +176,20 @@
     try {
       session.snapshot = await api.rescanLocal();
       now = new Date();
+      announce(t("a11y.rescanned"));
     } finally {
       loading = false;
     }
   }
 
-  async function refreshMenu(event: MouseEvent) {
-    event.preventDefault();
+  /** Refresh or rescan, from a right click or the keyboard's menu key. */
+  async function refreshMenu(anchor?: HTMLElement) {
     const items = await Promise.all([
       MenuItem.new({ text: t("app.refresh"), enabled: !loading, action: refresh }),
       MenuItem.new({ text: t("projects.rescan"), enabled: !loading, action: rescan }),
     ]);
     const menu = await Menu.new({ items });
-    await withDialog(() => menu.popup());
+    await popupMenu(menu, anchor);
   }
 
   // The very first sync: nothing to show yet but what is happening. Local results and
@@ -208,8 +215,7 @@
     return undefined;
   }
 
-  async function classMenu(event: MouseEvent, key: string) {
-    event.preventDefault();
+  async function classMenu(key: string, anchor?: HTMLElement) {
     const collapsed = isCollapsed(key);
     const hidden = isClassHidden(key);
     const items = await Promise.all([
@@ -223,7 +229,26 @@
       }),
     ]);
     const menu = await Menu.new({ items });
-    await withDialog(() => menu.popup());
+    await popupMenu(menu, anchor);
+  }
+
+  /**
+   * The filters are radio buttons: one Tab stop, the arrow keys choose. The focused button
+   * is the current choice: `filter` only changes once Rust has saved it, so two quick
+   * presses would both start from the old one.
+   */
+  function filterKey(event: KeyboardEvent) {
+    const buttons = [...(event.currentTarget as HTMLElement).querySelectorAll("button")];
+    const focused = buttons.indexOf(document.activeElement as HTMLButtonElement);
+    const current = focused >= 0 ? focused : FILTERS.indexOf(filter);
+    const next = moveIndex(event.key, current, FILTERS.length, {
+      horizontal: true,
+      wrap: true,
+    });
+    if (next === null) return;
+    event.preventDefault();
+    void saveSettings({ listFilter: FILTERS[next] });
+    buttons[next]?.focus();
   }
 
   function replaceTool(next: ToolStatus) {
@@ -281,7 +306,8 @@
       class:spinning={syncing}
       disabled={loading}
       onclick={refresh}
-      oncontextmenu={refreshMenu}
+      oncontextmenu={onContextMenu(() => refreshMenu())}
+      onkeydown={menuKey(refreshMenu)}
       title={syncedLabel ? `${t("app.refresh")} (${syncedLabel})` : t("app.refresh")}
       aria-label={t("app.refresh")}
     >
@@ -319,11 +345,18 @@
   {/if}
 </header>
 
-<div class="filters" role="radiogroup" aria-label={t("projects.filter.label")}>
+<div
+  class="filters"
+  role="radiogroup"
+  tabindex="-1"
+  aria-label={t("projects.filter.label")}
+  onkeydown={filterKey}
+>
   {#each FILTERS as option (option)}
     <button
       role="radio"
       aria-checked={filter === option}
+      tabindex={filter === option ? 0 : -1}
       class:active={filter === option}
       onclick={() => saveSettings({ listFilter: option })}>{t(`projects.filter.${option}`)}</button
     >
@@ -370,33 +403,37 @@
       </div>
     </div>
   {:else}
-    {#each groups as group (group.key)}
-      <Section
-        title={group.title}
-        collapsed={folded(group)}
-        note={classNote(group)}
-        ontoggle={() => setCollapsed(group.key, !isCollapsed(group.key))}
-        onmenu={(event) => classMenu(event, group.key)}
-      >
-        {#each group.projects as project (project.id)}
-          <ProjectRow {project} {now} unseen={unseen.has(project.id)} />
-        {/each}
-        {#each group.unaccepted as item (item.id)}
-          <UnacceptedRow {item} {now} unseen={unseen.has(item.id)} />
-        {/each}
-      </Section>
-    {:else}
-      <p class="empty">
-        {#if (query || filter !== "all") && (allProjects.length > 0 || session.snapshot?.unaccepted.length)}
-          {t("projects.noMatch")}
-        {:else if syncing}
-          {t("projects.loading")}
-        {:else}
-          {t("projects.empty")}
-          <button onclick={() => goto("/settings")}>{t("app.settings")}</button>
-        {/if}
-      </p>
-    {/each}
+    <!-- Every row of every class is one Tab stop; the arrow keys move between rows. -->
+    <div class="classes" use:rovingList>
+      {#each groups as group (group.key)}
+        <Section
+          title={group.title}
+          list
+          collapsed={folded(group)}
+          note={classNote(group)}
+          ontoggle={() => setCollapsed(group.key, !isCollapsed(group.key))}
+          onmenu={(anchor) => classMenu(group.key, anchor)}
+        >
+          {#each group.projects as project (project.id)}
+            <ProjectRow {project} {now} unseen={unseen.has(project.id)} />
+          {/each}
+          {#each group.unaccepted as item (item.id)}
+            <UnacceptedRow {item} {now} unseen={unseen.has(item.id)} />
+          {/each}
+        </Section>
+      {:else}
+        <p class="empty">
+          {#if (query || filter !== "all") && (allProjects.length > 0 || session.snapshot?.unaccepted.length)}
+            {t("projects.noMatch")}
+          {:else if syncing}
+            {t("projects.loading")}
+          {:else}
+            {t("projects.empty")}
+            <button onclick={() => goto("/settings")}>{t("app.settings")}</button>
+          {/if}
+        </p>
+      {/each}
+    </div>
   {/if}
 </main>
 
@@ -495,7 +532,8 @@
   }
 
   .search:focus-visible {
-    border-color: var(--accent);
+    border-color: var(--focus-ring);
+    box-shadow: 0 0 0 1px var(--focus-ring);
   }
 
   .tools {
@@ -523,6 +561,10 @@
   .logo {
     height: 26px;
     width: 26px;
+  }
+
+  .classes {
+    display: contents;
   }
 
   main {

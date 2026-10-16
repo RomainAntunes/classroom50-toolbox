@@ -8,13 +8,47 @@
   // A read-only preview (`showText`) has no input; its main action is always available.
   const preview = $derived(prompt.current?.text !== undefined);
   const ready = $derived(preview || value.trim() !== "");
+  let card = $state<HTMLElement | null>(null);
+  /** What had the focus before the prompt opened; it gets it back when the prompt closes. */
+  let restore: HTMLElement | null = null;
 
   $effect(() => {
     if (prompt.current) {
+      restore ??= document.activeElement instanceof HTMLElement ? document.activeElement : null;
       value = "";
       (input ?? pre)?.focus();
+    } else if (restore) {
+      const previous = restore;
+      restore = null;
+      if (previous.isConnected) previous.focus();
     }
   });
+
+  /** Keeps Tab and Shift+Tab inside the prompt, and Escape cancels it. */
+  function onKeyDown(event: KeyboardEvent) {
+    if (event.key === "Escape") {
+      event.preventDefault();
+      close(null);
+      return;
+    }
+    if (event.key !== "Tab" || !card) return;
+    const focusable = [
+      ...card.querySelectorAll<HTMLElement>("input, pre[tabindex], button:not(:disabled)"),
+    ];
+    const first = focusable[0];
+    const last = focusable[focusable.length - 1];
+    if (!first || !last) return;
+    // The handler only runs with the focus in the card; on the card itself (a click on
+    // its padding) Tab would otherwise leave it.
+    const onCard = document.activeElement === card;
+    if (event.shiftKey && (document.activeElement === first || onCard)) {
+      event.preventDefault();
+      last.focus();
+    } else if (!event.shiftKey && (document.activeElement === last || onCard)) {
+      event.preventDefault();
+      first.focus();
+    }
+  }
 
   function close(result: string | null, alt = false) {
     prompt.current?.resolve(result, alt);
@@ -29,11 +63,11 @@
       role="dialog"
       aria-modal="true"
       aria-labelledby="prompt-title"
+      aria-describedby={current.message ? "prompt-message" : undefined}
       tabindex="-1"
+      bind:this={card}
       onclick={(event) => event.stopPropagation()}
-      onkeydown={(event) => {
-        if (event.key === "Escape") close(null);
-      }}
+      onkeydown={onKeyDown}
     >
       <form
         onsubmit={(event) => {
@@ -42,14 +76,15 @@
         }}
       >
         <h2 id="prompt-title">{current.title}</h2>
-        {#if current.message}<p>{current.message}</p>{/if}
+        {#if current.message}<p id="prompt-message">{current.message}</p>{/if}
         {#if current.text !== undefined}
           <!-- svelte-ignore a11y_no_noninteractive_tabindex -->
-          <pre bind:this={pre} tabindex="0">{current.text}</pre>
+          <pre bind:this={pre} tabindex="0" aria-labelledby="prompt-title">{current.text}</pre>
         {:else}
           <input
             bind:this={input}
             bind:value
+            aria-label={current.title}
             placeholder={current.placeholder}
             autocomplete="off"
             autocapitalize="off"
@@ -128,7 +163,8 @@
   }
 
   input:focus-visible {
-    border-color: var(--accent);
+    border-color: var(--focus-ring);
+    box-shadow: 0 0 0 1px var(--focus-ring);
   }
 
   pre {
@@ -149,7 +185,8 @@
   }
 
   pre:focus-visible {
-    border-color: var(--accent);
+    border-color: var(--focus-ring);
+    box-shadow: 0 0 0 1px var(--focus-ring);
   }
 
   .buttons {

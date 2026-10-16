@@ -4,6 +4,7 @@ import { CheckMenuItem, Menu } from "@tauri-apps/api/menu";
 import { message } from "@tauri-apps/plugin-dialog";
 import { api, errorMessage, withDialog, type EditorInfo, type Project } from "$lib/api";
 import { t } from "$lib/i18n";
+import { popupMenu } from "$lib/keyboard";
 import { saveSettings, settings } from "$lib/settings.svelte";
 
 export const editors = $state<{ installed: EditorInfo[]; loaded: boolean }>({
@@ -48,7 +49,7 @@ export async function openInEditor(path: string, editor: EditorInfo): Promise<vo
 }
 
 /** A native menu of the installed editors, the default one checked; picking one saves it. */
-export async function chooseDefaultEditor(): Promise<void> {
+export async function chooseDefaultEditor(anchor?: Element | null): Promise<void> {
   const current = defaultEditor();
   const items = await Promise.all(
     editors.installed.map((other) =>
@@ -60,5 +61,5 @@ export async function chooseDefaultEditor(): Promise<void> {
     ),
   );
   const menu = await Menu.new({ items });
-  await withDialog(() => menu.popup());
+  await popupMenu(menu, anchor);
 }

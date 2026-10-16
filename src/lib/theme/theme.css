@@ -30,6 +30,8 @@
   --danger: #d70015;
   --warning: #c27c00;
   --success: #248a3d;
+  /* The keyboard focus ring: 3:1 against every surface it sits on. */
+  --focus-ring: var(--accent);
 
   color-scheme: light dark;
 }
@@ -186,9 +188,23 @@ button.icon svg {
   stroke-linejoin: round;
 }
 
-button:focus-visible {
-  outline: 2px solid var(--accent);
+/* Every focusable element shows where the keyboard is; components only move the offset. */
+:focus-visible {
+  outline: 2px solid var(--focus-ring);
   outline-offset: 1px;
+}
+
+/* Read by screen readers, not shown: what a color, an icon or a symbol says on screen. */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+  border: 0;
 }
 
 /* Thin and quiet, like the JetBrains Toolbox: a 4px rounded thumb on no track, inset from

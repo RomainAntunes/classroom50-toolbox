@@ -1,7 +1,7 @@
 <script lang="ts">
   import { Menu, MenuItem, PredefinedMenuItem, Submenu } from "@tauri-apps/api/menu";
   import { openUrl, revealItemInDir } from "@tauri-apps/plugin-opener";
-  import { api, withDialog, type Project } from "$lib/api";
+  import { api, type Project } from "$lib/api";
   import { cloneProject } from "$lib/clone";
   import { editorFor, editors, openInEditor } from "$lib/editor.svelte";
   import { pullProject } from "$lib/pull";
@@ -15,9 +15,11 @@
   import { session } from "$lib/session.svelte";
   import { settings } from "$lib/settings.svelte";
   import { copyLink, openLink } from "$lib/links";
+  import { menuKey, onContextMenu, popupMenu } from "$lib/keyboard";
   import Details from "./Details.svelte";
 
   let { project, now, unseen }: { project: Project; now: Date; unseen: boolean } = $props();
+  const uid = $props.id();
 
   const DAY = 24 * 60 * 60 * 1000;
 
@@ -244,9 +246,8 @@
     return items;
   });
 
-  /** The row's native context menu with every action. */
-  async function showMenu(event: MouseEvent) {
-    event.preventDefault();
+  /** The row's native context menu with every action, under `anchor` or at the pointer. */
+  async function showMenu(anchor?: HTMLElement) {
     const os = document.documentElement.dataset.os ?? "linux";
     const separator = () => PredefinedMenuItem.new({ item: "Separator" });
     const items = await Promise.all([
@@ -371,118 +372,103 @@
     ]);
     const menu = await Menu.new({ items });
     // Pinned like a dialog, so the popover stays open while the menu is up.
-    await withDialog(() => menu.popup());
+    await popupMenu(menu, anchor);
   }
 </script>
 
-<div class="item" class:linked={linked !== null} bind:this={element}>
-  <div
-    class="row"
-    role="button"
-    tabindex="0"
-    aria-expanded={open}
-    aria-label={name}
-    oncontextmenu={showMenu}
-    onclick={() => (open = !open)}
-    onkeydown={(event) => {
-      if (event.key === "Enter" || event.key === " ") {
-        event.preventDefault();
-        open = !open;
-      }
-    }}
-  >
-    <div class="text">
-      <span class="name" title={project.repo ?? path ?? undefined}>
-        {#if unseen}<span class="dot" aria-label={t("projects.new")}></span>{/if}{name}
+<li class="item" class:linked={linked !== null} data-item bind:this={element}>
+  <!-- A right click anywhere on the row opens its menu; the keyboard opens it from the
+       row's button (Menu key or Shift+F10). -->
+  <!-- svelte-ignore a11y_no_static_element_interactions -->
+  <div class="row" oncontextmenu={onContextMenu(() => showMenu())}>
+    <button
+      class="toggle"
+      data-row
+      aria-expanded={open}
+      aria-labelledby="{uid}-name"
+      aria-describedby={grade || grading?.state === "running"
+        ? `${uid}-meta ${uid}-grade`
+        : `${uid}-meta`}
+      onclick={() => (open = !open)}
+      onkeydown={menuKey((anchor) => showMenu(anchor))}
+    >
+      <span class="text">
+        <span class="name" id="{uid}-name" title={project.repo ?? path ?? undefined}>
+          {#if unseen}<span class="dot" aria-hidden="true"></span>{/if}{name}{#if unseen}<span
+              class="sr-only">, {t("projects.new")}</span
+            >{/if}
+        </span>
+        <span class="meta" id="{uid}-meta">
+          {#if hidden}
+            <span class="hidden-tag">{t("projects.hidden")}</span> ·
+          {/if}
+          {#if submitting}
+            <span class="status">{t("projects.submitting")}</span> ·
+          {:else if pushing}
+            <span class="status">{t("push.pushing")}</span> ·
+          {:else if committing}
+            <span class="status">{t("commit.committing")}</span> ·
+          {:else if pulling}
+            <span class="status">{t("projects.pulling")}</span> ·
+          {:else if status}
+            <span class="status" class:warn={status.warn} title={status.hint}>{status.label}</span> ·
+          {/if}
+          {#if feedback && feedback.comments > 0}
+            <span class="feedback">{t("projects.comments", { count: feedback.comments })}</span> ·
+          {/if}
+          {#if dueLabel}
+            <span class:soon={dueSoon}>{dueLabel}</span> ·
+          {/if}
+          {#if project.lateSeconds}
+            <span class="late" title={t("projects.lateHint")}
+              >{t("projects.late", { duration: durationLabel(project.lateSeconds) })}</span
+            > ·
+          {/if}
+          {path
+            ? (project.repo ?? project.config.assignment)
+            : t(cloning ? "projects.cloning" : "projects.notCloned")}
+        </span>
       </span>
-      <span class="meta">
-        {#if hidden}
-          <span class="hidden-tag">{t("projects.hidden")}</span> ·
-        {/if}
-        {#if submitting}
-          <span class="status">{t("projects.submitting")}</span> ·
-        {:else if pushing}
-          <span class="status">{t("push.pushing")}</span> ·
-        {:else if committing}
-          <span class="status">{t("commit.committing")}</span> ·
-        {:else if pulling}
-          <span class="status">{t("projects.pulling")}</span> ·
-        {:else if status}
-          <span class="status" class:warn={status.warn} title={status.hint}>{status.label}</span> ·
-        {/if}
-        {#if feedback && feedback.comments > 0}
-          <span class="feedback">{t("projects.comments", { count: feedback.comments })}</span> ·
-        {/if}
-        {#if dueLabel}
-          <span class:soon={dueSoon}>{dueLabel}</span> ·
-        {/if}
-        {#if project.lateSeconds}
-          <span class="late" title={t("projects.lateHint")}
-            >{t("projects.late", { duration: durationLabel(project.lateSeconds) })}</span
-          > ·
-        {/if}
-        {path
-          ? (project.repo ?? project.config.assignment)
-          : t(cloning ? "projects.cloning" : "projects.notCloned")}
-      </span>
-    </div>
-    {#if grading?.state === "running"}
-      <span class="grade grading" title={t("projects.gradingHint")}>{t("projects.grading")}</span>
-    {:else if grade}
-      <span
-        class="grade"
-        class:full={grade.score === grade.maxScore}
-        title={t("projects.gradeTests", { passed: grade.testsPassed, count: grade.testsTotal })}
-        >{grade.score}/{grade.maxScore}</span
-      >
-    {/if}
+      {#if grading?.state === "running"}
+        <span class="grade grading" id="{uid}-grade" title={t("projects.gradingHint")}
+          >{t("projects.grading")}</span
+        >
+      {:else if grade}
+        <span
+          class="grade"
+          class:full={grade.score === grade.maxScore}
+          id="{uid}-grade"
+          title={t("projects.gradeTests", { passed: grade.testsPassed, count: grade.testsTotal })}
+          ><span aria-hidden="true">{grade.score}/{grade.maxScore}</span><span class="sr-only"
+            >{t("projects.gradeSr", { score: grade.score, max: grade.maxScore })}</span
+          ></span
+        >
+      {/if}
+    </button>
     {#if pullable}
-      <button
-        title={t("projects.pullHint")}
-        disabled={pulling}
-        onclick={(event) => {
-          event.stopPropagation();
-          pull();
-        }}>{t("projects.pullAction")}</button
+      <button title={t("projects.pullHint")} disabled={pulling} onclick={pull}
+        >{t("projects.pullAction")}</button
       >
     {/if}
     {#if pushReady}
-      <button
-        class="primary"
-        title={t("push.hint")}
-        disabled={busy}
-        onclick={(event) => {
-          event.stopPropagation();
-          push();
-        }}>{t("push.ok")}</button
+      <button class="primary" title={t("push.hint")} disabled={busy} onclick={push}
+        >{t("push.ok")}</button
       >
     {:else if ready && !everyPush}
-      <button
-        class="primary"
-        disabled={submitting}
-        onclick={(event) => {
-          event.stopPropagation();
-          submit();
-        }}>{t("submit.ok")}</button
-      >
+      <button class="primary" disabled={submitting} onclick={submit}>{t("submit.ok")}</button>
     {/if}
     {#if cloneable}
       <button
         title={t("projects.clone")}
+        aria-label={t("projects.clone")}
         disabled={cloning}
-        onclick={(event) => {
-          event.stopPropagation();
-          clone();
-        }}>⤓</button
+        onclick={() => clone()}><span aria-hidden="true">⤓</span></button
       >
     {/if}
     {#if openTarget}
-      <button
-        title={t(project.webUrl ? "projects.openClassroom50" : "projects.openGitHub")}
-        onclick={(event) => {
-          event.stopPropagation();
-          openUrl(openTarget);
-        }}>↗</button
+      {@const openLabel = t(project.webUrl ? "projects.openClassroom50" : "projects.openGitHub")}
+      <button title={openLabel} aria-label={openLabel} onclick={() => openUrl(openTarget)}
+        ><span aria-hidden="true">↗</span></button
       >
     {/if}
   </div>
@@ -495,7 +481,7 @@
       gradeUrl={grade?.url ?? null}
     />
   {/if}
-</div>
+</li>
 
 <style>
   /* The row a link pointed to. */
@@ -504,11 +490,17 @@
     box-shadow: inset 3px 0 0 var(--accent);
   }
 
+  .item {
+    list-style: none;
+  }
+
+  /* The button that opens the details fills the row up to its action buttons, so a click
+     anywhere on the text toggles them as before. */
   .row {
     display: flex;
     align-items: center;
     gap: calc(var(--space) / 2);
-    padding: 8px 12px;
+    padding-right: 12px;
     transition: background-color 0.12s;
   }
 
@@ -516,8 +508,24 @@
     background: var(--bg-control);
   }
 
-  .row:focus-visible {
-    outline: 2px solid var(--accent);
+  .toggle {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    align-items: center;
+    gap: calc(var(--space) / 2);
+    padding: 8px 0 8px 12px;
+    border-radius: 0;
+    background: none;
+    text-align: left;
+    white-space: normal;
+  }
+
+  .toggle:hover:not(:disabled) {
+    background: none;
+  }
+
+  .toggle:focus-visible {
     outline-offset: -2px;
   }
 

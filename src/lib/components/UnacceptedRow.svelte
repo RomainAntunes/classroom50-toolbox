@@ -1,7 +1,8 @@
 <script lang="ts">
   import { Menu, MenuItem, PredefinedMenuItem } from "@tauri-apps/api/menu";
   import { openUrl } from "@tauri-apps/plugin-opener";
-  import { withDialog, type Unaccepted } from "$lib/api";
+  import type { Unaccepted } from "$lib/api";
+  import { menuKey, onContextMenu, popupMenu } from "$lib/keyboard";
   import { isHidden, setHidden } from "$lib/hidden";
   import { acceptAssignment, acceptBlocked } from "$lib/accept";
   import { session } from "$lib/session.svelte";
@@ -11,6 +12,7 @@
   import Details from "./Details.svelte";
 
   let { item, now, unseen }: { item: Unaccepted; now: Date; unseen: boolean } = $props();
+  const uid = $props.id();
 
   const due = $derived(item.assignment.due ? new Date(item.assignment.due) : null);
   const dueLabel = $derived(
@@ -32,8 +34,8 @@
 
   const hidden = $derived(isHidden(item.id));
 
-  async function showMenu(event: MouseEvent) {
-    event.preventDefault();
+  /** The row's native menu, under `anchor` or at the pointer. */
+  async function showMenu(anchor?: HTMLElement) {
     const items = await Promise.all([
       MenuItem.new({
         text: t("projects.accept"),
@@ -55,7 +57,7 @@
       }),
     ]);
     const menu = await Menu.new({ items });
-    await withDialog(() => menu.popup());
+    await popupMenu(menu, anchor);
   }
 
   let open = $state(false);
@@ -82,67 +84,63 @@
 </script>
 
 <!-- An assignment with no repo yet, published or upcoming. -->
-<div class="item" class:linked={linked !== null} bind:this={element}>
-  <div
-    class="row"
-    role="button"
-    tabindex="0"
-    aria-expanded={open}
-    aria-label={item.assignment.name}
-    oncontextmenu={showMenu}
-    onclick={() => (open = !open)}
-    onkeydown={(event) => {
-      if (event.key === "Enter" || event.key === " ") {
-        event.preventDefault();
-        open = !open;
-      }
-    }}
-  >
-    <div class="text">
-      <span class="name">
-        {#if unseen}<span class="dot" aria-label={t("projects.new")}></span>{/if}{item.assignment
-          .name}
+<li class="item" class:linked={linked !== null} data-item bind:this={element}>
+  <!-- A right click anywhere on the row opens its menu; the keyboard opens it from the
+       row's button (Menu key or Shift+F10). -->
+  <!-- svelte-ignore a11y_no_static_element_interactions -->
+  <div class="row" oncontextmenu={onContextMenu(() => showMenu())}>
+    <button
+      class="toggle"
+      data-row
+      aria-expanded={open}
+      aria-labelledby="{uid}-name"
+      aria-describedby="{uid}-meta"
+      onclick={() => (open = !open)}
+      onkeydown={menuKey((anchor) => showMenu(anchor))}
+    >
+      <span class="text">
+        <span class="name" id="{uid}-name">
+          {#if unseen}<span class="dot" aria-hidden="true"></span>{/if}{item.assignment
+            .name}{#if unseen}<span class="sr-only">, {t("projects.new")}</span>{/if}
+        </span>
+        <span class="meta" id="{uid}-meta">
+          {#if hidden}
+            <span class="hidden-tag">{t("projects.hidden")}</span> ·
+          {/if}
+          <span class="status" class:upcoming
+            >{accepting
+              ? t("projects.accepting")
+              : upcoming && opens
+                ? t("projects.opens", { when: fromNow(opens, now) })
+                : t("projects.notAccepted")}</span
+          >
+          {#if item.group}
+            · {t("projects.inGroup", { group: groupName(item.group) })}
+          {/if}
+          {#if dueLabel}
+            · {dueLabel}
+          {/if}
+          <!-- The disabled Accept button can't take focus, so its hint is read here. -->
+          {#if blocked}<span class="sr-only">. {blocked}</span>{/if}
+        </span>
       </span>
-      <span class="meta">
-        {#if hidden}
-          <span class="hidden-tag">{t("projects.hidden")}</span> ·
-        {/if}
-        <span class="status" class:upcoming
-          >{accepting
-            ? t("projects.accepting")
-            : upcoming && opens
-              ? t("projects.opens", { when: fromNow(opens, now) })
-              : t("projects.notAccepted")}</span
-        >
-        {#if item.group}
-          · {t("projects.inGroup", { group: groupName(item.group) })}
-        {/if}
-        {#if dueLabel}
-          · {dueLabel}
-        {/if}
-      </span>
-    </div>
+    </button>
     <button
       class="primary"
       title={blocked ?? undefined}
       disabled={accepting || blocked !== null}
-      onclick={(event) => {
-        event.stopPropagation();
-        accept();
-      }}>{t("projects.accept")}</button
+      onclick={accept}>{t("projects.accept")}</button
     >
     <button
       title={t("projects.openAcceptPage")}
-      onclick={(event) => {
-        event.stopPropagation();
-        openUrl(item.acceptUrl);
-      }}>↗</button
+      aria-label={t("projects.openAcceptPage")}
+      onclick={() => openUrl(item.acceptUrl)}><span aria-hidden="true">↗</span></button
     >
   </div>
   {#if open}
     <Details description={item.assignment.description} items={details} />
   {/if}
-</div>
+</li>
 
 <style>
   /* The row a link pointed to. */
@@ -155,16 +153,37 @@
     font-style: italic;
   }
 
+  .item {
+    list-style: none;
+  }
+
+  /* The button that opens the details fills the row up to its action buttons. */
   .row {
     display: flex;
     align-items: center;
     gap: calc(var(--space) / 2);
-    padding: 8px 12px;
+    padding-right: 12px;
     transition: background-color 0.12s;
   }
 
   .row:hover {
     background: var(--bg-control);
+  }
+
+  .toggle {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    align-items: center;
+    padding: 8px 0 8px 12px;
+    border-radius: 0;
+    background: none;
+    text-align: left;
+    white-space: normal;
+  }
+
+  .toggle:hover:not(:disabled) {
+    background: none;
   }
 
   .text {
@@ -200,8 +219,7 @@
     color: var(--fg-muted);
   }
 
-  .row:focus-visible {
-    outline: 2px solid var(--accent);
+  .toggle:focus-visible {
     outline-offset: -2px;
   }
 
