@@ -208,6 +208,7 @@ export function install(scenario: Scenario): E2E {
       case "cancel_tool_job":
       case "open_in_editor":
       case "open_terminal":
+      case "set_git_identity":
         return null;
       case "plugin:path|resolve_directory":
         return state.home;
