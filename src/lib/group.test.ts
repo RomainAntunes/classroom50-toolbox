@@ -8,6 +8,7 @@ const group = (name: string | null): Group => ({
   slug: "classroom50-group-0123456789abcdef-4",
   number: 4,
   name,
+  founders: null,
   url: "",
   members: [
     { login: "Alice", name: "Alice Martin", email: null },

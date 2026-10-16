@@ -2,8 +2,10 @@
 //! and submit logic has many steps and changes upstream). The CLI never prompts here: it
 //! only reads a terminal when stdin and stderr both are one, and `process` pipes stderr.
 
+use std::collections::HashMap;
 use std::ffi::OsString;
 use std::path::Path;
+use std::sync::Mutex;
 use std::time::Duration;
 
 use serde::Serialize;
@@ -35,6 +37,31 @@ pub enum Addition<'a> {
         repo: &'a str,
         clone: Option<&'a Path>,
     },
+}
+
+/// Where to add classmates to a group founded from the app, by the accepted assignment's id
+/// (`org/classroom/assignment`), while the sync that lists the new repo hasn't run yet.
+#[derive(Default)]
+pub struct FoundedGroups(Mutex<HashMap<String, FoundedGroup>>);
+
+#[derive(Clone)]
+pub struct FoundedGroup {
+    pub org: String,
+    pub classroom: String,
+    pub assignment: String,
+    pub key: Option<String>,
+}
+
+impl FoundedGroups {
+    pub fn insert(&self, id: &str, group: FoundedGroup) {
+        let mut map = self.0.lock().unwrap_or_else(|e| e.into_inner());
+        map.insert(id.to_owned(), group);
+    }
+
+    pub fn get(&self, id: &str) -> Option<FoundedGroup> {
+        let map = self.0.lock().unwrap_or_else(|e| e.into_inner());
+        map.get(id).cloned()
+    }
 }
 
 /// A GitHub login: letters, digits and single inner hyphens, at most 39 characters. Checked

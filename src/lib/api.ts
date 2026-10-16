@@ -246,8 +246,18 @@ export interface Group {
   /** The display name the founders chose, when they did. */
   name: string | null;
   members: Member[];
+  /** Logins of the team's maintainers (a student-formed group's founder, the only one who
+   *  can add members); null when the roles weren't read. */
+  founders: string[] | null;
   /** The team's page on GitHub. */
   url: string;
+}
+
+/** What adding one classmate gave (`add_teammates`). */
+export interface Added {
+  username: string;
+  /** Why it failed; null when they were added. */
+  error: CommandError | null;
 }
 
 export interface Member {
@@ -574,7 +584,10 @@ export const api = {
   signOut: (login: string) => invoke<AuthStatus>("sign_out", { login }),
   openTerminal: (path: string) => invoke<void>("open_terminal", { path }),
   installedEditors: () => invoke<EditorInfo[]>("installed_editors"),
-  addTeammate: (id: string, username: string) => invoke<void>("add_teammate", { id, username }),
+  /** Adds classmates one by one (`team add` or `invite`), then syncs; one result each.
+   *  `id` may be the assignment of a group just founded, before its repo is listed. */
+  addTeammates: (id: string, usernames: string[]) =>
+    invoke<Added[]>("add_teammates", { id, usernames }),
   openInEditor: (path: string, editor: string) => invoke<void>("open_in_editor", { path, editor }),
   /** Runs `gh student accept`, then syncs; rejects with `needsTeam` when a group is needed.
    *  `teamName` founds a group with that name (`--new-team --team-name`). */

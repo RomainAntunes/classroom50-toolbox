@@ -64,6 +64,7 @@ pub fn run() {
         .plugin(tauri_plugin_opener::init())
         .manage(popover::PopoverState::default())
         .manage(deeplink::DeepLinkState::default())
+        .manage(student::FoundedGroups::default())
         .manage(login::LoginState::default())
         .manage(tools::ToolJobs::default())
         .manage(watch::FolderWatcher::default())
@@ -158,7 +159,7 @@ pub fn run() {
             commands::open_terminal,
             commands::installed_editors,
             commands::open_in_editor,
-            commands::add_teammate,
+            commands::add_teammates,
             commands::clone_project,
             commands::git_protocol,
             commands::accept_assignment,

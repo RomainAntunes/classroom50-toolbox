@@ -11,6 +11,7 @@ const group: Group = {
   slug: "classroom50-group-0123456789abcdef-1",
   number: 1,
   name: "The Sharks",
+  founders: null,
   url: "",
   members: [{ login: "jmaendly", name: "Julie Maendly", email: null }],
 };

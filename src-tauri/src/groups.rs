@@ -49,6 +49,11 @@ pub struct Group {
     /// The display name the founders chose, when they did.
     pub name: Option<String>,
     pub members: Vec<Member>,
+    /// Logins of the team's maintainers: a student-formed group's founder, the only one who
+    /// can add members (`gh student team add`). None when the roles weren't read (a cache
+    /// from before they were).
+    #[serde(default)]
+    pub founders: Option<Vec<String>>,
     pub url: String,
     /// Classroom and assignment from the team's record, when it has one.
     #[serde(default)]
@@ -116,7 +121,28 @@ struct TeamMembers {
 
 #[derive(Deserialize)]
 struct MemberConnection {
-    nodes: Vec<Option<Member>>,
+    edges: Vec<Option<MemberEdge>>,
+}
+
+#[derive(Deserialize)]
+struct MemberEdge {
+    /// `MAINTAINER` or `MEMBER`.
+    role: String,
+    node: Option<Member>,
+}
+
+/// The members of a team, and the logins of its maintainers.
+fn members_and_founders(connection: MemberConnection) -> (Vec<Member>, Vec<String>) {
+    let mut members = Vec::new();
+    let mut founders = Vec::new();
+    for edge in connection.edges.into_iter().flatten() {
+        let Some(member) = edge.node else { continue };
+        if edge.role == "MAINTAINER" {
+            founders.push(member.login.clone());
+        }
+        members.push(member);
+    }
+    (members, founders)
 }
 
 #[derive(Deserialize)]
@@ -138,13 +164,14 @@ pub async fn load(
         let (query, variables) = members_query(batch);
         let mut data: Map<String, Value> = github::graphql(http, token, &query, variables).await?;
         for (i, team) in batch.iter().enumerate() {
-            let members = data
+            let (members, founders) = data
                 .remove(&format!("g{i}"))
                 .and_then(|value| serde_json::from_value::<TeamData>(value).ok())
                 .and_then(|org| org.team)
-                .map(|team| team.members.nodes.into_iter().flatten().collect())
-                .unwrap_or_default();
-            if let Some(group) = group(team, members) {
+                .map(|team| members_and_founders(team.members))
+                .map_or((Vec::new(), None), |(m, f)| (m, Some(f)));
+            if let Some(mut group) = group(team, members) {
+                group.founders = founders;
                 groups.push(group);
             }
         }
@@ -218,7 +245,7 @@ fn members_query(batch: &[GroupTeam]) -> (String, Value) {
     for (i, team) in batch.iter().enumerate() {
         declarations.push(format!("$o{i}: String!, $s{i}: String!"));
         fields.push(format!(
-            "g{i}: organization(login: $o{i}) {{ team(slug: $s{i}) {{ members(first: {MAX_MEMBERS}) {{ nodes {{ login name }} }} }} }}"
+            "g{i}: organization(login: $o{i}) {{ team(slug: $s{i}) {{ members(first: {MAX_MEMBERS}) {{ edges {{ role node {{ login name }} }} }} }} }}"
         ));
         variables.insert(format!("o{i}"), json!(team.org));
         variables.insert(format!("s{i}"), json!(team.slug));
@@ -258,6 +285,7 @@ fn group(team: &GroupTeam, members: Vec<Member>) -> Option<Group> {
         classroom: record.as_ref().map(|r| r.classroom.clone()),
         assignment: record.map(|r| r.assignment),
         members,
+        founders: None,
     })
 }
 
@@ -333,8 +361,25 @@ mod tests {
             description: None,
         };
         let (query, _) = members_query(&[team]);
-        assert!(query.contains("nodes { login name }"));
+        assert!(query.contains("edges { role node { login name } }"));
         assert!(!query.contains("email"));
+    }
+
+    #[test]
+    fn reads_founders_from_member_roles() {
+        let connection: MemberConnection = serde_json::from_value(json!({
+            "edges": [
+                { "role": "MAINTAINER", "node": { "login": "alice", "name": "Alice" } },
+                { "role": "MEMBER", "node": { "login": "bob", "name": null } },
+                { "role": "MEMBER", "node": null },
+                null
+            ]
+        }))
+        .unwrap();
+        let (members, founders) = members_and_founders(connection);
+        let logins: Vec<_> = members.iter().map(|m| m.login.as_str()).collect();
+        assert_eq!(logins, ["alice", "bob"]);
+        assert_eq!(founders, ["alice"]);
     }
 
     #[test]
@@ -388,6 +433,7 @@ mod tests {
             number: 2,
             name: None,
             members: Vec::new(),
+            founders: None,
             url: String::new(),
             classroom: None,
             assignment: None,

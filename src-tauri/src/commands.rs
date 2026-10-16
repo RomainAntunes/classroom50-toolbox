@@ -554,14 +554,27 @@ pub async fn accept_assignment(
         return accepted_project(&snapshot, &id)
             .ok_or_else(|| Error::Unsupported(format!("unknown assignment {id}")));
     };
+    let key = item.classroom.secret.as_deref();
     let accepted = student::accept(&student::AcceptRequest {
         org: &item.classroom.org,
         classroom: &item.classroom.slug,
         assignment: &item.assignment.slug,
-        key: item.classroom.secret.as_deref(),
+        key,
         new_team: team_name.as_deref(),
     })
     .await;
+    if accepted.is_ok() && item.assignment.mode == crate::classroom50::AssignmentMode::Team {
+        // Teammates can be added before a sync lists the group's repo.
+        app.state::<student::FoundedGroups>().insert(
+            &id,
+            student::FoundedGroup {
+                org: item.classroom.org.clone(),
+                classroom: item.classroom.slug.clone(),
+                assignment: item.assignment.slug.clone(),
+                key: key.map(str::to_owned),
+            },
+        );
+    }
     let repo = match accepted {
         Ok(repo) => repo,
         // A failure or a timeout may come after the repo was made: look again.
@@ -603,51 +616,81 @@ fn accepted_project(snapshot: &Snapshot, id: &str) -> Option<Accepted> {
     })
 }
 
-/// Gives a classmate push access to project `id`: joins them to the group on a team
-/// assignment, invites them as a collaborator otherwise. A full sync follows, so the
-/// group's members are read again.
+/// What adding one classmate gave.
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct Added {
+    username: String,
+    /// Why it failed, None when they were added.
+    error: Option<Error>,
+}
+
+/// Gives classmates push access to project `id`, one by one: joins them to the group on a
+/// team assignment, invites them as a collaborator otherwise. `id` may also be the
+/// assignment of a group just founded from the app whose repo no sync has listed yet. One
+/// full sync follows, so the group's members are read again.
 #[tauri::command]
-pub async fn add_teammate(
+pub async fn add_teammates(
     app: AppHandle,
     state: State<'_, ProjectsState>,
+    founded: State<'_, student::FoundedGroups>,
     id: String,
-    username: String,
-) -> Result<()> {
-    let project = state
-        .snapshot()
-        .projects
-        .into_iter()
-        .find(|p| p.id == id)
-        .ok_or_else(|| Error::Unsupported(format!("unknown project {id}")))?;
-    let (Some(owner), Some(repo)) = (project.owner.as_deref(), project.repo.as_deref()) else {
-        return Err(Error::Unsupported(format!("{id} isn't on GitHub")));
-    };
-    let team = project.group.is_some()
-        || project
-            .assignment
-            .as_ref()
-            .is_some_and(|a| a.mode == crate::classroom50::AssignmentMode::Team);
-    let full_name = format!("{owner}/{repo}");
-    let addition = if team {
-        student::Addition::Team {
-            org: owner,
-            classroom: &project.config.classroom,
-            assignment: &project.config.assignment,
-            key: project
-                .classroom
-                .as_ref()
-                .and_then(|c| c.secret.as_deref())
-                .or(project.config.secret.as_deref()),
+    usernames: Vec<String>,
+) -> Result<Vec<Added>> {
+    let project = state.snapshot().projects.into_iter().find(|p| p.id == id);
+    let group;
+    let full_name;
+    let addition = match &project {
+        None => {
+            group = founded
+                .get(&id)
+                .ok_or_else(|| Error::Unsupported(format!("unknown project {id}")))?;
+            student::Addition::Team {
+                org: &group.org,
+                classroom: &group.classroom,
+                assignment: &group.assignment,
+                key: group.key.as_deref(),
+            }
         }
-    } else {
-        student::Addition::Invite {
-            repo: &full_name,
-            clone: project.path.as_deref(),
+        Some(project) => {
+            let (Some(owner), Some(repo)) = (project.owner.as_deref(), project.repo.as_deref())
+            else {
+                return Err(Error::Unsupported(format!("{id} isn't on GitHub")));
+            };
+            let team = project.group.is_some()
+                || project
+                    .assignment
+                    .as_ref()
+                    .is_some_and(|a| a.mode == crate::classroom50::AssignmentMode::Team);
+            full_name = format!("{owner}/{repo}");
+            if team {
+                student::Addition::Team {
+                    org: owner,
+                    classroom: &project.config.classroom,
+                    assignment: &project.config.assignment,
+                    key: project
+                        .classroom
+                        .as_ref()
+                        .and_then(|c| c.secret.as_deref())
+                        .or(project.config.secret.as_deref()),
+                }
+            } else {
+                student::Addition::Invite {
+                    repo: &full_name,
+                    clone: project.path.as_deref(),
+                }
+            }
         }
     };
-    student::add(&addition, &username).await?;
-    projects::refresh_after_write(&app).await;
-    Ok(())
+    let mut results = Vec::new();
+    for username in usernames {
+        let error = student::add(&addition, &username).await.err();
+        results.push(Added { username, error });
+    }
+    if results.iter().any(|r| r.error.is_none()) {
+        projects::refresh_after_write(&app).await;
+    }
+    Ok(results)
 }
 
 /// The clone of project `id`, which must exist and still take submissions.
