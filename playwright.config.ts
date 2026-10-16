@@ -5,7 +5,8 @@ import { defineConfig, devices } from "@playwright/test";
 import process from "node:process";
 import { fileURLToPath } from "node:url";
 
-const PORT = 4173;
+// Not Vite preview's default, so another checkout's preview is never tested by mistake.
+const PORT = 4419;
 const CI = Boolean(process.env.CI);
 
 export default defineConfig({
@@ -34,11 +35,14 @@ export default defineConfig({
   webServer: {
     // A production build: no dependency optimizer reloading the page mid-test, and the
     // exact code that ships.
-    command: `pnpm build && pnpm preview --port ${PORT} --strictPort --host 127.0.0.1`,
+    // `exec`: the server is the process Playwright stops at the end (a pnpm wrapper outlived
+    // it and kept the run from exiting).
+    command: `vite build && exec vite preview --port ${PORT} --strictPort --host 127.0.0.1`,
     url: `http://127.0.0.1:${PORT}`,
     // The repo root, also for configs elsewhere that reuse this one (`e2e:shots`).
     cwd: fileURLToPath(new URL(".", import.meta.url)),
-    reuseExistingServer: !CI,
+    // Always this checkout's build: a server already on the port fails the run instead.
+    reuseExistingServer: false,
     timeout: 120_000,
   },
 });
