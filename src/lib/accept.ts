@@ -35,15 +35,18 @@ export function repoName(item: Unaccepted, login: string | null): string {
   return `${item.classroom.org}/${name}`;
 }
 
+/** The repo line of `notes`: its name, who owns it and who sees it. */
+function repoPoint(item: Unaccepted, login: string | null): string {
+  const key =
+    item.assignment.repoVisibility === "public" ? "accept.repoPublic" : "accept.repoPrivate";
+  return t(key, { repo: repoName(item, login), org: item.classroom.org });
+}
+
 /** What accepting does, one point per line: the repo, who sees and owns it, the Feedback
  *  PR, how submitting works, the due date, groups, and the clone offer that follows. */
 export function notes(item: Unaccepted, login: string | null): string {
   const a = item.assignment;
-  const repo = repoName(item, login);
-  const org = item.classroom.org;
-  const points = [
-    t(a.repoVisibility === "public" ? "accept.repoPublic" : "accept.repoPrivate", { repo, org }),
-  ];
+  const points = [repoPoint(item, login)];
   if (a.feedbackPr) points.push(t("accept.feedbackPr"));
   points.push(t(a.submissionMode === "tag" ? "accept.tagMode" : "accept.everyPush"));
   if (a.due) points.push(t("accept.due", { date: formatDate(new Date(a.due)) }));
@@ -77,25 +80,25 @@ export function canFoundGroup(item: Unaccepted): boolean {
   return a.mode === "team" && a.teamFormation !== "teacher" && !item.group;
 }
 
-/** Runs the accept, founding a group when the student names one (`newGroup` asks for the
- *  name up front, else only on `needsTeam`). Null when cancelled. */
+/** Runs the accept, founding `group` when named ("Create a group…"), else asking for a new
+ *  group's name only on `needsTeam`. Null when cancelled. */
 async function run(
   item: Unaccepted,
-  newGroup: boolean,
+  group: string | null,
 ): Promise<{ accepted: Accepted; group: string | null } | null> {
-  if (!newGroup) {
-    try {
-      return { accepted: await api.acceptAssignment(item.id, null), group: null };
-    } catch (err) {
-      if (errorKind(err) !== "needsTeam") throw err;
-    }
+  if (group) return { accepted: await api.acceptAssignment(item.id, group), group };
+  try {
+    return { accepted: await api.acceptAssignment(item.id, null), group: null };
+  } catch (err) {
+    if (errorKind(err) !== "needsTeam") throw err;
   }
-  const group = await askGroupName(t(newGroup ? "accept.createGroupHint" : "accept.needsTeam"));
-  return group ? { accepted: await api.acceptAssignment(item.id, group), group } : null;
+  const named = await askGroupName(t("accept.needsTeam"));
+  return named ? { accepted: await api.acceptAssignment(item.id, named), group: named } : null;
 }
 
 /** Asks, accepts, then offers to clone the new repo. The row shows it meanwhile. With
- *  `newGroup` ("Create a group…") it founds a group, asking its name first. */
+ *  `newGroup` ("Create a group…") the group's name is the only question (its prompt names
+ *  the repo), then it offers to add teammates. */
 export function acceptAssignment(item: Unaccepted, newGroup = false): Promise<void> {
   return busy("accepting", item.id, () => accept(item, newGroup));
 }
@@ -115,10 +118,15 @@ async function offerTeammates(group: string, id: string, repo: string, name: str
 
 async function accept(item: Unaccepted, newGroup: boolean): Promise<void> {
   const name = item.assignment.name;
-  if (!(await confirm(notes(item, session.snapshot?.login ?? null), name, t("accept.ok")))) return;
+  const login = session.snapshot?.login ?? null;
+  let group: string | null = null;
+  if (newGroup) {
+    group = await askGroupName(`${t("accept.createGroupHint")}\n${repoPoint(item, login)}`);
+    if (!group) return;
+  } else if (!(await confirm(notes(item, login), name, t("accept.ok")))) return;
   let result: Awaited<ReturnType<typeof run>>;
   try {
-    result = await run(item, newGroup);
+    result = await run(item, group);
   } catch (err) {
     await withDialog(() =>
       message(t("accept.failed", { error: errorMessage(err) }), { title: name, kind: "error" }),
