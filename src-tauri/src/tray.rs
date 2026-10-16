@@ -76,6 +76,23 @@ pub fn setup(app: &AppHandle) -> tauri::Result<()> {
     Ok(())
 }
 
+/// Hands the icon's position to the positioner, as a tray event would (`TrayIcon::rect`;
+/// unknown on Linux, where nothing changes).
+pub fn remember_position(app: &AppHandle) {
+    let Some(tray) = app.tray_by_id(ID) else {
+        return;
+    };
+    let Ok(Some(rect)) = tray.rect() else {
+        return;
+    };
+    let event = TrayIconEvent::Move {
+        id: tray.id().clone(),
+        position: rect.position.to_physical(1.0),
+        rect,
+    };
+    tauri_plugin_positioner::on_tray_event(app, &event);
+}
+
 /// Swaps the icon for one with a dot in the top-right corner, or back.
 pub fn set_badge(app: &AppHandle, on: bool) {
     let Some(tray) = app.tray_by_id(ID) else {

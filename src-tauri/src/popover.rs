@@ -93,8 +93,10 @@ pub fn show(app: &AppHandle) {
     let Some(window) = app.get_webview_window(LABEL) else {
         return;
     };
-    // Linux trays don't report their position; fall back to the screen corner there or
-    // before the first tray event.
+    // The positioner learns where the icon is from tray events; ask the tray itself, so the
+    // shortcut or the menu's Open anchors there before any click. Linux trays report no
+    // position at all: the screen corner there.
+    crate::tray::remember_position(app);
     if window.move_window(TRAY_POSITION).is_err() {
         let _ = window.move_window(FALLBACK_POSITION);
     }
