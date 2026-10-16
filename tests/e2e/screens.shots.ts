@@ -2,7 +2,7 @@
 import process from "node:process";
 import { App, expect, test } from "./app";
 import { richScenario } from "./samples";
-import { ok, settings, scenario, tools } from "./fixtures";
+import { ok, settings, scenario, tools, updateStatus } from "./fixtures";
 
 const OUT = new URL("../../e2e-shots/", import.meta.url).pathname;
 const LOCALE = process.env.SHOTS_LOCALE ?? "en";
@@ -43,6 +43,13 @@ for (const os of SKINS) {
       await page.screenshot({ path: name("prompt") });
       await app.prompt.getByRole("button").first().click();
 
+      await app.emit(
+        "update-state",
+        updateStatus({ state: { phase: "ready", version: "9.9.0", notes: null } }),
+      );
+      await expect(page.locator("main .banner")).toBeVisible();
+      await page.screenshot({ path: name("update") });
+
       await page.locator(".titlebar .icon").last().click();
       await expect(page.locator("main section").first()).toBeVisible();
       await page.screenshot({ path: name("settings"), fullPage: true });
@@ -61,6 +68,19 @@ for (const os of SKINS) {
       await guide.locator("footer .nav .primary").click();
       await guide.screenshot({ path: name("welcome-tools") });
       await guide.close();
+
+      // What's new after an update.
+      const updated = scenario({
+        settings: settings({ language: LOCALE, lastSeenVersion: "0.0.1" }),
+      });
+      updated.appInfo.os = os;
+      const notes = await page.context().newPage();
+      await notes.emulateMedia({ colorScheme: scheme, reducedMotion: "reduce" });
+      await new App(notes).start(updated);
+      await expect(notes.getByRole("button", { name: /./ }).last()).toBeVisible();
+      await expect(notes).toHaveURL(/\/whats-new$/);
+      await notes.screenshot({ path: name("whats-new") });
+      await notes.close();
     });
   }
 }
