@@ -341,6 +341,8 @@ export interface PushCheck {
   files: string[];
   /** The new ones among them. */
   untracked: string[];
+  /** Untracked editor and OS files left out of the commit (`.idea/`, `.DS_Store`). */
+  skipped: string[];
   /** Over 50 MB: GitHub warns about them. */
   large: string[];
   /** Over 100 MB: GitHub refuses them, so nothing is committed. */

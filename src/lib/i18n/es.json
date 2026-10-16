@@ -249,6 +249,7 @@
   "push.files.many": "{count} archivos modificados: {files}.",
   "push.files.other": "{count} archivos modificados: {files}.",
   "push.untracked": "Archivos nuevos incluidos: {files}.",
+  "push.skipped": "Se dejan fuera (archivos del editor y del sistema): {files}.",
   "push.large": "Archivos grandes (más de 50 MB) incluidos: {files}. GitHub puede mostrar un aviso.",
   "push.ahead.one": "También se sube tu commit que aún no está en GitHub.",
   "push.ahead.many": "También se suben tus {count} commits que aún no están en GitHub.",

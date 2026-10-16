@@ -111,6 +111,9 @@ async function commitWork(
     if (check.untracked.length) {
       lines.push(t("push.untracked", { files: fileList(check.untracked) }));
     }
+    if (check.skipped.length) {
+      lines.push(t("push.skipped", { files: fileList(check.skipped) }));
+    }
     if (check.large.length) lines.push(t("push.large", { files: fileList(check.large) }));
     if (canPush && check.ahead) lines.push(t("push.ahead", { count: check.ahead }));
     if (!canPush) lines.push(noPushLine(check.pushBlocked ?? "", branch));

@@ -33,6 +33,7 @@ const project = (assignment: Partial<Assignment> | null = {}) =>
 const check = (over: Partial<CommitCheck> = {}): CommitCheck => ({
   files: ["a.txt"],
   untracked: [],
+  skipped: [],
   large: [],
   tooLarge: [],
   ahead: 0,
@@ -155,6 +156,17 @@ describe("commitLocal", () => {
     expect(await done).toBe(true);
     expect(api.commitOnly).toHaveBeenCalledWith("o/r", "Fix");
     expect(api.commitPush).not.toHaveBeenCalled();
+  });
+
+  it("names the editor and system files it leaves out", async () => {
+    api.commitCheck.mockResolvedValue(check({ skipped: [".idea/", ".DS_Store"] }));
+    const done = commitLocal(project(), "Lab");
+    await vi.waitFor(() => expect(prompt.current).not.toBeNull());
+    expect(prompt.current?.message).toContain(
+      "Left out (editor and system files): .idea/, .DS_Store.",
+    );
+    await answer(null);
+    expect(await done).toBe(false);
   });
 
   it("pushes with the second action", async () => {

@@ -244,6 +244,7 @@
   "push.files.one": "{count} geänderte Datei: {files}.",
   "push.files.other": "{count} geänderte Dateien: {files}.",
   "push.untracked": "Neue Dateien dabei: {files}.",
+  "push.skipped": "Weggelassen (Editor- und Systemdateien): {files}.",
   "push.large": "Große Dateien (über 50 MB) dabei: {files}. GitHub warnt eventuell davor.",
   "push.ahead.one": "Dein Commit, der noch nicht auf GitHub ist, wird mitgepusht.",
   "push.ahead.other": "Deine {count} Commits, die noch nicht auf GitHub sind, werden mitgepusht.",
