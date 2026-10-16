@@ -213,7 +213,7 @@
 
   .status {
     font-weight: 500;
-    color: var(--accent);
+    color: var(--accent-text);
   }
 
   .status.upcoming {

@@ -205,7 +205,7 @@
   }
 
   .meta.update {
-    color: var(--accent);
+    color: var(--accent-text);
   }
 
   .meta.outdated {

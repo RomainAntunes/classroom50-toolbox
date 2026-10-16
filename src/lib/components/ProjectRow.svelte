@@ -574,7 +574,7 @@
   }
 
   .feedback {
-    color: var(--accent);
+    color: var(--accent-text);
   }
 
   .grade {
