@@ -304,6 +304,24 @@ pub fn assignment_for_repo<'a>(
         .max_by_key(|slug| slug.len())
 }
 
+/// A classroom or assignment slug as upstream's schemas allow it: `^[a-z0-9][a-z0-9-]{1,99}$`.
+pub fn valid_slug(slug: &str) -> bool {
+    let bytes = slug.as_bytes();
+    (2..=100).contains(&bytes.len())
+        && bytes[0].is_ascii_alphanumeric()
+        && bytes
+            .iter()
+            .all(|b| b.is_ascii_digit() || b.is_ascii_lowercase() || *b == b'-')
+}
+
+/// An unlisted classroom's key as upstream's schemas allow it: `^[a-z0-9]{4,64}$`.
+pub fn valid_secret(secret: &str) -> bool {
+    (4..=64).contains(&secret.len())
+        && secret
+            .bytes()
+            .all(|b| b.is_ascii_digit() || b.is_ascii_lowercase())
+}
+
 pub fn parse_assignments(url: &str, json: &str) -> Result<Vec<Assignment>> {
     let file: AssignmentsFile = serde_json::from_str(json).map_err(std::io::Error::other)?;
     if file.schema != ASSIGNMENTS_SCHEMA {
@@ -319,6 +337,24 @@ pub fn parse_assignments(url: &str, json: &str) -> Result<Vec<Assignment>> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn checks_slugs_and_secrets_like_the_schemas() {
+        assert!(valid_slug("cs50-fall-2026"));
+        assert!(valid_slug("26-poo-c"));
+        assert!(!valid_slug("a"));
+        assert!(!valid_slug("-lab"));
+        assert!(!valid_slug("Lab1"));
+        assert!(!valid_slug("lab_1"));
+        assert!(!valid_slug("lab%2f1"));
+        assert!(valid_slug(&"a".repeat(100)));
+        assert!(!valid_slug(&"a".repeat(101)));
+        assert!(valid_secret("k3y9"));
+        assert!(!valid_secret("abc"));
+        assert!(!valid_secret("ABCD"));
+        assert!(!valid_secret("ab-cd"));
+        assert!(!valid_secret(&"a".repeat(65)));
+    }
 
     #[test]
     fn parses_repo_config_and_ignores_unknown_keys() {

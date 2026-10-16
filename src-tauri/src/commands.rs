@@ -8,6 +8,7 @@ use tauri::{AppHandle, Manager, State};
 use tauri_plugin_autostart::ManagerExt;
 
 use crate::clones::{self, CloneStore};
+use crate::deeplink::{self, DeepLinkState};
 use crate::error::{Error, Result};
 use crate::login::{self, LoginState};
 use crate::platform::{self, Os};
@@ -449,7 +450,15 @@ pub async fn accept_assignment(
     new_team: bool,
 ) -> Result<Accepted> {
     let snapshot = state.snapshot();
-    let Some(item) = snapshot.unaccepted.iter().find(|u| u.id == id).cloned() else {
+    let listed = snapshot.unaccepted.iter().find(|u| u.id == id).cloned();
+    let Some(item) = listed.or_else(|| {
+        // An assignment a link pointed to, outside the list (an upcoming one, a class not
+        // synced yet), unless a sync has found its repo since.
+        accepted_project(&snapshot, &id)
+            .is_none()
+            .then(|| app.state::<DeepLinkState>().linked(&id))
+            .flatten()
+    }) else {
         // A sync may have found the repo (accepted elsewhere) since the row was drawn.
         return accepted_project(&snapshot, &id)
             .ok_or_else(|| Error::Unsupported(format!("unknown assignment {id}")));
@@ -496,13 +505,7 @@ pub async fn accept_assignment(
 fn accepted_project(snapshot: &Snapshot, id: &str) -> Option<Accepted> {
     let mut parts = id.splitn(3, '/');
     let (org, classroom, assignment) = (parts.next()?, parts.next()?, parts.next()?);
-    let project = snapshot.projects.iter().find(|p| {
-        p.owner
-            .as_deref()
-            .is_some_and(|o| o.eq_ignore_ascii_case(org))
-            && p.config.classroom.eq_ignore_ascii_case(classroom)
-            && p.config.assignment.eq_ignore_ascii_case(assignment)
-    })?;
+    let project = projects::assignment_project(snapshot, org, classroom, assignment)?;
     Some(Accepted {
         repo: format!("{}/{}", project.owner.as_deref()?, project.repo.as_deref()?),
         project_id: Some(project.id.clone()),
@@ -659,6 +662,30 @@ pub fn simulate_network(network: simulate::Network) -> Result<()> {
 #[tauri::command]
 pub fn simulated_network() -> simulate::Network {
     simulate::network()
+}
+
+/// The link the OS opened the app with, if one waits, and where the list says it leads.
+#[tauri::command]
+pub fn take_deep_link(app: AppHandle) -> Option<deeplink::Target> {
+    deeplink::take(&app)
+}
+
+/// The UI is done with the link it took; the next one may come.
+#[tauri::command]
+pub fn deep_link_done(state: State<'_, DeepLinkState>) {
+    state.finish();
+}
+
+/// Reads the manifest behind the `unlisted` link the student just agreed to open.
+#[tauri::command]
+pub async fn fetch_linked_assignment(app: AppHandle) -> Result<Option<deeplink::Target>> {
+    deeplink::fetch_unlisted(&app).await
+}
+
+/// Dev builds only: handles `url` as if the OS had opened it.
+#[tauri::command]
+pub fn simulate_deep_link(app: AppHandle, url: String) -> Result<()> {
+    deeplink::simulate(&app, &url)
 }
 
 #[cfg(test)]

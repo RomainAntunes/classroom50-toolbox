@@ -3,7 +3,9 @@
   import { openUrl } from "@tauri-apps/plugin-opener";
   import { withDialog, type Unaccepted } from "$lib/api";
   import { isHidden, setHidden } from "$lib/hidden";
-  import { acceptAssignment } from "$lib/accept";
+  import { acceptAssignment, acceptBlocked } from "$lib/accept";
+  import { session } from "$lib/session.svelte";
+  import { acceptLink, copyLink } from "$lib/links";
   import { groupDetails, groupName } from "$lib/group";
   import { formatDate, fromNow, t } from "$lib/i18n";
   import Details from "./Details.svelte";
@@ -21,22 +23,11 @@
   );
   const upcoming = $derived(opens !== null && opens > now);
 
-  const blocked = $derived(
-    item.assignment.locked
-      ? t("projects.lockedHint")
-      : upcoming
-        ? t("projects.upcomingHint")
-        : null,
-  );
+  const blocked = $derived(acceptBlocked(item, now));
 
-  let accepting = $state(false);
-  async function accept() {
-    accepting = true;
-    try {
-      await acceptAssignment(item);
-    } finally {
-      accepting = false;
-    }
+  const accepting = $derived(session.accepting.includes(item.id));
+  function accept() {
+    void acceptAssignment(item);
   }
 
   const hidden = $derived(isHidden(item.id));
@@ -53,6 +44,10 @@
         text: t("projects.openAcceptPage"),
         action: () => openUrl(item.acceptUrl),
       }),
+      MenuItem.new({
+        text: t("projects.copyLink"),
+        action: () => copyLink(acceptLink(item)),
+      }),
       PredefinedMenuItem.new({ item: "Separator" }),
       MenuItem.new({
         text: t(hidden ? "projects.unhide" : "projects.hide"),
@@ -64,6 +59,15 @@
   }
 
   let open = $state(false);
+
+  // A link pointed here: open the details and bring the row into view.
+  let element: HTMLElement | undefined = $state();
+  const linked = $derived(session.focus?.id === item.id ? session.focus.seq : null);
+  $effect(() => {
+    if (linked === null) return;
+    open = true;
+    element?.scrollIntoView({ block: "nearest", behavior: "smooth" });
+  });
   const details = $derived.by(() => {
     const a = item.assignment;
     const items: [string, string][] = [
@@ -78,7 +82,7 @@
 </script>
 
 <!-- An assignment with no repo yet, published or upcoming. -->
-<div class="item">
+<div class="item" class:linked={linked !== null} bind:this={element}>
   <div
     class="row"
     role="button"
@@ -141,6 +145,12 @@
 </div>
 
 <style>
+  /* The row a link pointed to. */
+  .item.linked {
+    background: color-mix(in srgb, var(--accent) 12%, transparent);
+    box-shadow: inset 3px 0 0 var(--accent);
+  }
+
   .hidden-tag {
     font-style: italic;
   }

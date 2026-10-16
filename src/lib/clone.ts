@@ -5,6 +5,7 @@ import { api, errorKind, errorMessage, withDialog } from "$lib/api";
 import { t } from "$lib/i18n";
 import { defaultEditor, loadEditors, openInEditor } from "$lib/editor.svelte";
 import { loadSettings, saveSettings, settings } from "$lib/settings.svelte";
+import { busy } from "$lib/session.svelte";
 
 async function cloneFolder(): Promise<string | null> {
   return (settings.current ?? (await loadSettings())).cloneFolder;
@@ -24,9 +25,13 @@ export async function pickCloneFolder(): Promise<string | null> {
 /**
  * Clones project `id` into the clone folder, asking for one when none is set or `choose`
  * is true, then opens it in the default editor. Returns the new folder, or null when
- * cancelled or failed.
+ * cancelled or failed. The row shows it meanwhile.
  */
-export async function cloneProject(id: string, choose = false): Promise<string | null> {
+export function cloneProject(id: string, choose = false): Promise<string | null> {
+  return busy("cloning", id, () => clone(id, choose));
+}
+
+async function clone(id: string, choose: boolean): Promise<string | null> {
   try {
     const saved = await cloneFolder();
     const parent = choose || !saved ? await pickCloneFolder() : saved;

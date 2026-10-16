@@ -404,6 +404,28 @@ impl ProjectsState {
         self.remote.lock().map(|r| r.clone()).unwrap_or_default()
     }
 
+    /// A classroom of the user's, as the last full sync read it (name, key, Pages host).
+    pub fn known_classroom(&self, org: &str, slug: &str) -> Option<Classroom> {
+        self.remote()
+            .classrooms
+            .into_iter()
+            .find(|c| c.org.eq_ignore_ascii_case(org) && c.slug.eq_ignore_ascii_case(slug))
+    }
+
+    /// One classroom's published assignments, through the same cache as the syncs.
+    pub async fn manifest(
+        &self,
+        http: &reqwest::Client,
+        classroom: &Classroom,
+    ) -> Result<Vec<Assignment>> {
+        let url = classroom.assignments_url();
+        let body = self
+            .http_cache
+            .get_text_or_cached(http, &url, MANIFEST_MAX_AGE)
+            .await?;
+        classroom50::parse_assignments(&url, &body)
+    }
+
     fn store_remote(&self, cache: RemoteCache) {
         match serde_json::to_vec(&cache) {
             Ok(json) => {
@@ -417,6 +439,23 @@ impl ProjectsState {
             *remote = cache;
         }
     }
+}
+
+/// The project holding assignment `org/classroom/assignment`, slugs compared without
+/// regard to case.
+pub fn assignment_project<'a>(
+    snapshot: &'a Snapshot,
+    org: &str,
+    classroom: &str,
+    assignment: &str,
+) -> Option<&'a Project> {
+    snapshot.projects.iter().find(|p| {
+        p.owner
+            .as_deref()
+            .is_some_and(|o| o.eq_ignore_ascii_case(org))
+            && p.config.classroom.eq_ignore_ascii_case(classroom)
+            && p.config.assignment.eq_ignore_ascii_case(assignment)
+    })
 }
 
 /// Runs a full sync for the user and broadcasts the result. Concurrent callers wait for

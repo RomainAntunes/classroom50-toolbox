@@ -4,6 +4,14 @@ import { ask, message } from "@tauri-apps/plugin-dialog";
 import { api, errorKind, errorMessage, withDialog, type Accepted, type Unaccepted } from "$lib/api";
 import { cloneProject } from "$lib/clone";
 import { t } from "$lib/i18n";
+import { busy } from "$lib/session.svelte";
+
+/** Why `item` can't be accepted from the app now (locked, or not open yet), else null. */
+export function acceptBlocked(item: Unaccepted, now: Date): string | null {
+  if (item.assignment.locked) return t("projects.lockedHint");
+  const opens = item.assignment.availableFrom ? new Date(item.assignment.availableFrom) : null;
+  return opens !== null && opens > now ? t("projects.upcomingHint") : null;
+}
 
 function confirm(text: string, title: string, okLabel: string): Promise<boolean> {
   return withDialog(() =>
@@ -33,8 +41,12 @@ async function run(item: Unaccepted): Promise<Accepted | null> {
   return found ? api.acceptAssignment(item.id, true) : null;
 }
 
-/** Asks, accepts, then offers to clone the new repo. */
-export async function acceptAssignment(item: Unaccepted): Promise<void> {
+/** Asks, accepts, then offers to clone the new repo. The row shows it meanwhile. */
+export function acceptAssignment(item: Unaccepted): Promise<void> {
+  return busy("accepting", item.id, () => accept(item));
+}
+
+async function accept(item: Unaccepted): Promise<void> {
   const name = item.assignment.name;
   if (!(await confirm(notes(item), name, t("accept.ok")))) return;
   let accepted: Accepted | null;

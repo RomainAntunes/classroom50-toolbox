@@ -15,6 +15,15 @@ export const session = $state<{
   /** Avatar `data:` URLs by login, fetched once per run. */
   avatars: Record<string, string>;
   search: string;
+  /**
+   * The row a link pointed to: shown whatever the filters and hidden lists, its class
+   * unfolded, scrolled to and opened. `seq` tells two links to the same row apart. Cleared
+   * when the popover hides.
+   */
+  focus: { id: string; seq: number } | null;
+  /** Assignments being accepted and projects being cloned, wherever it was started. */
+  accepting: string[];
+  cloning: string[];
 }>({
   tools: [],
   auth: null,
@@ -25,4 +34,21 @@ export const session = $state<{
   signingIn: false,
   avatars: {},
   search: "",
+  focus: null,
+  accepting: [],
+  cloning: [],
 });
+
+/** Runs `task` with `id` listed in `session[list]` meanwhile. */
+export async function busy<T>(
+  list: "accepting" | "cloning",
+  id: string,
+  task: () => Promise<T>,
+): Promise<T> {
+  session[list] = [...session[list], id];
+  try {
+    return await task();
+  } finally {
+    session[list] = session[list].filter((other) => other !== id);
+  }
+}

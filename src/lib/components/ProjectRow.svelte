@@ -11,6 +11,8 @@
   import { durationLabel, formatDate, fromNow, t } from "$lib/i18n";
   import { tildify } from "$lib/paths.svelte";
   import { groupDetails } from "$lib/group";
+  import { session } from "$lib/session.svelte";
+  import { copyLink, openLink } from "$lib/links";
   import Details from "./Details.svelte";
 
   let { project, now, unseen }: { project: Project; now: Date; unseen: boolean } = $props();
@@ -98,6 +100,7 @@
   );
   const openTarget = $derived(project.webUrl ?? githubUrl);
   const hidden = $derived(isHidden(project.id));
+  const link = $derived(openLink(project));
   // The editor that last opened the clone, else the default one.
   const editor = $derived(path ? editorFor(project) : null);
   const cloneable = $derived(!path && Boolean(project.owner && project.repo));
@@ -141,17 +144,21 @@
     }
   }
 
-  let cloning = $state(false);
-  async function clone(choose = false) {
-    cloning = true;
-    try {
-      await cloneProject(project.id, choose);
-    } finally {
-      cloning = false;
-    }
+  const cloning = $derived(session.cloning.includes(project.id));
+  function clone(choose = false) {
+    void cloneProject(project.id, choose);
   }
 
   let open = $state(false);
+
+  // A link pointed here: open the details and bring the row into view.
+  let element: HTMLElement | undefined = $state();
+  const linked = $derived(session.focus?.id === project.id ? session.focus.seq : null);
+  $effect(() => {
+    if (linked === null) return;
+    open = true;
+    element?.scrollIntoView({ block: "nearest", behavior: "smooth" });
+  });
   const details = $derived.by(() => {
     const a = project.assignment;
     const remote = project.remote;
@@ -294,6 +301,11 @@
       }),
       separator(),
       MenuItem.new({
+        text: t("projects.copyLink"),
+        enabled: link !== null,
+        action: () => link && copyLink(link),
+      }),
+      MenuItem.new({
         text: t(hidden ? "projects.unhide" : "projects.hide"),
         action: () => setHidden(project.id, !hidden),
       }),
@@ -304,7 +316,7 @@
   }
 </script>
 
-<div class="item">
+<div class="item" class:linked={linked !== null} bind:this={element}>
   <div
     class="row"
     role="button"
@@ -413,6 +425,12 @@
 </div>
 
 <style>
+  /* The row a link pointed to. */
+  .item.linked {
+    background: color-mix(in srgb, var(--accent) 12%, transparent);
+    box-shadow: inset 3px 0 0 var(--accent);
+  }
+
   .row {
     display: flex;
     align-items: center;
