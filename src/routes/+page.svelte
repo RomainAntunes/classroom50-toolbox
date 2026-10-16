@@ -22,7 +22,7 @@
   import { announce } from "$lib/announce.svelte";
   import { menuKey, onContextMenu, popupMenu, rovingList } from "$lib/keyboard";
   import { moveIndex } from "$lib/keys";
-  import { fromNow, t } from "$lib/i18n";
+  import { currentDirection, fromNow, t } from "$lib/i18n";
   import { session } from "$lib/session.svelte";
   import { loadSettings, saveSettings, settings } from "$lib/settings.svelte";
   import Section from "$lib/components/Section.svelte";
@@ -251,6 +251,7 @@
     const next = moveIndex(event.key, current, FILTERS.length, {
       horizontal: true,
       wrap: true,
+      rtl: currentDirection() === "rtl",
     });
     if (next === null) return;
     event.preventDefault();
@@ -473,8 +474,7 @@
   /* A hairline under the titlebar; the spinning refresh icon stays the main cue. */
   .progress {
     position: absolute;
-    left: 14px;
-    right: 14px;
+    inset-inline: 14px;
     bottom: -4px;
     height: 2px;
     border-radius: 1px;
@@ -508,6 +508,21 @@
     }
     to {
       transform: translateX(340%);
+    }
+  }
+
+  :global(:root[dir="rtl"]) .progress.indeterminate > div,
+  :global(:root[dir="rtl"]) .first-bar.indeterminate > div {
+    animation-name: slide-rtl;
+  }
+
+  /* Right to left the bar starts at the right edge and slides leftward. */
+  @keyframes slide-rtl {
+    from {
+      transform: translateX(100%);
+    }
+    to {
+      transform: translateX(-340%);
     }
   }
 
@@ -688,7 +703,7 @@
 
   .synced {
     flex-shrink: 0;
-    padding-right: 4px;
+    padding-inline-end: 4px;
     white-space: nowrap;
   }
 </style>

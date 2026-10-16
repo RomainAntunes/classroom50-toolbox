@@ -110,8 +110,9 @@
     >
       <span class="text">
         <span class="name" id="{uid}-name">
-          {#if unseen}<span class="dot" aria-hidden="true"></span>{/if}{item.assignment
-            .name}{#if unseen}<span class="sr-only">, {t("projects.new")}</span>{/if}
+          {#if unseen}<span class="dot" aria-hidden="true"></span>{/if}<bdi
+            >{item.assignment.name}</bdi
+          >{#if unseen}<span class="sr-only">, {t("projects.new")}</span>{/if}
         </span>
         <span class="meta" id="{uid}-meta">
           {#if hidden}
@@ -144,7 +145,8 @@
     <button
       title={t("projects.openAcceptPage")}
       aria-label={t("projects.openAcceptPage")}
-      onclick={() => openUrl(item.acceptUrl)}><span aria-hidden="true">↗</span></button
+      onclick={() => openUrl(item.acceptUrl)}
+      ><span class="mirror-rtl" aria-hidden="true">↗</span></button
     >
   </div>
   {#if open}
@@ -157,6 +159,10 @@
   .item.linked {
     background: color-mix(in srgb, var(--accent) 12%, transparent);
     box-shadow: inset 3px 0 0 var(--accent);
+  }
+
+  :global(:root[dir="rtl"]) .item.linked {
+    box-shadow: inset -3px 0 0 var(--accent);
   }
 
   .hidden-tag {
@@ -172,7 +178,7 @@
     display: flex;
     align-items: center;
     gap: calc(var(--space) / 2);
-    padding-right: 12px;
+    padding-inline-end: 12px;
     transition: background-color 0.12s;
   }
 
@@ -185,10 +191,11 @@
     min-width: 0;
     display: flex;
     align-items: center;
-    padding: 8px 0 8px 12px;
+    padding-block: 8px;
+    padding-inline: 12px 0;
     border-radius: 0;
     background: none;
-    text-align: left;
+    text-align: start;
     white-space: normal;
   }
 
@@ -237,7 +244,7 @@
     display: inline-block;
     width: 7px;
     height: 7px;
-    margin-right: 6px;
+    margin-inline-end: 6px;
     border-radius: 50%;
     background: var(--accent);
     vertical-align: 1px;

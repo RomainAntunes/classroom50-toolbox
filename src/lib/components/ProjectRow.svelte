@@ -9,7 +9,7 @@
   import { submitProject } from "$lib/submit";
   import { addTeammate, joinsGroup } from "$lib/teammate";
   import { isHidden, setHidden } from "$lib/hidden";
-  import { durationLabel, formatDate, fromNow, t } from "$lib/i18n";
+  import { durationLabel, formatDate, fromNow, isolated, t } from "$lib/i18n";
   import { tildify } from "$lib/paths.svelte";
   import { groupDetails } from "$lib/group";
   import { session } from "$lib/session.svelte";
@@ -219,7 +219,7 @@
     if (due) add("due", formatDate(due));
     if (remote?.head?.at) {
       const when = fromNow(new Date(remote.head.at), now);
-      add("lastPush", remote.head.author ? `${remote.head.author}, ${when}` : when);
+      add("lastPush", remote.head.author ? `${isolated(remote.head.author)}, ${when}` : when);
     }
     // With every-push grading the last submission is the last push.
     if (a?.submissionMode === "tag" && remote?.lastSubmission?.at) {
@@ -409,9 +409,8 @@
     >
       <span class="text">
         <span class="name" id="{uid}-name" title={project.repo ?? path ?? undefined}>
-          {#if unseen}<span class="dot" aria-hidden="true"></span>{/if}{name}{#if unseen}<span
-              class="sr-only">, {t("projects.new")}</span
-            >{/if}
+          {#if unseen}<span class="dot" aria-hidden="true"></span>{/if}<bdi>{name}</bdi
+          >{#if unseen}<span class="sr-only">, {t("projects.new")}</span>{/if}
         </span>
         <span class="meta" id="{uid}-meta">
           {#if hidden}
@@ -439,9 +438,9 @@
               >{t("projects.late", { duration: durationLabel(project.lateSeconds) })}</span
             > ·
           {/if}
-          {path
-            ? (project.repo ?? project.config.assignment)
-            : t(cloning ? "projects.cloning" : "projects.notCloned")}
+          {#if path}<bdi>{project.repo ?? project.config.assignment}</bdi>{:else}{t(
+              cloning ? "projects.cloning" : "projects.notCloned",
+            )}{/if}
         </span>
       </span>
       {#if grading?.state === "running"}
@@ -479,7 +478,7 @@
     {#if openTarget}
       {@const openLabel = t(project.webUrl ? "projects.openClassroom50" : "projects.openGitHub")}
       <button title={openLabel} aria-label={openLabel} onclick={() => openUrl(openTarget)}
-        ><span aria-hidden="true">↗</span></button
+        ><span class="mirror-rtl" aria-hidden="true">↗</span></button
       >
     {/if}
   </div>
@@ -501,6 +500,10 @@
     box-shadow: inset 3px 0 0 var(--accent);
   }
 
+  :global(:root[dir="rtl"]) .item.linked {
+    box-shadow: inset -3px 0 0 var(--accent);
+  }
+
   .item {
     list-style: none;
   }
@@ -511,7 +514,7 @@
     display: flex;
     align-items: center;
     gap: calc(var(--space) / 2);
-    padding-right: 12px;
+    padding-inline-end: 12px;
     transition: background-color 0.12s;
   }
 
@@ -525,10 +528,11 @@
     display: flex;
     align-items: center;
     gap: calc(var(--space) / 2);
-    padding: 8px 0 8px 12px;
+    padding-block: 8px;
+    padding-inline: 12px 0;
     border-radius: 0;
     background: none;
-    text-align: left;
+    text-align: start;
     white-space: normal;
   }
 
@@ -615,7 +619,7 @@
     display: inline-block;
     width: 7px;
     height: 7px;
-    margin-right: 6px;
+    margin-inline-end: 6px;
     border-radius: 50%;
     background: var(--accent);
     vertical-align: 1px;

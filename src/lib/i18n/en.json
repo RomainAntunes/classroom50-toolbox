@@ -141,6 +141,8 @@
   "settings.dev.os.macos": "macOS",
   "settings.dev.os.windows": "Windows",
   "settings.dev.os.linux": "Linux",
+  "settings.dev.rtl": "Right-to-left layout",
+  "settings.dev.rtlHint": "Lays the UI out as for Arabic or Hebrew, with the current language's words.",
   "settings.appearance": "Appearance",
   "settings.appearance.system": "System",
   "settings.appearance.light": "Light",

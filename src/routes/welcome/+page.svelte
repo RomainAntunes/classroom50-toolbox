@@ -74,7 +74,7 @@
     </section>
     <ul class="points">
       <li>
-        <svg viewBox="0 0 24 24" aria-hidden="true"
+        <svg class="mirror-rtl" viewBox="0 0 24 24" aria-hidden="true"
           ><path d="M8 6h13M8 12h13M8 18h13M3.5 6h.01M3.5 12h.01M3.5 18h.01" /></svg
         >
         <span>{t("welcome.point.list")}</span>
@@ -116,7 +116,9 @@
         <span class="text">
           <span>{t("settings.folders.cloneInto")}</span>
           <span class="sub path" title={current.cloneFolder ?? undefined}
-            >{current.cloneFolder ?? t("welcome.folders.cloneUnset")}</span
+            >{#if current.cloneFolder}<bdi dir="ltr">{current.cloneFolder}</bdi>{:else}<bdi
+                >{t("welcome.folders.cloneUnset")}</bdi
+              >{/if}</span
           >
         </span>
         <button onclick={pickCloneFolder}>
@@ -283,12 +285,20 @@
     color: var(--fg-muted);
   }
 
+  /* A path cut short at its start (`direction: rtl` puts the ellipsis there), the path
+     itself kept left to right by its `<bdi dir="ltr">` so its leading `/` stays put. */
   .path {
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
     direction: rtl;
     text-align: left;
+  }
+
+  /* `direction: rtl` above only puts the ellipsis at the path's start; the text still lines
+     up with the UI's start edge. */
+  :global(:root[dir="rtl"]) .path {
+    text-align: right;
   }
 
   footer {

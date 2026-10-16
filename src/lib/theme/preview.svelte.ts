@@ -1,9 +1,12 @@
 import type { Os } from "$lib/api";
+import { locale } from "$lib/i18n/locale.svelte";
 
 // Dev builds only: wear another platform's skin on this machine, to check every theme
-// without three computers. Kept in localStorage so a reload keeps it. Light and dark are a
-// real setting (`appearance`), applied by Rust.
+// without three computers, and lay the UI out right to left with the current language's
+// words. Kept in localStorage so a reload keeps them. Light and dark are a real setting
+// (`appearance`), applied by Rust.
 const OS_KEY = "dev.previewOs";
+const RTL_KEY = "dev.previewRtl";
 
 export const OS_CHOICES = ["auto", "macos", "windows", "linux"] as const;
 export type OsChoice = (typeof OS_CHOICES)[number];
@@ -29,6 +32,7 @@ export function initTheme(realOs: Os) {
   preview.realOs = realOs;
   if (import.meta.env.DEV) {
     preview.os = stored(OS_KEY, OS_CHOICES);
+    locale.rtlPreview = localStorage.getItem(RTL_KEY) === "1";
     // Left by builds that kept the dev appearance here.
     localStorage.removeItem("dev.previewTheme");
   }
@@ -39,4 +43,11 @@ export function setPreviewOs(os: OsChoice) {
   preview.os = os;
   localStorage.setItem(OS_KEY, os);
   applyOs();
+}
+
+/** Forces `dir="rtl"` (the layout applies it), whatever the language. */
+export function setPreviewRtl(on: boolean) {
+  locale.rtlPreview = on;
+  if (on) localStorage.setItem(RTL_KEY, "1");
+  else localStorage.removeItem(RTL_KEY);
 }

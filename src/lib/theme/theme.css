@@ -189,6 +189,19 @@ button.primary {
   color: var(--accent-fg);
 }
 
+/* WebKit's `li { text-align: match-parent }` hands its content a physical `left` or `right`,
+   which a left-to-right `<pre>` in a right-to-left list would keep. */
+li {
+  text-align: start;
+}
+
+/* A text field takes the direction of what is typed in it (a repo name in a right-to-left
+   UI, a right-to-left name in an English one); empty, it follows the UI, and so does its
+   placeholder (`dir="auto"` would turn an empty field left to right). */
+input:where(:not([type]), [type="text"], [type="search"]) {
+  unicode-bidi: plaintext;
+}
+
 /* Square icon buttons; the SVGs are from Lucide (ISC). */
 button.icon {
   display: grid;
@@ -206,6 +219,18 @@ button.icon svg {
   stroke-width: 2;
   stroke-linecap: round;
   stroke-linejoin: round;
+}
+
+/* Icons that point along the reading direction (back, chevrons, "open in" arrows, a list's
+   bullets) face the other way right to left. `scale` mirrors on top of any `transform`, so
+   an open chevron's rotation still points it down. Never on logos, checkmarks or clocks.
+   A glyph in running text takes it as an inline block. */
+:root[dir="rtl"] .mirror-rtl {
+  scale: -1 1;
+}
+
+:root[dir="rtl"] span.mirror-rtl {
+  display: inline-block;
 }
 
 /* Every focusable element shows where the keyboard is; components only move the offset. */

@@ -45,7 +45,8 @@
   import { popupMenu } from "$lib/keyboard";
   import { session } from "$lib/session.svelte";
   import { showText } from "$lib/prompt.svelte";
-  import { OS_CHOICES, preview, setPreviewOs } from "$lib/theme/preview.svelte";
+  import { OS_CHOICES, preview, setPreviewOs, setPreviewRtl } from "$lib/theme/preview.svelte";
+  import { locale } from "$lib/i18n/locale.svelte";
 
   const REMINDER_CHOICES = [72, 24, 6, 1];
   const REPO_URL = "https://github.com/RomainAntunes/classroom50-toolbox";
@@ -373,7 +374,7 @@
 
 <header class="titlebar">
   <button class="icon" onclick={() => goto("/")} title={t("app.back")} aria-label={t("app.back")}>
-    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m15 18-6-6 6-6" /></svg>
+    <svg class="mirror-rtl" viewBox="0 0 24 24" aria-hidden="true"><path d="m15 18-6-6 6-6" /></svg>
   </button>
   <h1>{t("app.settings")}</h1>
 </header>
@@ -391,7 +392,9 @@
         <span class="text">
           <span>{t("settings.folders.cloneInto")}</span>
           <span class="sub path" title={current.cloneFolder ?? undefined}
-            >{current.cloneFolder ?? t("settings.folders.cloneUnset")}</span
+            >{#if current.cloneFolder}<bdi dir="ltr">{current.cloneFolder}</bdi>{:else}<bdi
+                >{t("settings.folders.cloneUnset")}</bdi
+              >{/if}</span
           >
         </span>
         <button onclick={pickCloneFolder}>{t("settings.folders.change")}</button>
@@ -405,7 +408,7 @@
       </div>
       {#each current.watchedFolders as folder (folder)}
         <div class="row nested">
-          <span class="path" title={folder}>{folder}</span>
+          <span class="path" title={folder}><bdi dir="ltr">{folder}</bdi></span>
           <button onclick={() => removeFolder(folder)}>{t("settings.folders.remove")}</button>
         </div>
       {/each}
@@ -578,7 +581,9 @@
         <div class="row">
           <span class="text">
             <span>{t("settings.calendar.kept")}</span>
-            <span class="sub path" title={current.calendarFile}>{current.calendarFile}</span>
+            <span class="sub path" title={current.calendarFile}
+              ><bdi dir="ltr">{current.calendarFile}</bdi></span
+            >
           </span>
           <button onclick={() => save({ calendarFile: null })}>{t("settings.calendar.stop")}</button
           >
@@ -592,13 +597,15 @@
           <button disabled={clearing} onclick={clearCache}>{t("settings.sync.clear")}</button>
         {/snippet}
         <button class="disclosure" aria-expanded={showSync} onclick={() => (showSync = !showSync)}>
-          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m9 18 6-6-6-6" /></svg>
+          <svg class="mirror-rtl" viewBox="0 0 24 24" aria-hidden="true"
+            ><path d="m9 18 6-6-6-6" /></svg
+          >
           {t(showSync ? "settings.sync.hide" : "settings.sync.show")}
         </button>
         {#if showSync}
           <dl class="sync">
             <dt>{t("settings.sync.account")}</dt>
-            <dd>{sync.login ?? t("settings.sync.none")}</dd>
+            <dd><bdi>{sync.login ?? t("settings.sync.none")}</bdi></dd>
             <dt>{t("settings.sync.full")}</dt>
             <dd>{lastRun(sync.stats.full)}</dd>
             <dt>{t("settings.sync.status")}</dt>
@@ -632,7 +639,9 @@
             </dd>
             {#if sync.issue}
               <dt>{t("settings.sync.issue")}</dt>
-              <dd class="issue" title={errorMessage(sync.issue)}>{errorMessage(sync.issue)}</dd>
+              <dd class="issue" title={errorMessage(sync.issue)}>
+                <bdi>{errorMessage(sync.issue)}</bdi>
+              </dd>
             {/if}
           </dl>
         {/if}
@@ -651,6 +660,12 @@
             {/each}
           </div>
         </div>
+        <Toggle
+          label={t("settings.dev.rtl")}
+          hint={t("settings.dev.rtlHint")}
+          checked={locale.rtlPreview}
+          onchange={setPreviewRtl}
+        />
         <div class="row">
           <span id="network-label" title={t("settings.dev.networkHint")}
             >{t("settings.dev.network")}</span
@@ -693,7 +708,9 @@
           >
         </div>
         <button class="disclosure" aria-expanded={showDev} onclick={() => (showDev = !showDev)}>
-          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m9 18 6-6-6-6" /></svg>
+          <svg class="mirror-rtl" viewBox="0 0 24 24" aria-hidden="true"
+            ><path d="m9 18 6-6-6-6" /></svg
+          >
           {t("settings.dev.notifications")}
         </button>
         {#if showDev}
@@ -809,13 +826,15 @@
 
   main {
     flex: 1;
-    /* The 10px track is always there (and invisible), so the right margin is 2px plus the
-       track and matches the left one whether or not the page scrolls. */
+    /* The 10px track is always there (and invisible), on the inline-end side (left when
+       right to left), so that margin is 2px plus the track and matches the start one
+       whether or not the page scrolls. */
     overflow-y: scroll;
     display: flex;
     flex-direction: column;
     gap: calc(var(--space) * 2);
-    padding: var(--space) 2px 14px 12px;
+    padding-block: var(--space) 14px;
+    padding-inline: 12px 2px;
   }
 
   .disclosure {
@@ -826,7 +845,7 @@
     padding: 8px 12px;
     border-radius: 0;
     background: transparent;
-    text-align: left;
+    text-align: start;
     color: var(--fg-muted);
   }
 
@@ -891,7 +910,7 @@
   }
 
   .row.nested {
-    padding-left: 24px;
+    padding-inline-start: 24px;
   }
 
   .row {
@@ -914,6 +933,8 @@
     color: var(--fg-muted);
   }
 
+  /* A path cut short at its start (`direction: rtl` puts the ellipsis there), the path
+     itself kept left to right by its `<bdi dir="ltr">` so its leading `/` stays put. */
   .path {
     min-width: 0;
     overflow: hidden;
@@ -921,6 +942,12 @@
     white-space: nowrap;
     direction: rtl;
     text-align: left;
+  }
+
+  /* `direction: rtl` above only puts the ellipsis at the path's start; the text still lines
+     up with the UI's start edge. */
+  :global(:root[dir="rtl"]) .path {
+    text-align: right;
   }
 
   .hint {

@@ -41,14 +41,14 @@
           oncontextmenu={onmenu && onContextMenu(() => onmenu())}
           onkeydown={onmenu && menuKey(onmenu)}
         >
-          <svg class:open={!collapsed} viewBox="0 0 24 24" aria-hidden="true"
+          <svg class="mirror-rtl" class:open={!collapsed} viewBox="0 0 24 24" aria-hidden="true"
             ><path d="m9 18 6-6-6-6" /></svg
           >
-          <span class="label">{title}</span>
+          <span class="label"><bdi>{title}</bdi></span>
           {#if note}<span class="note">{note}</span>{/if}
         </button>
       {:else}
-        <span class="label">{title}</span>{#if note}<span class="note">{note}</span>{/if}
+        <span class="label"><bdi>{title}</bdi></span>{#if note}<span class="note">{note}</span>{/if}
       {/if}
     </h2>
     {@render actions?.()}
@@ -119,7 +119,7 @@
   }
 
   .note {
-    margin-left: 6px;
+    margin-inline-start: 6px;
     font-size: 0.72em;
     font-weight: 400;
     color: var(--fg-muted);
@@ -136,13 +136,14 @@
     gap: 4px;
     min-width: 0;
     flex: 1;
-    padding: 3px 8px 3px 6px;
+    padding-block: 3px;
+    padding-inline: 6px 8px;
     border: 0;
     border-radius: var(--radius-control);
     background: none;
     color: inherit;
     font: inherit;
-    text-align: left;
+    text-align: start;
     cursor: default;
   }
 

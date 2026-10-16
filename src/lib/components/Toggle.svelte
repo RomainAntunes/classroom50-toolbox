@@ -66,7 +66,7 @@
     content: "";
     position: absolute;
     top: 2px;
-    left: 2px;
+    inset-inline-start: 2px;
     width: calc(var(--h) - 4px);
     height: calc(var(--h) - 4px);
     border-radius: 50%;
@@ -83,6 +83,11 @@
     transform: translateX(calc(var(--w) - var(--h)));
   }
 
+  /* The knob starts at the inline start and slides toward the end, leftward right to left. */
+  :global(:root[dir="rtl"]) input:checked::after {
+    transform: translateX(calc(var(--h) - var(--w)));
+  }
+
   input:focus-visible {
     outline-offset: 2px;
   }
@@ -96,7 +101,7 @@
 
   :global(:root[data-os="windows"]) input::after {
     top: 3px;
-    left: 3px;
+    inset-inline-start: 3px;
     width: 12px;
     height: 12px;
     background: var(--fg-muted);

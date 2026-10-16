@@ -142,6 +142,8 @@
   "settings.dev.os.macos": "macOS",
   "settings.dev.os.windows": "Windows",
   "settings.dev.os.linux": "Linux",
+  "settings.dev.rtl": "Disposition de droite à gauche",
+  "settings.dev.rtlHint": "Dispose l'interface comme pour l'arabe ou l'hébreu, avec les mots de la langue actuelle.",
   "settings.appearance": "Apparence",
   "settings.appearance.system": "Système",
   "settings.appearance.light": "Clair",

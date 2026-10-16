@@ -230,7 +230,7 @@
 {#if device}
   <div class="device">
     <span>{t("auth.waiting")}</span>
-    <code>{device.code}</code>
+    <code dir="ltr">{device.code}</code>
     <div class="actions">
       <button class="primary" onclick={copyAndOpen}>{t("auth.copyAndOpen")}</button>
       <button onclick={cancel}>{t("auth.cancel")}</button>
@@ -299,7 +299,8 @@
     box-sizing: border-box;
     height: 26px;
     max-width: 100%;
-    padding: 0 8px 0 4px;
+    padding-block: 0;
+    padding-inline: 4px 8px;
     border-radius: 13px;
     background: transparent;
     color: inherit;

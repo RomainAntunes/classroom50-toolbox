@@ -75,11 +75,15 @@
           if (ready) close(preview ? "ok" : value);
         }}
       >
-        <h2 id="prompt-title">{current.title}</h2>
+        <h2 id="prompt-title"><bdi>{current.title}</bdi></h2>
         {#if current.message}<p id="prompt-message">{current.message}</p>{/if}
         {#if current.text !== undefined}
           <!-- svelte-ignore a11y_no_noninteractive_tabindex -->
-          <pre bind:this={pre} tabindex="0" aria-labelledby="prompt-title">{current.text}</pre>
+          <pre
+            bind:this={pre}
+            tabindex="0"
+            aria-labelledby="prompt-title"
+            dir="ltr">{current.text}</pre>
         {:else}
           <input
             bind:this={input}
