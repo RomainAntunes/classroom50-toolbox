@@ -90,22 +90,23 @@ describe("Classroom 50 Toolbox", () => {
     const hello = await item("Hello, World");
     await expect(hello.$(`.//button[normalize-space()="${t("submit.ok")}"]`)).toBeDisplayed();
     // The button asks through a native dialog WebDriver can't reach, so the commands it
-    // runs are called the same way the UI calls them.
+    // runs are called the same way the UI calls them. No `error` key in the result: wdio
+    // takes a response whose value has one for a failed command.
     const outcome = await browser.executeAsync((id, done) => {
       const { invoke } = window.__TAURI_INTERNALS__;
       invoke("submit_check", { id }).then(
         (check) =>
           invoke("submit_project", { id }).then(
             (submitted) => done({ check, submitted }),
-            (error) => done({ check, error }),
+            (refused) => done({ check, refused }),
           ),
-        (error) => done({ error }),
+        (refused) => done({ refused }),
       );
     }, HELLO_ID);
     expect(outcome.check).toEqual({ hasMarker: true, uncommitted: [], editorFiles: [] });
     expect(outcome.submitted).toBeUndefined();
-    expect(outcome.error.kind).toBe("blockedInDev");
-    expect(outcome.error.params.command).toBe("gh student submit");
+    expect(outcome.refused.kind).toBe("blockedInDev");
+    expect(outcome.refused.params.command).toBe("gh student submit");
     // `process::checked_args` stopped it: the fake gh never heard of it.
     expect(ghCalls().filter((call) => call.startsWith("student"))).toEqual([]);
     // gh itself was used all along (the fake one, through the PATH hook).
