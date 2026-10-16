@@ -838,7 +838,9 @@ mod tests {
 
         std::fs::write(clone.join(".vscode").join("settings.json"), "{\"a\":1}").unwrap();
         std::fs::write(clone.join("hello world.c"), "int main;").unwrap();
-        std::fs::write(clone.join("*.c"), "glob").unwrap();
+        // Glob characters in a name are taken literally (`*` and `?` aren't allowed in Windows
+        // file names, `[` is).
+        std::fs::write(clone.join("[x].c"), "glob").unwrap();
         sh(&clone, &["mv", "old name.c", "new name.c"]);
         let state = commit_check(&clone).await.unwrap();
         assert_eq!(
@@ -846,7 +848,7 @@ mod tests {
             [
                 ".vscode/settings.json",
                 "new name.c",
-                "*.c",
+                "[x].c",
                 "hello world.c"
             ]
         );
@@ -859,7 +861,7 @@ mod tests {
         let committed = sh(&clone, &["show", "--name-status", "--format=", "HEAD"]);
         assert_eq!(
             committed,
-            "A\t*.c\nM\t.vscode/settings.json\nA\thello world.c\nR100\told name.c\tnew name.c"
+            "M\t.vscode/settings.json\nA\t[x].c\nA\thello world.c\nR100\told name.c\tnew name.c"
         );
         assert_eq!(
             sh(&clone, &["status", "--porcelain", "--untracked-files=all"]),
