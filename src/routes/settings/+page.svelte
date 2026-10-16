@@ -11,6 +11,7 @@
     COMMIT_ACTIONS,
     PROJECTS_UPDATED_EVENT,
     SIMULATED_NETWORKS,
+    UPDATE_CHANNELS,
     withDialog,
     type AppInfo,
     type LastRun,
@@ -218,6 +219,22 @@
     await popupMenu(menu, anchor);
   }
 
+  /** Stable or Beta, as a native menu. */
+  async function chooseUpdateChannel(anchor: HTMLElement) {
+    const chosen = settings.current?.updateChannel ?? "stable";
+    const items = await Promise.all(
+      UPDATE_CHANNELS.map((choice) =>
+        CheckMenuItem.new({
+          text: t(`settings.updates.${choice}`),
+          checked: choice === chosen,
+          action: () => void save({ updateChannel: choice }),
+        }),
+      ),
+    );
+    const menu = await Menu.new({ items });
+    await popupMenu(menu, anchor);
+  }
+
   /** Off, Commit or Commit & push, as a native menu. */
   async function chooseCommitActions(anchor: HTMLElement) {
     const chosen = settings.current?.commitActions ?? "none";
@@ -295,6 +312,11 @@
     }
     return null;
   });
+
+  // MSI installs stay on stable (pre-releases ship no MSI).
+  const channel = $derived(
+    update?.hasBeta === false ? "stable" : (current?.updateChannel ?? "stable"),
+  );
 
   // Copy diagnostics: built in Rust with names masked, previewed, then copied.
   let diagnosing = $state(false);
@@ -474,6 +496,23 @@
         checked={current.launchAtLogin}
         onchange={(on) => save({ launchAtLogin: on })}
       />
+      <div class="row">
+        <span class="text">
+          <span>{t("settings.updates.channel")}</span>
+          <span class="sub"
+            >{update?.hasBeta === false
+              ? t("settings.updates.msiHint")
+              : t(`settings.updates.${channel}Hint`)}</span
+          >
+        </span>
+        <button
+          aria-haspopup="menu"
+          disabled={update?.hasBeta === false}
+          aria-label={`${t("settings.updates.channel")}: ${t(`settings.updates.${channel}`)}`}
+          onclick={(event) => chooseUpdateChannel(event.currentTarget)}
+          >{t(`settings.updates.${channel}`)}</button
+        >
+      </div>
     </Section>
 
     <Section title={t("settings.reminders.title")}>
