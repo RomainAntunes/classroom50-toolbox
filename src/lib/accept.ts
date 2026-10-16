@@ -8,6 +8,7 @@ import { groupName } from "$lib/group";
 import { announce } from "$lib/announce.svelte";
 import { busy, session } from "$lib/session.svelte";
 import { askText } from "$lib/prompt.svelte";
+import { addToNewGroup } from "$lib/teammate";
 
 /** The longest group name, as `student::MAX_TEAM_NAME` (upstream's web app) allows. */
 export const MAX_GROUP_NAME = 80;
@@ -69,37 +70,65 @@ export function askGroupName(message: string): Promise<string | null> {
   });
 }
 
-/** Runs the accept, founding a group when the student names one. Null when cancelled. */
-async function run(item: Unaccepted): Promise<Accepted | null> {
-  try {
-    return await api.acceptAssignment(item.id, null);
-  } catch (err) {
-    if (errorKind(err) !== "needsTeam") throw err;
+/** Whether the student can found a group for `item` ("Create a group…"): a team assignment
+ *  whose groups students form, and no group yet. */
+export function canFoundGroup(item: Unaccepted): boolean {
+  const a = item.assignment;
+  return a.mode === "team" && a.teamFormation !== "teacher" && !item.group;
+}
+
+/** Runs the accept, founding a group when the student names one (`newGroup` asks for the
+ *  name up front, else only on `needsTeam`). Null when cancelled. */
+async function run(
+  item: Unaccepted,
+  newGroup: boolean,
+): Promise<{ accepted: Accepted; group: string | null } | null> {
+  if (!newGroup) {
+    try {
+      return { accepted: await api.acceptAssignment(item.id, null), group: null };
+    } catch (err) {
+      if (errorKind(err) !== "needsTeam") throw err;
+    }
   }
-  const name = await askGroupName(t("accept.needsTeam"));
-  return name ? api.acceptAssignment(item.id, name) : null;
+  const group = await askGroupName(t(newGroup ? "accept.createGroupHint" : "accept.needsTeam"));
+  return group ? { accepted: await api.acceptAssignment(item.id, group), group } : null;
 }
 
-/** Asks, accepts, then offers to clone the new repo. The row shows it meanwhile. */
-export function acceptAssignment(item: Unaccepted): Promise<void> {
-  return busy("accepting", item.id, () => accept(item));
+/** Asks, accepts, then offers to clone the new repo. The row shows it meanwhile. With
+ *  `newGroup` ("Create a group…") it founds a group, asking its name first. */
+export function acceptAssignment(item: Unaccepted, newGroup = false): Promise<void> {
+  return busy("accepting", item.id, () => accept(item, newGroup));
 }
 
-async function accept(item: Unaccepted): Promise<void> {
+/** Right after founding a group: says how to add teammates, and offers to now. */
+async function offerTeammates(group: string, id: string, repo: string, name: string) {
+  const now = await withDialog(() =>
+    ask(t("accept.groupCreated", { group }), {
+      title: name,
+      kind: "info",
+      okLabel: t("accept.addTeammates"),
+      cancelLabel: t("accept.later"),
+    }),
+  );
+  if (now) await addToNewGroup(id, repo, name);
+}
+
+async function accept(item: Unaccepted, newGroup: boolean): Promise<void> {
   const name = item.assignment.name;
   if (!(await confirm(notes(item, session.snapshot?.login ?? null), name, t("accept.ok")))) return;
-  let accepted: Accepted | null;
+  let result: Awaited<ReturnType<typeof run>>;
   try {
-    accepted = await run(item);
+    result = await run(item, newGroup);
   } catch (err) {
     await withDialog(() =>
       message(t("accept.failed", { error: errorMessage(err) }), { title: name, kind: "error" }),
     );
     return;
   }
-  if (!accepted) return;
+  if (!result) return;
   announce(t("a11y.accepted", { name }));
-  const { repo, projectId } = accepted;
+  const { repo, projectId } = result.accepted;
+  if (result.group) await offerTeammates(result.group, projectId ?? item.id, repo, name);
   if (!projectId) {
     await withDialog(() => message(t("accept.done", { repo }), { title: name }));
     return;
