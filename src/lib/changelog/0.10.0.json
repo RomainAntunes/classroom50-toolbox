@@ -1,0 +1,253 @@
+{
+  "date": "2026-10-16",
+  "notes": {
+    "en": [
+      {
+        "kind": "new",
+        "text": "Choose in Settings whether the app may commit your work, or commit and push it. It's off by default, and both are in a project's menu."
+      },
+      {
+        "kind": "new",
+        "text": "Before you accept an assignment, see what it creates: the repository, who can see it, the due date and the group rules."
+      },
+      {
+        "kind": "new",
+        "text": "Create a group from an assignment's menu. A new group always gets a name, asked first."
+      },
+      {
+        "kind": "new",
+        "text": "Add several classmates to your group at once, right after creating it or later."
+      },
+      {
+        "kind": "new",
+        "text": "On Linux, due dates can go into GNOME Calendar, Evolution or KOrganizer. Elsewhere, the calendar file opens in your calendar app."
+      },
+      {
+        "kind": "new",
+        "text": "Copy a project's GitHub link or clone address from its menu."
+      },
+      {
+        "kind": "new",
+        "text": "A project's details list the files you haven't committed yet."
+      },
+      {
+        "kind": "new",
+        "text": "Settings > About can copy a report to attach to a bug report, with your names, classes and keys hidden."
+      },
+      {
+        "kind": "improved",
+        "text": "Everything works from the keyboard, and screen readers describe each assignment and what happened."
+      },
+      {
+        "kind": "improved",
+        "text": "Animations stop when your system asks for reduced motion, and text and colors are easier to read."
+      },
+      {
+        "kind": "improved",
+        "text": "Every clone asks first and names the folder it goes into."
+      },
+      {
+        "kind": "improved",
+        "text": "Editor and system files, like .DS_Store or .idea, no longer count as uncommitted work."
+      },
+      {
+        "kind": "improved",
+        "text": "Submit only runs once everything is committed, so you never hand in work you didn't mean to."
+      },
+      {
+        "kind": "fixed",
+        "text": "The window reopens on your assignments instead of Settings."
+      },
+      {
+        "kind": "fixed",
+        "text": "The clone folder is only remembered once you confirm the clone."
+      }
+    ],
+    "fr": [
+      {
+        "kind": "new",
+        "text": "Choisissez dans les réglages si l'app peut faire un commit de votre travail, ou un commit et un push. C'est désactivé par défaut, et les deux sont dans le menu d'un projet."
+      },
+      {
+        "kind": "new",
+        "text": "Avant d'accepter un devoir, voyez ce qu'il crée : le dépôt, qui peut le voir, l'échéance et les règles de groupe."
+      },
+      {
+        "kind": "new",
+        "text": "Créez un groupe depuis le menu d'un devoir. Un nouveau groupe a toujours un nom, demandé d'abord."
+      },
+      {
+        "kind": "new",
+        "text": "Ajoutez plusieurs camarades à votre groupe d'un coup, juste après l'avoir créé ou plus tard."
+      },
+      {
+        "kind": "new",
+        "text": "Sous Linux, les échéances peuvent aller dans GNOME Agenda, Evolution ou KOrganizer. Ailleurs, le fichier de calendrier s'ouvre dans votre app de calendrier."
+      },
+      {
+        "kind": "new",
+        "text": "Copiez le lien GitHub d'un projet ou son adresse de clone depuis son menu."
+      },
+      {
+        "kind": "new",
+        "text": "Les détails d'un projet listent les fichiers pas encore commités."
+      },
+      {
+        "kind": "new",
+        "text": "Réglages > À propos peut copier un rapport à joindre à un signalement de bug, avec vos noms, cours et clés masqués."
+      },
+      {
+        "kind": "improved",
+        "text": "Tout se fait au clavier, et les lecteurs d'écran décrivent chaque devoir et ce qui s'est passé."
+      },
+      {
+        "kind": "improved",
+        "text": "Les animations s'arrêtent quand votre système demande moins de mouvement, et textes et couleurs sont plus lisibles."
+      },
+      {
+        "kind": "improved",
+        "text": "Chaque clone demande d'abord et indique le dossier où il va."
+      },
+      {
+        "kind": "improved",
+        "text": "Les fichiers d'éditeur et du système, comme .DS_Store ou .idea, ne comptent plus comme du travail non commité."
+      },
+      {
+        "kind": "improved",
+        "text": "Rendre ne fonctionne qu'une fois tout commité, pour ne jamais rendre du travail par erreur."
+      },
+      {
+        "kind": "fixed",
+        "text": "La fenêtre se rouvre sur vos devoirs au lieu des réglages."
+      },
+      {
+        "kind": "fixed",
+        "text": "Le dossier de clone n'est retenu qu'une fois le clone confirmé."
+      }
+    ],
+    "es": [
+      {
+        "kind": "new",
+        "text": "Elige en Ajustes si la app puede hacer commit de tu trabajo, o commit y push. Viene desactivado, y ambos están en el menú de un proyecto."
+      },
+      {
+        "kind": "new",
+        "text": "Antes de aceptar una tarea, mira lo que crea: el repositorio, quién puede verlo, la fecha límite y las reglas del grupo."
+      },
+      {
+        "kind": "new",
+        "text": "Crea un grupo desde el menú de una tarea. Un grupo nuevo siempre tiene nombre, y se pide primero."
+      },
+      {
+        "kind": "new",
+        "text": "Añade varios compañeros a tu grupo a la vez, justo después de crearlo o más tarde."
+      },
+      {
+        "kind": "new",
+        "text": "En Linux, las fechas límite pueden ir a GNOME Calendar, Evolution o KOrganizer. En otros sistemas, el archivo de calendario se abre en tu app de calendario."
+      },
+      {
+        "kind": "new",
+        "text": "Copia el enlace de GitHub de un proyecto o su dirección para clonar desde su menú."
+      },
+      {
+        "kind": "new",
+        "text": "Los detalles de un proyecto muestran los archivos que aún no tienen commit."
+      },
+      {
+        "kind": "new",
+        "text": "Ajustes > Acerca de puede copiar un informe para adjuntar a un reporte de errores, con tus nombres, clases y claves ocultos."
+      },
+      {
+        "kind": "improved",
+        "text": "Todo funciona con el teclado, y los lectores de pantalla describen cada tarea y lo que pasó."
+      },
+      {
+        "kind": "improved",
+        "text": "Las animaciones se detienen cuando tu sistema pide reducir el movimiento, y los textos y colores se leen mejor."
+      },
+      {
+        "kind": "improved",
+        "text": "Cada clonación pregunta primero e indica la carpeta de destino."
+      },
+      {
+        "kind": "improved",
+        "text": "Los archivos del editor y del sistema, como .DS_Store o .idea, ya no cuentan como trabajo sin commit."
+      },
+      {
+        "kind": "improved",
+        "text": "Entregar solo funciona con todo en commit, así nunca entregas algo sin querer."
+      },
+      {
+        "kind": "fixed",
+        "text": "La ventana vuelve a abrirse en tus tareas en lugar de Ajustes."
+      },
+      {
+        "kind": "fixed",
+        "text": "La carpeta de clonación solo se recuerda cuando confirmas la clonación."
+      }
+    ],
+    "de": [
+      {
+        "kind": "new",
+        "text": "Wähle in den Einstellungen, ob die App deine Arbeit committen oder committen und pushen darf. Standardmäßig ist das aus, und beides steht im Menü eines Projekts."
+      },
+      {
+        "kind": "new",
+        "text": "Bevor du eine Aufgabe annimmst, siehst du, was dabei entsteht: das Repository, wer es sehen kann, der Abgabetermin und die Gruppenregeln."
+      },
+      {
+        "kind": "new",
+        "text": "Erstelle eine Gruppe über das Menü einer Aufgabe. Eine neue Gruppe bekommt immer einen Namen, der zuerst abgefragt wird."
+      },
+      {
+        "kind": "new",
+        "text": "Füge mehrere Mitstudierende auf einmal zu deiner Gruppe hinzu, direkt nach dem Erstellen oder später."
+      },
+      {
+        "kind": "new",
+        "text": "Unter Linux können Abgabetermine in GNOME Kalender, Evolution oder KOrganizer landen. Anderswo öffnet sich die Kalenderdatei in deiner Kalender-App."
+      },
+      {
+        "kind": "new",
+        "text": "Kopiere den GitHub-Link oder die Klon-Adresse eines Projekts über sein Menü."
+      },
+      {
+        "kind": "new",
+        "text": "Die Details eines Projekts zeigen die Dateien, die du noch nicht committet hast."
+      },
+      {
+        "kind": "new",
+        "text": "Einstellungen > Über kann einen Bericht für eine Fehlermeldung kopieren, mit deinen Namen, Kursen und Schlüsseln unkenntlich gemacht."
+      },
+      {
+        "kind": "improved",
+        "text": "Alles geht mit der Tastatur, und Screenreader beschreiben jede Aufgabe und was passiert ist."
+      },
+      {
+        "kind": "improved",
+        "text": "Animationen stoppen, wenn dein System weniger Bewegung wünscht, und Texte und Farben sind besser lesbar."
+      },
+      {
+        "kind": "improved",
+        "text": "Jedes Klonen fragt vorher und nennt den Zielordner."
+      },
+      {
+        "kind": "improved",
+        "text": "Editor- und Systemdateien wie .DS_Store oder .idea zählen nicht mehr als nicht committete Arbeit."
+      },
+      {
+        "kind": "improved",
+        "text": "Abgeben geht erst, wenn alles committet ist, damit du nie versehentlich etwas abgibst."
+      },
+      {
+        "kind": "fixed",
+        "text": "Das Fenster öffnet sich wieder bei deinen Aufgaben statt in den Einstellungen."
+      },
+      {
+        "kind": "fixed",
+        "text": "Der Klon-Ordner wird erst gespeichert, wenn du das Klonen bestätigst."
+      }
+    ]
+  }
+}
