@@ -14,7 +14,7 @@
   import { groupDetails } from "$lib/group";
   import { session } from "$lib/session.svelte";
   import { settings } from "$lib/settings.svelte";
-  import { copyLink, openLink } from "$lib/links";
+  import { cloneUrls, copyLink, gitProtocol, openLink } from "$lib/links";
   import { menuKey, onContextMenu, popupMenu } from "$lib/keyboard";
   import { scrollBehavior } from "$lib/motion";
   import Details from "./Details.svelte";
@@ -247,6 +247,21 @@
     return items;
   });
 
+  /** The "Copy" submenu: the app link, the GitHub page and the clone URLs, gh's
+   *  `git_protocol` first. Empty for a clone with no GitHub repo. */
+  async function copyItems() {
+    const { owner, repo } = project;
+    if (!link || !githubUrl || !owner || !repo) return [];
+    const urls = cloneUrls(owner, repo, await gitProtocol());
+    return Promise.all([
+      MenuItem.new({ text: t("copy.appLink"), action: () => copyLink(link) }),
+      MenuItem.new({ text: t("copy.github"), action: () => copyLink(githubUrl) }),
+      ...urls.map((url) =>
+        MenuItem.new({ text: t(`copy.${url.kind}`), action: () => copyLink(url.text) }),
+      ),
+    ]);
+  }
+
   /** The row's native context menu with every action, under `anchor` or at the pointer. */
   async function showMenu(anchor?: HTMLElement) {
     const os = document.documentElement.dataset.os ?? "linux";
@@ -361,10 +376,10 @@
         action: () => path && api.openTerminal(path),
       }),
       separator(),
-      MenuItem.new({
-        text: t("projects.copyLink"),
+      Submenu.new({
+        text: t("copy.menu"),
         enabled: link !== null,
-        action: () => link && copyLink(link),
+        items: await copyItems(),
       }),
       MenuItem.new({
         text: t(hidden ? "projects.unhide" : "projects.hide"),

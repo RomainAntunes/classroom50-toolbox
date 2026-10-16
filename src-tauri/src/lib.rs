@@ -160,6 +160,7 @@ pub fn run() {
             commands::open_in_editor,
             commands::add_teammate,
             commands::clone_project,
+            commands::git_protocol,
             commands::accept_assignment,
             commands::submit_check,
             commands::submit_project,

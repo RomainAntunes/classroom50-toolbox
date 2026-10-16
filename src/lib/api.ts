@@ -300,6 +300,9 @@ export type DeepLinkTarget =
   | { kind: "missing"; link: DeepLink };
 
 /** Result of `accept_assignment`. */
+/** How gh clones github.com repos. */
+export type GitProtocol = "https" | "ssh";
+
 export interface Accepted {
   /** `owner/name` as GitHub spells it. */
   repo: string;
@@ -581,6 +584,8 @@ export const api = {
   submitProject: (id: string) => invoke<Submitted>("submit_project", { id }),
   /** Clones into `parent/<repo>` and returns the new folder; `projects-updated` follows. */
   cloneProject: (id: string, parent: string) => invoke<string>("clone_project", { id, parent }),
+  /** gh's `git_protocol` for github.com (local config, no network). */
+  gitProtocol: () => invoke<GitProtocol>("git_protocol"),
   /** Fast-forwards the clone's default branch; rejects with `localChanges`, `otherBranch` or `diverged`. */
   pullProject: (id: string) => invoke<void>("pull_project", { id }),
   /** What Commit & push would send; rejects with `otherBranch`, `gitInProgress`, `remoteAhead` or `nothingToPush`. */

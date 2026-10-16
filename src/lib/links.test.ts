@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { Project, Unaccepted } from "$lib/api";
-import { acceptLink, openLink } from "$lib/links";
+import { acceptLink, cloneUrls, openLink } from "$lib/links";
 
 const item = (secret: string | null) =>
   ({
@@ -22,5 +22,18 @@ describe("links", () => {
       "classroom50-toolbox://open/heig-vd/26-poo-c-labo-3-alice",
     );
     expect(openLink(project(null, null))).toBeNull();
+  });
+
+  it("lists clone URLs with gh's protocol first", () => {
+    expect(cloneUrls("heig-vd", "lab", "https")).toEqual([
+      { kind: "https", text: "https://github.com/heig-vd/lab.git" },
+      { kind: "ssh", text: "git@github.com:heig-vd/lab.git" },
+      { kind: "gh", text: "gh repo clone heig-vd/lab" },
+    ]);
+    expect(cloneUrls("heig-vd", "lab", "ssh").map((url) => url.kind)).toEqual([
+      "ssh",
+      "https",
+      "gh",
+    ]);
   });
 });
