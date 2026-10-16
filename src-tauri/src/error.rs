@@ -71,6 +71,10 @@ pub enum Error {
     #[error("\"{0}\" isn't a GitHub username")]
     InvalidUsername(String),
 
+    /// Not a usable group name (`student::valid_team_name`), checked before it reaches gh.
+    #[error("a group name needs 1 to 80 characters, on one line")]
+    InvalidTeamName,
+
     /// Linux: none of the terminal emulators the app knows is installed.
     #[error("no terminal emulator found")]
     NoTerminal,
@@ -265,6 +269,7 @@ impl Error {
             Error::NeedsTeam => "needsTeam",
             Error::SubmissionsClosed => "submissionsClosed",
             Error::InvalidUsername(_) => "invalidUsername",
+            Error::InvalidTeamName => "invalidTeamName",
             Error::NoTerminal => "noTerminal",
             Error::LocalChanges => "localChanges",
             Error::OtherBranch(_) => "otherBranch",
@@ -343,6 +348,7 @@ mod tests {
             Error::NeedsTeam,
             Error::SubmissionsClosed,
             Error::InvalidUsername("--help".into()),
+            Error::InvalidTeamName,
             Error::NoTerminal,
             Error::LocalChanges,
             Error::OtherBranch("main".into()),

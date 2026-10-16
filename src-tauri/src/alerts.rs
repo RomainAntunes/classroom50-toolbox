@@ -677,6 +677,7 @@ mod tests {
                 number: 1,
                 name: None,
                 members,
+                founders: None,
                 url: String::new(),
                 classroom: None,
                 assignment: None,

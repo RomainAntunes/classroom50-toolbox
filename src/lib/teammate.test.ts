@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { Assignment, Group, Project } from "$lib/api";
 import { askText, prompt } from "$lib/prompt.svelte";
-import { joinsGroup } from "$lib/teammate";
+import { joinsGroup, notFounderReason, parseUsernames, resultsText } from "$lib/teammate";
 
 describe("joinsGroup", () => {
   const project = (mode: Assignment["mode"] | null, group: Group | null = null) =>
@@ -41,5 +41,53 @@ describe("askText", () => {
     expect(await first).toBeNull();
     prompt.current?.resolve("bob");
     expect(await second).toBe("bob");
+  });
+});
+
+describe("parseUsernames", () => {
+  it("splits on commas, semicolons and spaces, drops @ and repeats", () => {
+    expect(parseUsernames(" @alice, bob;carol\n  dave  ALICE ,, ")).toEqual([
+      "alice",
+      "bob",
+      "carol",
+      "dave",
+    ]);
+    expect(parseUsernames(" , @ ")).toEqual([]);
+  });
+});
+
+describe("notFounderReason", () => {
+  const group = (founders: string[] | null) => ({ founders }) as Group;
+
+  it("lets the founder add, and doesn't guess when roles are unknown", () => {
+    expect(notFounderReason(group(["Me"]), "me", false)).toBeNull();
+    expect(notFounderReason(group(null), "me", false)).toBeNull();
+    expect(notFounderReason(null, "me", false)).toBeNull();
+    expect(notFounderReason(group(["alice"]), null, false)).toBeNull();
+  });
+
+  it("says who can add instead", () => {
+    expect(notFounderReason(group(["alice"]), "me", false)).toContain("ask alice");
+    expect(notFounderReason(group([]), "me", false)).toContain("didn't found");
+    expect(notFounderReason(group([]), "me", true)).toContain("teacher assigns");
+  });
+});
+
+describe("resultsText", () => {
+  it("gives one line per username", () => {
+    const text = resultsText(
+      [
+        { username: "alice", error: null },
+        {
+          username: "x--y",
+          error: { kind: "invalidUsername", message: "", params: { username: "x--y" } },
+        },
+      ],
+      { repo: "o/r", assignment: "Lab", team: true },
+    );
+    expect(text.split("\n")).toEqual([
+      "alice is in your group now. They should accept Lab next.",
+      "Couldn't add x--y: \"x--y\" isn't a GitHub username",
+    ]);
   });
 });

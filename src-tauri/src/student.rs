@@ -2,8 +2,10 @@
 //! and submit logic has many steps and changes upstream). The CLI never prompts here: it
 //! only reads a terminal when stdin and stderr both are one, and `process` pipes stderr.
 
+use std::collections::HashMap;
 use std::ffi::OsString;
 use std::path::Path;
+use std::sync::Mutex;
 use std::time::Duration;
 
 use serde::Serialize;
@@ -35,6 +37,31 @@ pub enum Addition<'a> {
         repo: &'a str,
         clone: Option<&'a Path>,
     },
+}
+
+/// Where to add classmates to a group founded from the app, by the accepted assignment's id
+/// (`org/classroom/assignment`), while the sync that lists the new repo hasn't run yet.
+#[derive(Default)]
+pub struct FoundedGroups(Mutex<HashMap<String, FoundedGroup>>);
+
+#[derive(Clone)]
+pub struct FoundedGroup {
+    pub org: String,
+    pub classroom: String,
+    pub assignment: String,
+    pub key: Option<String>,
+}
+
+impl FoundedGroups {
+    pub fn insert(&self, id: &str, group: FoundedGroup) {
+        let mut map = self.0.lock().unwrap_or_else(|e| e.into_inner());
+        map.insert(id.to_owned(), group);
+    }
+
+    pub fn get(&self, id: &str) -> Option<FoundedGroup> {
+        let map = self.0.lock().unwrap_or_else(|e| e.into_inner());
+        map.get(id).cloned()
+    }
 }
 
 /// A GitHub login: letters, digits and single inner hyphens, at most 39 characters. Checked
@@ -88,6 +115,19 @@ fn add_args(addition: &Addition<'_>, username: &str) -> Result<Vec<OsString>> {
     Ok(args.into_iter().map(OsString::from).collect())
 }
 
+/// The longest group name, in UTF-16 units as upstream's web app counts them (its group
+/// name fields are `maxLength={80}`; `gh student` itself only trims `--team-name`).
+pub const MAX_TEAM_NAME: usize = 80;
+
+/// A group's display name: not blank, at most `MAX_TEAM_NAME` long, no control characters
+/// (the name lands in the team's one-line description record). Checked after trimming.
+pub fn valid_team_name(name: &str) -> bool {
+    !name.is_empty()
+        && name.trim() == name
+        && name.encode_utf16().count() <= MAX_TEAM_NAME
+        && !name.chars().any(char::is_control)
+}
+
 /// What accept needs to know about an assignment.
 pub struct AcceptRequest<'a> {
     pub org: &'a str,
@@ -95,13 +135,29 @@ pub struct AcceptRequest<'a> {
     pub assignment: &'a str,
     /// The unlisted classroom's key.
     pub key: Option<&'a str>,
-    /// Found a new group (team assignments formed by students).
-    pub new_team: bool,
+    /// Found a new group with this name (team assignments formed by students). A group is
+    /// never founded without one.
+    pub new_team: Option<&'a str>,
 }
 
 /// Runs `gh student accept` and returns the repo's `owner/name`. Accepting again is safe:
 /// an existing repo is reported as accepted (and repaired if its setup was cut short).
 pub async fn accept(request: &AcceptRequest<'_>) -> Result<String> {
+    let args = accept_args(request)?;
+    // Accept prints extra advice when run inside a git repo.
+    let cwd = std::env::temp_dir();
+    let output = run(args, &cwd, ACCEPT_TIMEOUT).await?;
+    accepted_repo(&output.stdout).ok_or_else(|| {
+        Error::Student(format!(
+            "gh student accept succeeded but printed no repository: {}",
+            output.stdout
+        ))
+    })
+}
+
+/// The `gh` arguments for an accept, after checking the group name. `--new-team` always
+/// comes with `--team-name`, in its `=` form so no name can be read as another flag.
+fn accept_args(request: &AcceptRequest<'_>) -> Result<Vec<OsString>> {
     let mut args: Vec<OsString> = [
         "student",
         "accept",
@@ -116,18 +172,15 @@ pub async fn accept(request: &AcceptRequest<'_>) -> Result<String> {
         args.push("--key".into());
         args.push(key.into());
     }
-    if request.new_team {
+    if let Some(name) = request.new_team {
+        let name = name.trim();
+        if !valid_team_name(name) {
+            return Err(Error::InvalidTeamName);
+        }
         args.push("--new-team".into());
+        args.push(format!("--team-name={name}").into());
     }
-    // Accept prints extra advice when run inside a git repo.
-    let cwd = std::env::temp_dir();
-    let output = run(args, &cwd, ACCEPT_TIMEOUT).await?;
-    accepted_repo(&output.stdout).ok_or_else(|| {
-        Error::Student(format!(
-            "gh student accept succeeded but printed no repository: {}",
-            output.stdout
-        ))
-    })
+    Ok(args)
 }
 
 /// What a submit is about to send, for the confirmation. `gh student submit` snapshots the
@@ -333,6 +386,70 @@ mod tests {
             let args = add_args(&addition, "alice").unwrap();
             assert!(process::writes_to_github("gh", &args));
         }
+    }
+
+    #[test]
+    fn accepts_only_usable_group_names() {
+        assert!(valid_team_name("The Sharks"));
+        assert!(valid_team_name("--help"));
+        assert!(valid_team_name("Équipe 3 🦈"));
+        assert!(valid_team_name(&"é".repeat(MAX_TEAM_NAME)));
+        assert!(!valid_team_name(""));
+        assert!(!valid_team_name(" padded "));
+        assert!(!valid_team_name("two\nlines"));
+        assert!(!valid_team_name("tab\there"));
+        assert!(!valid_team_name(&"a".repeat(MAX_TEAM_NAME + 1)));
+        // An emoji is two UTF-16 units, as the web app's `maxLength` counts it.
+        assert!(!valid_team_name(&"🦈".repeat(MAX_TEAM_NAME / 2 + 1)));
+    }
+
+    #[test]
+    fn builds_accept_arguments() {
+        let words = |args: Vec<OsString>| -> Vec<String> {
+            args.iter()
+                .map(|a| a.to_string_lossy().into_owned())
+                .collect()
+        };
+        let request = |key, new_team| AcceptRequest {
+            org: "HEIGVD-POO",
+            classroom: "26-poo-c",
+            assignment: "labo-3",
+            key,
+            new_team,
+        };
+        assert_eq!(
+            words(accept_args(&request(None, None)).unwrap()),
+            ["student", "accept", "HEIGVD-POO", "26-poo-c", "labo-3"]
+        );
+        assert_eq!(
+            words(accept_args(&request(Some("s3cret"), Some("  The Sharks "))).unwrap()),
+            [
+                "student",
+                "accept",
+                "HEIGVD-POO",
+                "26-poo-c",
+                "labo-3",
+                "--key",
+                "s3cret",
+                "--new-team",
+                "--team-name=The Sharks"
+            ]
+        );
+        assert_eq!(
+            words(accept_args(&request(None, Some("--key"))).unwrap())
+                .last()
+                .unwrap(),
+            "--team-name=--key"
+        );
+        // No path founds a group without a name.
+        for name in ["", "   ", "a\nb"] {
+            assert!(matches!(
+                accept_args(&request(None, Some(name))),
+                Err(Error::InvalidTeamName)
+            ));
+        }
+        let args = accept_args(&request(None, Some("X"))).unwrap();
+        assert!(process::writes_to_github("gh", &args));
     }
 
     #[test]
