@@ -6,6 +6,10 @@ import { cloneProject } from "$lib/clone";
 import { t } from "$lib/i18n";
 import { announce } from "$lib/announce.svelte";
 import { busy } from "$lib/session.svelte";
+import { askText } from "$lib/prompt.svelte";
+
+/** The longest group name, as `student::MAX_TEAM_NAME` (upstream's web app) allows. */
+export const MAX_GROUP_NAME = 80;
 
 /** Why `item` can't be accepted from the app now (locked, or not open yet), else null. */
 export function acceptBlocked(item: Unaccepted, now: Date): string | null {
@@ -31,15 +35,27 @@ function notes(item: Unaccepted): string {
   return lines.join("\n\n");
 }
 
-/** Runs the accept, founding a group when the student agrees. Null when cancelled. */
+/** Asks the new group's name (required: OK stays disabled while it's blank). Null when
+ *  cancelled. */
+export function askGroupName(message: string): Promise<string | null> {
+  return askText({
+    title: t("accept.groupNameTitle"),
+    message,
+    placeholder: t("accept.groupNamePlaceholder"),
+    okLabel: t("accept.newTeam"),
+    maxLength: MAX_GROUP_NAME,
+  });
+}
+
+/** Runs the accept, founding a group when the student names one. Null when cancelled. */
 async function run(item: Unaccepted): Promise<Accepted | null> {
   try {
-    return await api.acceptAssignment(item.id, false);
+    return await api.acceptAssignment(item.id, null);
   } catch (err) {
     if (errorKind(err) !== "needsTeam") throw err;
   }
-  const found = await confirm(t("accept.needsTeam"), item.assignment.name, t("accept.newTeam"));
-  return found ? api.acceptAssignment(item.id, true) : null;
+  const name = await askGroupName(t("accept.needsTeam"));
+  return name ? api.acceptAssignment(item.id, name) : null;
 }
 
 /** Asks, accepts, then offers to clone the new repo. The row shows it meanwhile. */

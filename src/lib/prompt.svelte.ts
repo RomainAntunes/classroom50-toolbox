@@ -5,6 +5,8 @@ export interface PromptOptions {
   title: string;
   message?: string;
   placeholder?: string;
+  /** The input's `maxlength`, in UTF-16 units. */
+  maxLength?: number;
   okLabel: string;
   /** A second action next to the main one (`askTextAction` only). */
   altLabel?: string;

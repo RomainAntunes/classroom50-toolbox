@@ -531,14 +531,14 @@ pub struct Accepted {
 }
 
 /// Accepts an unaccepted assignment with `gh student accept`, then syncs so the new repo
-/// shows up. `new_team` founds a group for a team assignment formed by students; without
-/// it such an assignment fails with `needsTeam`.
+/// shows up. `team_name` founds a group with that name for a team assignment formed by
+/// students; without it such an assignment fails with `needsTeam`.
 #[tauri::command]
 pub async fn accept_assignment(
     app: AppHandle,
     state: State<'_, ProjectsState>,
     id: String,
-    new_team: bool,
+    team_name: Option<String>,
 ) -> Result<Accepted> {
     let snapshot = state.snapshot();
     let listed = snapshot.unaccepted.iter().find(|u| u.id == id).cloned();
@@ -559,7 +559,7 @@ pub async fn accept_assignment(
         classroom: &item.classroom.slug,
         assignment: &item.assignment.slug,
         key: item.classroom.secret.as_deref(),
-        new_team,
+        new_team: team_name.as_deref(),
     })
     .await;
     let repo = match accepted {

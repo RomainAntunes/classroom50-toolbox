@@ -86,6 +86,7 @@
             bind:value
             aria-label={current.title}
             placeholder={current.placeholder}
+            maxlength={current.maxLength}
             autocomplete="off"
             autocapitalize="off"
             spellcheck="false"

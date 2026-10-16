@@ -576,9 +576,10 @@ export const api = {
   installedEditors: () => invoke<EditorInfo[]>("installed_editors"),
   addTeammate: (id: string, username: string) => invoke<void>("add_teammate", { id, username }),
   openInEditor: (path: string, editor: string) => invoke<void>("open_in_editor", { path, editor }),
-  /** Runs `gh student accept`, then syncs; rejects with `needsTeam` when a group is needed. */
-  acceptAssignment: (id: string, newTeam: boolean) =>
-    invoke<Accepted>("accept_assignment", { id, newTeam }),
+  /** Runs `gh student accept`, then syncs; rejects with `needsTeam` when a group is needed.
+   *  `teamName` founds a group with that name (`--new-team --team-name`). */
+  acceptAssignment: (id: string, teamName: string | null) =>
+    invoke<Accepted>("accept_assignment", { id, teamName }),
   submitCheck: (id: string) => invoke<SubmitCheck>("submit_check", { id }),
   /** Runs `gh student submit` in the clone, then re-reads the status while it's graded. */
   submitProject: (id: string) => invoke<Submitted>("submit_project", { id }),
