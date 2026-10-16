@@ -351,6 +351,10 @@ export interface Snapshot {
 export const APPEARANCES = ["system", "light", "dark"] as const;
 export type Appearance = (typeof APPEARANCES)[number];
 
+/** The git writes the app offers on a clone, from none to commit and push. */
+export const COMMIT_ACTIONS = ["none", "commit", "push"] as const;
+export type CommitActions = (typeof COMMIT_ACTIONS)[number];
+
 export interface Settings {
   watchedFolders: string[];
   scanEditorProjects: boolean;
@@ -376,6 +380,8 @@ export interface Settings {
   nativeCalendar: string | null;
   /** The first-run guide was finished or skipped. */
   onboarded: boolean;
+  /** Commit, or commit and push, from the app; `none` leaves it to git and the editor. */
+  commitActions: CommitActions;
 }
 
 /** An editor installed here that can open a folder. */

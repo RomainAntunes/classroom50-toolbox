@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import type { Assignment, CommitCheck, Project } from "$lib/api";
+import type { Assignment, CommitCheck, Project, Settings } from "$lib/api";
 import { prompt } from "$lib/prompt.svelte";
+import { settings } from "$lib/settings.svelte";
 
 const dialog = vi.hoisted(() => ({ ask: vi.fn(), message: vi.fn() }));
 const api = vi.hoisted(() => ({
@@ -204,8 +205,11 @@ describe("commitLocal", () => {
 
 describe("submitProject without a marker", () => {
   const noMarker = { hasMarker: false, untracked: [], deleted: [] };
+  const withActions = (commitActions: Settings["commitActions"]) =>
+    (settings.current = { commitActions } as Settings);
 
   it("offers Commit & push on every-push assignments", async () => {
+    withActions("push");
     api.submitCheck.mockResolvedValue(noMarker);
     api.commitCheck.mockResolvedValue(check());
     dialog.ask.mockResolvedValue(true);
@@ -215,7 +219,19 @@ describe("submitProject without a marker", () => {
     expect(api.commitPush).toHaveBeenCalledWith("o/r", "First version");
   });
 
+  it("only explains when push is off in Settings", async () => {
+    for (const actions of ["none", "commit"] as const) {
+      withActions(actions);
+      dialog.message.mockClear();
+      api.submitCheck.mockResolvedValue(noMarker);
+      expect(await submitProject(project(), "Lab")).toBe(false);
+      expect(dialog.ask).not.toHaveBeenCalled();
+      expect(dialog.message).toHaveBeenCalledOnce();
+    }
+  });
+
   it("only explains on tag-mode assignments", async () => {
+    withActions("push");
     api.submitCheck.mockResolvedValue(noMarker);
     expect(await submitProject(project({ submissionMode: "tag" }), "Lab")).toBe(false);
     expect(dialog.ask).not.toHaveBeenCalled();

@@ -75,7 +75,7 @@ export function commitLocal(
 
 /** Why push isn't offered next to Commit, in one line. */
 function noPushLine(reason: string, branch: string): string {
-  const known = ["tagMode", "closed", "otherBranch", "remoteAhead", "notOnGitHub"];
+  const known = ["tagMode", "closed", "otherBranch", "remoteAhead", "notOnGitHub", "disabled"];
   return t(`commit.noPush.${known.includes(reason) ? reason : "fallback"}`, { branch });
 }
 
