@@ -1,126 +1,354 @@
+/* Neutral like the systems the app lives in: the color comes from the app itself. The top bar
+   is drawn as a menu bar, and the hero screenshot hangs from its icon. */
 :root {
   color-scheme: light dark;
-  --fg: #1d1d1f;
-  --fg-muted: #6e6e73;
-  --bg: #fbfbfd;
-  --card: #fff;
-  --border: rgb(0 0 0 / 0.08);
-  --accent: #007aff;
-  --accent-fg: #fff;
+  --bg: #fff;
+  --surface: #f5f5f7;
+  --text: #1d1d1f;
+  --muted: #6e6e73;
+  --line: #d2d2d7;
+  --bar: rgb(246 246 246 / 0.82);
+  --bar-line: rgb(0 0 0 / 0.08);
+  --pressed: rgb(0 0 0 / 0.1);
+  --mono: ui-monospace, "SF Mono", "Cascadia Mono", "DejaVu Sans Mono", Menlo, monospace;
+  --wrap: 1080px;
+  --popover: 380px;
   font-family:
     system-ui,
     -apple-system,
+    "Segoe UI Variable Text",
     "Segoe UI",
     Cantarell,
     Ubuntu,
     sans-serif;
+  font-size: 17px;
   line-height: 1.5;
+  background: var(--bg);
+  color: var(--text);
+  -webkit-font-smoothing: antialiased;
 }
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --fg: #f5f5f7;
-    --fg-muted: #a1a1a6;
-    --bg: #161618;
-    --card: #1f1f22;
-    --border: rgb(255 255 255 / 0.1);
-    --accent: #0a84ff;
+    --bg: #1c1c1e;
+    --surface: #2c2c2e;
+    --text: #f5f5f7;
+    --muted: #98989d;
+    --line: #3a3a3c;
+    --bar: rgb(40 40 42 / 0.82);
+    --bar-line: rgb(255 255 255 / 0.08);
+    --pressed: rgb(255 255 255 / 0.16);
   }
 }
 
 body {
   margin: 0;
-  background: var(--bg);
-  color: var(--fg);
-}
-
-main {
-  max-width: 640px;
-  margin: 0 auto;
-  padding: 64px 24px 32px;
 }
 
 a {
-  color: var(--accent);
+  color: inherit;
+  text-decoration-thickness: 1px;
+  text-underline-offset: 0.18em;
+}
+
+a:hover {
+  color: var(--muted);
+}
+
+:focus-visible {
+  outline: 2px solid var(--text);
+  outline-offset: 3px;
+  border-radius: 6px;
 }
 
 [hidden] {
   display: none !important;
 }
 
-.muted {
-  color: var(--fg-muted);
+.muted,
+.meta {
+  color: var(--muted);
 }
 
-header {
-  text-align: center;
+code {
+  font-family: var(--mono);
+  font-size: 0.86em;
+  padding: 0.1em 0.35em;
+  border-radius: 5px;
+  background: var(--surface);
+}
+
+.wrap {
+  max-width: var(--wrap);
+  margin-inline: auto;
+  padding-inline: 24px;
+}
+
+.skip {
+  position: absolute;
+  left: 16px;
+  top: -48px;
+  z-index: 2;
+  padding: 8px 14px;
+  border-radius: 8px;
+  background: var(--text);
+  color: var(--bg);
+}
+
+.skip:focus {
+  top: 40px;
+}
+
+/* The menu bar */
+
+.menubar {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  background: var(--bar);
+  border-bottom: 1px solid var(--bar-line);
+  -webkit-backdrop-filter: blur(24px) saturate(1.8);
+  backdrop-filter: blur(24px) saturate(1.8);
+  font-size: 13px;
+  font-weight: 500;
+}
+
+.menubar nav {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  height: 30px;
+}
+
+.menubar a {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  height: 22px;
+  padding: 0 9px;
+  border-radius: 5px;
+  text-decoration: none;
+}
+
+.menubar a:hover {
+  color: inherit;
+  background: var(--pressed);
+}
+
+.menubar .app {
+  margin-left: -9px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+/* As wide as the popover and lined up with it, so the icon sits right above its middle. */
+.status {
+  position: relative;
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  width: var(--popover);
+  margin-left: auto;
+}
+
+.tray {
+  position: absolute;
+  left: 50%;
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 22px;
+  margin-left: -15px;
+  border-radius: 5px;
+  background: var(--pressed);
+  animation: press 0.2s 0.15s both;
+}
+
+.clock {
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+
+/* The hero */
+
+h1,
+h2 {
+  margin: 0;
+  letter-spacing: -0.022em;
+  line-height: 1.1;
+  text-wrap: balance;
 }
 
 h1 {
-  margin: 16px 0 8px;
-  font-size: 2.25rem;
-  letter-spacing: -0.02em;
+  font-size: clamp(2.4rem, 4.6vw, 3.5rem);
+  font-weight: 700;
 }
 
 h2 {
-  margin-top: 48px;
-  font-size: 1.25rem;
+  font-size: clamp(1.6rem, 2.6vw, 2.1rem);
+  font-weight: 650;
+}
+
+.hero {
+  display: grid;
+  grid-template-columns: 1fr 460px;
+  align-items: center;
+  gap: 48px;
 }
 
 .lead {
-  margin: 0;
-  font-size: 1.15rem;
-  color: var(--fg-muted);
+  margin: 20px 0 0;
+  max-width: 30em;
+  font-size: 1.2rem;
+  line-height: 1.45;
+  color: var(--muted);
 }
 
 .download {
   margin-top: 32px;
-  text-align: center;
-}
-
-.download .muted {
-  min-height: 1.5em;
-  margin: 8px 0;
-  font-size: 0.9rem;
 }
 
 .button {
   display: inline-block;
-  padding: 12px 28px;
-  border-radius: 999px;
-  background: var(--accent);
-  color: var(--accent-fg);
+  padding: 12px 24px;
+  border-radius: 10px;
+  background: var(--text);
+  color: var(--bg);
   font-weight: 600;
   text-decoration: none;
 }
 
 .button:hover {
-  filter: brightness(1.1);
+  color: var(--bg);
+  opacity: 0.86;
 }
 
-details {
-  display: inline-block;
-  text-align: left;
+.meta {
+  min-height: 1.5em;
+  margin: 12px 0 2px;
+  font-size: 0.88rem;
 }
 
 summary {
   cursor: pointer;
-  color: var(--fg-muted);
-  text-align: center;
+  color: var(--muted);
+  font-size: 0.88rem;
 }
 
-.features {
-  padding: 0;
-  list-style: none;
+#files {
+  margin: 8px 0 0;
+  padding-left: 20px;
+  font-size: 0.95rem;
 }
 
-.features li,
-dl {
-  padding: 14px 18px;
-  margin-bottom: 10px;
-  border: 1px solid var(--border);
+/* A popover screenshot is 460px wide: the 380px window plus 40px of shadow each side. */
+.popover img {
+  display: block;
+  width: 100%;
+  max-width: 460px;
+  height: auto;
+}
+
+.hero .popover {
+  /* The window's right edge on the page's, right under the icon. */
+  margin: -6px -40px 0 0;
+}
+
+.opening img {
+  transform-origin: 50% 0;
+  animation: open 0.28s 0.2s cubic-bezier(0.2, 0.8, 0.3, 1) both;
+}
+
+@keyframes open {
+  from {
+    opacity: 0;
+    transform: translateY(-8px) scale(0.98);
+  }
+}
+
+@keyframes press {
+  from {
+    background: transparent;
+  }
+}
+
+/* Feature rows */
+
+section {
+  margin-top: 104px;
+}
+
+.hero {
+  margin-top: 0;
+}
+
+.feature {
+  display: grid;
+  grid-template-columns: 460px 1fr;
+  align-items: center;
+  gap: 72px;
+}
+
+.feature:nth-child(even) {
+  grid-template-columns: 1fr 460px;
+}
+
+.feature:nth-child(even) .popover {
+  order: 2;
+}
+
+.copy {
+  max-width: 31em;
+}
+
+.copy p {
+  margin: 16px 0 0;
+}
+
+/* Every system */
+
+.systems > .muted {
+  margin: 10px 0 0;
+}
+
+.trio {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 24px;
+  margin-top: 40px;
+}
+
+figure {
+  margin: 0;
+}
+
+figure img {
+  display: block;
+  width: 100%;
+  height: auto;
   border-radius: 12px;
-  background: var(--card);
+  box-shadow: 0 0 0 1px var(--bar-line);
+}
+
+figcaption {
+  margin-top: 12px;
+  font-size: 0.95rem;
+  font-weight: 600;
+}
+
+/* Lists */
+
+.more {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 0 40px;
+  margin: 28px 0 0;
+}
+
+.more div,
+.steps div {
+  padding: 18px 0;
+  border-top: 1px solid var(--line);
 }
 
 dt {
@@ -128,19 +356,122 @@ dt {
 }
 
 dd {
-  margin: 0 0 10px;
+  margin: 4px 0 0;
+  color: var(--muted);
 }
 
-dd:last-child {
-  margin-bottom: 0;
+#install > p,
+section > p:not(.muted) {
+  max-width: 38em;
+  margin: 16px 0 0;
 }
 
-code {
-  font-size: 0.9em;
+.steps {
+  max-width: 44em;
+  margin: 20px 0 0;
 }
 
 footer {
-  padding: 32px 24px 48px;
-  text-align: center;
-  font-size: 0.875rem;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 24px;
+  margin-top: 120px;
+  padding-block: 28px 48px;
+  border-top: 1px solid var(--line);
+  font-size: 0.85rem;
+  color: var(--muted);
+}
+
+.maintainer {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--text);
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.maintainer img {
+  border-radius: 50%;
+}
+
+footer a:last-child {
+  margin-left: auto;
+}
+
+@media (max-width: 900px) {
+  .menubar .item {
+    display: none;
+  }
+
+  .status {
+    width: auto;
+    gap: 10px;
+  }
+
+  .tray {
+    position: static;
+    margin: 0;
+  }
+
+  .hero,
+  .feature,
+  .feature:nth-child(even) {
+    grid-template-columns: 1fr;
+    gap: 32px;
+  }
+
+  .hero {
+    padding-top: 40px;
+  }
+
+  .hero .popover {
+    margin: 0 auto;
+  }
+
+  .popover {
+    justify-self: center;
+  }
+
+  .feature:nth-child(even) .popover {
+    order: 0;
+  }
+
+  section {
+    margin-top: 88px;
+  }
+
+  .trio,
+  .more {
+    grid-template-columns: 1fr;
+  }
+
+  .trio {
+    max-width: 460px;
+    gap: 36px;
+  }
+
+  footer a:last-child {
+    margin-left: 0;
+  }
+}
+
+@media (max-width: 520px) {
+  .clock {
+    display: none;
+  }
+}
+
+@media (min-width: 901px) and (max-width: 1040px) {
+  .more {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .opening img,
+  .tray {
+    animation: none;
+  }
 }

@@ -3,98 +3,332 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Classroom 50 Toolbox</title>
+    <title>Classroom 50 Toolbox: your assignments in the menu bar</title>
     <meta
       name="description"
-      content="A tray app for Classroom 50 students: assignments, due dates, grades, accept, clone and submit, from the menu bar."
+      content="A free tray app for Classroom 50 students on macOS, Windows and Linux: due dates, grades and failed tests at a glance, and accept, clone, commit and submit without typing a command."
     />
+    <meta name="color-scheme" content="light dark" />
+    <meta name="theme-color" content="#f6f6f6" media="(prefers-color-scheme: light)" />
+    <meta name="theme-color" content="#28282a" media="(prefers-color-scheme: dark)" />
+    <meta property="og:type" content="website" />
+    <meta property="og:title" content="Classroom 50 Toolbox" />
+    <meta
+      property="og:description"
+      content="Your Classroom 50 assignments, due dates and grades in the menu bar. Free for macOS, Windows and Linux."
+    />
+    <meta property="og:url" content="https://romainantunes.github.io/classroom50-toolbox/" />
+    <meta
+      property="og:image"
+      content="https://romainantunes.github.io/classroom50-toolbox/screenshots/social.jpg"
+    />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta name="twitter:card" content="summary_large_image" />
     <link rel="icon" href="icon.svg" type="image/svg+xml" />
     <link rel="stylesheet" href="style.css" />
     <script src="download.js" defer></script>
   </head>
   <body>
-    <main>
-      <header>
-        <img src="icon.svg" alt="" width="96" height="96" />
-        <h1>Classroom 50 Toolbox</h1>
-        <p class="lead">
-          Your <a href="https://github.com/foundation50/classroom50">Classroom 50</a> assignments,
-          due dates and grades, one click away in the menu bar or notification area.
-        </p>
-      </header>
+    <a class="skip" href="#main">Skip to content</a>
 
-      <section class="download" aria-live="polite">
-        <a
-          id="primary"
-          class="button"
-          href="https://github.com/RomainAntunes/classroom50-toolbox/releases/latest"
+    <!-- The page's top bar is a menu bar, and the hero is the popover opened from its icon. -->
+    <header class="menubar">
+      <nav class="wrap" aria-label="Site">
+        <a class="app" href="./"
+          ><img src="icon.svg" alt="" width="18" height="18" />Classroom 50 Toolbox</a
         >
-          Download
-        </a>
-        <p id="version" class="muted"></p>
-        <details id="others" hidden>
-          <summary>Other platforms</summary>
-          <ul id="files"></ul>
-        </details>
+        <a class="item" href="#features">Features</a>
+        <a class="item" href="#install">Install</a>
+        <a class="item" href="https://github.com/RomainAntunes/classroom50-toolbox">GitHub</a>
+        <span class="status">
+          <span class="tray" aria-hidden="true">
+            <svg viewBox="168 168 688 688" width="16" height="16">
+              <g transform="translate(-60 -7)" fill="none" stroke="currentColor" stroke-width="116">
+                <path
+                  d="M486 316H316V486H384A118 118 0 0 1 384 722H296"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                />
+                <rect x="626" y="316" width="214" height="406" rx="107" />
+                <path d="M682 530H784V615A51 51 0 0 1 682 615Z" fill="currentColor" stroke="none" />
+              </g>
+            </svg>
+          </span>
+          <span id="clock" class="clock" aria-hidden="true"></span>
+        </span>
+      </nav>
+    </header>
+
+    <main id="main">
+      <section class="hero wrap">
+        <div class="pitch">
+          <h1>Your Classroom 50 assignments, one click away.</h1>
+          <p class="lead">
+            Due dates, grades and the tests that failed, in your menu bar or notification area.
+            Accept, clone, commit and submit with a button instead of a command.
+          </p>
+          <div class="download" aria-live="polite">
+            <a
+              id="primary"
+              class="button"
+              href="https://github.com/RomainAntunes/classroom50-toolbox/releases/latest"
+              >Download</a
+            >
+            <p id="version" class="meta">Free and open source, for macOS, Windows and Linux.</p>
+            <details id="others" hidden>
+              <summary>Other platforms</summary>
+              <ul id="files"></ul>
+            </details>
+          </div>
+        </div>
+        <picture class="popover opening">
+          <source
+            srcset="screenshots/popover-list-dark.webp"
+            media="(prefers-color-scheme: dark)"
+          />
+          <img
+            src="screenshots/popover-list-light.webp"
+            width="460"
+            height="640"
+            alt="The toolbox open under its menu bar icon: two classes, each assignment with its due date, grade, uncommitted work or an Accept button."
+          />
+        </picture>
       </section>
 
-      <section>
-        <h2>What it does</h2>
-        <ul class="features">
-          <li>
-            <strong>Sets up your machine.</strong> Installs git, the GitHub CLI and the
-            <code>gh student</code> extension, and keeps them up to date.
-          </li>
-          <li>
-            <strong>Lists your assignments.</strong> Due dates, late work, unsubmitted changes,
-            grades, failed tests and teacher feedback, from GitHub and the projects your editor
-            opened.
-          </li>
-          <li>
-            <strong>Accepts, clones, pulls and submits</strong> your work, without the terminal, and
-            opens it in your editor.
-          </li>
-          <li>
-            <strong>Shows your group</strong> on team assignments, with who is in it, and adds
-            classmates to it.
-          </li>
-          <li>
-            <strong>Notifies you</strong> before a deadline, when a grade or feedback arrives, when
-            a teammate pushes, and when a classmate joins your group.
-          </li>
-        </ul>
+      <div id="features">
+        <section class="feature wrap">
+          <picture class="popover">
+            <source
+              srcset="screenshots/popover-details-dark.webp"
+              media="(prefers-color-scheme: dark)"
+            />
+            <img
+              src="screenshots/popover-details-light.webp"
+              width="460"
+              height="640"
+              loading="lazy"
+              alt="An assignment's details: due date, last push, a grade of 8 out of 10, and the output of the one test that failed."
+            />
+          </picture>
+          <div class="copy">
+            <h2>See why a test failed</h2>
+            <p>
+              Every graded submission shows its score, which tests passed, and the autograder's
+              output for the ones that didn't. Your earlier grades and your teacher's feedback are
+              one click further.
+            </p>
+            <p class="muted">
+              The list also says what's waiting: work not committed, commits not pushed, a
+              teammate's new commits, and the autograder still running.
+            </p>
+          </div>
+        </section>
+
+        <section class="feature wrap">
+          <picture class="popover">
+            <source
+              srcset="screenshots/popover-commit-dark.webp"
+              media="(prefers-color-scheme: dark)"
+            />
+            <img
+              src="screenshots/popover-commit-light.webp"
+              width="460"
+              height="640"
+              loading="lazy"
+              alt="The Commit and push prompt: two changed files, .DS_Store left out, and a commit message typed in."
+            />
+          </picture>
+          <div class="copy">
+            <h2>Commit and push from the list</h2>
+            <p>
+              The app names the files it's about to commit and leaves out
+              <code>.DS_Store</code>, <code>.idea</code>, <code>.vscode</code> and other editor
+              files. Write a message, and your work is on GitHub.
+            </p>
+            <p class="muted">
+              Off until you turn it on in Settings, for classes that teach git in the terminal.
+              Accepting, cloning, pulling and submitting work the same way: one click, and the app
+              runs <code>gh student</code> or <code>git</code> for you.
+            </p>
+          </div>
+        </section>
+
+        <section class="feature wrap">
+          <picture class="popover">
+            <source
+              srcset="screenshots/popover-setup-dark.webp"
+              media="(prefers-color-scheme: dark)"
+            />
+            <img
+              src="screenshots/popover-setup-light.webp"
+              width="460"
+              height="640"
+              loading="lazy"
+              alt="The first-run guide installing the GitHub CLI, with a progress bar."
+            />
+          </picture>
+          <div class="copy">
+            <h2>Ready in a minute</h2>
+            <p>
+              The first launch installs git, the GitHub CLI and the
+              <code>gh student</code> extension through Homebrew, winget or your Linux package
+              manager, then signs you in with GitHub in your browser.
+            </p>
+            <p class="muted">
+              It finds the projects you already cloned in the folders your editor opened recently:
+              VS Code, Cursor, JetBrains IDEs, Zed, Sublime Text and more.
+            </p>
+          </div>
+        </section>
+      </div>
+
+      <section class="systems wrap" aria-labelledby="systems-title">
+        <h2 id="systems-title">At home on every system</h2>
+        <p class="muted">Each system's own materials, fonts and controls, in light and dark.</p>
+        <div class="trio">
+          <figure>
+            <picture>
+              <source
+                srcset="screenshots/list-macos-dark.webp"
+                media="(prefers-color-scheme: dark)"
+              />
+              <img
+                src="screenshots/list-macos-light.webp"
+                width="500"
+                height="644"
+                loading="lazy"
+                alt="The toolbox on macOS, under its menu bar icon."
+              />
+            </picture>
+            <figcaption>macOS</figcaption>
+          </figure>
+          <figure>
+            <picture>
+              <source
+                srcset="screenshots/list-windows-dark.webp"
+                media="(prefers-color-scheme: dark)"
+              />
+              <img
+                src="screenshots/list-windows-light.webp"
+                width="500"
+                height="644"
+                loading="lazy"
+                alt="The toolbox on Windows, above its notification area icon."
+              />
+            </picture>
+            <figcaption>Windows</figcaption>
+          </figure>
+          <figure>
+            <picture>
+              <source
+                srcset="screenshots/list-linux-dark.webp"
+                media="(prefers-color-scheme: dark)"
+              />
+              <img
+                src="screenshots/list-linux-light.webp"
+                width="500"
+                height="644"
+                loading="lazy"
+                alt="The toolbox on Linux, under its top bar icon."
+              />
+            </picture>
+            <figcaption>Linux</figcaption>
+          </figure>
+        </div>
       </section>
 
-      <section id="first-launch">
-        <h2>First launch</h2>
-        <p>The app isn't code-signed yet, so your system asks you to confirm it once.</p>
-        <dl>
-          <dt>macOS</dt>
-          <dd>
-            Open the app, then go to System Settings › Privacy &amp; Security and click
-            <strong>Open Anyway</strong>.
-          </dd>
-          <dt>Windows</dt>
-          <dd>
-            When SmartScreen says "Windows protected your PC", click
-            <strong>More info › Run anyway</strong>.
-          </dd>
-          <dt>Linux</dt>
-          <dd>On GNOME, tray icons need the AppIndicator extension (Ubuntu ships it).</dd>
+      <section class="wrap" aria-labelledby="more-title">
+        <h2 id="more-title">Also in the box</h2>
+        <dl class="more">
+          <div>
+            <dt>Notifications</dt>
+            <dd>
+              Before a deadline, when a grade or feedback arrives, when a new assignment is
+              published and when a teammate pushes.
+            </dd>
+          </div>
+          <div>
+            <dt>Groups</dt>
+            <dd>Who's in your group on team assignments, and adding a classmate to it.</dd>
+          </div>
+          <div>
+            <dt>Calendar</dt>
+            <dd>
+              Your due dates in the Calendar app, GNOME Calendar, KOrganizer or any app that opens
+              <code>.ics</code> files.
+            </dd>
+          </div>
+          <div>
+            <dt>15 languages</dt>
+            <dd>
+              English, French, Spanish, German, Italian, Portuguese, Chinese, Japanese and more.
+            </dd>
+          </div>
+          <div>
+            <dt>Keyboard and screen readers</dt>
+            <dd>Every action works without a mouse, and every row reads out what it shows.</dd>
+          </div>
+          <div>
+            <dt>Private</dt>
+            <dd>
+              Talks to GitHub only, with the sign-in <code>gh</code> already has. Nothing goes
+              anywhere else.
+            </dd>
+          </div>
         </dl>
-        <p>After that the app updates itself.</p>
+      </section>
+
+      <section id="install" class="wrap" aria-labelledby="install-title">
+        <h2 id="install-title">First launch</h2>
         <p>
-          Signing the app removes this step, and costs money the project doesn't have yet.
-          <a href="https://github.com/sponsors/RomainAntunes">Sponsoring it on GitHub</a>
-          pays for it.
+          The app isn't code-signed yet, so your system asks you to confirm it once. After that it
+          updates itself.
+        </p>
+        <dl class="steps">
+          <div>
+            <dt>macOS</dt>
+            <dd>
+              Open the app, then go to System Settings › Privacy &amp; Security and click
+              <strong>Open Anyway</strong>.
+            </dd>
+          </div>
+          <div>
+            <dt>Windows</dt>
+            <dd>
+              When SmartScreen says "Windows protected your PC", click
+              <strong>More info › Run anyway</strong>.
+            </dd>
+          </div>
+          <div>
+            <dt>Linux</dt>
+            <dd>On GNOME, tray icons need the AppIndicator extension (Ubuntu ships it).</dd>
+          </div>
+        </dl>
+      </section>
+
+      <section class="wrap" aria-labelledby="support-title">
+        <h2 id="support-title">Free and open source</h2>
+        <p>
+          The toolbox is GPL-3.0, like Classroom 50, and built by a student in their spare time.
+          Signing it, so the step above goes away, costs 99 USD a year, and
+          <a href="https://github.com/sponsors/RomainAntunes">sponsoring it on GitHub</a> pays for
+          that. Starring the repository and telling your class about it helps too.
         </p>
       </section>
     </main>
 
-    <footer class="muted">
-      <a href="https://github.com/RomainAntunes/classroom50-toolbox">Source on GitHub</a> ·
-      <a href="https://github.com/sponsors/RomainAntunes">Sponsor</a> · GPL-3.0 · Not affiliated
-      with the Fifty Foundation.
+    <footer class="wrap">
+      <a class="maintainer" href="https://github.com/RomainAntunes"
+        ><img
+          src="https://github.com/RomainAntunes.png?size=64"
+          alt=""
+          width="24"
+          height="24"
+        />Romain Antunes</a
+      >
+      <span>GPL-3.0 · Not affiliated with the Fifty Foundation</span>
+      <a href="https://github.com/RomainAntunes/classroom50-toolbox/issues">Report a problem</a>
     </footer>
   </body>
 </html>
