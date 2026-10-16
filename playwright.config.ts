@@ -3,6 +3,7 @@
 // (`tests/e2e/harness`). See CLAUDE.md > Commands.
 import { defineConfig, devices } from "@playwright/test";
 import process from "node:process";
+import { fileURLToPath } from "node:url";
 
 const PORT = 4173;
 const CI = Boolean(process.env.CI);
@@ -35,6 +36,8 @@ export default defineConfig({
     // exact code that ships.
     command: `pnpm build && pnpm preview --port ${PORT} --strictPort --host 127.0.0.1`,
     url: `http://127.0.0.1:${PORT}`,
+    // The repo root, also for configs elsewhere that reuse this one (`e2e:shots`).
+    cwd: fileURLToPath(new URL(".", import.meta.url)),
     reuseExistingServer: !CI,
     timeout: 120_000,
   },

@@ -7,6 +7,7 @@ import base from "../../playwright.config";
 export default defineConfig({
   ...base,
   testDir: ".",
+  outputDir: "../../test-results",
   testMatch: "**/*.shots.ts",
   retries: 0,
   reporter: [["list"]],
