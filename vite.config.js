@@ -1,8 +1,6 @@
 import { defineConfig } from "vite";
 import { sveltekit } from "@sveltejs/kit/vite";
-// @ts-expect-error type error without @types/node package
 import process from "node:process";
-// @ts-expect-error type error without @types/node package
 import { execSync } from "node:child_process";
 const host = process.env.TAURI_DEV_HOST;
 
@@ -26,6 +24,7 @@ export default defineConfig(() => ({
   },
   // Unit tests for the UI's own logic (`pnpm test`); runes compile through the plugin. The
   // WebDriver suite's mock GitHub is checked here too, without the suite's dependencies.
+  // Playwright's UI flows (`tests/e2e`, `pnpm test:e2e`) stay out.
   test: {
     include: ["src/**/*.test.ts", "scripts/**/*.test.mjs", "e2e/mock/**/*.test.js"],
     environment: "node",

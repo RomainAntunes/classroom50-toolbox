@@ -2,3 +2,6 @@ build
 .svelte-kit
 src-tauri
 pnpm-lock.yaml
+test-results
+playwright-report
+e2e-shots
