@@ -1,6 +1,7 @@
 // Typed wrappers for the Rust commands in src-tauri/src/commands.rs. Keep the two in sync:
 // Rust serializes with camelCase field names.
 import { invoke } from "@tauri-apps/api/core";
+import { hasKey, t } from "$lib/i18n";
 
 export type Os = "macos" | "windows" | "linux";
 export type Tool = "git" | "gh" | "gh-student";
@@ -234,6 +235,12 @@ export interface CalendarLabels {
   notAccepted: string;
 }
 
+/** The words of the tray icon's menu. */
+export interface TrayLabels {
+  open: string;
+  quit: string;
+}
+
 /** A published assignment the user hasn't accepted yet. */
 export interface Unaccepted {
   id: string;
@@ -300,6 +307,8 @@ export interface Settings {
   /** Classes whose section is folded in the list. */
   collapsedClasses: string[];
   appearance: Appearance;
+  /** A catalog code (`en`), or `system` for the OS's language (see `resolveLocale`). */
+  language: string;
   /** The last exported `.ics`, rewritten by Rust after each sync while set. */
   calendarFile: string | null;
   /** The OS calendar the due dates are kept in. */
@@ -403,6 +412,8 @@ export interface CommandError {
   url?: string;
   /** `manualInstall`: the command to run in a terminal. */
   command?: string;
+  /** What the UI's wording of this kind (`error.<kind>`) fills in. */
+  params?: Record<string, string>;
 }
 
 export const api = {
@@ -412,6 +423,9 @@ export const api = {
   /** Writes the due dates as an `.ics` file; returns the number of events. */
   exportCalendar: (path: string) => invoke<number>("export_calendar", { path }),
   setCalendarLabels: (labels: CalendarLabels) => invoke<void>("set_calendar_labels", { labels }),
+  setTrayLabels: (labels: TrayLabels) => invoke<void>("set_tray_labels", { labels }),
+  /** The OS's preferred languages, most wanted first (BCP 47). */
+  systemLanguages: () => invoke<string[]>("system_languages"),
   /** Asks for calendar access the first time. */
   nativeCalendars: () => invoke<NativeCalendar[]>("native_calendars"),
   /** Writes the due dates into that calendar from now on; `null` removes them. */
@@ -474,9 +488,15 @@ export function errorKind(err: unknown): string | null {
     : null;
 }
 
+/** The error in the UI's language when `en.json` words its kind, else Rust's message. */
 export function errorMessage(err: unknown): string {
   if (typeof err === "object" && err !== null && "message" in err) {
-    return String((err as CommandError).message);
+    const { kind, message, params } = err as CommandError;
+    const key = `error.${kind}`;
+    if (!hasKey(key)) return String(message);
+    // A param missing (a sync issue saved by an older version): Rust's words are complete.
+    const text = t(key, params ?? {});
+    return /\{\w+\}/.test(text) ? String(message) : text;
   }
   return String(err);
 }

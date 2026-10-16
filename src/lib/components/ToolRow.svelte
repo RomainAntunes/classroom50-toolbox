@@ -9,7 +9,7 @@
     type CommandError,
     type ToolStatus,
   } from "$lib/api";
-  import { t } from "$lib/i18n";
+  import { hasKey, t } from "$lib/i18n";
   import { session } from "$lib/session.svelte";
   import { toolJobs, watchToolJobs } from "$lib/toolJobs.svelte";
 
@@ -77,7 +77,9 @@
   /** The app can't install it here (no package manager, no password prompt): say why and
    * offer the download page or the command for a terminal. */
   async function manual(err: CommandError, tool: string) {
-    let text = t("setup.manual", { tool, reason: err.message });
+    const reasonKey = `setup.manualReason.${err.params?.reason}`;
+    const reason = hasKey(reasonKey) ? t(reasonKey) : err.message;
+    let text = t("setup.manual", { tool, reason });
     if (err.command) text += t("setup.runYourself", { command: err.command });
     const url = err.url;
     if (!url) {

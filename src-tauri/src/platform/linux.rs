@@ -144,7 +144,7 @@ pub fn open_terminal(dir: &Path) -> Result<()> {
             return process::spawn_detached::<[&str; 0], &str>(terminal, [], Some(dir));
         }
     }
-    Err(Error::Unsupported("no terminal emulator found".into()))
+    Err(Error::NoTerminal)
 }
 
 pub const NATIVE_CALENDAR: bool = false;

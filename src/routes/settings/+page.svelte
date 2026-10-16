@@ -19,10 +19,10 @@
     type SyncDetails,
     type ToolStatus,
   } from "$lib/api";
-  import { formatDate, fromNow, hoursLabel, t } from "$lib/i18n";
+  import { catalogs, formatDate, fromNow, hoursLabel, languageName, t } from "$lib/i18n";
   import { sampleNotices, showNotice } from "$lib/notices";
   import { loadSettings, pickWatchedFolder, saveSettings, settings } from "$lib/settings.svelte";
-  import { Menu, MenuItem, PredefinedMenuItem } from "@tauri-apps/api/menu";
+  import { CheckMenuItem, Menu, MenuItem, PredefinedMenuItem } from "@tauri-apps/api/menu";
   import { pickCloneFolder } from "$lib/clone";
   import { chooseDefaultEditor, defaultEditor, editors, loadEditors } from "$lib/editor.svelte";
   import Section from "$lib/components/Section.svelte";
@@ -92,7 +92,7 @@
     } catch (err) {
       await withDialog(() =>
         message(
-          t(`calendar.error.${(err as { kind?: string }).kind}`, {}, "calendar.error.other"),
+          t(`calendar.error.${(err as { kind?: string }).kind}`, {}, "calendar.error.fallback"),
           {
             kind: "error",
           },
@@ -109,7 +109,7 @@
     } catch (err) {
       await withDialog(() =>
         message(
-          t(`calendar.error.${(err as { kind?: string }).kind}`, {}, "calendar.error.other"),
+          t(`calendar.error.${(err as { kind?: string }).kind}`, {}, "calendar.error.fallback"),
           {
             kind: "error",
           },
@@ -162,6 +162,23 @@
       when: fromNow(new Date(run.at)),
       seconds: run.seconds.toFixed(1),
     });
+  }
+
+  /** "System", then each catalog named in its own language, as a native menu. */
+  async function chooseLanguage() {
+    const chosen = settings.current?.language ?? "system";
+    const codes = ["system", ...Object.keys(catalogs)];
+    const items = await Promise.all(
+      codes.map((code) =>
+        CheckMenuItem.new({
+          text: code === "system" ? t("settings.language.system") : languageName(code),
+          checked: code === chosen,
+          action: () => void save({ language: code }),
+        }),
+      ),
+    );
+    const menu = await Menu.new({ items });
+    await withDialog(() => menu.popup());
   }
 
   async function clearCache() {
@@ -320,6 +337,14 @@
           {/each}
         </div>
       </div>
+      <div class="row">
+        <span>{t("settings.language")}</span>
+        <button onclick={chooseLanguage}
+          >{current.language === "system"
+            ? t("settings.language.system")
+            : languageName(current.language)}</button
+        >
+      </div>
       <Toggle
         label={t("settings.launchAtLogin")}
         checked={current.launchAtLogin}
@@ -406,27 +431,27 @@
                   ? t("settings.sync.resets", { when: formatDate(new Date(rate.resetAt)) })
                   : undefined}
               >
-                {t("settings.sync.budgetValue", { remaining: rate.remaining, limit: rate.limit })}
+                {t("settings.sync.budgetValue", { remaining: rate.remaining, count: rate.limit })}
               </dd>
             {/if}
             <dt>{t("settings.sync.found")}</dt>
             <dd>
               {t("settings.sync.foundValue", {
-                repos: sync.stats.reposSeen,
-                assignments: sync.assignments,
-                clones: sync.clones,
+                repos: t("settings.sync.repos", { count: sync.stats.reposSeen }),
+                assignments: t("settings.sync.assignments", { count: sync.assignments }),
+                clones: t("settings.sync.cloned", { count: sync.clones }),
               })}
             </dd>
             <dt>{t("settings.sync.disk")}</dt>
             <dd>
               {t("settings.sync.diskValue", {
-                folders: sync.stats.scanRoots,
-                watched: sync.stats.watchTargets,
+                folders: t("settings.sync.folders", { count: sync.stats.scanRoots }),
+                watched: t("settings.sync.watched", { count: sync.stats.watchTargets }),
               })}
             </dd>
             {#if sync.issue}
               <dt>{t("settings.sync.issue")}</dt>
-              <dd class="issue" title={sync.issue.message}>{sync.issue.message}</dd>
+              <dd class="issue" title={errorMessage(sync.issue)}>{errorMessage(sync.issue)}</dd>
             {/if}
           </dl>
         {/if}

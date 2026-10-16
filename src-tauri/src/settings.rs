@@ -10,6 +10,9 @@ use crate::error::Result;
 
 pub const FILE_NAME: &str = "settings.json";
 
+/// The `language` setting that follows the OS.
+pub const SYSTEM_LANGUAGE: &str = "system";
+
 /// Reminders further out than a week aren't useful for a tray app.
 const MAX_NOTIFY_HOURS: u32 = 7 * 24;
 
@@ -40,6 +43,9 @@ pub struct Settings {
     pub collapsed_classes: Vec<String>,
     /// Light or dark, or following the system.
     pub appearance: Appearance,
+    /// The UI's language: a catalog code (`en`), or `system` for the OS's language. The UI
+    /// resolves it, since it owns the catalogs.
+    pub language: String,
     /// The last exported `.ics`, rewritten after each sync while set.
     pub calendar_file: Option<PathBuf>,
     /// The OS calendar (EventKit identifier) the due dates are written into, kept in sync.
@@ -85,6 +91,7 @@ impl Default for Settings {
             hidden_classes: Vec::new(),
             collapsed_classes: Vec::new(),
             appearance: Appearance::System,
+            language: SYSTEM_LANGUAGE.to_owned(),
             calendar_file: None,
             native_calendar: None,
             onboarded: false,
@@ -93,7 +100,8 @@ impl Default for Settings {
 }
 
 impl Settings {
-    /// Drops duplicate folders (keeping order) and out-of-range reminder hours.
+    /// Drops duplicate folders (keeping order), out-of-range reminder hours and a language
+    /// that can't be a language tag.
     pub fn normalized(mut self) -> Self {
         let mut seen = BTreeSet::new();
         self.watched_folders
@@ -106,6 +114,19 @@ impl Settings {
             let mut seen = BTreeSet::new();
             ids.retain(|id| seen.insert(id.clone()));
         }
+
+        // A BCP 47 tag is short ASCII; anything else came from a broken file.
+        let language = self.language.trim();
+        self.language = if language.is_empty()
+            || language.len() > 35
+            || !language
+                .chars()
+                .all(|c| c.is_ascii_alphanumeric() || c == '-')
+        {
+            SYSTEM_LANGUAGE.to_owned()
+        } else {
+            language.to_owned()
+        };
 
         let hours: BTreeSet<u32> = self
             .notify_hours_before
@@ -199,6 +220,7 @@ mod tests {
             hidden_classes: vec!["o/c".into(), "o/c".into()],
             collapsed_classes: Vec::new(),
             appearance: Appearance::Dark,
+            language: " fr ".into(),
             calendar_file: None,
             native_calendar: None,
             onboarded: true,
@@ -211,6 +233,15 @@ mod tests {
             vec![PathBuf::from("/a"), "/b".into()]
         );
         assert_eq!(settings.notify_hours_before, vec![24, 6, 1]);
+        assert_eq!(settings.language, "fr");
+        for broken in ["", "../x", "fr fr"] {
+            let settings = Settings {
+                language: broken.into(),
+                ..Settings::default()
+            }
+            .normalized();
+            assert_eq!(settings.language, SYSTEM_LANGUAGE, "{broken:?}");
+        }
     }
 
     #[test]
@@ -219,6 +250,7 @@ mod tests {
         assert!(settings.launch_at_login);
         assert!(settings.scan_editor_projects);
         assert_eq!(settings.notify_hours_before, vec![24, 1]);
+        assert_eq!(settings.language, SYSTEM_LANGUAGE);
     }
 
     #[test]

@@ -7,6 +7,7 @@
   import { Menu, MenuItem } from "@tauri-apps/api/menu";
   import {
     api,
+    errorMessage,
     PROJECTS_UPDATED_EVENT,
     SYNC_PROGRESS_EVENT,
     UPDATE_AVAILABLE_EVENT,
@@ -334,8 +335,8 @@
   {/if}
 
   {#if issue}
-    <p class="issue" title={issue.message}>
-      {t(`projects.issue.${issue.kind}`, {}, "projects.issue.other")}
+    <p class="issue" title={errorMessage(issue)}>
+      {t(`projects.issue.${issue.kind}`, {}, "projects.issue.fallback")}
     </p>
   {/if}
 

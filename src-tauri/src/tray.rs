@@ -1,17 +1,51 @@
-use tauri::AppHandle;
+use serde::Deserialize;
 use tauri::image::Image;
 use tauri::menu::{Menu, MenuItem, PredefinedMenuItem};
 use tauri::tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent};
+use tauri::{AppHandle, Wry};
 
 use crate::popover;
 
 pub const ID: &str = "main";
 
-pub fn setup(app: &AppHandle) -> tauri::Result<()> {
-    let open = MenuItem::with_id(app, "open", "Open Classroom 50 Toolbox", true, None::<&str>)?;
-    let quit = MenuItem::with_id(app, "quit", "Quit", true, None::<&str>)?;
+/// The menu's words, from the UI's i18n (`set_tray_labels`), sent at startup and when the
+/// language changes.
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct Labels {
+    pub open: String,
+    pub quit: String,
+}
+
+impl Default for Labels {
+    /// Until the UI has sent its own (it loads at startup, hidden).
+    fn default() -> Self {
+        Self {
+            open: "Open Classroom 50 Toolbox".into(),
+            quit: "Quit".into(),
+        }
+    }
+}
+
+fn menu(app: &AppHandle, labels: &Labels) -> tauri::Result<Menu<Wry>> {
+    let open = MenuItem::with_id(app, "open", &labels.open, true, None::<&str>)?;
+    let quit = MenuItem::with_id(app, "quit", &labels.quit, true, None::<&str>)?;
     let separator = PredefinedMenuItem::separator(app)?;
-    let menu = Menu::with_items(app, &[&open, &separator, &quit])?;
+    Menu::with_items(app, &[&open, &separator, &quit])
+}
+
+/// Rebuilds the menu in the UI's language.
+pub fn set_labels(app: &AppHandle, labels: &Labels) {
+    let Some(tray) = app.tray_by_id(ID) else {
+        return;
+    };
+    if let Err(err) = menu(app, labels).and_then(|menu| tray.set_menu(Some(menu))) {
+        log::warn!("tray menu: {err}");
+    }
+}
+
+pub fn setup(app: &AppHandle) -> tauri::Result<()> {
+    let menu = menu(app, &Labels::default())?;
 
     let builder = TrayIconBuilder::with_id(ID)
         .icon(icon()?)

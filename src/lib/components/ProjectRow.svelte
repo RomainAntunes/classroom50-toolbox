@@ -179,7 +179,7 @@
     else if (grade) {
       add(
         "grade",
-        `${grade.score}/${grade.maxScore} · ${t("projects.gradeTests", { passed: grade.testsPassed, total: grade.testsTotal })}`,
+        `${grade.score}/${grade.maxScore} · ${t("projects.gradeTests", { passed: grade.testsPassed, count: grade.testsTotal })}`,
       );
     }
     if (earlier.length) add("earlierGrades", earlier.map(gradeLine).join("\n"));
@@ -357,7 +357,7 @@
       <span
         class="grade"
         class:full={grade.score === grade.maxScore}
-        title={t("projects.gradeTests", { passed: grade.testsPassed, total: grade.testsTotal })}
+        title={t("projects.gradeTests", { passed: grade.testsPassed, count: grade.testsTotal })}
         >{grade.score}/{grade.maxScore}</span
       >
     {/if}

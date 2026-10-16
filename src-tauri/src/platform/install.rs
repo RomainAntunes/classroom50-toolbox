@@ -7,7 +7,7 @@
 
 use serde::Serialize;
 
-use crate::error::{Error, Result};
+use crate::error::{Error, ManualReason, Result};
 use crate::tools::Tool;
 
 /// Homebrew without the slow, unrelated work it does first: updating itself and every tap
@@ -117,7 +117,7 @@ pub fn macos(tool: Tool, probe: &Probe) -> Result<InstallPlan> {
         }),
         Tool::Gh if (probe.has)("brew") => Ok(InstallPlan::brew("gh")),
         Tool::Gh => Err(Error::ManualInstall {
-            reason: "Homebrew isn't installed".into(),
+            reason: ManualReason::NoHomebrew,
             url: Some(GH_DOWNLOADS.into()),
             command: None,
         }),
@@ -138,7 +138,7 @@ pub fn windows(tool: Tool, probe: &Probe) -> Result<InstallPlan> {
     };
     if !(probe.has)("winget") {
         return Err(Error::ManualInstall {
-            reason: "winget (App Installer) isn't installed".into(),
+            reason: ManualReason::NoWinget,
             url: Some(download_page(tool).into()),
             command: None,
         });
@@ -196,9 +196,7 @@ pub fn linux(tool: Tool, probe: &Probe) -> Result<InstallPlan> {
             return Ok(InstallPlan::brew(package));
         }
         return Err(Error::ManualInstall {
-            reason:
-                "this system's packages are read-only; install it with Homebrew or in a toolbox"
-                    .into(),
+            reason: ManualReason::ReadOnlySystem,
             url: manual_page(),
             command: None,
         });
@@ -211,7 +209,7 @@ pub fn linux(tool: Tool, probe: &Probe) -> Result<InstallPlan> {
             return Ok(InstallPlan::brew(package));
         }
         return Err(Error::ManualInstall {
-            reason: "no supported package manager found (apt, dnf, pacman, zypper)".into(),
+            reason: ManualReason::NoPackageManager,
             url: manual_page(),
             command: None,
         });
@@ -223,8 +221,7 @@ pub fn linux(tool: Tool, probe: &Probe) -> Result<InstallPlan> {
             return Ok(InstallPlan::brew(package));
         }
         return Err(Error::ManualInstall {
-            reason: "pkexec (polkit) isn't installed, so the app can't ask for your password"
-                .into(),
+            reason: ManualReason::NoPkexec,
             url: manual_page(),
             command: Some(manual),
         });
@@ -347,7 +344,7 @@ pub fn interpret_failure(program: &str, code: Option<i32>) -> Option<Result<()>>
         ("winget", INSTALL_CANCELLED_BY_USER) => Some(Err(Error::Cancelled)),
         // An App Installer from before `--disable-interactivity` (winget 1.4).
         ("winget", INVALID_CL_ARGUMENTS) => Some(Err(Error::ManualInstall {
-            reason: "winget is out of date; update App Installer from the Microsoft Store".into(),
+            reason: ManualReason::OldWinget,
             url: Some(WINGET_STORE.into()),
             command: None,
         })),
