@@ -2,7 +2,7 @@
   import { Menu, MenuItem, PredefinedMenuItem, Submenu } from "@tauri-apps/api/menu";
   import { openUrl, revealItemInDir } from "@tauri-apps/plugin-opener";
   import { api, type Project } from "$lib/api";
-  import { cloneProject } from "$lib/clone";
+  import { cloneProject, type CloneMode } from "$lib/clone";
   import { editorFor, editors, openInEditor } from "$lib/editor.svelte";
   import { pullProject } from "$lib/pull";
   import { commitLocal, commitPush, gradedOnPush } from "$lib/push";
@@ -189,8 +189,8 @@
   }
 
   const cloning = $derived(session.cloning.includes(project.id));
-  function clone(choose = false) {
-    void cloneProject(project.id, choose);
+  function clone(mode: CloneMode = "ask") {
+    void cloneProject(project.id, mode);
   }
 
   let open = $state(false);
@@ -331,7 +331,7 @@
       MenuItem.new({
         text: t("projects.cloneTo"),
         enabled: cloneable && !cloning,
-        action: () => clone(true),
+        action: () => clone("choose"),
       }),
       MenuItem.new({
         text: editor ? t("editor.open", { editor: editor.name }) : t("editor.none"),
