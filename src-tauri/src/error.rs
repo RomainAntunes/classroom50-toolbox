@@ -150,6 +150,18 @@ pub enum Error {
     #[error("the calendar service isn't responding")]
     CalendarUnavailable,
 
+    /// Not a shortcut the app accepts (`shortcut::normalize`).
+    #[error("a shortcut needs one key and a modifier other than Shift")]
+    InvalidShortcut,
+
+    /// The OS refused the shortcut: another app or the system uses it.
+    #[error("another app or the system already uses this shortcut")]
+    ShortcutTaken,
+
+    /// No system-wide shortcuts here (a Wayland session).
+    #[error("system-wide shortcuts aren't available on this system")]
+    ShortcutUnsupported,
+
     #[error("invalid .classroom50.yaml: {0}")]
     RepoConfig(#[from] serde_norway::Error),
 
@@ -294,6 +306,9 @@ impl Error {
             Error::NoSelfUpdate => "noSelfUpdate",
             Error::CalendarAccess => "calendarAccess",
             Error::CalendarUnavailable => "calendarUnavailable",
+            Error::InvalidShortcut => "invalidShortcut",
+            Error::ShortcutTaken => "shortcutTaken",
+            Error::ShortcutUnsupported => "shortcutUnsupported",
             Error::RepoConfig(_) => "repoConfig",
             Error::Io(_) => "io",
             Error::Http(_) => "http",
@@ -365,6 +380,9 @@ mod tests {
             Error::CalendarAccess,
             Error::CalendarUnavailable,
             Error::NoSelfUpdate,
+            Error::InvalidShortcut,
+            Error::ShortcutTaken,
+            Error::ShortcutUnsupported,
         ];
         for err in errors {
             let key = format!("error.{}", err.kind());

@@ -55,6 +55,9 @@ pub struct Settings {
     /// What the app may do with a clone's changes: nothing (git and the editor do it),
     /// commit only, or commit and push.
     pub commit_actions: CommitActions,
+    /// The system-wide shortcut that shows or hides the popover (`shortcut::normalize`
+    /// form), off by default: any default would clash with someone's editor.
+    pub global_shortcut: Option<String>,
     /// The newest version whose "What's new" the user has seen; `None` in a file from
     /// before the page existed, which shows the running version's notes once.
     pub last_seen_version: Option<String>,
@@ -125,13 +128,14 @@ impl Default for Settings {
             commit_actions: CommitActions::None,
             update_channel: UpdateChannel::Stable,
             last_seen_version: None,
+            global_shortcut: None,
         }
     }
 }
 
 impl Settings {
-    /// Drops duplicate folders (keeping order), out-of-range reminder hours and a language
-    /// that can't be a language tag.
+    /// Drops duplicate folders (keeping order), out-of-range reminder hours, a language
+    /// that can't be a language tag and a shortcut the app doesn't accept.
     pub fn normalized(mut self) -> Self {
         let mut seen = BTreeSet::new();
         self.watched_folders
@@ -176,6 +180,10 @@ impl Settings {
             .filter(|h| (1..=MAX_NOTIFY_HOURS).contains(h))
             .collect();
         self.notify_hours_before = hours.into_iter().rev().collect();
+        self.global_shortcut = self
+            .global_shortcut
+            .as_deref()
+            .and_then(crate::shortcut::normalize);
         self
     }
 }
@@ -269,9 +277,11 @@ mod tests {
             commit_actions: CommitActions::Push,
             update_channel: UpdateChannel::Beta,
             last_seen_version: Some(" 0.11.0-beta.2 ".into()),
+            global_shortcut: Some("alt+cmd+keyc".into()),
         }
         .normalized();
         assert_eq!(settings.last_seen_version.as_deref(), Some("0.11.0-beta.2"));
+        assert_eq!(settings.global_shortcut.as_deref(), Some("Alt+Super+KeyC"));
         assert_eq!(settings.hidden, vec!["a".to_owned()]);
         assert_eq!(settings.hidden_classes, vec!["o/c".to_owned()]);
         assert_eq!(
@@ -294,6 +304,12 @@ mod tests {
             .normalized();
             assert_eq!(settings.last_seen_version, None, "{broken:?}");
         }
+        let settings = Settings {
+            global_shortcut: Some("Shift+KeyA".into()),
+            ..Settings::default()
+        }
+        .normalized();
+        assert_eq!(settings.global_shortcut, None);
     }
 
     #[test]
@@ -306,6 +322,7 @@ mod tests {
         assert_eq!(settings.commit_actions, CommitActions::None);
         assert_eq!(settings.update_channel, UpdateChannel::Stable);
         assert_eq!(settings.last_seen_version, None);
+        assert_eq!(settings.global_shortcut, None);
     }
 
     #[test]

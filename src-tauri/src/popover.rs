@@ -13,6 +13,8 @@ use crate::settings::{Appearance, SettingsStore};
 pub const LABEL: &str = "main";
 /// Sent when the popover hides, so the UI drops what it only showed for the moment.
 pub const HIDDEN_EVENT: &str = "popover-hidden";
+/// Sent when the global shortcut showed the popover, so the list takes the keyboard focus.
+pub const SHORTCUT_EVENT: &str = "popover-shortcut";
 
 /// Clicking the tray icon while the popover is open first blurs (hides) it, then delivers
 /// the click; without this guard that click would immediately reopen it.
@@ -89,12 +91,29 @@ pub fn toggle(app: &AppHandle) {
     }
 }
 
+/// The global shortcut: hides the popover when it has the keyboard, else shows it as a tray
+/// click would and lets the UI focus the list. No reopen guard: a key press elsewhere
+/// doesn't blur the popover first.
+pub fn toggle_from_shortcut(app: &AppHandle) {
+    let Some(window) = app.get_webview_window(LABEL) else {
+        return;
+    };
+    if window.is_visible().unwrap_or(false) && window.is_focused().unwrap_or(false) {
+        hide(app);
+        return;
+    }
+    show(app);
+    let _ = app.emit(SHORTCUT_EVENT, ());
+}
+
 pub fn show(app: &AppHandle) {
     let Some(window) = app.get_webview_window(LABEL) else {
         return;
     };
-    // Linux trays don't report their position; fall back to the screen corner there or
-    // before the first tray event.
+    // The positioner learns where the icon is from tray events; ask the tray itself, so the
+    // shortcut or the menu's Open anchors there before any click. Linux trays report no
+    // position at all: the screen corner there.
+    crate::tray::remember_position(app);
     if window.move_window(TRAY_POSITION).is_err() {
         let _ = window.move_window(FALLBACK_POSITION);
     }

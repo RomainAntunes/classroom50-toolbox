@@ -156,6 +156,23 @@ pub fn editor_data_dirs() -> Vec<PathBuf> {
     imp::editor_data_dirs()
 }
 
+/// Whether a shortcut registered by the app works from any app. Not in a Wayland session:
+/// the plugin grabs keys through X11, which Wayland compositors only deliver to a focused
+/// X11 window.
+pub fn global_shortcuts_supported() -> bool {
+    imp::global_shortcuts_supported()
+}
+
+/// Whether the session is Wayland, from `XDG_SESSION_TYPE` (`wayland`, `x11`, `tty`...)
+/// and, when the session manager didn't set it, `WAYLAND_DISPLAY`.
+#[cfg_attr(not(target_os = "linux"), allow(dead_code))]
+fn is_wayland(session_type: Option<&str>, wayland_display: Option<&str>) -> bool {
+    match session_type.map(str::trim).filter(|kind| !kind.is_empty()) {
+        Some(kind) => kind.eq_ignore_ascii_case("wayland"),
+        None => wayland_display.is_some_and(|display| !display.trim().is_empty()),
+    }
+}
+
 pub fn home_dir() -> Option<PathBuf> {
     std::env::var_os(if cfg!(windows) { "USERPROFILE" } else { "HOME" }).map(PathBuf::from)
 }
@@ -164,6 +181,29 @@ pub fn home_dir() -> Option<PathBuf> {
 mod tests {
     use super::*;
     use crate::editors::ALL;
+
+    #[test]
+    fn detects_wayland_sessions() {
+        let cases = [
+            (Some("wayland"), None, true),
+            (Some("Wayland"), Some("wayland-0"), true),
+            (Some("x11"), None, false),
+            // An X11 session running a nested compositor is still X11.
+            (Some("x11"), Some("wayland-0"), false),
+            (Some("tty"), None, false),
+            (None, Some("wayland-0"), true),
+            (Some(""), Some("wayland-1"), true),
+            (None, Some(""), false),
+            (None, None, false),
+        ];
+        for (session_type, display, expected) in cases {
+            assert_eq!(
+                is_wayland(session_type, display),
+                expected,
+                "{session_type:?} {display:?}"
+            );
+        }
+    }
 
     /// Eclipse and Visual Studio have no command that opens a plain folder.
     #[test]

@@ -8,6 +8,7 @@
   import {
     api,
     errorMessage,
+    POPOVER_SHORTCUT_EVENT,
     PROJECTS_UPDATED_EVENT,
     SYNC_PROGRESS_EVENT,
     type AuthStatus,
@@ -266,9 +267,24 @@
     session.snapshot = await api.refreshProjects();
   }
 
+  let searchField = $state<HTMLInputElement>();
+
+  // The global shortcut opened the popover from another app: the keyboard lands on the
+  // list's current row (where Tab would go), else the search field, unless the focus is
+  // still where the user left it.
+  function focusList() {
+    const current = document.activeElement;
+    if (current instanceof HTMLElement && current !== document.body && current.isConnected) {
+      return;
+    }
+    const row = document.querySelector<HTMLElement>('.classes [data-row][tabindex="0"]');
+    (row ?? searchField)?.focus();
+  }
+
   onMount(() => {
     load();
     const unlisteners = [
+      listen(POPOVER_SHORTCUT_EVENT, focusList),
       listen<SyncProgress>(SYNC_PROGRESS_EVENT, (event) => {
         session.progress = event.payload;
       }),
@@ -301,6 +317,7 @@
     aria-label={t("projects.search")}
     spellcheck="false"
     autocomplete="off"
+    bind:this={searchField}
     bind:value={session.search}
   />
   <div class="tools">

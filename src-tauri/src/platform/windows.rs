@@ -274,6 +274,10 @@ pub fn open_terminal(dir: &Path) -> Result<()> {
     process::spawn_detached("powershell", ["-NoExit"], Some(dir))
 }
 
+pub fn global_shortcuts_supported() -> bool {
+    true
+}
+
 pub fn has_native_calendar() -> bool {
     false
 }

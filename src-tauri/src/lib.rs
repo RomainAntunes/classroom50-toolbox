@@ -21,6 +21,7 @@ pub mod projects;
 pub mod pull;
 pub mod push;
 pub mod settings;
+mod shortcut;
 mod simulate;
 pub mod status;
 pub mod student;
@@ -64,6 +65,7 @@ pub fn run() {
         .plugin(tauri_plugin_clipboard_manager::init())
         .plugin(tauri_plugin_opener::init())
         .manage(popover::PopoverState::default())
+        .manage(shortcut::ShortcutRegistration::default())
         .manage(deeplink::DeepLinkState::default())
         .manage(student::FoundedGroups::default())
         .manage(login::LoginState::default())
@@ -107,6 +109,7 @@ pub fn run() {
 
             popover::setup(handle)?;
             tray::setup(handle)?;
+            shortcut::setup(handle);
             alerts::restore_badge(handle);
             projects::start_background_sync(handle.clone());
             deeplink::setup(handle);
@@ -118,6 +121,8 @@ pub fn run() {
             commands::diagnostics_report,
             commands::set_popover_pinned,
             commands::hide_popover,
+            commands::active_global_shortcut,
+            commands::pause_global_shortcut,
             commands::tool_statuses,
             commands::install_command,
             commands::install_tool,

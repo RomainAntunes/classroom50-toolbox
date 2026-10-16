@@ -30,6 +30,8 @@ pub struct AppInfo {
     /// The OS has a calendar store the app can write into (macOS; Linux with Evolution Data
     /// Server or Akonadi).
     native_calendar: bool,
+    /// A system-wide shortcut can be registered (not in a Wayland session).
+    global_shortcuts: bool,
 }
 
 /// Async, so detecting a calendar store (Linux reads the XDG data dirs and PATH) runs off
@@ -43,6 +45,7 @@ pub async fn app_info(app: AppHandle) -> AppInfo {
         os: platform::os(),
         version: app.package_info().version.to_string(),
         native_calendar,
+        global_shortcuts: crate::shortcut::available(&app),
     }
 }
 
@@ -101,6 +104,20 @@ pub async fn diagnostics_report(
 #[tauri::command]
 pub fn set_popover_pinned(state: State<'_, PopoverState>, pinned: bool) {
     state.set_pinned(pinned);
+}
+
+/// The system-wide shortcut registered right now (`None` when the saved one couldn't be).
+/// Sync, like every caller of `shortcut::apply`: it runs on the main thread.
+#[tauri::command]
+pub fn active_global_shortcut(app: AppHandle) -> Option<String> {
+    app.state::<crate::shortcut::ShortcutRegistration>()
+        .active()
+}
+
+/// Lets the shortcut recorder hear the saved shortcut: unregistered while `paused`.
+#[tauri::command]
+pub fn pause_global_shortcut(app: AppHandle, paused: bool) -> Result<()> {
+    crate::shortcut::pause(&app, paused)
 }
 
 /// Hides the popover, as a click outside it would (Escape with nothing else to close).
@@ -349,10 +366,30 @@ pub fn update_settings(
     next: Settings,
 ) -> Result<Settings> {
     let previous = settings.get();
-    if next.launch_at_login != previous.launch_at_login {
-        apply_launch_at_login(&app, next.launch_at_login)?;
+    // First, so a shortcut the OS refuses saves nothing.
+    if next.global_shortcut != previous.global_shortcut {
+        crate::shortcut::apply(&app, next.global_shortcut.as_deref())?;
     }
-    let saved = settings.set(next)?;
+    let shortcut_changed = next.global_shortcut != previous.global_shortcut;
+    // Any later failure saves nothing, so the OS gets the saved shortcut back.
+    let restore_shortcut = || {
+        if shortcut_changed {
+            let _ = crate::shortcut::apply(&app, previous.global_shortcut.as_deref());
+        }
+    };
+    if next.launch_at_login != previous.launch_at_login
+        && let Err(err) = apply_launch_at_login(&app, next.launch_at_login)
+    {
+        restore_shortcut();
+        return Err(err);
+    }
+    let saved = match settings.set(next) {
+        Ok(saved) => saved,
+        Err(err) => {
+            restore_shortcut();
+            return Err(err);
+        }
+    };
     // What the calendar holds depends on these.
     if saved.hidden != previous.hidden
         || saved.hidden_classes != previous.hidden_classes

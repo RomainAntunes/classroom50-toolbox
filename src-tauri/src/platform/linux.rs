@@ -154,6 +154,14 @@ pub fn open_terminal(dir: &Path) -> Result<()> {
     Err(Error::NoTerminal)
 }
 
+pub fn global_shortcuts_supported() -> bool {
+    let var = |name: &str| std::env::var(name).ok();
+    !super::is_wayland(
+        var("XDG_SESSION_TYPE").as_deref(),
+        var("WAYLAND_DISPLAY").as_deref(),
+    )
+}
+
 mod calendar;
 
 pub use calendar::{has_native_calendar, native_calendars, write_calendar};

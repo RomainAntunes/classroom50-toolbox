@@ -11,6 +11,8 @@ export interface AppInfo {
   version: string;
   /** The OS has a calendar store the app can write into (macOS; Linux with GNOME's or KDE's). */
   nativeCalendar: boolean;
+  /** A system-wide shortcut can be registered (not in a Wayland session). */
+  globalShortcuts: boolean;
 }
 
 /** What the UI tells `diagnostics_report` about itself. */
@@ -427,6 +429,8 @@ export interface Settings {
   updateChannel: UpdateChannel;
   /** The newest version whose "What's new" was seen; `null` before the page existed. */
   lastSeenVersion: string | null;
+  /** The system-wide shortcut that shows or hides the popover (`Control+Alt+KeyC`), or off. */
+  globalShortcut: string | null;
 }
 
 /** An editor installed here that can open a folder. */
@@ -461,6 +465,8 @@ export const UNSEEN_EVENT = "unseen-updated";
 export const DEEP_LINK_EVENT = "deep-link";
 /** The popover hid. */
 export const POPOVER_HIDDEN_EVENT = "popover-hidden";
+/** The global shortcut showed the popover: the list takes the keyboard focus. */
+export const POPOVER_SHORTCUT_EVENT = "popover-shortcut";
 
 export type Notice =
   | { kind: "due"; assignment: string; due: string }
@@ -593,6 +599,10 @@ export const api = {
   setPopoverPinned: (pinned: boolean) => invoke<void>("set_popover_pinned", { pinned }),
   /** Hides the popover, like a click outside it. */
   hidePopover: () => invoke<void>("hide_popover"),
+  /** The system-wide shortcut registered now; `null` when the saved one couldn't be. */
+  activeGlobalShortcut: () => invoke<string | null>("active_global_shortcut"),
+  /** Unregisters the saved shortcut while the recorder listens, or registers it again. */
+  pauseGlobalShortcut: (paused: boolean) => invoke<void>("pause_global_shortcut", { paused }),
   toolStatuses: () => invoke<ToolStatus[]>("tool_statuses"),
   installCommand: (tool: Tool) => invoke<InstallPlan>("install_command", { tool }),
   /** The newer version `upgradeTool` would install; always null for git and gh. */
