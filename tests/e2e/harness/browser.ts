@@ -168,6 +168,21 @@ export function install(scenario: Scenario): E2E {
         return [];
       case "tool_update":
         return null;
+      case "update_status":
+      case "check_update":
+        return state.update;
+      case "defer_update":
+        state.update = { ...state.update, deferred: true };
+        void emit("update-state", state.update);
+        return null;
+      case "install_update":
+        state.update = { ...state.update, installing: true };
+        void emit("update-state", state.update);
+        return null;
+      case "active_global_shortcut":
+        return state.settings.globalShortcut;
+      case "simulated_network":
+        return "normal";
       case "install_command":
         return {
           program: "brew",
@@ -211,6 +226,10 @@ export function install(scenario: Scenario): E2E {
       case "open_in_editor":
       case "open_terminal":
       case "set_git_identity":
+      case "pause_global_shortcut":
+      case "quit_app":
+      case "simulate_update":
+      case "simulate_network":
         return null;
       case "plugin:path|resolve_directory":
         return state.home;
@@ -267,6 +286,7 @@ export function install(scenario: Scenario): E2E {
     const replies = state.responses[cmd];
     if (replies?.length) {
       const reply: Reply = replies.length > 1 ? replies.shift()! : replies[0];
+      if ("pass" in reply) return fallback(cmd, args);
       if ("error" in reply) throw reply.error;
       if ("hold" in reply) {
         return new Promise((resolve, reject) => {

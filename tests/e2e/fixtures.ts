@@ -19,11 +19,13 @@ import type {
   SyncDetails,
   ToolStatus,
   Unaccepted,
+  UpdateStatus,
 } from "../../src/lib/api";
+import pkg from "../../package.json" with { type: "json" };
 
-/** How the fake answers one call: a value, a rejection shaped like Rust's `Error`, or a
- *  promise the test settles later (`app.release`). */
-export type Reply = { value: unknown } | { error: CommandError } | { hold: true };
+/** How the fake answers one call: a value, a rejection shaped like Rust's `Error`, a
+ *  promise the test settles later (`app.release`), or the fake's default (`pass`). */
+export type Reply = { value: unknown } | { error: CommandError } | { hold: true } | { pass: true };
 
 export interface Scenario {
   appInfo: AppInfo;
@@ -36,6 +38,9 @@ export interface Scenario {
   systemLanguages: string[];
   unseen: string[];
   syncDetails: SyncDetails;
+  /** Self-update (`update_status`); `defer_update` and `install_update` change it and send
+   *  `update-state`, as Rust does. */
+  update: UpdateStatus;
   /** What `take_deep_link` hands over once (then null). */
   deepLink: DeepLinkTarget | null;
   /** The home folder `homeDir()` resolves to. */
@@ -46,6 +51,8 @@ export interface Scenario {
 
 export const ok = (value: unknown = null): Reply => ({ value });
 export const hold = (): Reply => ({ hold: true });
+/** The fake's own answer, e.g. after a failure: `respond(cmd, fail(...), pass())`. */
+export const pass = (): Reply => ({ pass: true });
 export function fail(
   kind: string,
   message = `${kind} (from Rust)`,
@@ -60,6 +67,8 @@ const HOUR = 3_600_000;
 export const hoursFromNow = (n: number) => new Date(NOW + n * HOUR).toISOString();
 export const daysFromNow = (n: number) => hoursFromNow(n * 24);
 
+/** The version the app reports (`app_info`), the one in package.json. */
+export const VERSION: string = pkg.version;
 export const HOME = "/Users/student";
 export const LOGIN = "student";
 
@@ -81,6 +90,10 @@ export function settings(over: Partial<Settings> = {}): Settings {
     nativeCalendar: null,
     onboarded: true,
     commitActions: "none",
+    updateChannel: "stable",
+    // This version's notes were read: What's new doesn't take the main page's place.
+    lastSeenVersion: VERSION,
+    globalShortcut: null,
     ...over,
   };
 }
@@ -232,6 +245,23 @@ export function unaccepted(
   };
 }
 
+/** Self-update with nothing to do, on a bundle that updates itself. */
+export function updateStatus(over: Partial<UpdateStatus> = {}): UpdateStatus {
+  return {
+    state: { phase: "idle" },
+    deferred: false,
+    installing: false,
+    simulated: false,
+    lastCheck: null,
+    bundle: "app",
+    canUpdate: true,
+    installOnQuit: true,
+    asksPassword: false,
+    hasBeta: true,
+    ...over,
+  };
+}
+
 export function snapshot(over: Partial<Snapshot> = {}): Snapshot {
   return {
     projects: [],
@@ -247,7 +277,7 @@ export function snapshot(over: Partial<Snapshot> = {}): Snapshot {
 /** A signed-in student with every tool, set up, and the given list. */
 export function scenario(over: Partial<Scenario> = {}): Scenario {
   return {
-    appInfo: { os: "macos", version: "0.10.0", nativeCalendar: true },
+    appInfo: { os: "macos", version: VERSION, nativeCalendar: true, globalShortcuts: true },
     settings: settings(),
     tools: tools(),
     auth: { loggedIn: true, login: LOGIN, missingScopes: [], envToken: null },
@@ -274,6 +304,7 @@ export function scenario(over: Partial<Scenario> = {}): Scenario {
       assignments: 0,
       clones: 0,
     },
+    update: updateStatus(),
     deepLink: null,
     home: HOME,
     responses: {},
