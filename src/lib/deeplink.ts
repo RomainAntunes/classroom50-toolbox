@@ -122,6 +122,13 @@ async function act(target: DeepLinkTarget): Promise<void> {
 
 let running = false;
 let again = false;
+// A link is being acted on (taken, not yet done): pages leave navigation to it.
+let active = false;
+
+/** Whether a link is being handled, so the What's new page doesn't take its place. */
+export function linkActive(): boolean {
+  return active;
+}
 
 /**
  * Takes the waiting link, if any, and acts on it. Rust drops other links until
@@ -138,9 +145,11 @@ export async function handleDeepLink(): Promise<void> {
       again = false;
       const target = await api.takeDeepLink();
       if (!target) continue;
+      active = true;
       try {
         if (await ready(target)) await act(target);
       } finally {
+        active = false;
         await api.deepLinkDone();
       }
     } while (again);

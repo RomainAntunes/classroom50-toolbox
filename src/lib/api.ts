@@ -425,6 +425,8 @@ export interface Settings {
   /** Commit, or commit and push, from the app; `none` leaves it to git and the editor. */
   commitActions: CommitActions;
   updateChannel: UpdateChannel;
+  /** The newest version whose "What's new" was seen; `null` before the page existed. */
+  lastSeenVersion: string | null;
 }
 
 /** An editor installed here that can open a folder. */

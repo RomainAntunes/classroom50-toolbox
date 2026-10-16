@@ -32,6 +32,8 @@
   import UnacceptedRow from "$lib/components/UnacceptedRow.svelte";
   import LoginStatus from "$lib/components/LoginStatus.svelte";
   import UpdateBanner from "$lib/components/UpdateBanner.svelte";
+  import { linkActive } from "$lib/deeplink";
+  import { pendingNotes } from "$lib/whatsnew";
 
   interface ClassGroup {
     key: string;
@@ -132,6 +134,11 @@
     const loaded = await loadSettings();
     if (!loaded.onboarded) {
       await goto("/welcome", { replaceState: true });
+      return;
+    }
+    // Updated since the notes were last read; a link being handled goes first.
+    if (!linkActive() && (await pendingNotes(loaded)).length) {
+      await goto("/whats-new", { replaceState: true });
       return;
     }
     const [tools, auth, snapshot, progress] = await Promise.all([

@@ -682,6 +682,12 @@
           <span title={t("settings.dev.updateHint")}>{t("settings.dev.update")}</span>
           <button onclick={() => api.simulateUpdate()}>{t("settings.dev.updateRun")}</button>
         </div>
+        <div class="row">
+          <span title={t("settings.dev.whatsNewHint")}>{t("settings.dev.whatsNew")}</span>
+          <button onclick={() => goto("/whats-new?from=settings&all")}
+            >{t("settings.dev.whatsNewShow")}</button
+          >
+        </div>
         <button class="disclosure" aria-expanded={showDev} onclick={() => (showDev = !showDev)}>
           <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m9 18 6-6-6-6" /></svg>
           {t("settings.dev.notifications")}
@@ -708,6 +714,12 @@
       <div class="row">
         <span>{t("settings.about.guide")}</span>
         <button onclick={() => goto("/welcome")}>{t("settings.about.openGuide")}</button>
+      </div>
+      <div class="row">
+        <span>{t("settings.about.whatsNew")}</span>
+        <button onclick={() => goto("/whats-new?from=settings")}
+          >{t("settings.about.openWhatsNew")}</button
+        >
       </div>
       <div class="row">
         <span class="text">

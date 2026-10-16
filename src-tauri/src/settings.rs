@@ -55,6 +55,9 @@ pub struct Settings {
     /// What the app may do with a clone's changes: nothing (git and the editor do it),
     /// commit only, or commit and push.
     pub commit_actions: CommitActions,
+    /// The newest version whose "What's new" the user has seen; `None` in a file from
+    /// before the page existed, which shows the running version's notes once.
+    pub last_seen_version: Option<String>,
     /// Which releases self-update follows (`updater.rs`).
     pub update_channel: UpdateChannel,
 }
@@ -121,6 +124,7 @@ impl Default for Settings {
             onboarded: false,
             commit_actions: CommitActions::None,
             update_channel: UpdateChannel::Stable,
+            last_seen_version: None,
         }
     }
 }
@@ -153,6 +157,18 @@ impl Settings {
         } else {
             language.to_owned()
         };
+
+        // A version is short ASCII (`0.11.0-beta.2`); anything else came from a broken file.
+        self.last_seen_version = self
+            .last_seen_version
+            .map(|version| version.trim().to_owned())
+            .filter(|version| {
+                !version.is_empty()
+                    && version.len() <= 64
+                    && version
+                        .chars()
+                        .all(|c| c.is_ascii_alphanumeric() || matches!(c, '.' | '-' | '+'))
+            });
 
         let hours: BTreeSet<u32> = self
             .notify_hours_before
@@ -252,8 +268,10 @@ mod tests {
             onboarded: true,
             commit_actions: CommitActions::Push,
             update_channel: UpdateChannel::Beta,
+            last_seen_version: Some(" 0.11.0-beta.2 ".into()),
         }
         .normalized();
+        assert_eq!(settings.last_seen_version.as_deref(), Some("0.11.0-beta.2"));
         assert_eq!(settings.hidden, vec!["a".to_owned()]);
         assert_eq!(settings.hidden_classes, vec!["o/c".to_owned()]);
         assert_eq!(
@@ -269,6 +287,12 @@ mod tests {
             }
             .normalized();
             assert_eq!(settings.language, SYSTEM_LANGUAGE, "{broken:?}");
+            let settings = Settings {
+                last_seen_version: Some(broken.into()),
+                ..Settings::default()
+            }
+            .normalized();
+            assert_eq!(settings.last_seen_version, None, "{broken:?}");
         }
     }
 
@@ -281,6 +305,7 @@ mod tests {
         assert_eq!(settings.language, SYSTEM_LANGUAGE);
         assert_eq!(settings.commit_actions, CommitActions::None);
         assert_eq!(settings.update_channel, UpdateChannel::Stable);
+        assert_eq!(settings.last_seen_version, None);
     }
 
     #[test]
