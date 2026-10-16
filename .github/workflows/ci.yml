@@ -48,3 +48,52 @@ jobs:
         working-directory: src-tauri
       - run: cargo test
         working-directory: src-tauri
+
+  # The WebDriver smoke suite (e2e/): the real app, a debug build, against a mock GitHub and
+  # a fake gh. Linux only: tauri-driver needs WebKitWebDriver, and macOS has no WKWebView driver.
+  webdriver:
+    runs-on: ubuntu-22.04
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: System dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libwebkit2gtk-4.1-dev libayatana-appindicator3-dev librsvg2-dev patchelf \
+            webkit2gtk-driver xvfb dbus
+
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v7
+        with:
+          node-version: lts/*
+          cache: pnpm
+          cache-dependency-path: |
+            pnpm-lock.yaml
+            e2e/pnpm-lock.yaml
+      - uses: dtolnay/rust-toolchain@stable
+      # Its own key: a debug build of the app, plus tauri-driver in ~/.cargo/bin.
+      - uses: swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+          key: webdriver
+
+      - name: Install tauri-driver
+        run: cargo install tauri-driver --locked
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm install --frozen-lockfile
+        working-directory: e2e
+      # Debug, so the dev write guard and the test hooks are in; the frontend is embedded.
+      - run: pnpm tauri build --debug --no-bundle
+
+      # The single-instance plugin needs a session bus, the webview a display.
+      - name: Smoke tests
+        run: dbus-run-session -- xvfb-run --auto-servernum --server-args="-screen 0 1280x1024x24" pnpm test
+        working-directory: e2e
+
+      - uses: actions/upload-artifact@v7
+        if: failure()
+        with:
+          name: webdriver-artifacts
+          path: e2e/artifacts
+          if-no-files-found: ignore
