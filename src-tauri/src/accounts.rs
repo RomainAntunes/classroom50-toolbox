@@ -106,7 +106,8 @@ pub async fn avatar(http: &reqwest::Client, cache_dir: &Path, login: &str) -> Re
 async fn download(http: &reqwest::Client, login: &str, path: &Path) -> Result<Vec<u8>> {
     crate::simulate::check()?;
     let url = format!("https://github.com/{login}.png?size=64");
-    let response = http.get(url).send().await?.error_for_status()?;
+    let url = crate::testenv::github_url(&url);
+    let response = http.get(url.as_ref()).send().await?.error_for_status()?;
     let bytes = response.bytes().await?.to_vec();
     if let Some(dir) = path.parent() {
         std::fs::create_dir_all(dir)?;
@@ -160,5 +161,18 @@ mod tests {
         assert!(valid_login("../etc").is_err());
         assert!(valid_login("-x").is_err());
         assert!(valid_login("").is_err());
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn the_suites_fake_gh_lists_one_account() {
+        let json = crate::testenv::fake_gh(&["auth", "status", "--json", "hosts"]);
+        assert_eq!(
+            parse_status(&json).unwrap(),
+            vec![Account {
+                login: "ada-e2e".into(),
+                active: true
+            }]
+        );
     }
 }

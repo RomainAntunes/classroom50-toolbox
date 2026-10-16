@@ -1,0 +1,16 @@
+{
+  "name": "classroom50-toolbox-e2e",
+  "description": "WebDriver smoke suite for the Classroom 50 Toolbox (Linux, tauri-driver)",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "wdio run wdio.conf.js"
+  },
+  "devDependencies": {
+    "@wdio/cli": "9.32.0",
+    "@wdio/local-runner": "9.32.0",
+    "@wdio/mocha-framework": "9.32.0",
+    "@wdio/spec-reporter": "9.32.0"
+  },
+  "packageManager": "pnpm@12.6.0"
+}

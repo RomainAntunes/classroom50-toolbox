@@ -1,0 +1,28 @@
+{
+  "schema": "classroom50/assignments/v1",
+  "assignments": [
+    {
+      "slug": "hello",
+      "name": "Hello, World",
+      "mode": "individual",
+      "autograder": "default",
+      "description": "Print a greeting, then a farewell.",
+      "due": "2026-10-19T12:00:00Z",
+      "submission_mode": "tag"
+    },
+    {
+      "slug": "sorting",
+      "name": "Sorting",
+      "mode": "individual",
+      "autograder": "default",
+      "due": "2026-10-14T12:00:00Z"
+    },
+    {
+      "slug": "graphs",
+      "name": "Graphs",
+      "mode": "individual",
+      "autograder": "default",
+      "due": "2026-10-26T12:00:00Z"
+    }
+  ]
+}

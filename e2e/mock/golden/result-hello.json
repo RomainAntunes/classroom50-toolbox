@@ -1,0 +1,34 @@
+{
+  "schema": "classroom50/result/v1",
+  "classroom": "algo",
+  "assignment": "hello",
+  "assignment_type": "individual",
+  "owner": "ada-e2e",
+  "submission": "submit/2026-10-15T12-00-00Z-bbbbbbb",
+  "commit": "https://github.com/c50-e2e-school/algo-hello-ada-e2e/commit/bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+  "release": "https://github.com/c50-e2e-school/algo-hello-ada-e2e/releases/tag/submit/2026-10-15T12-00-00Z-bbbbbbb",
+  "review": "https://github.com/c50-e2e-school/algo-hello-ada-e2e/compare/a...b",
+  "datetime": "2026-10-15T12:00:00Z",
+  "score": 7,
+  "max-score": 10,
+  "tests": [
+    {
+      "test-name": "compiles",
+      "passed": true,
+      "score": 3,
+      "max-score": 3
+    },
+    {
+      "test-name": "prints hello",
+      "passed": true,
+      "score": 4,
+      "max-score": 4
+    },
+    {
+      "test-name": "prints goodbye",
+      "passed": false,
+      "score": 0,
+      "max-score": 3
+    }
+  ]
+}

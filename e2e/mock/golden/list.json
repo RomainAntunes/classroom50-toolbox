@@ -1,0 +1,29 @@
+{
+  "viewer": {
+    "login": "ada-e2e",
+    "repositories": {
+      "pageInfo": {
+        "hasNextPage": false,
+        "endCursor": null
+      },
+      "nodes": [
+        {
+          "nameWithOwner": "c50-e2e-school/algo-hello-ada-e2e",
+          "pushedAt": "2026-10-16T11:00:00Z"
+        },
+        {
+          "nameWithOwner": "c50-e2e-school/algo-sorting-ada-e2e",
+          "pushedAt": "2026-10-15T12:00:00Z"
+        },
+        {
+          "nameWithOwner": "c50-e2e-lab/web-portfolio-ada-e2e",
+          "pushedAt": "2026-10-14T12:00:00Z"
+        },
+        {
+          "nameWithOwner": "ada-e2e/dotfiles",
+          "pushedAt": "2026-10-11T12:00:00Z"
+        }
+      ]
+    }
+  }
+}

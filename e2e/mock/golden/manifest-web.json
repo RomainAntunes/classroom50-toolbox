@@ -1,0 +1,12 @@
+{
+  "schema": "classroom50/assignments/v1",
+  "assignments": [
+    {
+      "slug": "portfolio",
+      "name": "Portfolio",
+      "mode": "individual",
+      "autograder": "empty_repo",
+      "due": "2026-10-23T12:00:00Z"
+    }
+  ]
+}

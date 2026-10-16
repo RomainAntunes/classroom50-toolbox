@@ -60,6 +60,7 @@ pub fn setup(app: &AppHandle) -> tauri::Result<()> {
     let handle = app.clone();
     window.on_window_event(move |event| {
         if let WindowEvent::Focused(false) = event
+            && !crate::testenv::keep_open()
             && !handle
                 .state::<PopoverState>()
                 .pinned

@@ -926,7 +926,9 @@ async fn github_reachable() -> bool {
     if !crate::simulate::reachable() {
         return false;
     }
-    let connect = tokio::net::TcpStream::connect(("api.github.com", 443));
+    let (host, port) =
+        crate::testenv::probe_addr().unwrap_or_else(|| ("api.github.com".to_owned(), 443));
+    let connect = tokio::net::TcpStream::connect((host.as_str(), port));
     matches!(
         tokio::time::timeout(Duration::from_secs(3), connect).await,
         Ok(Ok(_))
@@ -3188,5 +3190,73 @@ mod tests {
             cadence(&snapshot(24 * 30), now).1,
             chrono::TimeDelta::hours(1)
         );
+    }
+
+    /// The WebDriver suite's mock GitHub answers read like GitHub's (`testenv::golden`).
+    #[test]
+    fn reads_the_suites_mock_listing_and_teams() {
+        use crate::testenv::golden;
+        let list: ListData = serde_json::from_str(&golden("list")).unwrap();
+        assert_eq!(list.viewer.login, "ada-e2e");
+        assert_eq!(list.viewer.repositories.nodes.len(), 4);
+        assert!(!list.viewer.repositories.page_info.has_next_page);
+
+        let teams: TeamsData = serde_json::from_str(&golden("teams")).unwrap();
+        let classrooms: Vec<Classroom> = teams
+            .viewer
+            .organizations
+            .nodes
+            .into_iter()
+            .flatten()
+            .flat_map(|org| {
+                org.teams
+                    .nodes
+                    .into_iter()
+                    .flatten()
+                    .filter_map(move |team| {
+                        Classroom::from_team(&org.login, &team.slug, team.description.as_deref())
+                    })
+            })
+            .collect();
+        let names: Vec<_> = classrooms.iter().map(|c| c.name.as_deref()).collect();
+        assert_eq!(names, [Some("Algorithms"), Some("Web Programming")]);
+        assert!(classrooms.iter().all(|c| c.active && c.secret.is_none()));
+    }
+
+    #[test]
+    fn reads_the_suites_mock_repos_and_statuses() {
+        use crate::testenv::golden;
+        let mut details: HashMap<String, Option<RepoNode>> =
+            serde_json::from_str(&golden("details")).unwrap();
+        assert_eq!(details.len(), 5);
+        assert!(details["r4"].is_none(), "an unknown repo is null");
+        let hello = details.remove("r0").flatten().unwrap().into_remote();
+        assert_eq!(
+            hello.config.as_ref().map(|c| c.assignment.as_str()),
+            Some("hello")
+        );
+        assert!(hello.can_push && !hello.archived);
+        assert_eq!(
+            hello.head.as_ref().unwrap().author.as_deref(),
+            Some("ada-e2e")
+        );
+        let submission = hello.last_submission.unwrap();
+        assert!(submission.tag.starts_with("submit/") && submission.at.is_some());
+        assert_ne!(submission.commit, hello.head.unwrap().oid);
+        let portfolio = details.remove("r2").flatten().unwrap().into_remote();
+        assert!(portfolio.config.is_none());
+
+        let mut statuses: HashMap<String, Option<StatusNode>> =
+            serde_json::from_str(&golden("status")).unwrap();
+        let mut hello = statuses.remove("r0").flatten().unwrap();
+        let released = hello.status.graded_releases();
+        assert_eq!(released.len(), 1);
+        assert!(released[0].result_url.ends_with("/result.json"));
+        assert_eq!(hello.status.grading(), None);
+        assert_eq!(hello.status.feedback("ada-e2e"), None);
+        assert!(hello.status.unmerged(Some("main")).is_empty());
+        let mut sorting = statuses.remove("r1").flatten().unwrap();
+        assert!(sorting.status.graded_releases().is_empty());
+        assert!(sorting.repo.into_remote().config.is_some());
     }
 }
