@@ -3,6 +3,7 @@
 import { LogicalPosition } from "@tauri-apps/api/dpi";
 import type { Menu } from "@tauri-apps/api/menu";
 import { withDialog } from "$lib/api";
+import { currentDirection } from "$lib/i18n";
 import { isMenuKey, moveIndex } from "$lib/keys";
 
 /** When the last menu opened from the keyboard; see `onContextMenu`. */
@@ -10,13 +11,15 @@ let keyboardMenuAt = -Infinity;
 
 /**
  * Shows a native menu, pinned like a dialog. Under `anchor` when given (a "..." button, or a
- * row opened from the keyboard), else at the pointer (a right click).
+ * row opened from the keyboard), from its start corner (the right one right to left, where
+ * a right-to-left app's menus open leftward), else at the pointer (a right click).
  */
 export async function popupMenu(menu: Menu, anchor?: Element | null): Promise<void> {
   let at: LogicalPosition | undefined;
   if (anchor) {
     const rect = anchor.getBoundingClientRect();
-    at = new LogicalPosition(Math.round(rect.left), Math.round(rect.bottom));
+    const x = currentDirection() === "rtl" ? rect.right : rect.left;
+    at = new LogicalPosition(Math.round(x), Math.round(rect.bottom));
   }
   await withDialog(() => menu.popup(at));
 }
