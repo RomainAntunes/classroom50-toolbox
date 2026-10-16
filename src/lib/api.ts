@@ -327,10 +327,10 @@ export interface Accepted {
 export interface SubmitCheck {
   /** Submit needs `.classroom50.yaml`; empty-repo assignments are pushed by hand. */
   hasMarker: boolean;
-  /** New files that will be included. */
-  untracked: string[];
-  /** Tracked files deleted without `git rm`: submit would fail. */
-  deleted: string[];
+  /** Changes not committed yet, editor and OS files aside: submit refuses while there are any. */
+  uncommitted: string[];
+  /** Untracked editor and OS files, which don't block a submit but are sent with it. */
+  editorFiles: string[];
 }
 
 export interface Submitted {

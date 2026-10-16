@@ -13,6 +13,7 @@ use serde::Serialize;
 use crate::classroom50::REPO_CONFIG_FILE;
 use crate::error::{Error, Result};
 use crate::process;
+use crate::push;
 
 /// Accept's retry loops are bounded at a minute or two.
 const ACCEPT_TIMEOUT: Duration = Duration::from_secs(180);
@@ -186,45 +187,29 @@ fn accept_args(request: &AcceptRequest<'_>) -> Result<Vec<OsString>> {
 /// What a submit is about to send, for the confirmation. `gh student submit` snapshots the
 /// working tree (tracked files and untracked ones that aren't ignored) and pushes it to the
 /// default branch as a new commit on top of GitHub's head; the clone itself isn't changed.
+/// The app only submits a clean clone, so what is sent is what is committed.
 #[derive(Debug, Clone, Default, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct SubmitCheck {
     /// Submit needs `.classroom50.yaml`; `empty_repo` assignments have none and are pushed
     /// by hand.
     pub has_marker: bool,
-    /// New files that will be included.
-    pub untracked: Vec<String>,
-    /// Tracked files deleted without `git rm`: submit fails on them.
-    pub deleted: Vec<String>,
+    /// Changes not committed yet (new, modified, deleted, staged or not), editor and OS
+    /// files aside: submit refuses while there are any.
+    pub uncommitted: Vec<String>,
+    /// Untracked editor and OS files (`noise`, by root): they don't block a submit, but
+    /// `gh student submit` sends them too unless a `.gitignore` lists them.
+    pub editor_files: Vec<String>,
 }
 
 /// Lists what `check` reports, without taking the index lock.
 pub async fn check(path: &Path) -> Result<SubmitCheck> {
-    let list = |flag: &'static str| async move {
-        let args = [
-            "--no-optional-locks",
-            "ls-files",
-            flag,
-            "--exclude-standard",
-            "-z",
-        ];
-        process::run("git", args, Some(path))
-            .await
-            .map(|out| split_nul(&out.stdout))
-    };
-    let (untracked, deleted) = tokio::try_join!(list("--others"), list("--deleted"))?;
+    let tree = push::work_tree(path).await?;
     Ok(SubmitCheck {
         has_marker: path.join(REPO_CONFIG_FILE).is_file(),
-        untracked,
-        deleted,
+        uncommitted: tree.files,
+        editor_files: tree.skipped,
     })
-}
-
-fn split_nul(out: &str) -> Vec<String> {
-    out.split('\0')
-        .filter(|s| !s.is_empty())
-        .map(str::to_owned)
-        .collect()
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -234,8 +219,12 @@ pub struct Submitted {
     pub url: Option<String>,
 }
 
-/// Runs `gh student submit` in the clone at `path`.
+/// Runs `gh student submit` in the clone at `path`, which must have nothing uncommitted
+/// (`Error::LocalChanges`): the snapshot would send work the student never committed.
 pub async fn submit(path: &Path) -> Result<Submitted> {
+    if !check(path).await?.uncommitted.is_empty() {
+        return Err(Error::LocalChanges);
+    }
     let args = vec![OsString::from("student"), "submit".into()];
     let output = run(args, path, SUBMIT_TIMEOUT).await?;
     Ok(Submitted {
@@ -452,13 +441,45 @@ mod tests {
         assert!(process::writes_to_github("gh", &args));
     }
 
-    #[test]
-    fn splits_git_file_lists() {
-        assert_eq!(
-            split_nul("a.txt\0dir/b c.txt\0"),
-            vec!["a.txt", "dir/b c.txt"]
-        );
-        assert!(split_nul("").is_empty());
+    /// Uncommitted work blocks a submit before gh runs; editor files don't. A dev build
+    /// then refuses the submit itself, so this never reaches GitHub.
+    #[tokio::test]
+    async fn submits_only_a_clean_clone() {
+        let root = std::env::temp_dir().join(format!("c50tb-submit-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&root);
+        std::fs::create_dir_all(&root).unwrap();
+        let git = |args: &[&str]| {
+            let out = std::process::Command::new("git")
+                .args(["-c", "user.name=t", "-c", "user.email=t@t"])
+                .args(["-c", "commit.gpgsign=false"])
+                .args(args)
+                .current_dir(&root)
+                .output()
+                .unwrap();
+            assert!(out.status.success(), "{args:?}");
+        };
+        git(&["init", "-q", "-b", "main"]);
+        std::fs::write(root.join(REPO_CONFIG_FILE), "classroom: c\nassignment: a\n").unwrap();
+        std::fs::write(root.join("a.c"), "x").unwrap();
+        git(&["add", "--all"]);
+        git(&["commit", "-q", "-m", "one"]);
+        std::fs::write(root.join(".DS_Store"), "x").unwrap();
+        let clean = check(&root).await.unwrap();
+        assert!(clean.has_marker);
+        assert!(clean.uncommitted.is_empty());
+        assert_eq!(clean.editor_files, [".DS_Store"]);
+
+        std::fs::remove_file(root.join("a.c")).unwrap();
+        std::fs::write(root.join("b.c"), "x").unwrap();
+        assert_eq!(check(&root).await.unwrap().uncommitted, ["a.c", "b.c"]);
+        assert!(matches!(submit(&root).await, Err(Error::LocalChanges)));
+
+        git(&["add", "--all"]);
+        git(&["commit", "-q", "-m", "two"]);
+        if cfg!(debug_assertions) {
+            assert!(matches!(submit(&root).await, Err(Error::BlockedInDev(_))));
+        }
+        let _ = std::fs::remove_dir_all(&root);
     }
 
     #[test]

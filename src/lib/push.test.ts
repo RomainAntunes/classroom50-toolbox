@@ -9,6 +9,7 @@ const api = vi.hoisted(() => ({
   commitCheck: vi.fn(),
   commitOnly: vi.fn(),
   submitCheck: vi.fn(),
+  submitProject: vi.fn(),
   commitPush: vi.fn(),
   suggestedGitIdentity: vi.fn(),
   setGitIdentity: vi.fn(),
@@ -216,7 +217,7 @@ describe("commitLocal", () => {
 });
 
 describe("submitProject without a marker", () => {
-  const noMarker = { hasMarker: false, untracked: [], deleted: [] };
+  const noMarker = { hasMarker: false, uncommitted: [], editorFiles: [] };
   const withActions = (commitActions: Settings["commitActions"]) =>
     (settings.current = { commitActions } as Settings);
 
@@ -249,5 +250,56 @@ describe("submitProject without a marker", () => {
     expect(dialog.ask).not.toHaveBeenCalled();
     expect(dialog.message).toHaveBeenCalledOnce();
     expect(api.pushCheck).not.toHaveBeenCalled();
+  });
+});
+
+describe("submitProject with uncommitted changes", () => {
+  const dirty = { hasMarker: true, uncommitted: ["a.c", "b.c"], editorFiles: [] };
+  const withActions = (commitActions: Settings["commitActions"]) =>
+    (settings.current = { commitActions } as Settings);
+  const tagMode = () => ({ ...project({ submissionMode: "tag" }), path: "/c" }) as Project;
+
+  it("points to the editor when the app doesn't commit", async () => {
+    withActions("none");
+    api.submitCheck.mockResolvedValue(dirty);
+    expect(await submitProject(tagMode(), "Lab")).toBe(false);
+    expect(dialog.ask).not.toHaveBeenCalled();
+    expect(dialog.message).toHaveBeenCalledWith(
+      expect.stringMatching(/aren't committed yet: a\.c, b\.c\.[^]*editor or a terminal/),
+      expect.anything(),
+    );
+    expect(api.submitProject).not.toHaveBeenCalled();
+  });
+
+  it("offers Commit, then leaves Submit for later", async () => {
+    withActions("commit");
+    api.submitCheck.mockResolvedValue(dirty);
+    api.commitCheck.mockResolvedValue(check({ pushBlocked: "tagMode" }));
+    dialog.ask.mockResolvedValue(true);
+    const done = submitProject(tagMode(), "Lab");
+    await answer("Finish");
+    expect(await done).toBe(false);
+    expect(dialog.ask).toHaveBeenCalledWith(
+      expect.stringContaining("Commit them first, then submit."),
+      expect.objectContaining({ okLabel: "Commit…" }),
+    );
+    expect(api.commitOnly).toHaveBeenCalledWith("o/r", "Finish");
+    expect(api.submitProject).not.toHaveBeenCalled();
+  });
+
+  it("submits a clean clone and names the editor files sent with it", async () => {
+    api.submitCheck.mockResolvedValue({
+      hasMarker: true,
+      uncommitted: [],
+      editorFiles: [".idea/"],
+    });
+    api.submitProject.mockResolvedValue({ url: null });
+    dialog.ask.mockResolvedValue(true);
+    expect(await submitProject(tagMode(), "Lab")).toBe(true);
+    expect(dialog.ask).toHaveBeenCalledWith(
+      expect.stringContaining("sent too: .idea/."),
+      expect.anything(),
+    );
+    expect(api.submitProject).toHaveBeenCalledWith("o/r");
   });
 });

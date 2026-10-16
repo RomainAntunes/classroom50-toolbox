@@ -119,12 +119,12 @@
   const cloneable = $derived(!path && Boolean(project.owner && project.repo));
 
   const submittable = $derived(Boolean(path) && !closed);
-  // Local work that isn't graded yet; other rows submit from the menu only.
+  // Committed work that isn't graded yet; other rows submit from the menu only, which
+  // explains why a clone with uncommitted changes can't submit.
   const ready = $derived(
     submittable &&
-      (project.pending === "uncommitted" ||
-        project.pending === "unpushed" ||
-        project.pending === "unsubmitted"),
+      (project.local?.changedFiles ?? 0) === 0 &&
+      (project.pending === "unpushed" || project.pending === "unsubmitted"),
   );
 
   // Every-push assignments commit and push from the app; tag-mode ones submit. The
