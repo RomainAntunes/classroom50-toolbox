@@ -10,7 +10,7 @@ A tray app for [Classroom 50](https://github.com/foundation50/classroom50) stude
 2. Discovers and tracks Classroom 50 assignment repos: due dates, submission state, grades.
 3. Runs student actions: accept, clone, submit, and open in an editor, terminal or file manager.
 
-The first release is for students only. Keep the domain layer role-agnostic so a teacher mode (`gh teacher`) can be added later without a rewrite.
+The app is for students only, by design. Teacher and TA tooling (creating classrooms, grading, closing submissions) stays in the web app and `gh teacher` and is out of this project's scope.
 
 - Repo: `github.com/RomainAntunes/classroom50-toolbox`. License: GPL-3.0, the same as Classroom 50.
 - Status: tray, popover, tool detection and install, persisted settings, in-app sign-in, the merged project list (GitHub discovery, editor and folder scan with git status, Pages manifests), grades, Feedback PR activity, unmerged-branch detection, unaccepted assignments, notifications, the tray badge, and accept, clone, submit, commit and commit & push from the app are done.
