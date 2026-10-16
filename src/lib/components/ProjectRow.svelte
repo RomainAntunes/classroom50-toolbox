@@ -17,6 +17,7 @@
   import { cloneUrls, copyLink, gitProtocol, openLink } from "$lib/links";
   import { menuKey, onContextMenu, popupMenu } from "$lib/keyboard";
   import { scrollBehavior } from "$lib/motion";
+  import { changedLines } from "$lib/files";
   import Details from "./Details.svelte";
 
   let { project, now, unseen }: { project: Project; now: Date; unseen: boolean } = $props();
@@ -70,6 +71,13 @@
         hint: t("projects.conflictHint"),
       };
     }
+    if (project.pending === "uncommitted" && project.local) {
+      return {
+        label: t("projects.pending.uncommitted"),
+        warn: true,
+        hint: t("projects.uncommittedHint", { files: changedLines(project.local) }),
+      };
+    }
     if (project.pending) {
       return { label: t(`projects.pending.${project.pending}`), warn: true, hint: undefined };
     }
@@ -111,12 +119,12 @@
   const cloneable = $derived(!path && Boolean(project.owner && project.repo));
 
   const submittable = $derived(Boolean(path) && !closed);
-  // Local work that isn't graded yet; other rows submit from the menu only.
+  // Committed work that isn't graded yet; other rows submit from the menu only, which
+  // explains why a clone with uncommitted changes can't submit.
   const ready = $derived(
     submittable &&
-      (project.pending === "uncommitted" ||
-        project.pending === "unpushed" ||
-        project.pending === "unsubmitted"),
+      (project.local?.changedFiles ?? 0) === 0 &&
+      (project.pending === "unpushed" || project.pending === "unsubmitted"),
   );
 
   // Every-push assignments commit and push from the app; tag-mode ones submit. The
@@ -124,18 +132,9 @@
   const commitActions = $derived(settings.current?.commitActions ?? "none");
   const everyPush = $derived(gradedOnPush(project));
   const offersPush = $derived(everyPush && commitActions === "push");
+  // No row button: the row shows where the work stands and the student picks Commit or
+  // Commit & push from the menu, which explains a refusal.
   const pushable = $derived(submittable && offersPush);
-  // The button only shows when it can work: GitHub's data known, work to send on the default
-  // branch, and GitHub has nothing the clone lacks. The menu always offers it and explains a
-  // refusal.
-  const pushReady = $derived(
-    pushable &&
-      Boolean(project.remote) &&
-      project.local?.branch === defaultBranch &&
-      (project.local.changedFiles > 0 || (project.local.ahead ?? 0) > 0) &&
-      behind === 0 &&
-      !project.local.remoteAhead,
-  );
 
   // GitHub has commits the clone lacks. The button only shows when a fast-forward can work;
   // the menu always offers it and explains a refusal.
@@ -241,7 +240,7 @@
       const local = project.local;
       // Only the default branch is graded, so another one is worth pointing out.
       if (local.branch !== defaultBranch) add("branch", local.branch);
-      if (local.changedFiles) add("changes", String(local.changedFiles));
+      if (local.changedFiles) add("changes", changedLines(local, 10));
     }
     add("folder", path ? tildify(path) : null);
     return items;
@@ -466,11 +465,7 @@
         >{t("projects.pullAction")}</button
       >
     {/if}
-    {#if pushReady}
-      <button class="primary" title={t("push.hint")} disabled={busy} onclick={push}
-        >{t("push.ok")}</button
-      >
-    {:else if ready && !everyPush}
+    {#if ready && !everyPush}
       <button class="primary" disabled={submitting} onclick={submit}>{t("submit.ok")}</button>
     {/if}
     {#if cloneable}

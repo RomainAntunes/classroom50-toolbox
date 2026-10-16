@@ -55,7 +55,7 @@ async function setIdentity(project: Project, name: string): Promise<boolean> {
   return true;
 }
 
-/** Commit & push (row button, menu): pushing is the main action, "Commit only" the second. */
+/** Commit & push (the menu): pushing is the main action, "Commit only" the second. */
 export function commitPush(
   project: Project,
   name: string,
@@ -110,6 +110,9 @@ async function commitWork(
     const lines = [t("push.files", { count: check.files.length, files: fileList(check.files) })];
     if (check.untracked.length) {
       lines.push(t("push.untracked", { files: fileList(check.untracked) }));
+    }
+    if (check.skipped.length) {
+      lines.push(t("push.skipped", { files: fileList(check.skipped) }));
     }
     if (check.large.length) lines.push(t("push.large", { files: fileList(check.large) }));
     if (canPush && check.ahead) lines.push(t("push.ahead", { count: check.ahead }));

@@ -188,7 +188,10 @@ export interface LocalState {
   head: string | null;
   ahead: number | null;
   behind: number | null;
+  /** Changes git reports, untracked editor and OS files aside. */
   changedFiles: number;
+  /** The first 20 of them (a new folder once, ending with `/`). */
+  changedPaths: string[];
   /** Local branches with commits missing from the local default branch. */
   unmerged: string[];
   /** GitHub has commits the clone doesn't (someone pushed since the last pull). */
@@ -324,10 +327,10 @@ export interface Accepted {
 export interface SubmitCheck {
   /** Submit needs `.classroom50.yaml`; empty-repo assignments are pushed by hand. */
   hasMarker: boolean;
-  /** New files that will be included. */
-  untracked: string[];
-  /** Tracked files deleted without `git rm`: submit would fail. */
-  deleted: string[];
+  /** Changes not committed yet, editor and OS files aside: submit refuses while there are any. */
+  uncommitted: string[];
+  /** Untracked editor and OS files, which don't block a submit but are sent with it. */
+  editorFiles: string[];
 }
 
 export interface Submitted {
@@ -341,6 +344,8 @@ export interface PushCheck {
   files: string[];
   /** The new ones among them. */
   untracked: string[];
+  /** Untracked editor and OS files left out of the commit (`.idea/`, `.DS_Store`). */
+  skipped: string[];
   /** Over 50 MB: GitHub warns about them. */
   large: string[];
   /** Over 100 MB: GitHub refuses them, so nothing is committed. */

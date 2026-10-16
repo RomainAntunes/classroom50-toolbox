@@ -13,6 +13,7 @@ use std::time::Duration;
 use serde::Serialize;
 
 use crate::error::{Error, Result};
+use crate::noise;
 use crate::process;
 use crate::pull::GH_CREDENTIALS;
 
@@ -32,6 +33,9 @@ pub struct PushCheck {
     pub files: Vec<String>,
     /// The new ones among them.
     pub untracked: Vec<String>,
+    /// Untracked editor and OS files left out of the commit (`noise`), a folder once with
+    /// its trailing `/`: `.idea/`, `.DS_Store`.
+    pub skipped: Vec<String>,
     /// Over 50 MB: GitHub warns about them.
     pub large: Vec<String>,
     /// Over 100 MB: GitHub refuses them, so the commit isn't made.
@@ -101,6 +105,39 @@ pub async fn commit(path: &Path, message: &str) -> Result<Pushed> {
 
 /// The changed files of the clone, their sizes and whether git knows who commits.
 async fn changes(path: &Path) -> Result<PushCheck> {
+    let WorkTree {
+        files,
+        untracked,
+        skipped,
+    } = work_tree(path).await?;
+    let (large, too_large) = sizes(path, &files);
+    let has_identity = has_config(path, "user.name").await && has_config(path, "user.email").await;
+    Ok(PushCheck {
+        files,
+        untracked,
+        skipped,
+        large,
+        too_large,
+        ahead: 0,
+        has_identity,
+    })
+}
+
+/// What a commit of the clone would hold, and the editor and OS files it leaves out.
+#[derive(Debug, Default)]
+pub(crate) struct WorkTree {
+    /// Every changed path, new, modified, deleted or renamed, noise aside.
+    pub files: Vec<String>,
+    /// The new ones among them.
+    pub untracked: Vec<String>,
+    /// Untracked noise, by root (`noise::root`), file by file in a folder that also holds
+    /// a file of the commit.
+    pub skipped: Vec<String>,
+}
+
+/// Reads the clone's changes (every untracked file, not folders), without taking the index
+/// lock.
+pub(crate) async fn work_tree(path: &Path) -> Result<WorkTree> {
     let status = git(
         path,
         &[
@@ -112,17 +149,7 @@ async fn changes(path: &Path) -> Result<PushCheck> {
         ],
     )
     .await?;
-    let (files, untracked) = parse_status(&status);
-    let (large, too_large) = sizes(path, &files);
-    let has_identity = has_config(path, "user.name").await && has_config(path, "user.email").await;
-    Ok(PushCheck {
-        files,
-        untracked,
-        large,
-        too_large,
-        ahead: 0,
-        has_identity,
-    })
+    Ok(parse_status(&status))
 }
 
 /// `git add --all` and `git commit`, refusing files GitHub would reject and a missing
@@ -139,7 +166,10 @@ async fn commit_changes(path: &Path, state: &PushCheck, message: Option<&str>) -
         .filter(|m| !m.is_empty())
         .ok_or_else(|| Error::Unsupported("a commit message is needed".into()))?;
     let saved = SavedIndex::read(path).await?;
-    git(path, &["add", "--all"]).await?;
+    if let Err(err) = stage(path, state).await {
+        saved.restore(path).await;
+        return Err(err);
+    }
     let args = commit_args(message);
     let committed = process::run_with_timeout("git", &args, Some(path), COMMIT_TIMEOUT)
         .await
@@ -149,6 +179,45 @@ async fn commit_changes(path: &Path, state: &PushCheck, message: Option<&str>) -
         saved.restore(path).await;
     }
     committed
+}
+
+/// Stages what the commit holds: every change (`git add --all`), or with editor and OS files
+/// to leave out, exactly the listed paths. Those are named in a file rather than on the
+/// command line (there may be thousands), and never staged at all, so a `node_modules`
+/// isn't hashed into the object store just to be dropped again.
+async fn stage(path: &Path, state: &PushCheck) -> Result<()> {
+    if state.skipped.is_empty() {
+        return git(path, &["add", "--all"]).await.map(drop);
+    }
+    let list = std::env::temp_dir().join(format!(
+        "c50tb-pathspec-{}-{}",
+        std::process::id(),
+        std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .map(|d| d.as_nanos())
+            .unwrap_or_default()
+    ));
+    let mut bytes = Vec::new();
+    for file in &state.files {
+        bytes.extend_from_slice(file.as_bytes());
+        bytes.push(0);
+    }
+    std::fs::write(&list, bytes)?;
+    let from = format!("--pathspec-from-file={}", list.display());
+    let staged = git(
+        path,
+        &[
+            "--literal-pathspecs",
+            "add",
+            "--all",
+            from.as_str(),
+            "--pathspec-file-nul",
+        ],
+    )
+    .await
+    .map(drop);
+    let _ = std::fs::remove_file(&list);
+    staged
 }
 
 /// The clone's index before `git add --all`, put back byte for byte when the commit then
@@ -372,11 +441,11 @@ async fn ahead(path: &Path, github_head: Option<&str>) -> Result<u32> {
     }
 }
 
-/// `git status --porcelain=v1 -z`: every path, and the untracked ones. A rename's second
-/// entry (its old path) is skipped.
-fn parse_status(out: &str) -> (Vec<String>, Vec<String>) {
-    let mut files = Vec::new();
-    let mut untracked = Vec::new();
+/// `git status --porcelain=v1 -z`: every path, the untracked ones, and the untracked noise
+/// left out of both. A rename's second entry (its old path) is skipped.
+fn parse_status(out: &str) -> WorkTree {
+    let mut tree = WorkTree::default();
+    let mut noise = Vec::new();
     let mut entries = out.split('\0').filter(|e| !e.is_empty());
     while let Some(entry) = entries.next() {
         let (Some(code), Some(file)) = (entry.get(..2), entry.get(3..)) else {
@@ -386,11 +455,27 @@ fn parse_status(out: &str) -> (Vec<String>, Vec<String>) {
             entries.next();
         }
         if code == "??" {
-            untracked.push(file.to_owned());
+            if noise::is_noise(file) {
+                noise.push(file);
+                continue;
+            }
+            tree.untracked.push(file.to_owned());
         }
-        files.push(file.to_owned());
+        tree.files.push(file.to_owned());
     }
-    (files, untracked)
+    // A folder that also holds a file going into the commit (a tracked `.vscode/settings.json`)
+    // is named file by file, so "left out" never covers what goes in.
+    let mut skipped: Vec<String> = Vec::new();
+    for file in noise {
+        let root = noise::root(file).unwrap_or(file);
+        let shared = root.ends_with('/') && tree.files.iter().any(|f| f.starts_with(root));
+        let shown = if shared { file } else { root };
+        if !skipped.iter().any(|s| s == shown) {
+            skipped.push(shown.to_owned());
+        }
+    }
+    tree.skipped = skipped;
+    tree
 }
 
 /// The files over GitHub's warning size, and those over its limit.
@@ -496,10 +581,21 @@ mod tests {
 
     #[test]
     fn parses_status() {
-        let out = " M a.txt\0R  new.txt\0old.txt\0?? dir/b.txt\0 D gone.txt\0";
-        let (files, untracked) = parse_status(out);
-        assert_eq!(files, ["a.txt", "new.txt", "dir/b.txt", "gone.txt"]);
-        assert_eq!(untracked, ["dir/b.txt"]);
+        let out = " M a.txt\0R  new.txt\0old.txt\0?? dir/b.txt\0 D gone.txt\0\
+            ?? .idea/workspace.xml\0?? .idea/misc.xml\0?? src/.DS_Store\0 M .vscode/settings.json\0";
+        let tree = parse_status(out);
+        assert_eq!(
+            tree.files,
+            [
+                "a.txt",
+                "new.txt",
+                "dir/b.txt",
+                "gone.txt",
+                ".vscode/settings.json"
+            ]
+        );
+        assert_eq!(tree.untracked, ["dir/b.txt"]);
+        assert_eq!(tree.skipped, [".idea/", "src/.DS_Store"]);
     }
 
     #[test]
@@ -709,6 +805,68 @@ mod tests {
             commit_check(&clone).await,
             Err(Error::NothingToCommit)
         ));
+        let _ = std::fs::remove_dir_all(&root);
+    }
+
+    /// Untracked editor and OS files stay out of the commit and stay untracked; a tracked
+    /// file in an editor folder is real work and goes in. Nothing but noise: nothing to
+    /// commit.
+    #[tokio::test]
+    async fn commits_leave_editor_files_out() {
+        let root = std::env::temp_dir().join(format!("c50tb-noise-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&root);
+        let clone = root.join("clone");
+        std::fs::create_dir_all(clone.join(".vscode")).unwrap();
+        sh(&clone, &["init", "-q", "-b", "main"]);
+        sh(&clone, &["config", "--local", "commit.gpgsign", "false"]);
+        std::fs::write(clone.join(".vscode").join("settings.json"), "{}").unwrap();
+        std::fs::write(clone.join("old name.c"), "o").unwrap();
+        sh(&clone, &["add", "--all"]);
+        sh(&clone, &["commit", "-q", "-m", "one"]);
+        set_identity(&clone, "Ada", &noreply_email(1, "ada"))
+            .await
+            .unwrap();
+
+        std::fs::create_dir_all(clone.join(".idea")).unwrap();
+        std::fs::write(clone.join(".idea").join("workspace.xml"), "x").unwrap();
+        std::fs::write(clone.join(".DS_Store"), "x").unwrap();
+        std::fs::write(clone.join(".vscode").join("launch.json"), "{}").unwrap();
+        assert!(matches!(
+            commit_check(&clone).await,
+            Err(Error::NothingToCommit)
+        ));
+
+        std::fs::write(clone.join(".vscode").join("settings.json"), "{\"a\":1}").unwrap();
+        std::fs::write(clone.join("hello world.c"), "int main;").unwrap();
+        // Glob characters in a name are taken literally (`*` and `?` aren't allowed in Windows
+        // file names, `[` is).
+        std::fs::write(clone.join("[x].c"), "glob").unwrap();
+        sh(&clone, &["mv", "old name.c", "new name.c"]);
+        let state = commit_check(&clone).await.unwrap();
+        assert_eq!(
+            state.files,
+            [
+                ".vscode/settings.json",
+                "new name.c",
+                "[x].c",
+                "hello world.c"
+            ]
+        );
+        assert_eq!(
+            state.skipped,
+            [".DS_Store", ".idea/", ".vscode/launch.json"]
+        );
+
+        commit(&clone, "Work").await.unwrap();
+        let committed = sh(&clone, &["show", "--name-status", "--format=", "HEAD"]);
+        assert_eq!(
+            committed,
+            "M\t.vscode/settings.json\nA\t[x].c\nA\thello world.c\nR100\told name.c\tnew name.c"
+        );
+        assert_eq!(
+            sh(&clone, &["status", "--porcelain", "--untracked-files=all"]),
+            "?? .DS_Store\n?? .idea/workspace.xml\n?? .vscode/launch.json"
+        );
         let _ = std::fs::remove_dir_all(&root);
     }
 

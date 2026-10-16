@@ -1,17 +1,38 @@
 // Submitting a project from the list. `gh student submit` pushes the clone's files as they
-// are (not its commits) on top of GitHub's head and asks nothing, so everything that could
-// surprise the student is said before it runs.
+// are (not its commits) on top of GitHub's head and asks nothing, so the app only submits a
+// clean clone (Rust refuses otherwise too) and says everything that could surprise the
+// student before it runs.
 import { ask, message } from "@tauri-apps/plugin-dialog";
 import { openUrl } from "@tauri-apps/plugin-opener";
 import { api, errorMessage, withDialog, type Project } from "$lib/api";
 import { t } from "$lib/i18n";
 import { announce } from "$lib/announce.svelte";
 import { fileList } from "$lib/files";
-import { commitPush, gradedOnPush } from "$lib/push";
+import { commitLocal, commitPush, gradedOnPush } from "$lib/push";
 import { settings } from "$lib/settings.svelte";
 
 async function show(text: string, title: string, kind: "info" | "error" = "info") {
   await withDialog(() => message(text, { title, kind }));
+}
+
+/** Submit sends committed work only: says so, and offers Commit when the `commitActions`
+ *  setting lets the app commit (else the editor or a terminal does). Never submits itself:
+ *  the row offers Submit again once the clone is clean. */
+async function commitFirst(project: Project, name: string, files: string[]) {
+  const what = t("submit.uncommitted", { files: fileList(files) });
+  if ((settings.current?.commitActions ?? "none") === "none") {
+    await show(`${what}\n\n${t("submit.commitElsewhere")}`, name);
+    return;
+  }
+  const commit = await withDialog(() =>
+    ask(`${what}\n\n${t("submit.commitFirst")}`, {
+      title: name,
+      kind: "info",
+      okLabel: t("commit.menu"),
+      cancelLabel: t("accept.cancel"),
+    }),
+  );
+  if (commit) await commitLocal(project, name);
 }
 
 /** Confirms, submits and reports. Returns true when the submission went through. */
@@ -35,8 +56,8 @@ export async function submitProject(project: Project, name: string): Promise<boo
       );
       return push && (await commitPush(project, name));
     }
-    if (check.deleted.length) {
-      await show(t("submit.deleted", { files: fileList(check.deleted) }), name, "error");
+    if (check.uncommitted.length) {
+      await commitFirst(project, name, check.uncommitted);
       return false;
     }
     const local = project.local;
@@ -47,8 +68,8 @@ export async function submitProject(project: Project, name: string): Promise<boo
         branch: remote?.defaultBranch ?? "main",
       }),
     ];
-    if (check.untracked.length) {
-      lines.push(t("submit.untracked", { files: fileList(check.untracked) }));
+    if (check.editorFiles.length) {
+      lines.push(t("submit.editorFiles", { files: fileList(check.editorFiles) }));
     }
     if (local?.remoteAhead) {
       lines.push(
@@ -56,12 +77,7 @@ export async function submitProject(project: Project, name: string): Promise<boo
           ? t("submit.remoteAheadBy", { author: remote.head.author })
           : t("submit.remoteAhead"),
       );
-    } else if (
-      local &&
-      local.changedFiles === 0 &&
-      !check.untracked.length &&
-      local.head === remote?.head?.oid
-    ) {
+    } else if (local && local.head === remote?.head?.oid) {
       lines.push(t("submit.unchanged"));
     }
     const due = project.assignment?.due ? new Date(project.assignment.due) : null;
