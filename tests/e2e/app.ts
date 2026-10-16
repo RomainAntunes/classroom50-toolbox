@@ -142,6 +142,13 @@ export class App {
     return this.menu();
   }
 
+  /** Goes to Settings from the main page's gear, and waits for it. */
+  async openSettings(): Promise<void> {
+    await this.page.locator(".titlebar .icon").last().click();
+    await expect(this.page).toHaveURL(/\/settings$/);
+    await expect(this.page.locator("main section").first()).toBeVisible();
+  }
+
   /** The in-popover text prompt. */
   get prompt() {
     return this.page.getByRole("dialog");
