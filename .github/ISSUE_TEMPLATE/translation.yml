@@ -1,0 +1,51 @@
+name: Translation
+description: Wrong, unclear or missing wording in one of the app's languages.
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks! The Japanese, Korean, Turkish, Chinese, Arabic and Hebrew translations were made with AI and haven't been reviewed by native speakers yet. You can also fix the text directly in [`src/lib/i18n/`](https://github.com/RomainAntunes/classroom50-toolbox/tree/main/src/lib/i18n) with a pull request.
+  - type: dropdown
+    id: language
+    attributes:
+      label: Language
+      options:
+        - English
+        - Français (French)
+        - Español (Spanish)
+        - Deutsch (German)
+        - Italiano (Italian)
+        - Português (Brasil)
+        - Português (Portugal)
+        - Nederlands (Dutch)
+        - Polski (Polish)
+        - Türkçe (Turkish)
+        - العربية (Arabic)
+        - עברית (Hebrew)
+        - 简体中文 (Simplified Chinese)
+        - 日本語 (Japanese)
+        - 한국어 (Korean)
+        - Another language
+    validations:
+      required: true
+  - type: textarea
+    id: current
+    attributes:
+      label: Current text
+      description: Quote it exactly, and say where it shows (the main list, Settings, a notification...).
+    validations:
+      required: true
+  - type: textarea
+    id: suggestion
+    attributes:
+      label: Suggested text
+      description: What it should say, and why if it isn't obvious.
+    validations:
+      required: true
+  - type: checkboxes
+    id: speaker
+    attributes:
+      label: About you
+      options:
+        - label: I'm a native or fluent speaker of this language.
+          required: false

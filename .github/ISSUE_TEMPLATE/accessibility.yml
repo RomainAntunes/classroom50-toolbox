@@ -1,0 +1,60 @@
+name: Accessibility barrier
+description: Something that's hard or impossible to use with a screen reader, the keyboard, magnification or other assistive technology.
+labels: [accessibility]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for telling us. [ACCESSIBILITY.md](https://github.com/RomainAntunes/classroom50-toolbox/blob/main/.github/ACCESSIBILITY.md) lists what the app supports and the limitations already known. Fill in what you can; every field but the first is optional. If you'd rather not use this form, email [romain.antunes@proton.me](mailto:romain.antunes@proton.me).
+  - type: textarea
+    id: barrier
+    attributes:
+      label: What were you trying to do, and what got in the way?
+      description: For example "I couldn't reach the Submit action with the keyboard" or "VoiceOver reads the grade as a number with no label".
+    validations:
+      required: true
+  - type: dropdown
+    id: impact
+    attributes:
+      label: How much does it affect you?
+      options:
+        - It stops me from doing something
+        - I can do it, but only with a workaround
+        - It's slower or more tiring than it should be
+    validations:
+      required: false
+  - type: textarea
+    id: assistive-tech
+    attributes:
+      label: Assistive technology and settings
+      description: Name and version, for example VoiceOver, NVDA 2025.3, JAWS, Narrator, Orca, Zoom, Voice Control, keyboard only, reduced motion, increased contrast, Windows contrast themes, a larger text size.
+    validations:
+      required: false
+  - type: input
+    id: version
+    attributes:
+      label: App version
+      description: Shown in Settings > About.
+    validations:
+      required: false
+  - type: input
+    id: os
+    attributes:
+      label: Operating system and version
+      description: For example macOS 26.1, Windows 11 24H2, or Ubuntu 24.04 with GNOME.
+    validations:
+      required: false
+  - type: textarea
+    id: workaround
+    attributes:
+      label: Workaround
+      description: If you found a way around it, it may help others until it's fixed.
+    validations:
+      required: false
+  - type: textarea
+    id: media
+    attributes:
+      label: Screenshots or recordings
+      description: Optional. A screen reader transcript or a short recording helps a lot. Hide anything private.
+    validations:
+      required: false
