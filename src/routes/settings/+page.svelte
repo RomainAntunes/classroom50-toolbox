@@ -45,7 +45,8 @@
   import { popupMenu } from "$lib/keyboard";
   import { session } from "$lib/session.svelte";
   import { showText } from "$lib/prompt.svelte";
-  import { OS_CHOICES, preview, setPreviewOs } from "$lib/theme/preview.svelte";
+  import { OS_CHOICES, preview, setPreviewOs, setPreviewRtl } from "$lib/theme/preview.svelte";
+  import { locale } from "$lib/i18n/locale.svelte";
 
   const REMINDER_CHOICES = [72, 24, 6, 1];
   const REPO_URL = "https://github.com/RomainAntunes/classroom50-toolbox";
@@ -651,6 +652,12 @@
             {/each}
           </div>
         </div>
+        <Toggle
+          label={t("settings.dev.rtl")}
+          hint={t("settings.dev.rtlHint")}
+          checked={locale.rtlPreview}
+          onchange={setPreviewRtl}
+        />
         <div class="row">
           <span id="network-label" title={t("settings.dev.networkHint")}
             >{t("settings.dev.network")}</span
