@@ -12,6 +12,8 @@ const repo = new URL("../../", import.meta.url);
 export const IDENTIFIER = JSON.parse(
   readFileSync(new URL("src-tauri/tauri.conf.json", repo), "utf8"),
 ).identifier;
+/** The app's version, read by `tauri.conf.json` from `package.json`. */
+const VERSION = JSON.parse(readFileSync(new URL("package.json", repo), "utf8")).version;
 
 /** Runs git in `cwd` with a fixed identity and dates, ignoring the runner's own config. */
 function git(cwd, args, date) {
@@ -60,6 +62,8 @@ export function prepare() {
         language: "en",
         appearance: "light",
         onboarded: true,
+        // This version's notes already read, so the list shows instead of What's new.
+        lastSeenVersion: VERSION,
       },
       null,
       2,
