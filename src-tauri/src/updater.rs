@@ -681,6 +681,12 @@ pub fn defer(app: &AppHandle) {
 /// never relaunches itself here.
 pub fn quit(app: &AppHandle) {
     let state = app.state::<UpdaterState>();
+    // "Restart now" is installing: quitting now could leave an AppImage half written or
+    // cut a deb or rpm install short. The restart that follows ends the app anyway.
+    if state.with(|machine| machine.installing) {
+        log::info!("quit ignored while the update installs");
+        return;
+    }
     if state.quitting.swap(true, Ordering::SeqCst) {
         return;
     }
