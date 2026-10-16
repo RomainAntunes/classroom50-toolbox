@@ -3,10 +3,11 @@ name: Beta channel
 # Apps on the Beta update channel read the latest.json attached to the `beta-channel`
 # release. It must point at the newest published release, pre-release or stable, so beta
 # users also move onto the stable that follows their beta. Releases are drafts until
-# published by hand, so the file is rewritten whenever one is published (or by hand).
+# published by hand, so the file is rewritten whenever one is published, unpublished or
+# deleted (so the feed never points at a release that's gone), or by hand.
 on:
   release:
-    types: [published]
+    types: [published, unpublished, deleted]
   workflow_dispatch:
 
 permissions:
