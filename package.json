@@ -20,6 +20,7 @@
     "test:e2e": "playwright test",
     "test:e2e:debug": "playwright test --headed --debug",
     "e2e:shots": "playwright test --config tests/e2e/shots.config.ts",
+    "site:shots": "playwright test --config tests/e2e/showcase.config.ts",
     "bump": "node scripts/bump-version.mjs"
   },
   "dependencies": {
