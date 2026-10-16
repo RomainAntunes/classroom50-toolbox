@@ -2,6 +2,8 @@
   import "$lib/theme/theme.css";
   import { onMount } from "svelte";
   import { listen } from "@tauri-apps/api/event";
+  import { goto } from "$app/navigation";
+  import { page } from "$app/state";
   import {
     api,
     DEEP_LINK_EVENT,
@@ -90,6 +92,9 @@
       listen(DEEP_LINK_EVENT, () => void handleDeepLink()),
       listen(POPOVER_HIDDEN_EVENT, () => {
         session.focus = null;
+        // Like JetBrains Toolbox, the popover reopens on the list. The first-run guide keeps
+        // its step, and a pinned popover (a dialog or menu up) never hides.
+        if (page.url.pathname.startsWith("/settings")) void goto("/", { replaceState: true });
       }),
     ];
     // A link that started the app came before this page could hear about it.
