@@ -341,19 +341,21 @@ impl Memory {
 
 /// Whether the daily check is due (every start checks anyway): once `DAILY` has passed
 /// since the last one, measured on the wall clock so the time a laptop slept counts, and
-/// not within `RETRY` of a failure. Another version or channel checks at once.
+/// not within `RETRY` of a failure. Another version or channel checks at once, after the
+/// same wait when the last try failed (offline right after an update).
 fn due(memory: &Memory, now: DateTime<Utc>, version: &str, channel: UpdateChannel) -> bool {
+    let rested = memory.failed_at.is_none_or(|at| now - at >= RETRY);
     let Some(checked_at) = memory.checked_at else {
-        return memory.failed_at.is_none_or(|at| now - at >= RETRY);
+        return rested;
     };
     if memory.version.as_deref() != Some(version) || memory.channel != Some(channel) {
-        return true;
+        return rested;
     }
     // The clock went back: the stored time means nothing.
     if checked_at > now + chrono::TimeDelta::minutes(5) {
         return true;
     }
-    now - checked_at >= DAILY && memory.failed_at.is_none_or(|at| now - at >= RETRY)
+    now - checked_at >= DAILY && rested
 }
 
 /// The wall clock moved further than the monotonic one between two ticks: the machine
@@ -910,6 +912,13 @@ mod tests {
         assert!(!due(&recent, now, "0.10.0", stable));
         assert!(due(&recent, now, "0.11.0", stable));
         assert!(due(&recent, now, "0.10.0", UpdateChannel::Beta));
+        // Offline right after an update: the next try waits like any failure.
+        let failed = Memory {
+            failed_at: Some(at("2026-10-16T11:45:00Z")),
+            ..recent.clone()
+        };
+        assert!(!due(&failed, now, "0.11.0", stable));
+        assert!(due(&failed, at("2026-10-16T12:45:00Z"), "0.11.0", stable));
     }
 
     #[test]
