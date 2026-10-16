@@ -128,6 +128,11 @@ export function formatDate(date: Date): string {
   }).format(date);
 }
 
+/** "16 October 2026" in the catalog's language: a day, with no time. */
+export function formatDay(date: Date): string {
+  return new Intl.DateTimeFormat(locale.code, { dateStyle: "long" }).format(date);
+}
+
 // Dates and numbers follow the catalog's language, not the OS's, so a French system
 // doesn't get "Due il y a 6 jours" while the app is in English.
 const relatives = new Map<string, Intl.RelativeTimeFormat>();

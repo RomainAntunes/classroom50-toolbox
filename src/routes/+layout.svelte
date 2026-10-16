@@ -14,7 +14,7 @@
     type Notice,
     type UpdateStatus,
   } from "$lib/api";
-  import { handleDeepLink } from "$lib/deeplink";
+  import { handleDeepLink, linkActive } from "$lib/deeplink";
   import { currentLocale, setLocale, t } from "$lib/i18n";
   import { showNotice } from "$lib/notices";
   import { loadEditors } from "$lib/editor.svelte";
@@ -24,6 +24,7 @@
   import { prompt } from "$lib/prompt.svelte";
   import { session } from "$lib/session.svelte";
   import { loadSettings, settings } from "$lib/settings.svelte";
+  import { pendingNotes } from "$lib/whatsnew";
 
   let { children } = $props();
 
@@ -85,6 +86,24 @@
     }
   }
 
+  /**
+   * Where the popover reopens once hidden. Like JetBrains Toolbox, on the list; on What's
+   * new while its notes are unread (a link may have taken its place). The first-run guide
+   * and What's new after an update keep their place, and a pinned popover (a dialog or
+   * menu up) never hides.
+   */
+  async function reopenOn() {
+    const { pathname, searchParams } = page.url;
+    const again = pathname === "/whats-new" && searchParams.has("from");
+    if (pathname === "/welcome" || (pathname === "/whats-new" && !again)) return;
+    const current = settings.current;
+    if (current && !linkActive() && (await pendingNotes(current)).length) {
+      await goto("/whats-new", { replaceState: true });
+    } else if (pathname.startsWith("/settings") || again) {
+      await goto("/", { replaceState: true });
+    }
+  }
+
   // Lives in the layout so notices arrive whichever page is shown, and while hidden.
   onMount(() => {
     void loadSettings();
@@ -107,9 +126,7 @@
       listen(DEEP_LINK_EVENT, () => void handleDeepLink()),
       listen(POPOVER_HIDDEN_EVENT, () => {
         session.focus = null;
-        // Like JetBrains Toolbox, the popover reopens on the list. The first-run guide keeps
-        // its step, and a pinned popover (a dialog or menu up) never hides.
-        if (page.url.pathname.startsWith("/settings")) void goto("/", { replaceState: true });
+        void reopenOn();
       }),
     ];
     // A link that started the app came before this page could hear about it.

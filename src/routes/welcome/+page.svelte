@@ -9,6 +9,7 @@
   import { pickCloneFolder } from "$lib/clone";
   import { loadSettings, saveSettings, settings } from "$lib/settings.svelte";
   import { session } from "$lib/session.svelte";
+  import { seenVersion } from "$lib/whatsnew";
   import LoginStatus from "$lib/components/LoginStatus.svelte";
   import Section from "$lib/components/Section.svelte";
   import Toggle from "$lib/components/Toggle.svelte";
@@ -41,7 +42,8 @@
   }
 
   async function finish() {
-    await saveSettings({ onboarded: true });
+    // A first run starts with this version: its notes are no news.
+    await saveSettings({ onboarded: true, lastSeenVersion: await seenVersion(settings.current) });
     await goto("/", { replaceState: true });
     // Signed in during the guide: start filling the list now.
     if (session.auth?.loggedIn) session.snapshot = await api.refreshProjects();
