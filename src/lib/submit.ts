@@ -18,6 +18,7 @@ import { t } from "$lib/i18n";
 import { announce } from "$lib/announce.svelte";
 import { fileList } from "$lib/files";
 import { commitLocal } from "$lib/push";
+import { pullProject } from "$lib/pull";
 import { session } from "$lib/session.svelte";
 import { settings } from "$lib/settings.svelte";
 
@@ -80,6 +81,21 @@ async function updateGhStudent(err: CommandError, name: string): Promise<boolean
     await show(text, name, "error");
     return false;
   }
+}
+
+/** The teacher renamed the assignment and the clone's marker still names the old slug
+ *  (Rust refuses with `staleMarker`): offers Pull, and never submits right after, so the row
+ *  offers Submit again once the clone has the new marker. */
+async function pullFirst(project: Project, name: string) {
+  const pull = await withDialog(() =>
+    ask(t("submit.renamed"), {
+      title: name,
+      kind: "info",
+      okLabel: t("projects.pullAction"),
+      cancelLabel: t("accept.cancel"),
+    }),
+  );
+  if (pull) await pullProject(project, name);
 }
 
 /** Confirms, submits and reports. Returns true when the submission went through. */
@@ -152,6 +168,10 @@ export async function submitProject(project: Project, name: string): Promise<boo
     if (view) await openUrl(url);
     return true;
   } catch (err) {
+    if (errorKind(err) === "staleMarker") {
+      await pullFirst(project, name);
+      return false;
+    }
     await show(t("submit.failed", { error: errorMessage(err) }), name, "error");
     return false;
   }

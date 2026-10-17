@@ -1,7 +1,7 @@
 //! IPC surface for the Svelte UI. Keep these thin: the logic lives in the domain modules.
 //! Every command here has a typed wrapper in `src/lib/api.ts`.
 
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 use serde::Serialize;
 use tauri::{AppHandle, Manager, State};
@@ -351,12 +351,16 @@ pub fn sync_progress(state: State<'_, ProjectsState>) -> SyncProgress {
 
 #[tauri::command]
 pub fn get_settings(app: AppHandle, settings: State<'_, SettingsStore>) -> Settings {
-    let mut current = settings.get();
-    // The OS setting wins: the user may have removed the login item outside the app.
+    reported_settings(&app, settings.get())
+}
+
+/// `settings` as the UI gets them: the OS setting wins, since the user may have removed
+/// the login item outside the app.
+pub fn reported_settings(app: &AppHandle, mut settings: Settings) -> Settings {
     if let Ok(enabled) = app.autolaunch().is_enabled() {
-        current.launch_at_login = enabled;
+        settings.launch_at_login = enabled;
     }
-    current
+    settings
 }
 
 #[tauri::command]
@@ -767,6 +771,24 @@ fn submit_target(project: &Project) -> student::SubmitTarget<'_> {
     }
 }
 
+/// Refuses to submit project `id` while its clone's marker names the slug the assignment
+/// was renamed from (`student::stale_marker`): it needs a pull first.
+fn refuse_stale_marker(state: &ProjectsState, id: &str, path: &Path) -> Result<()> {
+    let snapshot = state.snapshot();
+    let Some(project) = snapshot.projects.iter().find(|p| p.id == id) else {
+        return Ok(());
+    };
+    let Some(assignment) = project.assignment.as_ref() else {
+        return Ok(());
+    };
+    let local = crate::classroom50::RepoConfig::read(path).ok().flatten();
+    let github = project.remote.as_ref().and_then(|r| r.config.as_ref());
+    if student::stale_marker(local.as_ref(), github, assignment) {
+        return Err(Error::StaleMarker);
+    }
+    Ok(())
+}
+
 /// What submitting project `id` would send, for the confirmation dialog.
 #[tauri::command]
 pub async fn submit_check(
@@ -774,6 +796,7 @@ pub async fn submit_check(
     id: String,
 ) -> Result<student::SubmitCheck> {
     let (path, project) = submittable(&state, &id)?;
+    refuse_stale_marker(&state, &id, &path)?;
     student::check(&path, submit_target(&project)).await
 }
 
@@ -786,6 +809,7 @@ pub async fn submit_project(
     id: String,
 ) -> Result<student::Submitted> {
     let (path, project) = submittable(&state, &id)?;
+    refuse_stale_marker(&state, &id, &path)?;
     let submitted = student::submit(&path, submit_target(&project)).await?;
     tauri::async_runtime::spawn(async move {
         projects::refresh_after_push(&app).await;

@@ -281,3 +281,53 @@ test("a failed gh-student update says so and submits nothing", async ({ app }) =
   expect(await app.writes()).toEqual(["upgrade_tool"]);
   expect(await app.calls("submit_project")).toEqual([]);
 });
+
+// `gh teacher assignment rename`: Rust files the clone made before the rename (old origin, old
+// marker) under the renamed repo, and refuses Submit until a pull brings the new marker.
+test.describe("an assignment the teacher renamed", () => {
+  const renamed = () =>
+    ready({
+      slug: "ps3",
+      name: "Problem Set 3",
+      assignment: { renamedFrom: "problem-set-three" },
+      local: { remoteAhead: true },
+    });
+  const stale = fail(
+    "staleMarker",
+    "this assignment was renamed: pull the clone before you submit",
+  );
+
+  test("shows as one row; Submit offers Pull and never submits", async ({ app, page }) => {
+    const lab = renamed();
+    await app.start(
+      scenario({
+        snapshot: snapshot({ projects: [lab] }),
+        responses: { submit_check: [stale], pull_project: [ok(null)] },
+      }),
+    );
+    await expect(page.locator("li[data-item]")).toHaveCount(1);
+    await app.row("Problem Set 3").getByRole("button", { name: "Submit" }).click();
+
+    const dialog = await app.dialog();
+    expect(dialog.message).toContain("Your teacher renamed this assignment");
+    expect(dialog.labels).toEqual({ ok: "Pull", cancel: "Cancel" });
+    await app.answer("ok");
+
+    const pulled = await app.waitForCall("pull_project");
+    expect(pulled[0].args).toEqual({ id: lab.id });
+    expect(await app.writes()).toEqual(["pull_project"]);
+    expect(await app.calls("submit_project")).toEqual([]);
+  });
+
+  test("Cancel invokes nothing", async ({ app }) => {
+    await app.start(
+      scenario({
+        snapshot: snapshot({ projects: [renamed()] }),
+        responses: { submit_check: [stale] },
+      }),
+    );
+    await app.row("Problem Set 3").getByRole("button", { name: "Submit" }).click();
+    await app.expectDialog([/Pull first to get the update/], "cancel");
+    expect(await app.writes()).toEqual([]);
+  });
+});

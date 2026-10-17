@@ -191,6 +191,9 @@ impl Settings {
 pub struct SettingsStore {
     path: PathBuf,
     current: Mutex<Settings>,
+    /// Held across every write, so `update`'s read, change and write never let a `set`
+    /// land in between (and be lost).
+    writing: Mutex<()>,
 }
 
 impl SettingsStore {
@@ -221,6 +224,7 @@ impl SettingsStore {
         let store = Self {
             path,
             current: Mutex::new(settings),
+            writing: Mutex::new(()),
         };
         (store, first_run)
     }
@@ -231,6 +235,25 @@ impl SettingsStore {
 
     /// Normalizes, writes atomically (temp file + rename), then swaps the in-memory copy.
     pub fn set(&self, settings: Settings) -> Result<Settings> {
+        let _writing = self.writing.lock().unwrap_or_else(|e| e.into_inner());
+        self.write(settings)
+    }
+
+    /// Saves what `change` makes of the current settings, read under the same lock as
+    /// every `set`, so a write from the UI is never undone by one made from older settings.
+    /// `change` returning `None` saves nothing (`Ok(None)`).
+    pub fn update(
+        &self,
+        change: impl FnOnce(&Settings) -> Option<Settings>,
+    ) -> Result<Option<Settings>> {
+        let _writing = self.writing.lock().unwrap_or_else(|e| e.into_inner());
+        match change(&self.get()) {
+            Some(next) => self.write(next).map(Some),
+            None => Ok(None),
+        }
+    }
+
+    fn write(&self, settings: Settings) -> Result<Settings> {
         let settings = settings.normalized();
         if let Some(dir) = self.path.parent() {
             std::fs::create_dir_all(dir)?;
@@ -341,6 +364,29 @@ mod tests {
             reloaded.get().watched_folders,
             vec![PathBuf::from("/courses")]
         );
+        std::fs::remove_dir_all(&dir).unwrap();
+    }
+
+    #[test]
+    fn updates_from_the_settings_saved_last() {
+        let dir = temp_dir("settings-update");
+        let (store, _) = SettingsStore::load(&dir);
+        let mut settings = store.get();
+        settings.hidden = vec!["org/old".into()];
+        store.set(settings).unwrap();
+        // Nothing to change: nothing saved.
+        assert!(store.update(|_| None).unwrap().is_none());
+        let saved = store
+            .update(|s| {
+                Some(Settings {
+                    hidden: vec!["org/new".into()],
+                    ..s.clone()
+                })
+            })
+            .unwrap()
+            .unwrap();
+        assert_eq!(saved.hidden, ["org/new"]);
+        assert_eq!(SettingsStore::load(&dir).0.get().hidden, ["org/new"]);
         std::fs::remove_dir_all(&dir).unwrap();
     }
 

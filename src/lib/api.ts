@@ -221,6 +221,8 @@ export interface Assignment {
   teamFormation: "teacher" | "student" | null;
   /** `"public"` when accepting creates a public repo. */
   repoVisibility: string | null;
+  /** The slug before the teacher renamed the assignment, when they did. */
+  renamedFrom: string | null;
 }
 
 /** One assignment repo, merged from GitHub, the watched folders and the Pages manifest. */
@@ -466,6 +468,8 @@ export const SYNC_PROGRESS_EVENT = "sync-progress";
 export const NOTIFY_EVENT = "notify";
 /** Payload: ids of projects and unaccepted assignments with unseen news. */
 export const UNSEEN_EVENT = "unseen-updated";
+/** Payload: `Settings` Rust changed by itself (hidden ids moved by a rename). */
+export const SETTINGS_UPDATED_EVENT = "settings-updated";
 /** A `classroom50-toolbox://` link is waiting; `takeDeepLink` reads it. */
 export const DEEP_LINK_EVENT = "deep-link";
 /** The popover hid. */

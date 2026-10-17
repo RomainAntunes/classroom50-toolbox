@@ -77,6 +77,11 @@ pub enum Error {
     #[error("submitting a repository without .classroom50.yaml needs gh-student {min} or newer (installed: {version})", min = min_gh_student())]
     GhStudentOutdated { version: String },
 
+    /// Submit refused: the teacher renamed the assignment and the clone's marker still
+    /// names the old slug; `gh student submit` would push it back over the rewritten one.
+    #[error("this assignment was renamed: pull the clone before you submit")]
+    StaleMarker,
+
     /// Not a GitHub login, checked before it reaches `gh student`.
     #[error("\"{0}\" isn't a GitHub username")]
     InvalidUsername(String),
@@ -306,6 +311,7 @@ impl Error {
             Error::SubmissionsClosed => "submissionsClosed",
             Error::UnknownAssignment => "unknownAssignment",
             Error::GhStudentOutdated { .. } => "ghStudentOutdated",
+            Error::StaleMarker => "staleMarker",
             Error::InvalidUsername(_) => "invalidUsername",
             Error::InvalidTeamName => "invalidTeamName",
             Error::NoTerminal => "noTerminal",
@@ -393,6 +399,7 @@ mod tests {
             Error::GhStudentOutdated {
                 version: "v1.55.0".into(),
             },
+            Error::StaleMarker,
             Error::InvalidUsername("--help".into()),
             Error::InvalidTeamName,
             Error::NoTerminal,

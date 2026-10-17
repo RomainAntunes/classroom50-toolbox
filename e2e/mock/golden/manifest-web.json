@@ -6,7 +6,8 @@
       "name": "Portfolio",
       "mode": "individual",
       "autograder": "empty_repo",
-      "due": "2026-10-23T12:00:00Z"
+      "due": "2026-10-23T12:00:00Z",
+      "renamed_from": "website"
     }
   ]
 }

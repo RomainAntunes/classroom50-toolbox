@@ -479,7 +479,7 @@ impl ProjectsState {
 }
 
 /// The project holding assignment `org/classroom/assignment`, slugs compared without
-/// regard to case.
+/// regard to case; the slug may be the one the assignment was renamed from.
 pub fn assignment_project<'a>(
     snapshot: &'a Snapshot,
     org: &str,
@@ -491,8 +491,75 @@ pub fn assignment_project<'a>(
             .as_deref()
             .is_some_and(|o| o.eq_ignore_ascii_case(org))
             && p.config.classroom.eq_ignore_ascii_case(classroom)
-            && p.config.assignment.eq_ignore_ascii_case(assignment)
+            && (p.config.assignment.eq_ignore_ascii_case(assignment)
+                || p.assignment
+                    .as_ref()
+                    .is_some_and(|a| a.answers_to(assignment)))
     })
+}
+
+/// The id `project` had before `gh teacher assignment rename` renamed its repo (same
+/// suffix, the old slug): what the hidden list, `alerts.json` and calendar UIDs may still
+/// hold. `None` for a repo never renamed, or one the rename skipped.
+pub fn previous_id(project: &Project) -> Option<String> {
+    let assignment = project.assignment.as_ref()?;
+    let old = classroom50::previous_repo_name(
+        project.repo.as_deref()?,
+        &project.config.classroom,
+        std::slice::from_ref(assignment),
+    )?;
+    Some(key(&format!("{}/{old}", project.owner.as_deref()?)))
+}
+
+/// The id an unaccepted assignment had before its rename (`org/classroom/<old slug>`).
+pub fn previous_unaccepted_id(item: &Unaccepted) -> Option<String> {
+    let old = item.assignment.old_slug()?;
+    Some(unaccepted_key(
+        &item.classroom.org,
+        &item.classroom.slug,
+        old,
+    ))
+}
+
+/// `org/classroom/assignment`, lowercase: an unaccepted assignment's id, and how
+/// `alerts.json` keys due dates and closings.
+pub fn unaccepted_key(org: &str, classroom: &str, assignment: &str) -> String {
+    format!("{org}/{classroom}/{assignment}").to_ascii_lowercase()
+}
+
+/// What renames changed among the ids of `snapshot`, as `(old, new)`: projects (`owner/repo`)
+/// and assignments (`org/classroom/slug`), for the hidden list and `alerts.json` to follow.
+/// An old id still in use (a repo the rename skipped) is left alone.
+pub fn renamed_ids(snapshot: &Snapshot) -> Vec<(String, String)> {
+    let in_use: HashSet<&str> = snapshot
+        .projects
+        .iter()
+        .map(|p| p.id.as_str())
+        .chain(snapshot.unaccepted.iter().map(|u| u.id.as_str()))
+        .collect();
+    let projects = snapshot.projects.iter().flat_map(|p| {
+        let assignment = p.assignment.as_ref();
+        let slug_pair = p.owner.as_deref().zip(assignment).and_then(|(owner, a)| {
+            let old = a.old_slug()?;
+            Some((
+                unaccepted_key(owner, &p.config.classroom, old),
+                unaccepted_key(owner, &p.config.classroom, &a.slug),
+            ))
+        });
+        let id_pair = previous_id(p).map(|old| (old, p.id.clone()));
+        id_pair.into_iter().chain(slug_pair)
+    });
+    let unaccepted = snapshot
+        .unaccepted
+        .iter()
+        .filter_map(|u| Some((previous_unaccepted_id(u)?, u.id.clone())));
+    let mut pairs: Vec<(String, String)> = projects
+        .chain(unaccepted)
+        .filter(|(old, new)| old != new && !in_use.contains(old.as_str()))
+        .collect();
+    pairs.sort();
+    pairs.dedup();
+    pairs
 }
 
 /// Runs a full sync for the user and broadcasts the result. Concurrent callers wait for
@@ -1038,28 +1105,29 @@ fn author_email(log: &str, member: &groups::Member) -> Option<String> {
 /// account.
 fn annotate(state: &ProjectsState, snapshot: &mut Snapshot, recents: &[editors::Recent]) {
     let groups = state.remote().groups;
+    // A rename leaves the group teams as they were, named after the old slug.
+    let find = |org: &str, classroom: &str, slug: &str, old: Option<&str>| {
+        groups::find(&groups, org, classroom, slug)
+            .or_else(|| groups::find(&groups, org, classroom, old?))
+            .cloned()
+    };
     for item in &mut snapshot.unaccepted {
-        item.group = groups::find(
-            &groups,
+        item.group = find(
             &item.classroom.org,
             &item.classroom.slug,
             &item.assignment.slug,
-        )
-        .cloned();
+            item.assignment.old_slug(),
+        );
     }
     for project in &mut snapshot.projects {
-        project.group = project
-            .owner
-            .as_deref()
-            .and_then(|owner| {
-                groups::find(
-                    &groups,
-                    owner,
-                    &project.config.classroom,
-                    &project.config.assignment,
-                )
-            })
-            .cloned();
+        project.group = project.owner.as_deref().and_then(|owner| {
+            find(
+                owner,
+                &project.config.classroom,
+                &project.config.assignment,
+                project.assignment.as_ref().and_then(|a| a.old_slug()),
+            )
+        });
         project.editor = project
             .path
             .as_deref()
@@ -1304,8 +1372,26 @@ async fn build(
             remote
         }
     };
+    // A clone made before its assignment was renamed joins the renamed repo's row.
+    let listed: HashMap<String, String> = remote
+        .iter()
+        .map(|(repo, _)| {
+            (
+                key(&format!("{}/{}", repo.owner, repo.name)),
+                repo.name.clone(),
+            )
+        })
+        .collect();
     let locals: Vec<(LocalProject, RepoConfig)> = locals
         .into_iter()
+        .map(|mut clone| {
+            if let (Some(owner), Some(name)) = (&clone.owner, &clone.repo)
+                && let Some(renamed) = renamed_clone(owner, name, &classrooms, &manifests, &listed)
+            {
+                clone.repo = Some(renamed);
+            }
+            clone
+        })
         .filter_map(|clone| {
             let config = identify(
                 clone.owner.as_deref(),
@@ -1387,13 +1473,11 @@ fn unaccepted(
             continue;
         };
         for (key, classroom) in classrooms.iter().filter(|((org, _), _)| *org == owner) {
-            let slugs = manifests
-                .get(key)
-                .into_iter()
-                .flatten()
-                .map(|a| a.slug.as_str());
-            if let Some(slug) = classroom50::assignment_for_repo(name, &classroom.slug, slugs) {
-                accepted.insert((key.clone(), slug.to_ascii_lowercase()));
+            let Some(list) = manifests.get(key) else {
+                continue;
+            };
+            if let Some(found) = classroom50::assignment_for_repo(name, &classroom.slug, list) {
+                accepted.insert((key.clone(), found.assignment.slug.to_ascii_lowercase()));
             }
         }
     }
@@ -1426,7 +1510,9 @@ fn unaccepted(
 }
 
 /// The assignment identity of a repo: its marker file, else its name matched against the
-/// manifests of the owner's classrooms. `None` means it isn't an assignment repo.
+/// manifests of the owner's classrooms. `None` means it isn't an assignment repo. A marker
+/// naming the slug an assignment was renamed from (a repo the rename skipped, a clone not
+/// pulled since) counts as that assignment, under its current slug.
 fn identify(
     owner: Option<&str>,
     name: Option<&str>,
@@ -1435,20 +1521,58 @@ fn identify(
     manifests: &HashMap<ClassroomKey, Vec<Assignment>>,
 ) -> Option<RepoConfig> {
     if let Some(config) = config {
-        return Some(config.clone());
+        let mut config = config.clone();
+        let current = owner
+            .and_then(|owner| {
+                let key = (
+                    owner.to_ascii_lowercase(),
+                    config.classroom.to_ascii_lowercase(),
+                );
+                manifests.get(&key)
+            })
+            .and_then(|list| classroom50::assignment_for_slug(&config.assignment, list));
+        if let Some(assignment) = current {
+            config.assignment = assignment.slug.clone();
+        }
+        return Some(config);
     }
     let (owner, name) = (owner?.to_ascii_lowercase(), name?);
     classrooms
         .iter()
         .filter(|((org, _), _)| *org == owner)
         .find_map(|(key, classroom)| {
-            let slugs = manifests.get(key)?.iter().map(|a| a.slug.as_str());
-            let slug = classroom50::assignment_for_repo(name, &classroom.slug, slugs)?;
+            let found =
+                classroom50::assignment_for_repo(name, &classroom.slug, manifests.get(key)?)?;
             Some(RepoConfig {
                 classroom: classroom.slug.clone(),
-                assignment: slug.to_owned(),
+                assignment: found.assignment.slug.clone(),
                 secret: classroom.secret.clone(),
             })
+        })
+}
+
+/// The name GitHub now lists a clone's repo under, when the clone's `origin` still names
+/// it as it was before `gh teacher assignment rename` (GitHub redirects the old name): the
+/// old name isn't listed, the renamed one is (`listed`, lowercase `owner/repo` to GitHub's
+/// spelling). `None` when the clone needs no new name.
+fn renamed_clone(
+    owner: &str,
+    name: &str,
+    classrooms: &BTreeMap<ClassroomKey, Classroom>,
+    manifests: &HashMap<ClassroomKey, Vec<Assignment>>,
+    listed: &HashMap<String, String>,
+) -> Option<String> {
+    let owner = owner.to_ascii_lowercase();
+    if listed.contains_key(&format!("{owner}/{}", name.to_ascii_lowercase())) {
+        return None;
+    }
+    classrooms
+        .iter()
+        .filter(|((org, _), _)| *org == owner)
+        .find_map(|(key, classroom)| {
+            let renamed =
+                classroom50::renamed_repo_name(name, &classroom.slug, manifests.get(key)?)?;
+            listed.get(&format!("{owner}/{renamed}")).cloned()
         })
 }
 
@@ -2950,6 +3074,179 @@ mod tests {
         let slugs: Vec<&str> = list.iter().map(|u| u.assignment.slug.as_str()).collect();
         assert_eq!(slugs, ["labo-4", "labo-5"]);
         assert_eq!(list[0].id, "heigvd-poo/26-poo-c/labo-4");
+    }
+
+    /// `cs/ps3` was `problem-set-three` before `gh teacher assignment rename`.
+    fn renamed_class() -> (
+        BTreeMap<ClassroomKey, Classroom>,
+        HashMap<ClassroomKey, Vec<Assignment>>,
+    ) {
+        let cs = Classroom::from_team("CS50", "classroom50-cs", None).unwrap();
+        let manifest: Vec<Assignment> = serde_json::from_value(json!([
+            {"slug": "ps3", "name": "Problem Set 3", "mode": "individual",
+             "renamed_from": "problem-set-three"},
+            {"slug": "ps4", "name": "Problem Set 4", "mode": "individual"}
+        ]))
+        .unwrap();
+        (
+            BTreeMap::from([(cs.key(), cs)]),
+            HashMap::from([(("cs50".to_owned(), "cs".to_owned()), manifest)]),
+        )
+    }
+
+    fn cs_config(assignment: &str) -> RepoConfig {
+        RepoConfig {
+            classroom: "cs".into(),
+            assignment: assignment.into(),
+            secret: None,
+        }
+    }
+
+    #[test]
+    fn renamed_assignments_keep_their_repos() {
+        let (classrooms, manifests) = renamed_class();
+        let find =
+            |name, config| identify(Some("CS50"), Some(name), config, &classrooms, &manifests);
+        // A marker the rename didn't rewrite, or a clone not pulled since.
+        let old = cs_config("problem-set-three");
+        assert_eq!(
+            find("cs-problem-set-three-alice", Some(&old)).map(|c| c.assignment),
+            Some("ps3".to_owned())
+        );
+        // No marker: the old name or the new one.
+        assert_eq!(
+            find("cs-problem-set-three-bob", None).map(|c| c.assignment),
+            Some("ps3".to_owned())
+        );
+        assert_eq!(
+            find("cs-ps3-bob", None).map(|c| c.assignment),
+            Some("ps3".to_owned())
+        );
+        // A marker of another class or naming something else stays as it is.
+        let other = cs_config("lab");
+        assert_eq!(find("cs-lab-bob", Some(&other)), Some(other));
+
+        // A straggler the rename skipped counts as accepting the renamed assignment.
+        let mut straggler = remote("cs-problem-set-three-alice", "aaa", None);
+        straggler.config = Some(old.clone());
+        let projects = merge(vec![(straggler, cs_config("ps3"))], Vec::new());
+        let list = unaccepted(&projects, &classrooms, &manifests);
+        let slugs: Vec<&str> = list.iter().map(|u| u.assignment.slug.as_str()).collect();
+        assert_eq!(slugs, ["ps4"]);
+        // The old name alone is enough too, whatever its marker says.
+        let mut projects = projects;
+        projects[0].config.assignment = "something-else".into();
+        let list = unaccepted(&projects, &classrooms, &manifests);
+        let slugs: Vec<&str> = list.iter().map(|u| u.assignment.slug.as_str()).collect();
+        assert_eq!(slugs, ["ps4"]);
+    }
+
+    #[test]
+    fn clones_made_before_a_rename_join_the_renamed_repo() {
+        let (classrooms, manifests) = renamed_class();
+        let listed = HashMap::from([("cs50/cs-ps3-alice".to_owned(), "cs-ps3-alice".to_owned())]);
+        let rename = |owner, name| renamed_clone(owner, name, &classrooms, &manifests, &listed);
+        assert_eq!(
+            rename("cs50", "CS-problem-set-three-Alice").as_deref(),
+            Some("cs-ps3-alice")
+        );
+        // Not renamed on GitHub yet, another student's, a current name, another org.
+        assert_eq!(rename("cs50", "cs-problem-set-three-bob"), None);
+        assert_eq!(rename("cs50", "cs-ps3-alice"), None);
+        assert_eq!(rename("other", "cs-problem-set-three-alice"), None);
+        let straggler = HashMap::from([
+            ("cs50/cs-ps3-alice".to_owned(), "cs-ps3-alice".to_owned()),
+            (
+                "cs50/cs-problem-set-three-alice".to_owned(),
+                "cs-problem-set-three-alice".to_owned(),
+            ),
+        ]);
+        assert_eq!(
+            renamed_clone(
+                "cs50",
+                "cs-problem-set-three-alice",
+                &classrooms,
+                &manifests,
+                &straggler
+            ),
+            None
+        );
+
+        // Renamed, the clone and GitHub's repo are one row.
+        let clone = LocalProject {
+            path: "/code/ps3".into(),
+            owner: Some("cs50".into()),
+            repo: rename("cs50", "cs-problem-set-three-alice"),
+            config: Some(cs_config("problem-set-three")),
+        };
+        let projects = merge(
+            vec![(remote("cs-ps3-alice", "aaa", None), cs_config("ps3"))],
+            vec![(clone, cs_config("ps3"), Some(LocalState::default()))],
+        );
+        assert_eq!(projects.len(), 1);
+        assert_eq!(projects[0].id, "cs50/cs-ps3-alice");
+        assert!(projects[0].path.is_some() && projects[0].remote.is_some());
+    }
+
+    #[test]
+    fn tells_which_ids_a_rename_changed() {
+        let (classrooms, manifests) = renamed_class();
+        let key = ("cs50".to_owned(), "cs".to_owned());
+        let ps3 = manifests[&key][0].clone();
+        let classroom = classrooms[&key].clone();
+        let project = |name: &str| {
+            let mut project = merge(
+                vec![(remote(name, "aaa", None), cs_config("ps3"))],
+                Vec::new(),
+            )
+            .remove(0);
+            project.assignment = Some(ps3.clone());
+            project
+        };
+        let unaccepted = Unaccepted {
+            id: "cs50/cs/ps3".into(),
+            classroom,
+            assignment: ps3.clone(),
+            accept_url: String::new(),
+            group: None,
+        };
+        let snapshot = Snapshot {
+            projects: vec![project("cs-ps3-alice")],
+            unaccepted: vec![unaccepted],
+            ..Snapshot::default()
+        };
+        assert_eq!(
+            renamed_ids(&snapshot),
+            [
+                (
+                    "cs50/cs-problem-set-three-alice".to_owned(),
+                    "cs50/cs-ps3-alice".to_owned()
+                ),
+                (
+                    "cs50/cs/problem-set-three".to_owned(),
+                    "cs50/cs/ps3".to_owned()
+                ),
+            ]
+        );
+        assert_eq!(
+            previous_id(&snapshot.projects[0]).as_deref(),
+            Some("cs50/cs-problem-set-three-alice")
+        );
+        // A straggler keeps its id, and nothing moves onto it.
+        let snapshot = Snapshot {
+            projects: vec![
+                project("cs-problem-set-three-alice"),
+                project("cs-ps3-alice"),
+            ],
+            ..Snapshot::default()
+        };
+        assert_eq!(
+            renamed_ids(&snapshot),
+            [(
+                "cs50/cs/problem-set-three".to_owned(),
+                "cs50/cs/ps3".to_owned()
+            )]
+        );
     }
 
     #[test]

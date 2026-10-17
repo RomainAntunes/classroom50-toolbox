@@ -85,6 +85,9 @@ export function buildWorld({ now = new Date(), heads = {} } = {}) {
             mode: "individual",
             autograder: "empty_repo",
             due: iso(7 * DAY),
+            // Renamed with `gh teacher assignment rename`; repos named after the old slug
+            // still count.
+            renamed_from: "website",
           },
         ],
       },

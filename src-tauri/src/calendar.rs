@@ -1,7 +1,7 @@
 //! Due dates as an iCalendar file (RFC 5545) to import in Calendar, Outlook or Google
 //! Calendar. One event per assignment at its due time, with an alarm at each reminder the
 //! user picked. UIDs are the list's ids, so importing again updates events rather than
-//! duplicating them.
+//! duplicating them; a renamed assignment keeps the UID of its id before the rename.
 
 use std::hash::{Hash, Hasher};
 use std::path::{Path, PathBuf};
@@ -16,7 +16,7 @@ use serde::Deserialize;
 use crate::error::Result;
 use crate::groups::Group;
 use crate::platform::{self, CalendarEvent, WrittenEvents};
-use crate::projects::{ProjectsState, Snapshot};
+use crate::projects::{self, ProjectsState, Snapshot};
 use crate::settings::{Settings, SettingsStore};
 
 const PRODID: &str = "-//classroom50-toolbox//EN";
@@ -142,7 +142,7 @@ pub fn events(
                 (None, None) => Status::Open,
             };
             Some((
-                &p.id,
+                projects::previous_id(p).unwrap_or_else(|| p.id.clone()),
                 p.assignment.as_ref()?,
                 p.classroom.as_ref(),
                 &p.config.classroom,
@@ -157,7 +157,7 @@ pub fn events(
         .filter(|u| !hidden.contains(&u.id) && !class_hidden(&u.classroom.org, &u.classroom.slug))
         .map(|u| {
             (
-                &u.id,
+                projects::previous_unaccepted_id(u).unwrap_or_else(|| u.id.clone()),
                 &u.assignment,
                 Some(&u.classroom),
                 &u.classroom.slug,
@@ -176,7 +176,7 @@ pub fn events(
             alarm_hours.sort_unstable_by(|a, b| b.cmp(a));
             alarm_hours.dedup();
             let mut event = CalendarEvent {
-                uid: uid.clone(),
+                uid,
                 // Short enough for a week view; the class is in the notes.
                 title: assignment.name.clone(),
                 notes: Some(notes(
@@ -564,6 +564,19 @@ mod tests {
             .1,
             0
         );
+    }
+
+    #[test]
+    fn a_renamed_assignment_keeps_its_uid() {
+        let mut item = unaccepted("org/poo/lab-one", "Lab 1", Some("2026-11-02T23:59:00Z"));
+        item.assignment.slug = "lab-one".into();
+        item.assignment.renamed_from = Some("lab1".into());
+        let snapshot = Snapshot {
+            unaccepted: vec![item],
+            ..Snapshot::default()
+        };
+        let events = events(&snapshot, &[], &[], &[], &Labels::default());
+        assert_eq!(events[0].uid, "org/poo/lab1");
     }
 
     #[test]
