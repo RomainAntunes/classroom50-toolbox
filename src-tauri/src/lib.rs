@@ -50,8 +50,12 @@ pub fn run() {
         }))
         .plugin(tauri_plugin_deep_link::init())
         .plugin(
+            // 128 KB per file and seven older files kept: 1 MB at most on disk, where the
+            // plugin's default deletes the whole file every 40 KB.
             tauri_plugin_log::Builder::new()
                 .level(log::LevelFilter::Info)
+                .max_file_size(128 * 1024)
+                .rotation_strategy(tauri_plugin_log::RotationStrategy::KeepSome(7))
                 .build(),
         )
         .plugin(tauri_plugin_positioner::init())

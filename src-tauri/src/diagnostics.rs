@@ -327,8 +327,31 @@ fn fence_for(text: &str) -> String {
 // ---------------------------------------------------------------------------------------
 // The log file
 
-/// The last `LOG_LINES` lines of the log file, each cut at `LOG_LINE_CHARS`.
+/// The last `LOG_LINES` lines of the log file, each cut at `LOG_LINE_CHARS`. Right after a
+/// rotation the file is short, so the newest older file the plugin kept fills in the lines
+/// before it.
 pub fn read_log(path: &Path) -> Option<String> {
+    let current = read_tail(path, LOG_LINES)?;
+    let count = if current.is_empty() {
+        0
+    } else {
+        current.lines().count()
+    };
+    if count >= LOG_LINES {
+        return Some(current);
+    }
+    let older = previous_log(path)
+        .and_then(|older| read_tail(&older, LOG_LINES - count))
+        .filter(|older| !older.is_empty());
+    Some(match older {
+        Some(older) if current.is_empty() => older,
+        Some(older) => format!("{older}\n{current}"),
+        None => current,
+    })
+}
+
+/// The last `count` lines of the file at `path`, read from its last `LOG_TAIL_BYTES`.
+fn read_tail(path: &Path, count: usize) -> Option<String> {
     let mut file = std::fs::File::open(path).ok()?;
     let len = file.metadata().ok()?.len();
     let start = len.saturating_sub(LOG_TAIL_BYTES);
@@ -336,7 +359,21 @@ pub fn read_log(path: &Path) -> Option<String> {
     let mut bytes = Vec::new();
     file.read_to_end(&mut bytes).ok()?;
     let text = String::from_utf8_lossy(&bytes);
-    Some(last_lines(&text, LOG_LINES, start > 0))
+    Some(last_lines(&text, count, start > 0))
+}
+
+/// The newest file rotated out of `path`: tauri-plugin-log names them
+/// `<name>_<YYYY-MM-DD_HH-MM-SS>.log` next to it, so the largest name is the newest.
+fn previous_log(path: &Path) -> Option<std::path::PathBuf> {
+    let prefix = format!("{}_", path.file_stem()?.to_str()?);
+    std::fs::read_dir(path.parent()?)
+        .ok()?
+        .filter_map(|entry| {
+            let name = entry.ok()?.file_name().into_string().ok()?;
+            (name.starts_with(&prefix) && name.ends_with(".log")).then_some(name)
+        })
+        .max()
+        .map(|name| path.with_file_name(name))
 }
 
 /// The last `count` lines of `text`; `cut` drops the first one, which reading from the
@@ -1344,6 +1381,32 @@ mod tests {
         assert!(log.starts_with("line 100\n"));
         assert!(log.ends_with("line 299"));
         assert_eq!(read_log(&dir.join("missing.log")), None);
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn fills_a_short_log_from_the_newest_rotated_file() {
+        let dir = std::env::temp_dir().join(format!("c50tb-rotated-{}", std::process::id()));
+        std::fs::create_dir_all(&dir).unwrap();
+        let path = dir.join("app.log");
+        let write = |name: &str, from: usize, to: usize| {
+            let lines: Vec<String> = (from..to).map(|n| format!("line {n}")).collect();
+            std::fs::write(dir.join(name), lines.join("\n")).unwrap();
+        };
+        write("app_2026-10-01_08-00-00.log", 0, 300);
+        write("app_2026-10-10_08-00-00.log", 300, 600);
+        write("app.log", 600, 650);
+        write("other_2026-10-20_08-00-00.log", 900, 1000);
+        let log = read_log(&path).unwrap();
+        assert_eq!(log.lines().count(), LOG_LINES);
+        assert!(log.starts_with("line 450\n"));
+        assert!(log.contains("line 599\nline 600\n"));
+        assert!(log.ends_with("line 649"));
+
+        // An empty current file shows the older one's tail alone.
+        std::fs::write(&path, "").unwrap();
+        let log = read_log(&path).unwrap();
+        assert!(log.starts_with("line 400\n") && log.ends_with("line 599"));
         let _ = std::fs::remove_dir_all(&dir);
     }
 }
