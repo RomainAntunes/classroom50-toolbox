@@ -103,12 +103,13 @@ impl Grade {
         let parsed = failures::parse(body.unwrap_or_default());
         let mut outputs = failures::cap_outputs(parsed.tests);
         for test in self.tests.iter_mut().filter(|t| !t.passed) {
-            let Some(i) = outputs.iter().position(|(name, _)| *name == test.name) else {
+            let Some(i) = outputs.iter().position(|(t, _)| t.name == test.name) else {
                 continue;
             };
-            let (_, output) = outputs.remove(i);
-            test.output_clipped = output.clipped;
-            test.output = (!output.text.is_empty()).then_some(output.text);
+            let (found, clipped) = outputs.remove(i);
+            test.output_clipped = clipped;
+            test.output = (!found.output.is_empty()).then_some(found.output);
+            test.timed_out_after = found.timed_out_after;
         }
         let notes =
             (!parsed.notes.is_empty()).then(|| failures::clip(&parsed.notes, failures::NOTES_CAP));
@@ -161,6 +162,10 @@ pub struct GradeTest {
     pub output: Option<String>,
     #[serde(default)]
     pub output_clipped: bool,
+    /// The runner stopped it at its time limit, in seconds (the release body's `timed out
+    /// after <N>s` line, not repeated in `output`). `None` in grades read before.
+    #[serde(default)]
+    pub timed_out_after: Option<u32>,
 }
 
 /// The autograder's run on the head commit, while it says something the grade doesn't.
@@ -450,6 +455,7 @@ fn grade_from(release: &GradedRelease, result: &GradeResult) -> Grade {
                 max_score: t.max_score,
                 output: None,
                 output_clipped: false,
+                timed_out_after: None,
             })
             .collect(),
         published_at: release.published_at,
@@ -659,6 +665,7 @@ mod tests {
                 max_score: 3,
                 output: None,
                 output_clipped: false,
+                timed_out_after: None,
             }
         );
         assert!(grade.has_tests());
@@ -674,6 +681,19 @@ mod tests {
         .unwrap();
         assert!(!old.has_tests());
         assert!(old.needs_release_notes());
+        // A test saved before timeouts were read has none.
+        let before: GradeTest = serde_json::from_str(
+            r#"{"name": "t", "passed": false, "score": 0, "maxScore": 1,
+                "output": "timed out after 10s", "outputClipped": false}"#,
+        )
+        .unwrap();
+        assert_eq!(before.timed_out_after, None);
+        let timed_out = GradeTest {
+            timed_out_after: Some(10),
+            ..before
+        };
+        let json = serde_json::to_value(&timed_out).unwrap();
+        assert_eq!(json["timedOutAfter"], 10);
     }
 
     fn test(name: &str, passed: bool) -> GradeTest {
@@ -684,6 +704,7 @@ mod tests {
             max_score: 1,
             output: None,
             output_clipped: false,
+            timed_out_after: None,
         }
     }
 
@@ -742,7 +763,7 @@ mod tests {
             result_url: String::new(),
         };
         let mut grade = grade_from(&release, &result);
-        assert_eq!((grade.score, grade.max_score), (7, 10));
+        assert_eq!((grade.score, grade.max_score), (7, 12));
         assert!(grade.needs_release_notes());
         let body: BodyData = serde_json::from_str(&golden("release-body")).unwrap();
         let body = body
@@ -751,8 +772,9 @@ mod tests {
             .and_then(|r| r.description);
         grade.apply_release_body(body.as_deref());
         let failed: Vec<_> = grade.tests.iter().filter(|t| !t.passed).collect();
-        assert_eq!(failed.len(), 1);
+        assert_eq!(failed.len(), 2);
         assert_eq!(failed[0].name, "prints goodbye");
+        assert_eq!(failed[0].timed_out_after, None);
         assert!(
             failed[0]
                 .output
@@ -761,6 +783,13 @@ mod tests {
                 .contains("-goodbye, world"),
             "{:?}",
             failed[0].output
+        );
+        // The runner stopped it: the line becomes `timed_out_after`, the rest is output.
+        assert_eq!(failed[1].name, "asks for a name");
+        assert_eq!(failed[1].timed_out_after, Some(10));
+        assert_eq!(
+            failed[1].output.as_deref(),
+            Some("--- input ---\nAda\n\n--- actual stdout ---\nWhat's your name?")
         );
     }
 }

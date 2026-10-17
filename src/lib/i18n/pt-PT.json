@@ -416,6 +416,8 @@
   "details.failedTests": "Testes falhados",
   "details.failedTestsHint": "Testes falhados (Abrir detalhes da nota mostra porquê)",
   "details.seeOnGitHub": "Ver o resto no GitHub",
+  "details.timedOut": "Interrompido após {duration}: o programa ainda estava a correr quando o tempo acabou.",
+  "details.timedOutHint": "O que imprimiu sem fazer flush perde-se, por isso pode faltar uma mensagem a pedir dados.",
   "details.releaseNotes": "Relatório do avaliador automático",
   "details.moreTests.one": "e mais {count}",
   "details.moreTests.many": "e mais {count}",

@@ -443,6 +443,8 @@
   "details.failedTests": "الاختبارات الفاشلة",
   "details.failedTestsHint": "الاختبارات الفاشلة («فتح تفاصيل الدرجة» يبيّن السبب)",
   "details.seeOnGitHub": "عرض الباقي على GitHub",
+  "details.timedOut": "أُوقف التشغيل عند بلوغ المهلة ({duration}): كان البرنامج لا يزال يعمل حين انتهى الوقت.",
+  "details.timedOutHint": "يضيع ما طبعه البرنامج ولم يُفرَّغ من المخزن المؤقت (flush) بعد، لذا قد تكون رسالة طلب الإدخال مفقودة.",
   "details.releaseNotes": "تقرير المصحح الآلي",
   "details.moreTests.zero": "ولا شيء آخر",
   "details.moreTests.one": "واختبار آخر",

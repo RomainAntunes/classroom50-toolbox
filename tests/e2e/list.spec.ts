@@ -3,6 +3,7 @@ import { expect, test } from "./app";
 import {
   classroom,
   grade,
+  gradeTest,
   hoursFromNow,
   project,
   scenario,
@@ -93,4 +94,83 @@ test("the date filter is saved through Rust", async ({ app, page }) => {
   await expect(app.row("Lab 1")).toBeVisible();
   await expect(app.row("Lab 2")).toHaveCount(0);
   expect((await app.settings()).listFilter).toBe("past");
+});
+
+// What the runner (cli 1.58.0 on) keeps of a test it stopped at its time limit: the input it
+// was fed, then what it flushed before the kill.
+const STOPPED_OUTPUT =
+  "--- input ---\n-3\n\n--- actual stdout ---\nHeight: Height: \n--- stderr ---\nheight must be positive";
+
+const graded = snapshot({
+  projects: [
+    project({
+      slug: "mario",
+      name: "Mario",
+      remote: {
+        grade: grade(1, 7, {
+          testsPassed: 1,
+          testsTotal: 5,
+          tests: [
+            gradeTest("compiles", { passed: true, score: 1 }),
+            gradeTest("rejects a negative height", {
+              maxScore: 2,
+              output: STOPPED_OUTPUT,
+              timedOutAfter: 10,
+            }),
+            // An older runner wrote the timeout line alone.
+            gradeTest("waits for input", { timedOutAfter: 1 }),
+            gradeTest("builds a pyramid", { maxScore: 2, output: "-#\n+##" }),
+            gradeTest("style"),
+          ],
+          releaseNotes: { notes: null, notesClipped: false },
+        }),
+      },
+    }),
+  ],
+});
+
+test("a test the autograder stopped says so before what it printed", async ({ app, page }) => {
+  await app.start(scenario({ snapshot: graded }));
+  const mario = app.row("Mario");
+  await mario.locator("[data-row]").click();
+  await expect(mario.locator(".details .heading")).toHaveText("Failed tests");
+  const testButton = (name: string) => mario.locator("button.test", { hasText: name });
+  const failedTest = (name: string) =>
+    mario.locator(".tests li", { has: page.locator("button.test", { hasText: name }) });
+
+  await testButton("rejects a negative height").click();
+  await expect(testButton("rejects a negative height")).toHaveAttribute("aria-expanded", "true");
+  const stopped = failedTest("rejects a negative height");
+  await expect(stopped.locator(".timeout")).toHaveText(
+    "Stopped after 10 seconds: the program was still running when time ran out.",
+  );
+  await expect(stopped.locator(".hint")).toHaveText(
+    "What it printed but hadn't flushed yet is lost, so a prompt may be missing.",
+  );
+  const output = stopped.locator(".output pre");
+  await expect(output).toHaveAttribute("dir", "ltr");
+  await expect(output).toContainText("--- actual stdout ---");
+  await expect(output).toContainText("height must be positive");
+  await expect(stopped).not.toContainText("timed out after");
+
+  // The old one-line format opens on the same line and hint, with no output under them.
+  await testButton("waits for input").click();
+  const old = failedTest("waits for input");
+  await expect(old.locator(".timeout")).toHaveText(
+    "Stopped after 1 second: the program was still running when time ran out.",
+  );
+  await expect(old.locator(".hint")).toBeVisible();
+  await expect(old.locator("pre")).toHaveCount(0);
+
+  // Any other failure looks as before.
+  await testButton("builds a pyramid").click();
+  const pyramid = failedTest("builds a pyramid");
+  await expect(pyramid.locator("pre")).toHaveText("-#\n+##");
+  await expect(pyramid.locator(".timeout, .hint")).toHaveCount(0);
+  await expect(mario.locator("div.test", { hasText: "style" })).toBeVisible();
+  await expect(testButton("style")).toHaveCount(0);
+
+  // Reading a grade is read-only.
+  expect(await app.writes()).toEqual([]);
+  await expect(page.locator(".timeout")).toHaveCount(2);
 });

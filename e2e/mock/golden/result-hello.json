@@ -10,7 +10,7 @@
   "review": "https://github.com/c50-e2e-school/algo-hello-ada-e2e/compare/a...b",
   "datetime": "2026-10-15T12:00:00Z",
   "score": 7,
-  "max-score": 10,
+  "max-score": 12,
   "tests": [
     {
       "test-name": "compiles",
@@ -29,6 +29,12 @@
       "passed": false,
       "score": 0,
       "max-score": 3
+    },
+    {
+      "test-name": "asks for a name",
+      "passed": false,
+      "score": 0,
+      "max-score": 2
     }
   ]
 }

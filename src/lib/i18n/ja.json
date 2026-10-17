@@ -398,6 +398,8 @@
   "details.failedTests": "不合格のテスト",
   "details.failedTestsHint": "不合格のテスト（理由は「成績の詳細を開く」で確認できます）",
   "details.seeOnGitHub": "続きをGitHubで見る",
+  "details.timedOut": "{duration}で停止しました。時間切れの時点でプログラムはまだ実行中でした。",
+  "details.timedOutHint": "表示したもののまだフラッシュ（flush）していなかった出力は失われるため、入力を求めるメッセージが欠けていることがあります。",
   "details.releaseNotes": "自動採点のレポート",
   "details.moreTests.other": "ほか{count}件",
   "alerts.noDeadline": "期限なし",

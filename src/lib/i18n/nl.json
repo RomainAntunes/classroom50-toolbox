@@ -407,6 +407,8 @@
   "details.failedTests": "Mislukte tests",
   "details.failedTestsHint": "Mislukte tests (Cijferdetails openen toont waarom)",
   "details.seeOnGitHub": "De rest bekijken op GitHub",
+  "details.timedOut": "Gestopt na {duration}: het programma draaide nog toen de tijd om was.",
+  "details.timedOutHint": "Wat het had geprint maar nog niet had geflusht, is verloren, dus een invoerprompt kan ontbreken.",
   "details.releaseNotes": "Autograder-rapport",
   "details.moreTests.one": "en nog {count}",
   "details.moreTests.other": "en nog {count}",

@@ -425,6 +425,8 @@
   "details.failedTests": "Niezaliczone testy",
   "details.failedTestsHint": "Niezaliczone testy (przyczynę pokazuje „Otwórz szczegóły oceny”)",
   "details.seeOnGitHub": "Zobacz resztę na GitHubie",
+  "details.timedOut": "Przerwano po przekroczeniu limitu czasu ({duration}): program wciąż działał, gdy czas się skończył.",
+  "details.timedOutHint": "To, co program wypisał, ale jeszcze nie opróżnił z bufora (flush), przepada, więc może brakować prośby o dane.",
   "details.releaseNotes": "Raport autogradera",
   "details.moreTests.one": "i jeszcze {count}",
   "details.moreTests.few": "i jeszcze {count}",

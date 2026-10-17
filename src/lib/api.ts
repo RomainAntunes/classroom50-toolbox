@@ -161,6 +161,8 @@ export interface GradeTest {
   output: string | null;
   /** The release page has more than `output`. */
   outputClipped: boolean;
+  /** The autograder stopped it at its time limit, in seconds; `output` is then what it was fed and printed first. */
+  timedOutAfter: number | null;
 }
 
 /** The release body's text that isn't a test's output (a custom autograder's report). */

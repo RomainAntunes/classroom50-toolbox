@@ -407,6 +407,8 @@
   "details.failedTests": "Fehlgeschlagene Tests",
   "details.failedTestsHint": "Fehlgeschlagene Tests (Notendetails öffnen zeigt den Grund)",
   "details.seeOnGitHub": "Den Rest auf GitHub ansehen",
+  "details.timedOut": "Nach {duration} gestoppt: Das Programm lief noch, als die Zeit abgelaufen war.",
+  "details.timedOutHint": "Was es ausgegeben, aber noch nicht geflusht hatte, geht verloren, daher kann eine Eingabeaufforderung fehlen.",
   "details.releaseNotes": "Autograder-Bericht",
   "details.moreTests.one": "und {count} weiterer",
   "details.moreTests.other": "und {count} weitere",

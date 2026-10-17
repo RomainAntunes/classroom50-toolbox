@@ -416,6 +416,8 @@
   "details.failedTests": "Pruebas fallidas",
   "details.failedTestsHint": "Pruebas fallidas (Ver detalles de la calificación muestra por qué)",
   "details.seeOnGitHub": "Ver el resto en GitHub",
+  "details.timedOut": "Se detuvo tras {duration}: el programa seguía ejecutándose cuando se acabó el tiempo.",
+  "details.timedOutHint": "Lo que imprimió sin hacer flush se pierde, así que puede faltar un mensaje que pedía datos.",
   "details.releaseNotes": "Informe del corrector",
   "details.moreTests.one": "y {count} más",
   "details.moreTests.many": "y {count} más",

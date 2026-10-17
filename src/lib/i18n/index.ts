@@ -269,6 +269,21 @@ export function durationLabel(seconds: number): string {
   );
 }
 
+/** 10 -> "10 seconds", 120 -> "2 minutes", 90 -> "90 seconds": exact, for a time limit. */
+export function secondsLabel(seconds: number): string {
+  const units: [Intl.NumberFormatOptions["unit"], number][] = [
+    ["hour", 3600],
+    ["minute", 60],
+  ];
+  const [unit, size] = units.find(([, size]) => seconds >= size && seconds % size === 0) ?? [
+    "second",
+    1,
+  ];
+  return new Intl.NumberFormat(locale.code, { style: "unit", unit, unitDisplay: "long" }).format(
+    seconds / size,
+  );
+}
+
 /** 24 -> "1 day", 6 -> "6 hours", in the user's locale. */
 export function hoursLabel(hours: number): string {
   const [value, unit] = hours % 24 === 0 ? [hours / 24, "day"] : [hours, "hour"];

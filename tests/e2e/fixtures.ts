@@ -11,6 +11,7 @@ import type {
   DeepLinkTarget,
   EditorInfo,
   Grade,
+  GradeTest,
   LocalState,
   Project,
   RemoteRepo,
@@ -150,6 +151,20 @@ export function grade(score: number, maxScore: number, over: Partial<Grade> = {}
     publishedAt: hoursFromNow(-5),
     url: "https://github.com/cs50-school/release",
     releaseNotes: null,
+    ...over,
+  };
+}
+
+/** One test of a grade; failed, with no output, unless `over` says otherwise. */
+export function gradeTest(name: string, over: Partial<GradeTest> = {}): GradeTest {
+  return {
+    name,
+    passed: false,
+    score: 0,
+    maxScore: 1,
+    output: null,
+    outputClipped: false,
+    timedOutAfter: null,
     ...over,
   };
 }

@@ -28,7 +28,7 @@ describe("Classroom 50 Toolbox", () => {
     // The first full sync runs at start; the list shows once it has read GitHub.
     await item("Hello, World").waitForDisplayed({ timeout: 90_000 });
     // The grade comes with the status read that follows discovery.
-    await browser.waitUntil(async () => (await text("Hello, World")).includes("7/10"), {
+    await browser.waitUntil(async () => (await text("Hello, World")).includes("7/12"), {
       timeout: 60_000,
       timeoutMsg: "the hello grade never showed",
     });

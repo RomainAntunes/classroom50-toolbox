@@ -4,6 +4,7 @@ import {
   classroom,
   daysFromNow,
   grade,
+  gradeTest,
   hoursFromNow,
   project,
   scenario,
@@ -32,7 +33,19 @@ export function richScenario(over: Partial<Settings> = {}): Scenario {
           assignment: { due: hoursFromNow(-30) },
           lateSeconds: 26 * 3600,
           remote: {
-            grade: grade(8, 10),
+            grade: grade(8, 10, {
+              tests: [
+                gradeTest("compiles", { passed: true, score: 3, maxScore: 3 }),
+                gradeTest("prints hello", { passed: true, score: 5, maxScore: 5 }),
+                // A test the autograder stopped at its time limit, with what it printed.
+                gradeTest("rejects a negative height", {
+                  maxScore: 2,
+                  output: "--- input ---\n-3\n\n--- actual stdout ---\nHeight: Height: ",
+                  timedOutAfter: 10,
+                }),
+              ],
+              releaseNotes: { notes: null, notesClipped: false },
+            }),
             feedback: { url: "https://github.com/pr/1", comments: 3, latestAt: hoursFromNow(-1) },
           },
         }),

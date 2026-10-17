@@ -398,6 +398,8 @@
   "details.failedTests": "未通过的测试",
   "details.failedTestsHint": "未通过的测试（“打开成绩详情”会显示原因）",
   "details.seeOnGitHub": "在GitHub上查看其余内容",
+  "details.timedOut": "{duration}后被停止：时间用完时程序仍在运行。",
+  "details.timedOutHint": "程序已打印但尚未刷新（flush）的内容会丢失，所以可能看不到输入提示。",
   "details.releaseNotes": "自动评分报告",
   "details.moreTests.other": "以及另外{count}个",
   "alerts.noDeadline": "无截止日期",
