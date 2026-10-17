@@ -18,6 +18,10 @@
 //! ````
 //!
 //! The fence is longer than any backtick run inside the block, so it is matched exactly.
+//! A test the runner stopped at its time limit starts with `timed out after <N>s`, then (since
+//! upstream's cli 1.58.0) what it was fed and printed before the kill (`--- input ---`,
+//! `--- actual stdout ---`, `--- stderr ---` or `--- output ---`); that first line is kept
+//! as `FailedTest::timed_out_after`, not as output. Older runners write the line alone.
 //! Passing tests that opted into `show-output` get a `Test output` section, skipped here. The
 //! runner may append a note listing files removed by `allowed_files`: whatever isn't the
 //! heading, the table, the `Status:` line or one of those two sections is kept as `notes`.
@@ -40,12 +44,43 @@ const SCORE_HEADING: &str = "### classroom50 autograde:";
 const FAILURES_SUMMARY: &str = "Failure details";
 /// The runner's section for passing tests that opted into `show-output`.
 const OUTPUT_SUMMARY: &str = "Test output";
+/// The first line of a test the runner stopped (`_timeout_outcome`): `timed out after 10s`.
+const TIMEOUT_PREFIX: &str = "timed out after ";
+
+/// A failed test of the runner's `Failure details` section.
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct FailedTest {
+    pub name: String,
+    /// Its output, uncapped, without the timeout line.
+    pub output: String,
+    /// The runner stopped it after this many seconds.
+    pub timed_out_after: Option<u32>,
+}
+
+impl FailedTest {
+    /// The test as the runner wrote it: a leading `timed out after <N>s` line becomes
+    /// `timed_out_after`.
+    fn new(name: String, block: &str) -> Self {
+        let (first, rest) = block.split_once('\n').unwrap_or((block, ""));
+        let seconds = first
+            .trim_end()
+            .strip_prefix(TIMEOUT_PREFIX)
+            .and_then(|s| s.strip_suffix('s'))
+            .filter(|n| !n.is_empty() && n.bytes().all(|b| b.is_ascii_digit()))
+            .and_then(|n| n.parse().ok());
+        Self {
+            name,
+            output: if seconds.is_some() { rest } else { block }.to_owned(),
+            timed_out_after: seconds,
+        }
+    }
+}
 
 /// The parts of a release body.
 #[derive(Debug, Default, PartialEq, Eq)]
 pub struct Parsed {
-    /// Each failed test's output by test name, in the body's order, uncapped.
-    pub tests: Vec<(String, String)>,
+    /// Each failed test with its output, in the body's order, uncapped.
+    pub tests: Vec<FailedTest>,
     /// The rest of the body, uncapped, empty when there is none.
     pub notes: String,
 }
@@ -108,9 +143,8 @@ pub fn parse(body: &str) -> Parsed {
                     block.push(inner);
                 }
                 if open && let Some(name) = name.take() {
-                    parsed
-                        .tests
-                        .push((name, block.join("\n").trim_end().to_owned()));
+                    let block = block.join("\n");
+                    parsed.tests.push(FailedTest::new(name, block.trim_end()));
                 }
             } else if let Some(test) = bold(trimmed) {
                 name = Some(test.to_owned());
@@ -144,15 +178,17 @@ pub fn parse(body: &str) -> Parsed {
     parsed
 }
 
-/// Caps each test's output and all of them together, in order.
-pub fn cap_outputs(tests: Vec<(String, String)>) -> Vec<(String, Clipped)> {
+/// Caps each test's output and all of them together, in order: each test with whether its
+/// output was cut short.
+pub fn cap_outputs(tests: Vec<FailedTest>) -> Vec<(FailedTest, bool)> {
     let mut left = TOTAL_CAP;
     tests
         .into_iter()
-        .map(|(name, text)| {
-            let kept = clip(&text, TEST_CAP.min(left));
+        .map(|test| {
+            let kept = clip(&test.output, TEST_CAP.min(left));
             left = left.saturating_sub(kept.text.len());
-            (name, kept)
+            let output = kept.text;
+            (FailedTest { output, ..test }, kept.clipped)
         })
         .collect()
 }
@@ -344,19 +380,21 @@ These files are not in this assignment's `allowed_files` set, so the autograder 
     #[test]
     fn splits_a_declarative_body_per_test() {
         let parsed = parse(DECLARATIVE);
-        let names: Vec<&str> = parsed.tests.iter().map(|(n, _)| n.as_str()).collect();
+        let names: Vec<&str> = parsed.tests.iter().map(|t| t.name.as_str()).collect();
         assert_eq!(names, ["prints | pipes", "exits cleanly", "hangs"]);
         assert_eq!(
-            parsed.tests[0].1,
+            parsed.tests[0].output,
             "exit 0; comparison=exact\n--- input ---\n3\n--- expected\n+++ actual stdout\n\
              @@ -1 +1 @@\n-```9```\n+6"
         );
         assert_eq!(
-            parsed.tests[1].1,
+            parsed.tests[1].output,
             "exit 1 (wanted 0)\n--- output ---\nTraceback (most recent call last):\n  \
              File \"hello.py\", line 1"
         );
-        assert_eq!(parsed.tests[2].1, "timed out after 10s");
+        assert_eq!(parsed.tests[0].timed_out_after, None);
+        assert_eq!(parsed.tests[2].output, "");
+        assert_eq!(parsed.tests[2].timed_out_after, Some(10));
         assert_eq!(
             parsed.notes,
             "Removed 1 file(s) outside the assignment's allowed files\n\n\
@@ -395,7 +433,7 @@ These files are not in this assignment's `allowed_files` set, so the autograder 
     fn an_unclosed_section_still_parses() {
         let body = "### classroom50 autograde: 0/1\n\
                     <details><summary>Failure details</summary>\n**a**\n```\nboom\n";
-        assert_eq!(parse(body).tests, [("a".to_owned(), "boom".to_owned())]);
+        assert_eq!(parse(body).tests, [failed("a", "boom", None)]);
     }
 
     /// A custom autograder's report without the runner's heading: its table, `Status:` line
@@ -449,15 +487,177 @@ These files are not in this assignment's `allowed_files` set, so the autograder 
     #[test]
     fn caps_the_outputs_together() {
         let big = "x".repeat(TEST_CAP * 2);
-        let tests: Vec<(String, String)> = (0..8).map(|i| (i.to_string(), big.clone())).collect();
+        let tests: Vec<FailedTest> = (0..8)
+            .map(|i| failed(&i.to_string(), &big, Some(i)))
+            .collect();
         let capped = cap_outputs(tests);
         assert!(
             capped
                 .iter()
-                .all(|(_, c)| c.clipped && c.text.len() <= TEST_CAP)
+                .all(|(t, clipped)| *clipped && t.output.len() <= TEST_CAP)
         );
-        let total: usize = capped.iter().map(|(_, c)| c.text.len()).sum();
+        let total: usize = capped.iter().map(|(t, _)| t.output.len()).sum();
         assert_eq!(total, TOTAL_CAP);
-        assert!(capped[7].1.text.is_empty());
+        assert!(capped[7].0.output.is_empty());
+        assert_eq!(capped[7].0.timed_out_after, Some(7));
+    }
+
+    fn failed(name: &str, output: &str, timed_out_after: Option<u32>) -> FailedTest {
+        FailedTest {
+            name: name.into(),
+            output: output.into(),
+            timed_out_after,
+        }
+    }
+
+    /// Real bodies: tiny programs run through upstream's `execute_test` then
+    /// `render_declarative_body` (`runner.py` at main, after cli 1.58.0's #1114, and at
+    /// c4cd997 before it for the `old` ones), with 1 s time limits.
+    fn fixture(name: &str) -> Parsed {
+        let path = format!(
+            "{}/fixtures/release-bodies/{name}.md",
+            env!("CARGO_MANIFEST_DIR")
+        );
+        let body = std::fs::read_to_string(&path).unwrap();
+        let parsed = parse(&body);
+        assert_eq!(parsed.notes, "", "{name}");
+        parsed
+    }
+
+    /// An `io` test fed `-3` that prompts again and waits: its input, the prompts it
+    /// flushed and its stderr.
+    const IO_OUTPUT: &str = "--- input ---\n-3\n\n--- actual stdout ---\nHeight: Height: \n\
+                             --- stderr ---\nheight must be positive";
+
+    #[test]
+    fn reads_timeouts_with_what_the_program_printed() {
+        let height = "rejects a negative height";
+        assert_eq!(
+            fixture("timeout-io").tests,
+            [failed(height, IO_OUTPUT, Some(1))]
+        );
+        assert_eq!(
+            fixture("timeout-run").tests,
+            [failed(
+                "compiles",
+                "--- output ---\ncompiling\nwarn",
+                Some(1)
+            )]
+        );
+        // `actual-only` hides the input.
+        assert_eq!(
+            fixture("timeout-actual-only").tests,
+            [failed(
+                height,
+                "--- actual stdout ---\nHeight: Height: \n--- stderr ---\nheight must be positive",
+                Some(1)
+            )]
+        );
+        // A prompt never flushed is lost: only the input shows.
+        assert_eq!(
+            fixture("timeout-buffered").tests,
+            [failed("prompts for a height", "--- input ---\n-3", Some(1))]
+        );
+    }
+
+    #[test]
+    fn reads_timeouts_with_nothing_else() {
+        assert_eq!(
+            fixture("timeout-silent").tests,
+            [failed("finishes", "", Some(1))]
+        );
+        // `none`: the failure kind alone.
+        assert_eq!(
+            fixture("timeout-none").tests,
+            [failed("rejects a negative height", "", Some(1))]
+        );
+        // The runner before cli 1.58.0 wrote the line alone.
+        assert_eq!(
+            fixture("timeout-old").tests,
+            [failed("rejects a negative height", "", Some(1))]
+        );
+    }
+
+    #[test]
+    fn reads_a_timeout_next_to_other_failures() {
+        let parsed = fixture("timeout-mixed");
+        assert_eq!(parsed.tests.len(), 3);
+        assert_eq!(parsed.tests[0].timed_out_after, None);
+        assert!(
+            parsed.tests[0]
+                .output
+                .starts_with("exit 0; comparison=exact\n--- input ---\n3\n")
+        );
+        assert!(parsed.tests[0].output.ends_with(" ###\n+####"));
+        assert_eq!(
+            parsed.tests[1],
+            failed("rejects a negative height", IO_OUTPUT, Some(1))
+        );
+        // `show-command` puts the command after the timeout line.
+        assert_eq!(
+            parsed.tests[2],
+            failed(
+                "prints its steps",
+                "--- run command ---\npython3 compile.py\n--- output ---\ncompiling\nwarn",
+                Some(1)
+            )
+        );
+
+        let old = fixture("timeout-old-mixed");
+        assert_eq!(old.tests[0], parsed.tests[0]);
+        assert_eq!(
+            old.tests[1..],
+            [
+                failed("rejects a negative height", "", Some(1)),
+                failed(
+                    "prints its steps",
+                    "--- run command ---\npython3 compile.py",
+                    Some(1)
+                ),
+            ]
+        );
+    }
+
+    #[test]
+    fn reads_a_timeout_the_runner_clipped() {
+        let parsed = fixture("timeout-clipped");
+        let [test] = &parsed.tests[..] else {
+            panic!("{:?}", parsed.tests)
+        };
+        assert_eq!(test.timed_out_after, Some(1));
+        assert!(test.output.starts_with("--- output ---\nstep 0000\n"));
+        assert!(test.output.ends_with("step 0199\n\n... (truncated)"));
+    }
+
+    /// Only the runner's exact first line counts; a custom autograder's report is never
+    /// read for it.
+    #[test]
+    fn reads_only_the_runners_timeout_line() {
+        let section = |detail: &str| {
+            format!(
+                "### classroom50 autograde: 0/1\n\n<details><summary>Failure details</summary>\n\n\
+                 **a**\n\n```\n{detail}\n```\n\n</details>\n"
+            )
+        };
+        for detail in [
+            "timed out after 1.5s",
+            "timed out after s",
+            "timed out after -1s",
+            "timed out after 99999999999s",
+            "timed out after 10s, then more",
+            "setup timed out after 10s",
+            "exit 1 (wanted 0)\ntimed out after 10s",
+        ] {
+            assert_eq!(
+                parse(&section(detail)).tests,
+                [failed("a", detail, None)],
+                "{detail}"
+            );
+        }
+        let custom =
+            section("timed out after 10s").replace("### classroom50 autograde: 0/1", "## Report");
+        let parsed = parse(&custom);
+        assert!(parsed.tests.is_empty());
+        assert!(parsed.notes.contains("timed out after 10s"));
     }
 }
