@@ -46,8 +46,11 @@ describe("Classroom 50 Toolbox", () => {
     expect(await text("Graphs")).toContain(t("projects.notAccepted"));
     // An `empty_repo` assignment, found by its repo's name.
     expect(await text("Portfolio")).toContain(t("projects.notCloned"));
-    // A repo outside Classroom 50 never shows.
+    // Renamed by hand without a marker: found by the template GitHub generated it from.
+    expect(await text("Blog")).toContain(t("projects.notCloned"));
+    // A repo outside Classroom 50 never shows, nor a read-only copy of the Blog's template.
     expect(await $("main").getText()).not.toContain("dotfiles");
+    expect(await $("main").getText()).not.toContain("blog-solution");
 
     // Everything came from the mock, through the hooks.
     const asked = await (await fetch(`${mockUrl}/__requests`)).json();

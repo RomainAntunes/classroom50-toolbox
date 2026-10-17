@@ -106,9 +106,27 @@ pub struct Assignment {
     /// `origin` with the old name (GitHub redirects it), so both still count.
     #[serde(default, alias = "renamedFrom")]
     pub renamed_from: Option<String>,
+    /// The repo each student repo is generated from; absent on `empty_repo` assignments.
+    #[serde(default)]
+    pub template: Option<Template>,
+}
+
+/// An assignment's starter repo (`assignments-v1` `template`).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct Template {
+    pub owner: String,
+    pub repo: String,
+    #[serde(default)]
+    pub branch: Option<String>,
 }
 
 impl Assignment {
+    /// `owner/repo` of the template, as GitHub's `templateRepository` names it.
+    pub fn template_name(&self) -> Option<String> {
+        let template = self.template.as_ref()?;
+        Some(format!("{}/{}", template.owner, template.repo))
+    }
+
     /// The slug a rename left behind, when there was one.
     pub fn old_slug(&self) -> Option<&str> {
         self.renamed_from

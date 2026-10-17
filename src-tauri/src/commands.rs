@@ -763,10 +763,23 @@ fn submittable(state: &ProjectsState, id: &str) -> Result<(PathBuf, Project)> {
 }
 
 /// What a clone without a marker needs for `gh student submit`: whether the repo's name
-/// matched an assignment of its class's manifest, and the unlisted class's key.
+/// matches its assignment (gh-student reads nothing else: a repo known by its template
+/// alone, or renamed by hand, it can't place), and the unlisted class's key.
 fn submit_target(project: &Project) -> student::SubmitTarget<'_> {
+    let named = project
+        .repo
+        .as_deref()
+        .zip(project.assignment.as_ref())
+        .is_some_and(|(name, assignment)| {
+            crate::classroom50::assignment_for_repo(
+                name,
+                &project.config.classroom,
+                std::slice::from_ref(assignment),
+            )
+            .is_some()
+        });
     student::SubmitTarget {
-        assignment_known: project.assignment.is_some(),
+        assignment_known: named,
         key: project.classroom.as_ref().and_then(|c| c.secret.as_deref()),
     }
 }
@@ -1239,10 +1252,12 @@ mod tests {
         assert!(accepted_project(&snapshot, "").is_none());
     }
 
-    /// A clone without a marker submits with its class's key, and only for a known assignment.
+    /// A clone without a marker submits with its class's key, and only when its name
+    /// matches its assignment, as gh-student finds it.
     #[test]
     fn submits_with_the_classs_key() {
         let mut p = every_push("main", None);
+        p.repo = Some("C-Lab-1-alice".into());
         let target = submit_target(&p);
         assert!(target.assignment_known);
         assert_eq!(target.key, None);
@@ -1256,8 +1271,26 @@ mod tests {
             pages_base_url: None,
         });
         assert_eq!(submit_target(&p).key, Some("a1b2c3d4"));
+        // Renamed by hand, known by its template alone: gh-student can't place it.
+        p.repo = Some("lab-1-alice".into());
+        assert!(!submit_target(&p).assignment_known);
+        p.repo = Some("c-lab-1-alice".into());
         p.assignment = None;
         assert!(!submit_target(&p).assignment_known);
+    }
+
+    /// A clone made before a rename keeps the old name, which gh-student still places.
+    #[test]
+    fn a_name_from_before_a_rename_still_submits() {
+        let mut p = every_push("main", None);
+        p.repo = Some("c-lab-one-alice".into());
+        p.assignment = Some(
+            serde_json::from_value(serde_json::json!({
+                "slug": "lab-1", "name": "Lab 1", "mode": "individual", "renamed_from": "lab-one"
+            }))
+            .unwrap(),
+        );
+        assert!(submit_target(&p).assignment_known);
     }
 
     /// An every-push project on branch `local_branch`, with GitHub's data when `remote` is

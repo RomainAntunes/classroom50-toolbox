@@ -137,6 +137,7 @@ export function assignment(over: Partial<Assignment> & { slug: string }): Assign
     teamFormation: null,
     repoVisibility: null,
     renamedFrom: null,
+    template: null,
     ...over,
   };
 }
@@ -222,6 +223,7 @@ export function project(options: ProjectOptions): Project {
           head: { oid: head, at: hoursFromNow(-2), author: LOGIN },
           lastSubmission: null,
           config: { classroom: cls.slug, assignment: options.slug, secret: null },
+          template: null,
           unmerged: [],
           grade: null,
           history: [],

@@ -95,7 +95,7 @@ describe("the mock GitHub", () => {
     const asset = respond(world, BASE, { method: "GET", url: new URL(url).pathname });
     expect(JSON.parse(String(asset?.body)).score).toBe(7);
     expect(status.r1.releases.nodes).toEqual([]);
-    expect(status.r4).toBe(null);
+    expect(status[`r${names.length - 1}`]).toBe(null);
   });
 
   it("serves manifests with an ETag and 304s a revalidation", () => {

@@ -115,6 +115,8 @@ export interface RemoteRepo {
   head: Commit | null;
   lastSubmission: Submission | null;
   config: RepoConfig | null;
+  /** `owner/repo` of the template GitHub generated the repo from, when it can tell. */
+  template: string | null;
   /** Branches with commits missing from the default branch. */
   unmerged: Branch[];
   grade: Grade | null;
@@ -223,6 +225,8 @@ export interface Assignment {
   repoVisibility: string | null;
   /** The slug before the teacher renamed the assignment, when they did. */
   renamedFrom: string | null;
+  /** The starter repo student repos are generated from; none on `empty_repo` ones. */
+  template: { owner: string; repo: string; branch: string | null } | null;
 }
 
 /** One assignment repo, merged from GitHub, the watched folders and the Pages manifest. */
@@ -333,8 +337,8 @@ export interface Accepted {
 /** What a submit would send (`submit_check`). */
 export interface SubmitCheck {
   /** The clone has `.classroom50.yaml`. Without it gh-student finds the assignment from the
-   *  repo's name; the check fails first with `unknownAssignment` (the app doesn't know it
-   *  either) or `ghStudentOutdated` (`params.version`, `params.min`) when it couldn't. */
+   *  repo's name; the check fails first with `unknownAssignment` (the name doesn't match
+   *  its assignment) or `ghStudentOutdated` (`params.version`, `params.min`) when it couldn't. */
   hasMarker: boolean;
   /** Changes not committed yet, editor and OS files aside: submit refuses while there are any. */
   uncommitted: string[];
