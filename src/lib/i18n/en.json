@@ -284,7 +284,7 @@
   "submit.remoteAheadBy": "GitHub has commits this clone doesn't have (the latest by {author}). Submitting sends your files as they are, so changes made only on GitHub are undone. Pull first to keep them.",
   "submit.unchanged": "Nothing changed since the last push: this grades the same work again.",
   "submit.late": "The due date has passed, so this submission will be marked late.",
-  "submit.noMarker": "This assignment has no autograder setup to submit through. Commit and push your work with git instead.",
+  "submit.noMarker": "The toolbox can't tell which assignment this repository belongs to, so it can't submit it from here. Commit and push your work with git instead.",
   "submit.updateGhStudent": "This repository has no .classroom50.yaml, so Classroom 50 (gh student) finds its assignment from the repository's name. That needs version {min} or newer, and {version} is installed. Update it now?",
   "submit.done": "Submitted. The autograder runs now, and the grade shows up here when it's done. Your clone is now one commit behind GitHub: click Pull to get the submission commit.",
   "submit.view": "View submission",

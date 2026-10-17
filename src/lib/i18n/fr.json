@@ -288,7 +288,7 @@
   "submit.remoteAheadBy": "GitHub a des commits que ce clone n'a pas (le dernier de {author}). Rendre envoie vos fichiers tels quels, donc les modifications faites uniquement sur GitHub sont annulées. Faites d'abord un pull pour les garder.",
   "submit.unchanged": "Rien n'a changé depuis le dernier push : le même travail sera noté à nouveau.",
   "submit.late": "L'échéance est passée, ce rendu sera donc marqué en retard.",
-  "submit.noMarker": "Ce devoir n'a pas de correction automatique par laquelle rendre. Faites plutôt un commit et un push de votre travail avec git.",
+  "submit.noMarker": "La toolbox ne sait pas à quel devoir appartient ce dépôt, elle ne peut donc pas le rendre d'ici. Faites plutôt un commit et un push de votre travail avec git.",
   "submit.updateGhStudent": "Ce dépôt n'a pas de .classroom50.yaml : Classroom 50 (gh student) retrouve donc son devoir d'après le nom du dépôt. Il faut pour cela la version {min} ou plus récente, et la version {version} est installée. Le mettre à jour maintenant ?",
   "submit.done": "Rendu. La correction automatique démarre, et la note s'affiche ici quand c'est fini. Votre clone a maintenant un commit de retard sur GitHub : cliquez sur Pull pour récupérer le commit du rendu.",
   "submit.view": "Voir le rendu",

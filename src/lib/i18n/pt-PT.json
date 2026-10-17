@@ -288,7 +288,7 @@
   "submit.remoteAheadBy": "O GitHub tem commits que este clone não tem (o mais recente de {author}). Entregar envia os teus ficheiros tal como estão, por isso as alterações feitas só no GitHub são desfeitas. Faz pull primeiro para as manteres.",
   "submit.unchanged": "Nada mudou desde o último push: isto avalia novamente o mesmo trabalho.",
   "submit.late": "O prazo já passou, por isso esta entrega vai ser marcada como atrasada.",
-  "submit.noMarker": "Este trabalho não tem um avaliador automático configurado para receber entregas. Em vez disso, faz commit e push do teu trabalho com o git.",
+  "submit.noMarker": "A app não consegue identificar a que trabalho pertence este repositório, por isso não o pode entregar daqui. Em vez disso, faz commit e push do teu trabalho com o git.",
   "submit.updateGhStudent": "Este repositório não tem .classroom50.yaml, por isso o Classroom 50 (gh student) encontra o trabalho pelo nome do repositório. Para isso, precisas da versão {min} ou mais recente, e tens instalada a {version}. Atualizar agora?",
   "submit.done": "Entregue. O avaliador automático começa agora, e a nota aparece aqui quando terminar. O teu clone tem agora menos um commit do que o GitHub: clica em Pull para receberes o commit da entrega.",
   "submit.view": "Ver entrega",

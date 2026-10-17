@@ -288,7 +288,7 @@
   "submit.remoteAheadBy": "GitHub ha commit che questo clone non ha (l'ultimo di {author}). Consegna invia i tuoi file così come sono, quindi le modifiche fatte solo su GitHub vengono annullate. Fai prima pull per conservarle.",
   "submit.unchanged": "Nulla è cambiato dall'ultimo push: lo stesso lavoro viene valutato di nuovo.",
   "submit.late": "La scadenza è passata, quindi questa consegna sarà segnata in ritardo.",
-  "submit.noMarker": "Questo compito non ha un correttore automatico configurato per le consegne. Fai invece commit e push del tuo lavoro con git.",
+  "submit.noMarker": "L'app non riesce a capire a quale compito appartiene questo repository, quindi non può consegnarlo da qui. Fai invece commit e push del tuo lavoro con git.",
   "submit.updateGhStudent": "Questo repository non ha .classroom50.yaml, quindi Classroom 50 (gh student) trova il compito dal nome del repository. Serve la versione {min} o successiva, e hai installato la {version}. Vuoi aggiornarlo ora?",
   "submit.done": "Consegnato. Il correttore automatico parte ora, e il voto compare qui quando ha finito. Il tuo clone ora è indietro di un commit rispetto a GitHub: fai clic su Pull per ricevere il commit della consegna.",
   "submit.view": "Vedi la consegna",

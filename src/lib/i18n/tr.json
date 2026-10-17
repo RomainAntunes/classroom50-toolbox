@@ -284,7 +284,7 @@
   "submit.remoteAheadBy": "GitHub'da bu klonda olmayan commit'ler var (en yenisinin yazarı: {author}). Teslim etmek dosyalarınızı oldukları gibi gönderir, bu yüzden yalnızca GitHub'da yapılan değişiklikler geri alınır. Bunları korumak için önce pull edin.",
   "submit.unchanged": "Son push'tan beri hiçbir şey değişmedi: aynı çalışma yeniden notlandırılır.",
   "submit.late": "Teslim tarihi geçti, bu yüzden bu teslim geç olarak işaretlenecek.",
-  "submit.noMarker": "Bu ödevde teslim için bir autograder kurulumu yok. Bunun yerine çalışmanızı git ile commit ve push edin.",
+  "submit.noMarker": "Toolbox bu deponun hangi ödeve ait olduğunu anlayamıyor, bu yüzden onu buradan teslim edemiyor. Bunun yerine çalışmanızı git ile commit ve push edin.",
   "submit.updateGhStudent": "Bu depoda .classroom50.yaml yok, bu yüzden Classroom 50 (gh student) ödevi deponun adından bulur. Bunun için {min} veya daha yeni bir sürüm gerekir, yüklü sürüm ise {version}. Şimdi güncellensin mi?",
   "submit.done": "Teslim edildi. Autograder şimdi çalışıyor; bittiğinde not burada görünür. Klonunuz artık GitHub'ın bir commit gerisinde: teslim commit'ini almak için Pull'a tıklayın.",
   "submit.view": "Teslimi görüntüle",

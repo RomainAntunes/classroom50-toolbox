@@ -284,7 +284,7 @@
   "submit.remoteAheadBy": "GitHub hat Commits, die dieser Klon nicht hat (der neueste von {author}). Beim Abgeben werden deine Dateien so gesendet, wie sie sind, also werden Änderungen, die nur auf GitHub gemacht wurden, rückgängig gemacht. Pulle zuerst, um sie zu behalten.",
   "submit.unchanged": "Seit dem letzten Push hat sich nichts geändert: Dieselbe Arbeit wird erneut bewertet.",
   "submit.late": "Der Abgabetermin ist vorbei, daher wird diese Abgabe als verspätet markiert.",
-  "submit.noMarker": "Diese Aufgabe hat keine Autograder-Einrichtung für Abgaben. Committe und pushe deine Arbeit stattdessen mit git.",
+  "submit.noMarker": "Die Toolbox weiß nicht, zu welcher Aufgabe dieses Repository gehört, und kann es deshalb nicht von hier abgeben. Committe und pushe deine Arbeit stattdessen mit git.",
   "submit.updateGhStudent": "Dieses Repository hat keine .classroom50.yaml, deshalb findet Classroom 50 (gh student) die Aufgabe über den Namen des Repositorys. Dafür braucht es Version {min} oder neuer, installiert ist {version}. Jetzt aktualisieren?",
   "submit.done": "Abgegeben. Der Autograder läuft jetzt, und die Note erscheint hier, sobald er fertig ist. Dein Klon liegt jetzt einen Commit hinter GitHub: Klicke auf Pull, um den Abgabe-Commit zu holen.",
   "submit.view": "Abgabe ansehen",

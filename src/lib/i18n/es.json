@@ -288,7 +288,7 @@
   "submit.remoteAheadBy": "GitHub tiene commits que este clon no tiene (el último de {author}). Al entregar se envían tus archivos tal como están, así que se deshacen los cambios hechos solo en GitHub. Haz pull primero para conservarlos.",
   "submit.unchanged": "Nada cambió desde el último push: se volverá a calificar el mismo trabajo.",
   "submit.late": "La fecha límite ya pasó, así que esta entrega se marcará como tardía.",
-  "submit.noMarker": "Esta tarea no tiene corrector automático configurado para entregar. Haz commit y push de tu trabajo con git.",
+  "submit.noMarker": "La toolbox no sabe a qué tarea pertenece este repositorio, así que no puede entregarlo desde aquí. Haz commit y push de tu trabajo con git.",
   "submit.updateGhStudent": "Este repositorio no tiene .classroom50.yaml, así que Classroom 50 (gh student) busca su tarea por el nombre del repositorio. Para eso necesita la versión {min} o posterior, y tienes instalada la {version}. ¿Actualizarlo ahora?",
   "submit.done": "Entregada. El corrector automático se ejecuta ahora, y la calificación aparecerá aquí cuando termine. Tu clon queda un commit por detrás de GitHub: haz clic en Pull para traer el commit de la entrega.",
   "submit.view": "Ver entrega",

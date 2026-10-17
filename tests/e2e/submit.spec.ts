@@ -201,6 +201,7 @@ test("no marker and an assignment the app doesn't know only explains", async ({ 
   );
   await app.row("Lab 1").getByRole("button", { name: "Submit" }).click();
   const dialog = await app.dialog();
+  expect(dialog.message).toContain("can't tell which assignment this repository belongs to");
   expect(dialog.message).toContain("Commit and push your work with git instead");
   expect(dialog.labels).toEqual({ ok: "Ok" });
   await app.answer("ok");

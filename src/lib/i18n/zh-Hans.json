@@ -280,7 +280,7 @@
   "submit.remoteAheadBy": "GitHub上有此克隆没有的提交（最新的一个来自{author}）。上交会按原样发送你的文件，因此只在GitHub上做的更改会被撤销。请先拉取以保留这些更改。",
   "submit.unchanged": "自上次推送以来没有任何更改：这会再次为同样的工作评分。",
   "submit.late": "截止日期已过，因此此次上交会被标记为逾期。",
-  "submit.noMarker": "此作业没有可用于上交的自动评分设置。请改用git提交并推送你的工作。",
+  "submit.noMarker": "本工具箱无法判断此仓库属于哪个作业，因此无法从这里上交。请改用git提交并推送你的工作。",
   "submit.updateGhStudent": "此仓库没有.classroom50.yaml，所以Classroom 50（gh student）会根据仓库名称查找作业。这需要{min}或更高版本，而你安装的是{version}。现在更新吗？",
   "submit.done": "已上交。自动评分程序现在开始运行，完成后成绩会显示在这里。你的克隆现在落后GitHub一个提交：点击“拉取”获取上交提交。",
   "submit.view": "查看上交",
