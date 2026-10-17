@@ -100,6 +100,11 @@ pub struct RemoteRepo {
     pub last_submission: Option<Submission>,
     /// The repo's `.classroom50.yaml`, when it has a valid one.
     pub config: Option<RepoConfig>,
+    /// `owner/repo` of the template GitHub generated it from, from the repo list; `None`
+    /// when it wasn't generated from one, the template is private to the viewer, or the
+    /// repo can't be the user's work (`ListedRepo::generated_from`).
+    #[serde(default)]
+    pub template: Option<String>,
     /// Branches with commits missing from the default branch. Like `grade` and `feedback`,
     /// read by the status query, for assignment repos only.
     #[serde(default)]
@@ -1351,16 +1356,21 @@ async fn build(
     let manifests = fetch_manifests(&classrooms, &state.http_cache, http, network, progress).await;
     state.http_cache.save();
 
-    let identify = |owner: Option<&str>, name: Option<&str>, config: Option<&RepoConfig>| {
-        identify(owner, name, config, &classrooms, &manifests)
-    };
-    let remote: Vec<(RemoteRepo, RepoConfig)> = remote
+    let remote = remote
         .into_iter()
         .filter_map(|repo| {
-            let config = identify(Some(&repo.owner), Some(&repo.name), repo.config.as_ref())?;
-            Some((repo, config))
+            let found = Found {
+                owner: Some(&repo.owner),
+                name: Some(&repo.name),
+                config: repo.config.as_ref(),
+                template: repo.template.as_deref(),
+                can_push: repo.can_push,
+            };
+            let (config, by) = identify_by(found, &classrooms, &manifests)?;
+            Some((repo, config, by))
         })
         .collect();
+    let remote = without_doubtful_templates(remote);
     let remote = match status {
         Some(auth) => {
             let remote = refresh_statuses(state, http, auth, remote, progress).await;
@@ -1382,6 +1392,11 @@ async fn build(
             )
         })
         .collect();
+    // A clone without a marker whose repo GitHub knew by its template.
+    let identified: HashMap<String, &RepoConfig> = remote
+        .iter()
+        .map(|(repo, config)| (key(&format!("{}/{}", repo.owner, repo.name)), config))
+        .collect();
     let locals: Vec<(LocalProject, RepoConfig)> = locals
         .into_iter()
         .map(|mut clone| {
@@ -1393,11 +1408,21 @@ async fn build(
             clone
         })
         .filter_map(|clone| {
-            let config = identify(
-                clone.owner.as_deref(),
-                clone.repo.as_deref(),
-                clone.config.as_ref(),
-            )?;
+            let found = Found {
+                owner: clone.owner.as_deref(),
+                name: clone.repo.as_deref(),
+                config: clone.config.as_ref(),
+                template: None,
+                can_push: false,
+            };
+            let config = identify(found, &classrooms, &manifests).or_else(|| {
+                let id = key(&format!(
+                    "{}/{}",
+                    clone.owner.as_deref()?,
+                    clone.repo.as_deref()?
+                ));
+                identified.get(&id).map(|config| (*config).clone())
+            })?;
             Some((clone, config))
         })
         .collect();
@@ -1509,17 +1534,53 @@ fn unaccepted(
     list
 }
 
+/// What `identify` knows of a repo: from GitHub, from a clone, or both.
+#[derive(Clone, Copy, Default)]
+struct Found<'a> {
+    owner: Option<&'a str>,
+    name: Option<&'a str>,
+    config: Option<&'a RepoConfig>,
+    /// `owner/repo` of the template GitHub generated it from (`RemoteRepo::template`).
+    template: Option<&'a str>,
+    /// The user may push to it (`RemoteRepo::can_push`): a template match needs it unless
+    /// the entry's submissions are closed, which makes every student repo read-only.
+    can_push: bool,
+}
+
+/// How `identify_by` told a repo's assignment.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum MatchedBy {
+    Marker,
+    Name,
+    Template,
+}
+
 /// The assignment identity of a repo: its marker file, else its name matched against the
-/// manifests of the owner's classrooms. `None` means it isn't an assignment repo. A marker
-/// naming the slug an assignment was renamed from (a repo the rename skipped, a clone not
-/// pulled since) counts as that assignment, under its current slug.
+/// manifests of the owner's classrooms, else the template it was generated from
+/// (`by_template`). `None` means it isn't an assignment repo. A marker naming the slug an
+/// assignment was renamed from (a repo the rename skipped, a clone not pulled since) counts
+/// as that assignment, under its current slug.
 fn identify(
-    owner: Option<&str>,
-    name: Option<&str>,
-    config: Option<&RepoConfig>,
+    found: Found<'_>,
     classrooms: &BTreeMap<ClassroomKey, Classroom>,
     manifests: &HashMap<ClassroomKey, Vec<Assignment>>,
 ) -> Option<RepoConfig> {
+    identify_by(found, classrooms, manifests).map(|(config, _)| config)
+}
+
+/// `identify`, saying how the assignment was told.
+fn identify_by(
+    found: Found<'_>,
+    classrooms: &BTreeMap<ClassroomKey, Classroom>,
+    manifests: &HashMap<ClassroomKey, Vec<Assignment>>,
+) -> Option<(RepoConfig, MatchedBy)> {
+    let Found {
+        owner,
+        name,
+        config,
+        template,
+        can_push,
+    } = found;
     if let Some(config) = config {
         let mut config = config.clone();
         let current = owner
@@ -1534,21 +1595,142 @@ fn identify(
         if let Some(assignment) = current {
             config.assignment = assignment.slug.clone();
         }
-        return Some(config);
+        return Some((config, MatchedBy::Marker));
     }
     let (owner, name) = (owner?.to_ascii_lowercase(), name?);
-    classrooms
+    let by_name = classrooms
         .iter()
         .filter(|((org, _), _)| *org == owner)
         .find_map(|(key, classroom)| {
             let found =
                 classroom50::assignment_for_repo(name, &classroom.slug, manifests.get(key)?)?;
-            Some(RepoConfig {
-                classroom: classroom.slug.clone(),
-                assignment: found.assignment.slug.clone(),
-                secret: classroom.secret.clone(),
-            })
+            Some((classroom, found.assignment, MatchedBy::Name))
+        });
+    let (classroom, assignment, by) = by_name.or_else(|| {
+        let (classroom, assignment) =
+            by_template(&owner, name, template?, can_push, classrooms, manifests)?;
+        Some((classroom, assignment, MatchedBy::Template))
+    })?;
+    let config = RepoConfig {
+        classroom: classroom.slug.clone(),
+        assignment: assignment.slug.clone(),
+        secret: classroom.secret.clone(),
+    };
+    Some((config, by))
+}
+
+/// Drops the repos told by their template alone (`MatchedBy::Template`) whose assignment
+/// already has a repo told by its marker or name, or another one told by its template: a
+/// scratch copy generated from the same template is no second submission, and two of them
+/// can't be told apart. Each assignment keeps one row, one calendar event, one reminder.
+fn without_doubtful_templates(
+    repos: Vec<(RemoteRepo, RepoConfig, MatchedBy)>,
+) -> Vec<(RemoteRepo, RepoConfig)> {
+    let assignment = |repo: &RemoteRepo, config: &RepoConfig| {
+        (
+            repo.owner.to_ascii_lowercase(),
+            config.classroom.to_ascii_lowercase(),
+            config.assignment.to_ascii_lowercase(),
+        )
+    };
+    let mut told: HashSet<(String, String, String)> = HashSet::new();
+    let mut by_template: HashMap<(String, String, String), usize> = HashMap::new();
+    for (repo, config, by) in &repos {
+        match by {
+            MatchedBy::Template => *by_template.entry(assignment(repo, config)).or_default() += 1,
+            MatchedBy::Marker | MatchedBy::Name => {
+                told.insert(assignment(repo, config));
+            }
+        }
+    }
+    repos
+        .into_iter()
+        .filter(|(repo, config, by)| {
+            let key = assignment(repo, config);
+            *by != MatchedBy::Template || (!told.contains(&key) && by_template[&key] == 1)
         })
+        .map(|(repo, config, _)| (repo, config))
+        .collect()
+}
+
+/// The assignment a repo without a marker or a matching name was generated for: the one
+/// entry, among the manifests of the user's classrooms in the repo's org, whose `template`
+/// is the repo's (a teacher renamed the repo by hand, say). Several entries sharing it (an
+/// assignment reused, one template in two classes) are told apart by the name: the
+/// classroom's `<classroom>-` prefix, then the slug inside it. Still several, or none:
+/// `None`. Never the template repo itself, nor a repo outside the classroom's org (`owner`,
+/// lowercase), nor one named after another of the org's classrooms (`<other>-...`, the
+/// longest prefix deciding): those are no student's work for that entry. `empty_repo`
+/// assignments have no template. Nor a repo the user can't push to (`can_push`), unless the
+/// entry is closed (Close submission sets every student repo read-only). The repo list only
+/// passes a template on for repos that aren't templates or archived
+/// (`ListedRepo::generated_from`).
+fn by_template<'a>(
+    owner: &str,
+    name: &str,
+    template: &str,
+    can_push: bool,
+    classrooms: &'a BTreeMap<ClassroomKey, Classroom>,
+    manifests: &'a HashMap<ClassroomKey, Vec<Assignment>>,
+) -> Option<(&'a Classroom, &'a Assignment)> {
+    let entries: Vec<(&Classroom, &Assignment)> = classrooms
+        .iter()
+        .filter(|((org, _), _)| org == owner)
+        .flat_map(|(key, classroom)| {
+            manifests
+                .get(key)
+                .into_iter()
+                .flatten()
+                .map(move |assignment| (classroom, assignment))
+        })
+        .collect();
+    let itself = format!("{owner}/{name}");
+    if entries.iter().any(|(_, a)| {
+        a.template_name()
+            .is_some_and(|t| t.eq_ignore_ascii_case(&itself))
+    }) {
+        return None;
+    }
+    let lower = name.to_ascii_lowercase();
+    // The classroom the name starts with, if any: `cs-2026-...` belongs to `cs-2026`,
+    // not `cs`.
+    let named_after = classrooms
+        .values()
+        .filter(|c| c.org.eq_ignore_ascii_case(owner))
+        .map(|c| c.slug.to_ascii_lowercase())
+        .filter(|slug| lower.starts_with(&format!("{slug}-")))
+        .max_by_key(String::len);
+    let mut candidates: Vec<(&Classroom, &Assignment)> = entries
+        .into_iter()
+        .filter(|(_, a)| {
+            a.template_name()
+                .is_some_and(|t| t.eq_ignore_ascii_case(template))
+        })
+        .filter(|(c, _)| {
+            named_after
+                .as_ref()
+                .is_none_or(|slug| c.slug.eq_ignore_ascii_case(slug))
+        })
+        // Read only: a teacher's copy or a classmate's public repo, unless the teacher
+        // closed submissions, which makes the student's own repo read-only too.
+        .filter(|(_, a)| can_push || a.closed)
+        .collect();
+    /// Keeps the candidates `keep` accepts, unless none or a single one is left.
+    fn narrow(
+        candidates: &mut Vec<(&Classroom, &Assignment)>,
+        keep: impl Fn(&Classroom, &Assignment) -> bool,
+    ) {
+        if candidates.len() > 1 && candidates.iter().any(|(c, a)| keep(c, a)) {
+            candidates.retain(|(c, a)| keep(c, a));
+        }
+    }
+    narrow(&mut candidates, |_, a| {
+        lower.contains(&a.slug.to_ascii_lowercase())
+    });
+    match candidates.as_slice() {
+        [one] => Some(*one),
+        _ => None,
+    }
 }
 
 /// The name GitHub now lists a clone's repo under, when the clone's `origin` still names
@@ -1626,7 +1808,10 @@ query($cursor: String) {
                  ownerAffiliations: [OWNER, COLLABORATOR, ORGANIZATION_MEMBER],
                  orderBy: {field: PUSHED_AT, direction: DESC}) {
       pageInfo { hasNextPage endCursor }
-      nodes { nameWithOwner pushedAt }
+      nodes {
+        nameWithOwner pushedAt isTemplate isArchived viewerPermission
+        templateRepository { nameWithOwner }
+      }
     }
   }
 }"#;
@@ -1678,6 +1863,39 @@ struct PageInfo {
 struct ListedRepo {
     name_with_owner: String,
     pushed_at: Option<DateTime<Utc>>,
+    #[serde(default)]
+    is_template: bool,
+    #[serde(default)]
+    is_archived: bool,
+    #[serde(default)]
+    viewer_permission: Option<String>,
+    #[serde(default)]
+    template_repository: Option<NameWithOwner>,
+}
+
+impl ListedRepo {
+    /// The template GitHub generated the repo from, only when the repo may be the user's
+    /// own work: not a template itself (one made from the template), not archived. Whether
+    /// a read-only one counts depends on the entry it matches (`by_template`).
+    fn generated_from(&self) -> Option<String> {
+        if self.is_template || self.is_archived {
+            return None;
+        }
+        let template = self.template_repository.as_ref()?;
+        Some(template.name_with_owner.clone())
+    }
+
+    /// The user may push to the repo, `None` when the list didn't say.
+    fn can_push(&self) -> Option<bool> {
+        let permission = self.viewer_permission.as_deref()?;
+        Some(matches!(permission, "ADMIN" | "MAINTAIN" | "WRITE"))
+    }
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct NameWithOwner {
+    name_with_owner: String,
 }
 
 #[derive(Deserialize)]
@@ -1778,6 +1996,7 @@ impl RepoNode {
             head,
             last_submission,
             config,
+            template: None,
             unmerged: Vec::new(),
             grade: None,
             history: Vec::new(),
@@ -1881,6 +2100,17 @@ async fn sync_remote(
                     }
                     None => cache.repos.remove(&k),
                 };
+            }
+        }
+    }
+    // The template comes with the list, so every repo has it, read or not this time.
+    for listed in &listed {
+        if let Some(repo) = cache.repos.get_mut(&key(&listed.name_with_owner)) {
+            repo.template = listed.generated_from();
+            // Fresher than the details, which are only re-read after a push: closing
+            // submissions changes the permission, not `pushedAt`.
+            if let Some(can_push) = listed.can_push() {
+                repo.can_push = can_push;
             }
         }
     }
@@ -2134,6 +2364,7 @@ async fn refresh_statuses(
             continue;
         };
         let mut repo = repo.into_remote();
+        repo.template.clone_from(&old.template);
         repo.unmerged = status.unmerged(repo.default_branch.as_deref());
         repo.feedback = status.feedback(&auth.login);
         repo.grading = status.grading();
@@ -2765,6 +2996,7 @@ mod tests {
                 at: None,
             }),
             config: Some(config("hello")),
+            template: None,
             unmerged: Vec::new(),
             grade: None,
             history: Vec::new(),
@@ -2991,7 +3223,16 @@ mod tests {
         .unwrap();
         let manifests =
             HashMap::from([(("heigvd-poo".to_owned(), "26-poo-c".to_owned()), manifest)]);
-        let find = |owner, name, config| identify(owner, name, config, &classrooms, &manifests);
+        let find = |owner, name, config| {
+            let found = Found {
+                owner,
+                name,
+                config,
+                template: None,
+                can_push: true,
+            };
+            identify(found, &classrooms, &manifests)
+        };
 
         let lab3 = find(
             Some("HEIGVD-POO"),
@@ -3105,8 +3346,16 @@ mod tests {
     #[test]
     fn renamed_assignments_keep_their_repos() {
         let (classrooms, manifests) = renamed_class();
-        let find =
-            |name, config| identify(Some("CS50"), Some(name), config, &classrooms, &manifests);
+        let find = |name, config| {
+            let found = Found {
+                owner: Some("CS50"),
+                name: Some(name),
+                config,
+                template: None,
+                can_push: true,
+            };
+            identify(found, &classrooms, &manifests)
+        };
         // A marker the rename didn't rewrite, or a clone not pulled since.
         let old = cs_config("problem-set-three");
         assert_eq!(
@@ -3247,6 +3496,228 @@ mod tests {
                 "cs50/cs/ps3".to_owned()
             )]
         );
+    }
+
+    #[test]
+    fn identifies_repos_by_their_template() {
+        let c = Classroom::from_team("HEIGVD-POO", "classroom50-26-poo-c", None).unwrap();
+        let d = Classroom::from_team("HEIGVD-POO", "classroom50-26-poo-d", None).unwrap();
+        let other = Classroom::from_team("Elsewhere", "classroom50-web", None).unwrap();
+        // A classroom of the org whose slug starts the others' (no manifest read).
+        let poo = Classroom::from_team("HEIGVD-POO", "classroom50-26-poo", None).unwrap();
+        let template = |repo: &str| json!({"owner": "HEIGVD-POO", "repo": repo, "branch": "main"});
+        let entry = |slug: &str, repo: Option<&str>| json!({"slug": slug, "name": slug, "mode": "team", "template": repo.map(template)});
+        let list = |entries: Vec<serde_json::Value>| -> Vec<Assignment> {
+            serde_json::from_value(serde_json::Value::Array(entries)).unwrap()
+        };
+        let manifests = HashMap::from([
+            (
+                c.key(),
+                list(vec![
+                    entry("labo-3-hogwarts", Some("hogwarts")),
+                    entry("labo-4", Some("shared")),
+                    entry("labo-5", Some("shared")),
+                    entry("labo-6", Some("unique")),
+                    entry("labo-e", None),
+                ]),
+            ),
+            (d.key(), list(vec![entry("labo-3", Some("hogwarts"))])),
+            (other.key(), list(vec![entry("site", Some("unique"))])),
+        ]);
+        let classrooms = BTreeMap::from([
+            (c.key(), c),
+            (d.key(), d),
+            (other.key(), other),
+            (poo.key(), poo),
+        ]);
+        let find = |owner: &str, name: &str, template: Option<&str>| {
+            let found = Found {
+                owner: Some(owner),
+                name: Some(name),
+                config: None,
+                template,
+                can_push: true,
+            };
+            identify(found, &classrooms, &manifests)
+                .map(|c| format!("{}/{}", c.classroom, c.assignment))
+        };
+        let hogwarts = Some("HEIGVD-POO/hogwarts");
+        let shared = Some("heigvd-poo/Shared");
+
+        // One entry with that template: renamed by hand, still found.
+        assert_eq!(
+            find("HEIGVD-POO", "renamed-by-hand", Some("HEIGVD-POO/unique")).as_deref(),
+            Some("26-poo-c/labo-6")
+        );
+        // The name rule comes first.
+        assert_eq!(
+            find("HEIGVD-POO", "26-poo-c-labo-4-alice", hogwarts).as_deref(),
+            Some("26-poo-c/labo-4")
+        );
+        // One template in two classes: the classroom prefix decides, else nothing.
+        assert_eq!(
+            find("HEIGVD-POO", "26-poo-c-hogwarts-alice", hogwarts).as_deref(),
+            Some("26-poo-c/labo-3-hogwarts")
+        );
+        assert_eq!(
+            find("heigvd-poo", "26-POO-D-mine", hogwarts).as_deref(),
+            Some("26-poo-d/labo-3")
+        );
+        assert_eq!(find("HEIGVD-POO", "my-hogwarts", hogwarts), None);
+        // One template reused in a class: the slug in the name decides, else nothing.
+        assert_eq!(
+            find("HEIGVD-POO", "26-poo-c-my-labo-5", shared).as_deref(),
+            Some("26-poo-c/labo-5")
+        );
+        assert_eq!(find("HEIGVD-POO", "26-poo-c-renamed", shared), None);
+        assert_eq!(find("HEIGVD-POO", "labo-4-and-labo-5", shared), None);
+        // No template, an unknown one, the template itself, or a repo outside the org.
+        assert_eq!(find("HEIGVD-POO", "renamed-by-hand", None), None);
+        assert_eq!(find("HEIGVD-POO", "x", Some("HEIGVD-POO/other")), None);
+        assert_eq!(
+            find("HEIGVD-POO", "hogwarts", Some("HEIGVD-POO/unique")),
+            None
+        );
+        assert_eq!(
+            find("alice", "renamed-by-hand", Some("HEIGVD-POO/unique")),
+            None
+        );
+        assert_eq!(
+            find("Elsewhere", "copy", Some("HEIGVD-POO/unique")).as_deref(),
+            Some("web/site")
+        );
+        // Named after another classroom of the org (the longest prefix deciding): an old
+        // term's repo, a sibling class's, never this entry's.
+        assert_eq!(
+            find("HEIGVD-POO", "26-poo-d-renamed", Some("HEIGVD-POO/unique")),
+            None
+        );
+        assert_eq!(
+            find("HEIGVD-POO", "26-poo-x-renamed", Some("HEIGVD-POO/unique")),
+            None
+        );
+        assert_eq!(
+            find("HEIGVD-POO", "26-poo-c-renamed", Some("HEIGVD-POO/unique")).as_deref(),
+            Some("26-poo-c/labo-6")
+        );
+
+        // Accepted that way, the assignment isn't offered again.
+        let mut repo = remote("renamed-by-hand", "aaa", None);
+        repo.owner = "HEIGVD-POO".into();
+        repo.config = None;
+        repo.template = Some("HEIGVD-POO/unique".into());
+        let config = identify(
+            Found {
+                owner: Some(&repo.owner),
+                name: Some(&repo.name),
+                config: None,
+                template: repo.template.as_deref(),
+                can_push: repo.can_push,
+            },
+            &classrooms,
+            &manifests,
+        )
+        .unwrap();
+        let projects = merge(vec![(repo, config)], Vec::new());
+        let list = unaccepted(&projects, &classrooms, &manifests);
+        assert!(list.iter().all(|u| u.assignment.slug != "labo-6"));
+        assert!(list.iter().any(|u| u.assignment.slug == "labo-5"));
+    }
+
+    #[test]
+    fn passes_templates_on_only_for_the_users_own_repos() {
+        let listed = |is_template: bool, is_archived: bool, permission: Option<&str>| {
+            serde_json::from_value::<ListedRepo>(json!({
+                "nameWithOwner": "cs50/renamed",
+                "pushedAt": null,
+                "isTemplate": is_template,
+                "isArchived": is_archived,
+                "viewerPermission": permission,
+                "templateRepository": {"nameWithOwner": "cs50/lab1-template"},
+            }))
+            .unwrap()
+        };
+        for permission in ["ADMIN", "MAINTAIN", "WRITE"] {
+            let repo = listed(false, false, Some(permission));
+            assert_eq!(repo.generated_from().as_deref(), Some("cs50/lab1-template"));
+            assert_eq!(repo.can_push(), Some(true));
+        }
+        // Read only: passed on, `by_template` decides from the entry.
+        for permission in ["READ", "TRIAGE"] {
+            let repo = listed(false, false, Some(permission));
+            assert!(repo.generated_from().is_some());
+            assert_eq!(repo.can_push(), Some(false));
+        }
+        assert_eq!(listed(false, false, None).can_push(), None);
+        // A template made from the template, an old term's archived repo.
+        assert_eq!(listed(true, false, Some("ADMIN")).generated_from(), None);
+        assert_eq!(listed(false, true, Some("ADMIN")).generated_from(), None);
+    }
+
+    /// Close submission sets every student repo read-only: the student's own repo, known
+    /// by its template, stays; a read-only copy of an open assignment's template never counts.
+    #[test]
+    fn a_read_only_repo_matches_a_closed_assignment_only() {
+        let class = Classroom::from_team("cs50", "classroom50-cs", None).unwrap();
+        let manifest: Vec<Assignment> = serde_json::from_value(json!([
+            {"slug": "lab1", "name": "Lab 1", "mode": "individual", "closed": true,
+             "template": {"owner": "cs50", "repo": "lab1-template", "branch": "main"}},
+            {"slug": "lab2", "name": "Lab 2", "mode": "individual",
+             "template": {"owner": "cs50", "repo": "lab2-template", "branch": "main"}},
+        ]))
+        .unwrap();
+        assert!(manifest[0].closed && !manifest[1].closed);
+        let manifests = HashMap::from([(class.key(), manifest)]);
+        let classrooms = BTreeMap::from([(class.key(), class)]);
+        let find = |template: &str, can_push: bool| {
+            let found = Found {
+                owner: Some("cs50"),
+                name: Some("renamed-by-hand"),
+                config: None,
+                template: Some(template),
+                can_push,
+            };
+            identify(found, &classrooms, &manifests).map(|c| c.assignment)
+        };
+        assert_eq!(find("cs50/lab1-template", false).as_deref(), Some("lab1"));
+        assert_eq!(find("cs50/lab1-template", true).as_deref(), Some("lab1"));
+        assert_eq!(find("cs50/lab2-template", false), None);
+        assert_eq!(find("cs50/lab2-template", true).as_deref(), Some("lab2"));
+    }
+
+    #[test]
+    fn a_template_alone_never_doubles_an_assignment() {
+        let repo = |name: &str| {
+            let mut repo = remote(name, "aaa", None);
+            repo.config = None;
+            repo
+        };
+        let lab = |slug: &str| cs_config(slug);
+        let names = |repos: Vec<(RemoteRepo, RepoConfig)>| -> Vec<String> {
+            repos.into_iter().map(|(r, _)| r.name).collect()
+        };
+        // A scratch copy next to the real repo (by name or marker) drops out.
+        let kept = without_doubtful_templates(vec![
+            (repo("cs-lab1-alice"), lab("lab1"), MatchedBy::Name),
+            (
+                repo("alice-lab1-practice"),
+                lab("lab1"),
+                MatchedBy::Template,
+            ),
+            (repo("cs-lab2-alice"), lab("LAB2"), MatchedBy::Marker),
+            (repo("lab2-again"), lab("lab2"), MatchedBy::Template),
+            (repo("renamed-lab3"), lab("lab3"), MatchedBy::Template),
+        ]);
+        assert_eq!(
+            names(kept),
+            ["cs-lab1-alice", "cs-lab2-alice", "renamed-lab3"]
+        );
+        // Two told by their template alone: neither can be trusted.
+        let kept = without_doubtful_templates(vec![
+            (repo("mine"), lab("lab4"), MatchedBy::Template),
+            (repo("also-mine"), lab("lab4"), MatchedBy::Template),
+        ]);
+        assert!(kept.is_empty());
     }
 
     #[test]
@@ -3495,7 +3966,38 @@ mod tests {
         use crate::testenv::golden;
         let list: ListData = serde_json::from_str(&golden("list")).unwrap();
         assert_eq!(list.viewer.login, "ada-e2e");
-        assert_eq!(list.viewer.repositories.nodes.len(), 4);
+        let nodes: Vec<&ListedRepo> = list.viewer.repositories.nodes.iter().flatten().collect();
+        assert_eq!(nodes.len(), 6);
+        let templates: Vec<Option<String>> = nodes.iter().map(|n| n.generated_from()).collect();
+        assert_eq!(templates[3].as_deref(), Some("c50-e2e-lab/blog-starter"));
+        assert_eq!(nodes[3].can_push(), Some(true));
+        // A read-only copy generated from the same template.
+        assert_eq!(nodes[4].name_with_owner, "c50-e2e-lab/blog-solution");
+        assert_eq!(templates[4], templates[3]);
+        assert_eq!(nodes[4].can_push(), Some(false));
+        assert!(templates.iter().filter(|t| t.is_some()).count() == 2);
+        // That repo matches no name: its template says which assignment it is.
+        let web = Classroom::from_team("c50-e2e-lab", "classroom50-web", None).unwrap();
+        let manifest = classroom50::parse_assignments("web", &golden("manifest-web")).unwrap();
+        let manifests = HashMap::from([(web.key(), manifest)]);
+        let classrooms = BTreeMap::from([(web.key(), web)]);
+        let found = Found {
+            owner: Some("c50-e2e-lab"),
+            name: Some("ada-writes"),
+            config: None,
+            template: templates[3].as_deref(),
+            can_push: true,
+        };
+        let config = identify(found, &classrooms, &manifests).unwrap();
+        assert_eq!(config.assignment, "blog");
+        // The read-only copy: Blog is open, so it is no student's work.
+        let copy = Found {
+            name: Some("blog-solution"),
+            template: templates[4].as_deref(),
+            can_push: false,
+            ..found
+        };
+        assert!(identify(copy, &classrooms, &manifests).is_none());
         assert!(!list.viewer.repositories.page_info.has_next_page);
 
         let teams: TeamsData = serde_json::from_str(&golden("teams")).unwrap();
@@ -3525,8 +4027,8 @@ mod tests {
         use crate::testenv::golden;
         let mut details: HashMap<String, Option<RepoNode>> =
             serde_json::from_str(&golden("details")).unwrap();
-        assert_eq!(details.len(), 5);
-        assert!(details["r4"].is_none(), "an unknown repo is null");
+        assert_eq!(details.len(), 7);
+        assert!(details["r6"].is_none(), "an unknown repo is null");
         let hello = details.remove("r0").flatten().unwrap().into_remote();
         assert_eq!(
             hello.config.as_ref().map(|c| c.assignment.as_str()),

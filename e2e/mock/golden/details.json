@@ -92,6 +92,58 @@
     }
   },
   "r3": {
+    "name": "ada-writes",
+    "owner": {
+      "login": "c50-e2e-lab"
+    },
+    "url": "https://github.com/c50-e2e-lab/ada-writes",
+    "isArchived": false,
+    "viewerPermission": "ADMIN",
+    "defaultBranchRef": {
+      "name": "main",
+      "target": {
+        "oid": "6666666666666666666666666666666666666666",
+        "committedDate": "2026-10-13T12:00:00Z",
+        "author": {
+          "name": "Ada E2E",
+          "user": {
+            "login": "ada-e2e"
+          }
+        }
+      }
+    },
+    "config": null,
+    "submissions": {
+      "nodes": []
+    }
+  },
+  "r4": {
+    "name": "blog-solution",
+    "owner": {
+      "login": "c50-e2e-lab"
+    },
+    "url": "https://github.com/c50-e2e-lab/blog-solution",
+    "isArchived": false,
+    "viewerPermission": "READ",
+    "defaultBranchRef": {
+      "name": "main",
+      "target": {
+        "oid": "7777777777777777777777777777777777777777",
+        "committedDate": "2026-10-12T12:00:00Z",
+        "author": {
+          "name": "Ada E2E",
+          "user": {
+            "login": "ada-e2e"
+          }
+        }
+      }
+    },
+    "config": null,
+    "submissions": {
+      "nodes": []
+    }
+  },
+  "r5": {
     "name": "dotfiles",
     "owner": {
       "login": "ada-e2e"
@@ -117,5 +169,5 @@
       "nodes": []
     }
   },
-  "r4": null
+  "r6": null
 }

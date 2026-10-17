@@ -8,6 +8,18 @@
       "autograder": "empty_repo",
       "due": "2026-10-23T12:00:00Z",
       "renamed_from": "website"
+    },
+    {
+      "slug": "blog",
+      "name": "Blog",
+      "mode": "individual",
+      "autograder": "no_autograder",
+      "due": "2026-10-30T12:00:00Z",
+      "template": {
+        "owner": "c50-e2e-lab",
+        "repo": "blog-starter",
+        "branch": "main"
+      }
     }
   ]
 }

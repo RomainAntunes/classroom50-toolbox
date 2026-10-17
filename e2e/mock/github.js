@@ -39,7 +39,7 @@ function repoNode(repo, login) {
     owner: { login: repo.owner },
     url: webUrl(repo),
     isArchived: false,
-    viewerPermission: "ADMIN",
+    viewerPermission: repo.permission ?? "ADMIN",
     defaultBranchRef: {
       name: "main",
       target: {
@@ -102,6 +102,10 @@ export function graphql(world, base, { query, variables = {} }) {
             nodes: world.repos.map((r) => ({
               nameWithOwner: `${r.owner}/${r.name}`,
               pushedAt: r.pushedAt,
+              isTemplate: false,
+              isArchived: false,
+              viewerPermission: r.permission ?? "ADMIN",
+              templateRepository: r.template ? { nameWithOwner: r.template } : null,
             })),
           },
         },
