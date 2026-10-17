@@ -47,7 +47,8 @@ export interface ToolStatus {
   tool: Tool;
   installed: boolean;
   version: string | null;
-  /** Installed but older than the app needs (gh only); installing again upgrades it. */
+  /** Installed but older than the app needs (gh, gh-student): installing gh again upgrades
+   *  it, gh-student is upgraded (`upgradeTool`). */
   outdated: boolean;
 }
 
