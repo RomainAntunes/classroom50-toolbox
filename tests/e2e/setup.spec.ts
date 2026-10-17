@@ -56,6 +56,25 @@ test("Cancel asks Rust to stop the job", async ({ app, page }) => {
   expect(await app.pendingDialogs()).toEqual([]);
 });
 
+test("an outdated gh-student shows Setup, and Update upgrades it instead of installing", async ({
+  app,
+  page,
+}) => {
+  const old = tools().map((tool) =>
+    tool.tool === "gh-student" ? { ...tool, version: "v1.52.2", outdated: true } : tool,
+  );
+  const updated = { tool: "gh-student", installed: true, version: "v1.58.1", outdated: false };
+  await app.start(scenario({ tools: old, responses: { upgrade_tool: [ok(updated)] } }));
+  await expect(page.getByText("Setup", { exact: true })).toBeVisible();
+  const row = page.locator(".tool").filter({ hasText: "Classroom 50 (gh student)" });
+  await expect(row.getByText("v1.52.2, too old")).toBeVisible();
+  await row.getByRole("button", { name: "Update" }).click();
+  // `gh extension install` refuses an installed extension: it's upgraded.
+  expect((await app.waitForCall("upgrade_tool"))[0].args).toEqual({ tool: "gh-student" });
+  expect(await app.calls("install_tool")).toEqual([]);
+  await expect(page.getByText("Setup", { exact: true })).toHaveCount(0);
+});
+
 test("gh-student waits for gh", async ({ app, page }) => {
   await app.start(scenario({ tools: tools(["gh", "gh-student"]) }));
   const row = page.locator(".tool").filter({ hasText: "Classroom 50 (gh student)" });

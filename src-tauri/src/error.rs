@@ -67,6 +67,16 @@ pub enum Error {
     #[error("submissions are closed for this assignment")]
     SubmissionsClosed,
 
+    /// Submit refused: the clone has no `.classroom50.yaml` and its name matches no
+    /// assignment the app knows, so gh-student couldn't find it either.
+    #[error("this repository has no .classroom50.yaml and doesn't match a published assignment")]
+    UnknownAssignment,
+
+    /// Submit refused: the clone has no `.classroom50.yaml` and this gh-student (installed
+    /// version here) can't find the assignment from the repo's name (`tools::MIN_GH_STUDENT`).
+    #[error("submitting a repository without .classroom50.yaml needs gh-student {min} or newer (installed: {version})", min = min_gh_student())]
+    GhStudentOutdated { version: String },
+
     /// Not a GitHub login, checked before it reaches `gh student`.
     #[error("\"{0}\" isn't a GitHub username")]
     InvalidUsername(String),
@@ -236,6 +246,12 @@ impl std::fmt::Display for ManualReason {
     }
 }
 
+/// `1.56.0`, the gh-student `Error::GhStudentOutdated` asks for.
+fn min_gh_student() -> String {
+    let (major, minor, patch) = crate::tools::MIN_GH_STUDENT;
+    format!("{major}.{minor}.{patch}")
+}
+
 /// ", retrying after 14:05 UTC", or nothing when GitHub didn't say.
 fn retry_at(reset_at: &Option<chrono::DateTime<chrono::Utc>>) -> String {
     reset_at
@@ -256,6 +272,9 @@ impl Error {
             Error::TokenFromEnv(var) => vec![("var", var.clone())],
             Error::InvalidUsername(name) => vec![("username", name.clone())],
             Error::ManualInstall { reason, .. } => vec![("reason", reason.code().to_owned())],
+            Error::GhStudentOutdated { version } => {
+                vec![("version", version.clone()), ("min", min_gh_student())]
+            }
             _ => Vec::new(),
         }
     }
@@ -285,6 +304,8 @@ impl Error {
             Error::Student(_) => "student",
             Error::NeedsTeam => "needsTeam",
             Error::SubmissionsClosed => "submissionsClosed",
+            Error::UnknownAssignment => "unknownAssignment",
+            Error::GhStudentOutdated { .. } => "ghStudentOutdated",
             Error::InvalidUsername(_) => "invalidUsername",
             Error::InvalidTeamName => "invalidTeamName",
             Error::NoTerminal => "noTerminal",
@@ -368,6 +389,10 @@ mod tests {
             Error::PathExists("/tmp/lab-1".into()),
             Error::NeedsTeam,
             Error::SubmissionsClosed,
+            Error::UnknownAssignment,
+            Error::GhStudentOutdated {
+                version: "v1.55.0".into(),
+            },
             Error::InvalidUsername("--help".into()),
             Error::InvalidTeamName,
             Error::NoTerminal,

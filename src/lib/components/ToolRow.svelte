@@ -155,8 +155,11 @@
       {#if upgrading || installing}
         <button onclick={cancel} disabled={!job}>{t("setup.cancel")}</button>
       {:else if status.outdated}
-        <!-- Installing again upgrades it, through the same package manager. -->
-        <button class="primary" onclick={install}>{t("setup.update")}</button>
+        <!-- gh is installed again, which upgrades it through the same package manager;
+             gh-student is upgraded (`gh extension install` refuses an installed one). -->
+        <button class="primary" onclick={status.tool === "gh-student" ? upgrade : install}
+          >{t("setup.update")}</button
+        >
       {:else if latest}
         <button class="primary" onclick={upgrade}>{t("setup.update")}</button>
       {/if}

@@ -20,6 +20,11 @@ pub const GH_STUDENT_REPO: &str = "foundation50/gh-student";
 /// 2.81.0. Debian's and Ubuntu's own gh is older; installing again from the app upgrades it.
 pub const MIN_GH: (u32, u32, u32) = (2, 81, 0);
 
+/// The oldest gh-student the app works with: `gh student submit` finds the assignment of a
+/// repo without `.classroom50.yaml` (`no_autograder` and `empty_repo` assignments) from the
+/// repo's name since 1.56.0. Older ones are updated with `gh extension upgrade`.
+pub const MIN_GH_STUDENT: (u32, u32, u32) = (1, 56, 0);
+
 /// Payload: every running install or update (`ToolJob[]`), sent when one starts, prints a
 /// line or ends.
 pub const JOBS_EVENT: &str = "tool-jobs";
@@ -48,8 +53,31 @@ pub struct ToolStatus {
     pub tool: Tool,
     pub installed: bool,
     pub version: Option<String>,
-    /// Installed, but older than the app needs (`MIN_GH`); installing again upgrades it.
+    /// Installed, but older than the app needs (`MIN_GH`, `MIN_GH_STUDENT`): installing gh
+    /// again upgrades it, gh-student is upgraded. A version that can't be read isn't.
     pub outdated: bool,
+}
+
+impl ToolStatus {
+    pub fn new(tool: Tool, installed: bool, version: Option<String>) -> Self {
+        let min = match tool {
+            Tool::Git => None,
+            Tool::Gh => Some(MIN_GH),
+            Tool::GhStudent => Some(MIN_GH_STUDENT),
+        };
+        let outdated = min.is_some_and(|min| {
+            version
+                .as_deref()
+                .and_then(parse_semver)
+                .is_some_and(|v| v < min)
+        });
+        Self {
+            tool,
+            installed,
+            version,
+            outdated,
+        }
+    }
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -81,17 +109,7 @@ pub async fn status(tool: Tool) -> ToolStatus {
         ),
         Tool::GhStudent => gh_student_status().await,
     };
-    let outdated = tool == Tool::Gh
-        && version
-            .as_deref()
-            .and_then(parse_semver)
-            .is_some_and(|v| v < MIN_GH);
-    ToolStatus {
-        tool,
-        installed,
-        version,
-        outdated,
-    }
+    ToolStatus::new(tool, installed, version)
 }
 
 fn found(version: Option<String>) -> (bool, Option<String>) {
@@ -768,6 +786,25 @@ mod tests {
         assert!(parse_semver("2.46.0").unwrap() < MIN_GH);
         assert!(parse_semver("2.81.0").unwrap() >= MIN_GH);
         assert!(parse_semver("2.100.0").unwrap() >= MIN_GH);
+        let gh = |v: &str| ToolStatus::new(Tool::Gh, true, Some(v.into())).outdated;
+        assert!(gh("2.46.0"));
+        assert!(!gh("2.81.0"));
+    }
+
+    #[test]
+    fn finds_an_outdated_gh_student() {
+        let outdated = |v: &str| ToolStatus::new(Tool::GhStudent, true, Some(v.into())).outdated;
+        assert!(outdated("v1.55.0"));
+        assert!(outdated("v1.52.2"));
+        assert!(outdated("1.9.0"));
+        assert!(!outdated("v1.56.0"));
+        assert!(!outdated("v1.58.1"));
+        assert!(!outdated("v2.0.0"));
+        // A git clone of the extension has no version: not called outdated.
+        assert!(!ToolStatus::new(Tool::GhStudent, true, None).outdated);
+        assert!(!ToolStatus::new(Tool::GhStudent, false, None).outdated);
+        // git has no minimum.
+        assert!(!ToolStatus::new(Tool::Git, true, Some("1.0.0".into())).outdated);
     }
 
     #[test]
