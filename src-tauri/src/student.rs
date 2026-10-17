@@ -10,7 +10,7 @@ use std::time::Duration;
 
 use serde::Serialize;
 
-use crate::classroom50::{self, REPO_CONFIG_FILE};
+use crate::classroom50::{self, Assignment, REPO_CONFIG_FILE, RepoConfig};
 use crate::error::{Error, Result};
 use crate::process;
 use crate::push;
@@ -288,6 +288,23 @@ fn submit_args(has_marker: bool, key: Option<&str>) -> Vec<OsString> {
     args
 }
 
+/// Whether the clone's marker (`local`) still names the slug `assignment` was renamed from
+/// while GitHub's (`github`) doesn't: `gh teacher assignment rename` rewrote it, and
+/// `gh student submit`, which pushes the clone's files as they are, would put the old one
+/// back. Pulling first brings the new marker. A repo the rename skipped (GitHub's marker
+/// old too) is left to gh-student.
+pub fn stale_marker(
+    local: Option<&RepoConfig>,
+    github: Option<&RepoConfig>,
+    assignment: &Assignment,
+) -> bool {
+    let Some(old) = assignment.old_slug() else {
+        return false;
+    };
+    let names_old = |marker: &RepoConfig| marker.assignment.eq_ignore_ascii_case(old);
+    local.is_some_and(names_old) && !github.is_some_and(names_old)
+}
+
 /// `View your submission at: https://github.com/o/r/commit/<sha>`.
 fn submission_url(stdout: &str) -> Option<String> {
     stdout.lines().find_map(|line| {
@@ -335,6 +352,31 @@ fn failure(stderr: &str) -> Error {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn a_marker_from_before_a_rename_needs_a_pull() {
+        let assignment: Assignment = serde_json::from_value(serde_json::json!({
+            "slug": "ps3", "name": "PS3", "mode": "individual", "renamed_from": "problem-set-three"
+        }))
+        .unwrap();
+        let marker = |slug: &str| RepoConfig {
+            classroom: "cs".into(),
+            assignment: slug.into(),
+            secret: None,
+        };
+        let (old, new) = (marker("Problem-Set-Three"), marker("ps3"));
+        // Rewritten on GitHub, not pulled yet; or no GitHub data to tell.
+        assert!(stale_marker(Some(&old), Some(&new), &assignment));
+        assert!(stale_marker(Some(&old), None, &assignment));
+        // Pulled, a repo the rename skipped, no marker in the clone.
+        assert!(!stale_marker(Some(&new), Some(&new), &assignment));
+        assert!(!stale_marker(Some(&old), Some(&old), &assignment));
+        assert!(!stale_marker(None, Some(&new), &assignment));
+        // Never renamed.
+        let mut plain = assignment.clone();
+        plain.renamed_from = None;
+        assert!(!stale_marker(Some(&old), Some(&new), &plain));
+    }
 
     #[test]
     fn reads_the_accepted_repo() {
