@@ -1,0 +1,395 @@
+{
+  "date": "2026-10-17",
+  "notes": {
+    "en": [
+      {
+        "kind": "new",
+        "text": "Submit now also works on assignments created without autograding files. If Classroom 50 (gh student) is too old for that, the app offers to update it first."
+      },
+      {
+        "kind": "new",
+        "text": "When the autograder stops a test at its time limit, the test's details say so and show what your program printed before it was stopped."
+      },
+      {
+        "kind": "improved",
+        "text": "Assignments are found even when their repository doesn't have the usual name, from the template it was created from."
+      },
+      {
+        "kind": "fixed",
+        "text": "When your teacher renames an assignment, the app follows it: your clone stays on the same row, hidden items stay hidden, and Submit asks you to pull first."
+      },
+      {
+        "kind": "fixed",
+        "text": "Updating an outdated Classroom 50 (gh student) works instead of failing."
+      },
+      {
+        "kind": "fixed",
+        "text": "The app's log takes 1 MB at most and keeps more of its history for diagnostics reports."
+      }
+    ],
+    "fr": [
+      {
+        "kind": "new",
+        "text": "Rendre fonctionne maintenant aussi pour les devoirs créés sans fichiers de correction automatique. Si Classroom 50 (gh student) est trop ancien pour cela, l'app propose d'abord de le mettre à jour."
+      },
+      {
+        "kind": "new",
+        "text": "Quand la correction automatique arrête un test à sa limite de temps, les détails du test le disent et montrent ce que votre programme avait affiché avant d'être arrêté."
+      },
+      {
+        "kind": "improved",
+        "text": "Les devoirs sont reconnus même quand leur dépôt ne porte pas le nom habituel, grâce au modèle dont il a été créé."
+      },
+      {
+        "kind": "fixed",
+        "text": "Quand votre enseignant renomme un devoir, l'app suit : votre clone reste sur la même ligne, les éléments masqués restent masqués, et Rendre vous demande d'abord un pull."
+      },
+      {
+        "kind": "fixed",
+        "text": "La mise à jour d'un Classroom 50 (gh student) trop ancien fonctionne au lieu d'échouer."
+      },
+      {
+        "kind": "fixed",
+        "text": "Le journal de l'app prend 1 Mo au maximum et garde plus d'historique pour les rapports de diagnostic."
+      }
+    ],
+    "es": [
+      {
+        "kind": "new",
+        "text": "Entregar ahora también funciona en tareas creadas sin archivos de corrección automática. Si Classroom 50 (gh student) es demasiado antiguo para eso, la app te ofrece actualizarlo primero."
+      },
+      {
+        "kind": "new",
+        "text": "Cuando el corrector automático detiene una prueba al llegar a su límite de tiempo, los detalles de la prueba lo indican y muestran lo que tu programa había mostrado antes de detenerse."
+      },
+      {
+        "kind": "improved",
+        "text": "Las tareas se reconocen aunque su repositorio no tenga el nombre habitual, por la plantilla con la que se creó."
+      },
+      {
+        "kind": "fixed",
+        "text": "Cuando tu docente cambia el nombre de una tarea, la app lo sigue: tu clon queda en la misma fila, lo oculto sigue oculto y Entregar te pide hacer pull primero."
+      },
+      {
+        "kind": "fixed",
+        "text": "Actualizar un Classroom 50 (gh student) antiguo funciona en lugar de fallar."
+      },
+      {
+        "kind": "fixed",
+        "text": "El registro de la app ocupa 1 MB como máximo y guarda más historial para los informes de diagnóstico."
+      }
+    ],
+    "de": [
+      {
+        "kind": "new",
+        "text": "Abgeben klappt jetzt auch bei Aufgaben, die ohne Autograder-Dateien erstellt wurden. Ist Classroom 50 (gh student) dafür zu alt, bietet die App zuerst ein Update an."
+      },
+      {
+        "kind": "new",
+        "text": "Stoppt der Autograder einen Test an seinem Zeitlimit, sagen die Details des Tests das und zeigen, was dein Programm bis dahin ausgegeben hat."
+      },
+      {
+        "kind": "improved",
+        "text": "Aufgaben werden auch erkannt, wenn ihr Repository nicht den üblichen Namen hat, und zwar an der Vorlage, aus der es erstellt wurde."
+      },
+      {
+        "kind": "fixed",
+        "text": "Benennt deine Lehrperson eine Aufgabe um, zieht die App mit: Dein Klon bleibt in derselben Zeile, Ausgeblendetes bleibt ausgeblendet, und Abgeben bittet dich zuerst um einen Pull."
+      },
+      {
+        "kind": "fixed",
+        "text": "Ein veraltetes Classroom 50 (gh student) lässt sich jetzt aktualisieren, statt mit einem Fehler abzubrechen."
+      },
+      {
+        "kind": "fixed",
+        "text": "Das Protokoll der App belegt höchstens 1 MB und hebt mehr Verlauf für Diagnoseberichte auf."
+      }
+    ],
+    "it": [
+      {
+        "kind": "new",
+        "text": "Consegna ora funziona anche per i compiti creati senza file di correzione automatica. Se Classroom 50 (gh student) è troppo vecchio per questo, l'app propone prima di aggiornarlo."
+      },
+      {
+        "kind": "new",
+        "text": "Quando il correttore automatico ferma un test al suo limite di tempo, i dettagli del test lo dicono e mostrano cosa aveva stampato il tuo programma prima di essere fermato."
+      },
+      {
+        "kind": "improved",
+        "text": "I compiti vengono riconosciuti anche quando il loro repository non ha il nome solito, dal modello da cui è stato creato."
+      },
+      {
+        "kind": "fixed",
+        "text": "Quando l'insegnante rinomina un compito, l'app lo segue: il tuo clone resta sulla stessa riga, gli elementi nascosti restano nascosti e Consegna ti chiede prima un pull."
+      },
+      {
+        "kind": "fixed",
+        "text": "Aggiornare un Classroom 50 (gh student) troppo vecchio ora funziona invece di fallire."
+      },
+      {
+        "kind": "fixed",
+        "text": "Il registro dell'app occupa al massimo 1 MB e conserva più cronologia per i report di diagnostica."
+      }
+    ],
+    "pt-BR": [
+      {
+        "kind": "new",
+        "text": "Entregar agora também funciona em tarefas criadas sem arquivos de correção automática. Se o Classroom 50 (gh student) for antigo demais para isso, o app oferece atualizá-lo antes."
+      },
+      {
+        "kind": "new",
+        "text": "Quando o corretor automático para um teste no limite de tempo, os detalhes do teste avisam e mostram o que seu programa tinha exibido antes de ser interrompido."
+      },
+      {
+        "kind": "improved",
+        "text": "As tarefas são reconhecidas mesmo quando o repositório não tem o nome de sempre, pelo modelo a partir do qual ele foi criado."
+      },
+      {
+        "kind": "fixed",
+        "text": "Quando seu professor renomeia uma tarefa, o app acompanha: seu clone continua na mesma linha, o que estava oculto continua oculto e Entregar pede um pull antes."
+      },
+      {
+        "kind": "fixed",
+        "text": "Atualizar um Classroom 50 (gh student) desatualizado funciona em vez de falhar."
+      },
+      {
+        "kind": "fixed",
+        "text": "O registro do app ocupa no máximo 1 MB e guarda mais histórico para os relatórios de diagnóstico."
+      }
+    ],
+    "pt-PT": [
+      {
+        "kind": "new",
+        "text": "Entregar agora também funciona em trabalhos criados sem ficheiros de avaliação automática. Se o Classroom 50 (gh student) for demasiado antigo para isso, a app propõe atualizá-lo primeiro."
+      },
+      {
+        "kind": "new",
+        "text": "Quando o avaliador automático para um teste no limite de tempo, os detalhes do teste dizem-no e mostram o que o teu programa tinha escrito antes de ser parado."
+      },
+      {
+        "kind": "improved",
+        "text": "Os trabalhos são reconhecidos mesmo quando o repositório não tem o nome habitual, pelo modelo a partir do qual foi criado."
+      },
+      {
+        "kind": "fixed",
+        "text": "Quando o teu professor muda o nome de um trabalho, a app acompanha: o teu clone fica na mesma linha, o que estava oculto continua oculto e Entregar pede-te primeiro um pull."
+      },
+      {
+        "kind": "fixed",
+        "text": "Atualizar um Classroom 50 (gh student) desatualizado funciona em vez de falhar."
+      },
+      {
+        "kind": "fixed",
+        "text": "O registo da app ocupa no máximo 1 MB e guarda mais histórico para os relatórios de diagnóstico."
+      }
+    ],
+    "nl": [
+      {
+        "kind": "new",
+        "text": "Inleveren werkt nu ook bij opdrachten die zonder autograder-bestanden zijn gemaakt. Is Classroom 50 (gh student) daarvoor te oud, dan biedt de app eerst een update aan."
+      },
+      {
+        "kind": "new",
+        "text": "Als de autograder een test bij de tijdslimiet stopt, zeggen de details van de test dat en laten ze zien wat je programma had geprint voordat het werd gestopt."
+      },
+      {
+        "kind": "improved",
+        "text": "Opdrachten worden ook herkend als hun repository niet de gewone naam heeft, aan de template waaruit hij is gemaakt."
+      },
+      {
+        "kind": "fixed",
+        "text": "Als je docent een opdracht hernoemt, volgt de app mee: je kloon blijft in dezelfde rij, verborgen items blijven verborgen en Inleveren vraagt je eerst te pullen."
+      },
+      {
+        "kind": "fixed",
+        "text": "Een verouderde Classroom 50 (gh student) bijwerken lukt nu in plaats van te mislukken."
+      },
+      {
+        "kind": "fixed",
+        "text": "Het logboek van de app neemt hooguit 1 MB in beslag en bewaart meer geschiedenis voor diagnoserapporten."
+      }
+    ],
+    "pl": [
+      {
+        "kind": "new",
+        "text": "Oddawanie działa teraz także przy zadaniach utworzonych bez plików autogradera. Jeśli Classroom 50 (gh student) jest na to za stary, aplikacja najpierw proponuje aktualizację."
+      },
+      {
+        "kind": "new",
+        "text": "Gdy autograder przerwie test po przekroczeniu limitu czasu, szczegóły testu to mówią i pokazują, co twój program wypisał przed przerwaniem."
+      },
+      {
+        "kind": "improved",
+        "text": "Zadania są rozpoznawane nawet wtedy, gdy repozytorium nie ma zwykłej nazwy, po szablonie, z którego powstało."
+      },
+      {
+        "kind": "fixed",
+        "text": "Gdy nauczyciel zmieni nazwę zadania, aplikacja za tym nadąża: twój klon zostaje w tym samym wierszu, ukryte elementy pozostają ukryte, a Oddaj najpierw prosi o pull."
+      },
+      {
+        "kind": "fixed",
+        "text": "Aktualizacja przestarzałego Classroom 50 (gh student) działa, zamiast kończyć się błędem."
+      },
+      {
+        "kind": "fixed",
+        "text": "Dziennik aplikacji zajmuje najwyżej 1 MB i zachowuje więcej historii na potrzeby raportów diagnostycznych."
+      }
+    ],
+    "tr": [
+      {
+        "kind": "new",
+        "text": "Teslim etme artık otomatik değerlendirme dosyaları olmadan oluşturulan ödevlerde de çalışıyor. Classroom 50 (gh student) bunun için çok eskiyse uygulama önce güncellemeyi önerir."
+      },
+      {
+        "kind": "new",
+        "text": "Autograder bir testi süre sınırında durdurduğunda testin ayrıntıları bunu belirtir ve programınızın durdurulmadan önce yazdıklarını gösterir."
+      },
+      {
+        "kind": "improved",
+        "text": "Ödevler, deposu alışılmış adı taşımasa bile oluşturulduğu şablondan tanınır."
+      },
+      {
+        "kind": "fixed",
+        "text": "Öğretmeniniz bir ödevin adını değiştirdiğinde uygulama da bunu izler: klonunuz aynı satırda kalır, gizlenenler gizli kalır ve Teslim et önce pull yapmanızı ister."
+      },
+      {
+        "kind": "fixed",
+        "text": "Eski bir Classroom 50 (gh student) sürümünü güncellemek artık hata vermeden çalışıyor."
+      },
+      {
+        "kind": "fixed",
+        "text": "Uygulamanın günlüğü en fazla 1 MB yer kaplar ve tanılama raporları için daha fazla geçmiş saklar."
+      }
+    ],
+    "ar": [
+      {
+        "kind": "new",
+        "text": "أصبح التسليم يعمل أيضًا مع الواجبات التي أُنشئت دون ملفات التصحيح الآلي. وإذا كان Classroom 50 (gh student) أقدم من اللازم لذلك، يعرض التطبيق تحديثه أولًا."
+      },
+      {
+        "kind": "new",
+        "text": "عندما يوقف المصحح الآلي اختبارًا عند بلوغ مهلته، تذكر تفاصيل الاختبار ذلك وتعرض ما طبعه البرنامج قبل إيقافه."
+      },
+      {
+        "kind": "improved",
+        "text": "يُتعرَّف على الواجبات حتى عندما لا يحمل مستودعها الاسم المعتاد، من القالب الذي أُنشئ منه."
+      },
+      {
+        "kind": "fixed",
+        "text": "عندما يغيّر فريق التدريس اسم واجب، يتبعه التطبيق: تبقى النسخة المحلية في الصف نفسه، ويبقى المخفي مخفيًا، ويطلب التسليم إجراء pull أولًا."
+      },
+      {
+        "kind": "fixed",
+        "text": "أصبح تحديث نسخة قديمة من Classroom 50 (gh student) يعمل بدلًا من أن يفشل."
+      },
+      {
+        "kind": "fixed",
+        "text": "لا يتجاوز سجل التطبيق 1 ميغابايت، ويحتفظ بسجل أطول لتقارير التشخيص."
+      }
+    ],
+    "he": [
+      {
+        "kind": "new",
+        "text": "הגשה עובדת עכשיו גם במטלות שנוצרו בלי קובצי בדיקה אוטומטית. אם Classroom 50 (gh student) ישן מדי לשם כך, האפליקציה מציעה לעדכן אותו קודם."
+      },
+      {
+        "kind": "new",
+        "text": "כשהבודק האוטומטי עוצר בדיקה בגבול הזמן שלה, פרטי הבדיקה אומרים זאת ומציגים את מה שהתוכנית הדפיסה לפני שנעצרה."
+      },
+      {
+        "kind": "improved",
+        "text": "מטלות מזוהות גם כשלמאגר שלהן אין השם הרגיל, לפי התבנית שממנה הוא נוצר."
+      },
+      {
+        "kind": "fixed",
+        "text": "כשצוות הקורס משנה שם של מטלה, האפליקציה עוקבת: העותק המקומי נשאר באותה שורה, מה שהוסתר נשאר מוסתר, והגשה מבקשת לבצע pull קודם."
+      },
+      {
+        "kind": "fixed",
+        "text": "עדכון של Classroom 50 (gh student) ישן עובד עכשיו במקום להיכשל."
+      },
+      {
+        "kind": "fixed",
+        "text": "היומן של האפליקציה תופס 1 MB לכל היותר ושומר יותר היסטוריה לדוחות אבחון."
+      }
+    ],
+    "zh-Hans": [
+      {
+        "kind": "new",
+        "text": "现在，没有自动评分文件的作业也能上交了。如果 Classroom 50（gh student）版本太旧，应用会先提示你更新。"
+      },
+      {
+        "kind": "new",
+        "text": "当自动评分程序因超时停止一项测试时，测试详情会说明这一点，并显示你的程序在被停止前输出的内容。"
+      },
+      {
+        "kind": "improved",
+        "text": "即使仓库名称不是通常的格式，也能根据创建它的模板识别出对应的作业。"
+      },
+      {
+        "kind": "fixed",
+        "text": "老师重命名作业后，应用会跟着更新：你的克隆仍在同一行，已隐藏的项目保持隐藏，上交前会先请你拉取。"
+      },
+      {
+        "kind": "fixed",
+        "text": "更新过旧的 Classroom 50（gh student）不再失败。"
+      },
+      {
+        "kind": "fixed",
+        "text": "应用日志最多占用 1 MB，并为诊断报告保留更多历史记录。"
+      }
+    ],
+    "ja": [
+      {
+        "kind": "new",
+        "text": "自動採点のファイルなしで作られた課題でも提出できるようになりました。Classroom 50（gh student）が古すぎる場合は、先に更新を提案します。"
+      },
+      {
+        "kind": "new",
+        "text": "自動採点が制限時間でテストを停止すると、テストの詳細にそのことと、停止されるまでにプログラムが出力した内容が表示されます。"
+      },
+      {
+        "kind": "improved",
+        "text": "リポジトリがいつもの名前でなくても、作成元のテンプレートから課題を認識します。"
+      },
+      {
+        "kind": "fixed",
+        "text": "先生が課題の名前を変えても、アプリが追従します。クローンは同じ行に残り、非表示にした項目は非表示のまま、提出の前にはプルを求めます。"
+      },
+      {
+        "kind": "fixed",
+        "text": "古い Classroom 50（gh student）の更新が失敗せずにできるようになりました。"
+      },
+      {
+        "kind": "fixed",
+        "text": "アプリのログは最大 1 MB に収まり、診断レポート用により多くの履歴を残します。"
+      }
+    ],
+    "ko": [
+      {
+        "kind": "new",
+        "text": "이제 자동 채점 파일 없이 만든 과제도 제출할 수 있어요. Classroom 50 (gh student)이 너무 오래됐으면 앱이 먼저 업데이트를 제안해요."
+      },
+      {
+        "kind": "new",
+        "text": "자동 채점기가 제한 시간에 테스트를 중지하면, 테스트 세부 정보에 그 사실과 프로그램이 중지되기 전에 출력한 내용이 표시돼요."
+      },
+      {
+        "kind": "improved",
+        "text": "리포지토리 이름이 평소와 달라도, 만들어진 템플릿을 보고 과제를 알아봐요."
+      },
+      {
+        "kind": "fixed",
+        "text": "선생님이 과제 이름을 바꾸면 앱도 따라가요. 복제본은 같은 줄에 남고, 숨긴 항목은 계속 숨겨지며, 제출 전에 먼저 끌어오기를 요청해요."
+      },
+      {
+        "kind": "fixed",
+        "text": "오래된 Classroom 50 (gh student) 업데이트가 실패하지 않고 돼요."
+      },
+      {
+        "kind": "fixed",
+        "text": "앱 로그는 최대 1MB만 차지하고, 진단 보고서용 기록을 더 많이 남겨요."
+      }
+    ]
+  }
+}
