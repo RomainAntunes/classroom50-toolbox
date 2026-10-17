@@ -15,12 +15,14 @@ use tauri::{AppHandle, Emitter, Manager};
 use crate::classroom50::SubmissionMode;
 use crate::github;
 use crate::projects::{Project, Snapshot};
-use crate::settings::SettingsStore;
+use crate::settings::{Settings, SettingsStore};
 use crate::status::Grading;
 use crate::tray;
 
 pub const NOTIFY_EVENT: &str = "notify";
 pub const UNSEEN_EVENT: &str = "unseen-updated";
+/// Settings Rust changed by itself (the hidden list after a rename), for the UI's copy.
+pub const SETTINGS_EVENT: &str = "settings-updated";
 
 const FILE_NAME: &str = "alerts.json";
 /// A grade or comment first seen for a repo is announced only if this recent; older ones
@@ -154,7 +156,8 @@ pub fn process(app: &AppHandle, snapshot: &Snapshot) {
     if snapshot.checked_at.is_none() {
         return;
     }
-    let settings = app.state::<SettingsStore>().get();
+    let renames = crate::projects::renamed_ids(snapshot);
+    let settings = carry_hidden(app, &renames);
     let hours = settings.notify_hours_before;
     let snapshot = &without_hidden(snapshot, &settings.hidden, &settings.hidden_classes);
     let state = app.state::<AlertsState>();
@@ -167,6 +170,7 @@ pub fn process(app: &AppHandle, snapshot: &Snapshot) {
             ..Memory::default()
         };
     }
+    carry_over(&mut memory, &renames);
     let notices = diff(&mut memory, snapshot, &hours, Utc::now());
     state.save(&memory);
     let unseen: Vec<String> = memory.unseen.iter().cloned().collect();
@@ -180,6 +184,93 @@ pub fn process(app: &AppHandle, snapshot: &Snapshot) {
     }
     let _ = app.emit(UNSEEN_EVENT, &unseen);
     set_badge(app, attention);
+}
+
+/// The settings, with the hidden ids a rename changed (`projects::renamed_ids`) moved to
+/// the new ones, saved once (`SettingsStore::update`, so a change the UI saves meanwhile
+/// isn't lost) and sent to the UI as `settings-updated`, as `get_settings` reports them.
+fn carry_hidden(app: &AppHandle, renames: &[(String, String)]) -> Settings {
+    let store = app.state::<SettingsStore>();
+    let moved = store.update(|settings| {
+        let hidden = renamed_list(&settings.hidden, renames)?;
+        Some(Settings {
+            hidden,
+            ..settings.clone()
+        })
+    });
+    match moved {
+        Ok(Some(saved)) => {
+            let reported = crate::commands::reported_settings(app, saved.clone());
+            let _ = app.emit(SETTINGS_EVENT, &reported);
+            saved
+        }
+        Ok(None) => store.get(),
+        Err(err) => {
+            log::warn!("could not save the hidden list after a rename: {err}");
+            store.get()
+        }
+    }
+}
+
+/// `ids` with each renamed one replaced, or `None` when none was.
+fn renamed_list(ids: &[String], renames: &[(String, String)]) -> Option<Vec<String>> {
+    let mut changed = false;
+    let list = ids
+        .iter()
+        .map(|id| match renamed(id, renames) {
+            Some(new) => {
+                changed = true;
+                new.to_owned()
+            }
+            None => id.clone(),
+        })
+        .collect();
+    changed.then_some(list)
+}
+
+fn renamed<'a>(id: &str, renames: &'a [(String, String)]) -> Option<&'a str> {
+    renames
+        .iter()
+        .find(|(old, _)| old == id)
+        .map(|(_, new)| new.as_str())
+}
+
+/// Moves what `memory` knows under an id a rename changed to the new id, so nothing seen
+/// under the old one is announced again. What the new id already has wins.
+fn carry_over(memory: &mut Memory, renames: &[(String, String)]) {
+    fn move_keys<V>(map: &mut BTreeMap<String, V>, renames: &[(String, String)]) {
+        for (old, new) in renames {
+            if let Some(value) = map.remove(old) {
+                map.entry(new.clone()).or_insert(value);
+            }
+        }
+    }
+    fn move_items(set: &mut BTreeSet<String>, renames: &[(String, String)]) {
+        for (old, new) in renames {
+            if set.remove(old) {
+                set.insert(new.clone());
+            }
+        }
+    }
+    move_keys(&mut memory.grades, renames);
+    move_keys(&mut memory.grading_failed, renames);
+    move_keys(&mut memory.feedback, renames);
+    move_keys(&mut memory.heads, renames);
+    move_keys(&mut memory.groups, renames);
+    move_keys(&mut memory.dues, renames);
+    move_items(&mut memory.closed, renames);
+    move_items(&mut memory.unseen, renames);
+    move_items(&mut memory.badge, renames);
+    memory.reminded = std::mem::take(&mut memory.reminded)
+        .into_iter()
+        .map(|key| match key.split_once('|') {
+            Some((id, rest)) => match renamed(id, renames) {
+                Some(new) => format!("{new}|{rest}"),
+                None => key,
+            },
+            None => key,
+        })
+        .collect();
 }
 
 /// The snapshot minus hidden assignments and classes, which stay quiet; what changed
@@ -247,36 +338,64 @@ fn diff(
 
     // Newly published assignments, per classroom. A classroom seen for the first time
     // only records its list.
-    let mut catalog: BTreeMap<String, Vec<(String, String, String, String)>> = BTreeMap::new();
+    // A renamed assignment (its old slug already known) is recorded under the new one
+    // without a word.
+    struct Listed {
+        slug: String,
+        old: Option<String>,
+        name: String,
+        classroom: String,
+        id: String,
+    }
+    let mut catalog: BTreeMap<String, Vec<Listed>> = BTreeMap::new();
     for project in &snapshot.projects {
         let Some(owner) = &project.owner else {
             continue;
         };
         let classroom = classroom_key(owner, &project.config.classroom);
-        catalog.entry(classroom).or_default().push((
-            project.config.assignment.clone(),
-            assignment_name(project),
-            classroom_name(project),
-            project.id.clone(),
-        ));
+        catalog.entry(classroom).or_default().push(Listed {
+            slug: project.config.assignment.clone(),
+            old: project
+                .assignment
+                .as_ref()
+                .and_then(|a| a.old_slug())
+                .map(str::to_owned),
+            name: assignment_name(project),
+            classroom: classroom_name(project),
+            id: project.id.clone(),
+        });
     }
     for item in &snapshot.unaccepted {
         let classroom = classroom_key(&item.classroom.org, &item.classroom.slug);
-        catalog.entry(classroom).or_default().push((
-            item.assignment.slug.clone(),
-            item.assignment.name.clone(),
-            item.classroom
+        catalog.entry(classroom).or_default().push(Listed {
+            slug: item.assignment.slug.clone(),
+            old: item.assignment.old_slug().map(str::to_owned),
+            name: item.assignment.name.clone(),
+            classroom: item
+                .classroom
                 .name
                 .clone()
                 .unwrap_or_else(|| item.classroom.slug.clone()),
-            item.id.clone(),
-        ));
+            id: item.id.clone(),
+        });
     }
     for (classroom, assignments) in catalog {
         let first_time = !memory.assignments.contains_key(&classroom);
         let known = memory.assignments.entry(classroom).or_default();
-        for (slug, name, classroom_name, id) in assignments {
-            if known.insert(slug) && !first_time {
+        for Listed {
+            slug,
+            old,
+            name,
+            classroom: classroom_name,
+            id,
+        } in assignments
+        {
+            let renamed = old.is_some_and(|old| known.iter().any(|k| k.eq_ignore_ascii_case(&old)));
+            // A marker may spell the slug in another case than the manifest the app now
+            // follows: the same assignment, no news.
+            let seen = known.iter().any(|k| k.eq_ignore_ascii_case(&slug));
+            known.insert(slug);
+            if !seen && !first_time && !renamed {
                 notices.push(Notice::NewAssignment {
                     assignment: name,
                     classroom: classroom_name,
@@ -508,8 +627,8 @@ fn classroom_name(project: &Project) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::classroom50::{Assignment, RepoConfig};
-    use crate::projects::RemoteRepo;
+    use crate::classroom50::{Assignment, Classroom, RepoConfig};
+    use crate::projects::{RemoteRepo, Unaccepted};
     use crate::status::{Feedback, Grade};
 
     fn assignment(slug: &str, due: Option<DateTime<Utc>>) -> Assignment {
@@ -633,6 +752,126 @@ mod tests {
             ]
         );
         assert!(memory.unseen.contains("org/c-lab1-alice"));
+    }
+
+    #[test]
+    fn a_rename_announces_nothing_seen_under_the_old_id() {
+        let now = Utc::now();
+        let graded = |mut project: Project| {
+            let remote = project.remote.as_mut().unwrap();
+            remote.grade = Some(Grade {
+                tag: "submit/a".into(),
+                score: 8,
+                max_score: 10,
+                tests_passed: 4,
+                tests_total: 5,
+                tests: Vec::new(),
+                published_at: Some(now),
+                url: "u".into(),
+                release_notes: None,
+            });
+            remote.feedback = Some(Feedback {
+                url: "u".into(),
+                comments: 2,
+                latest_at: Some(now),
+            });
+            project
+        };
+        let mut memory = Memory::default();
+        diff(
+            &mut memory,
+            &snapshot(vec![project("lab0", None)]),
+            &[],
+            now,
+        );
+        diff(
+            &mut memory,
+            &snapshot(vec![graded(project("old", None))]),
+            &[],
+            now,
+        );
+        memory.unseen.insert("org/c-old-alice".into());
+
+        // `gh teacher assignment rename` made `old` into `new`, and the repo with it.
+        let mut renamed = graded(project("new", None));
+        renamed.assignment.as_mut().unwrap().renamed_from = Some("old".into());
+        let after = snapshot(vec![renamed]);
+        let renames = crate::projects::renamed_ids(&after);
+        assert_eq!(
+            renames,
+            [
+                ("org/c-old-alice".to_owned(), "org/c-new-alice".to_owned()),
+                ("org/c/old".to_owned(), "org/c/new".to_owned()),
+            ]
+        );
+        carry_over(&mut memory, &renames);
+        assert_eq!(diff(&mut memory, &after, &[], now), Vec::new());
+        assert!(memory.unseen.contains("org/c-new-alice"));
+        assert!(!memory.grades.contains_key("org/c-old-alice"));
+
+        // The hidden list follows, and only when something changed.
+        let hidden = vec!["org/c-old-alice".to_owned(), "org/c/x".to_owned()];
+        assert_eq!(
+            renamed_list(&hidden, &renames),
+            Some(vec!["org/c-new-alice".to_owned(), "org/c/x".to_owned()])
+        );
+        assert_eq!(renamed_list(&hidden[1..], &renames), None);
+    }
+
+    #[test]
+    fn a_renamed_unaccepted_assignment_is_not_new() {
+        let now = Utc::now();
+        let item = |slug: &str, renamed_from: Option<&str>| {
+            let mut assignment = assignment(slug, None);
+            assignment.renamed_from = renamed_from.map(str::to_owned);
+            Unaccepted {
+                id: format!("org/c/{slug}"),
+                classroom: Classroom::from_team("org", "classroom50-c", None).unwrap(),
+                assignment,
+                accept_url: String::new(),
+                group: None,
+            }
+        };
+        let mut memory = Memory::default();
+        let before = Snapshot {
+            unaccepted: vec![item("old", None)],
+            ..snapshot(Vec::new())
+        };
+        diff(&mut memory, &before, &[], now);
+        let after = Snapshot {
+            unaccepted: vec![item("new", Some("old")), item("lab9", None)],
+            ..snapshot(Vec::new())
+        };
+        let notices = diff(&mut memory, &after, &[], now);
+        assert_eq!(
+            notices,
+            vec![Notice::NewAssignment {
+                assignment: "LAB9".into(),
+                classroom: "c".into()
+            }]
+        );
+        assert!(memory.assignments["org/c"].contains("new"));
+    }
+
+    /// A marker spelling the slug `Lab1` was remembered as is; the manifest's `lab1`, which
+    /// the project now carries, is the same assignment.
+    #[test]
+    fn a_slug_in_another_case_is_not_new() {
+        let now = Utc::now();
+        let mut memory = Memory::default();
+        diff(
+            &mut memory,
+            &snapshot(vec![project("Lab1", None)]),
+            &[],
+            now,
+        );
+        let notices = diff(
+            &mut memory,
+            &snapshot(vec![project("lab1", None)]),
+            &[],
+            now,
+        );
+        assert!(notices.is_empty(), "{notices:?}");
     }
 
     #[test]

@@ -351,12 +351,16 @@ pub fn sync_progress(state: State<'_, ProjectsState>) -> SyncProgress {
 
 #[tauri::command]
 pub fn get_settings(app: AppHandle, settings: State<'_, SettingsStore>) -> Settings {
-    let mut current = settings.get();
-    // The OS setting wins: the user may have removed the login item outside the app.
+    reported_settings(&app, settings.get())
+}
+
+/// `settings` as the UI gets them: the OS setting wins, since the user may have removed
+/// the login item outside the app.
+pub fn reported_settings(app: &AppHandle, mut settings: Settings) -> Settings {
     if let Ok(enabled) = app.autolaunch().is_enabled() {
-        current.launch_at_login = enabled;
+        settings.launch_at_login = enabled;
     }
-    current
+    settings
 }
 
 #[tauri::command]

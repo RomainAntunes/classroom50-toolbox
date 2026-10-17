@@ -136,6 +136,7 @@ export function assignment(over: Partial<Assignment> & { slug: string }): Assign
     passThreshold: null,
     teamFormation: null,
     repoVisibility: null,
+    renamedFrom: null,
     ...over,
   };
 }

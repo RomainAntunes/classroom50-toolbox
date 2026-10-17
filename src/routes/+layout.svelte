@@ -9,9 +9,11 @@
     DEEP_LINK_EVENT,
     NOTIFY_EVENT,
     POPOVER_HIDDEN_EVENT,
+    SETTINGS_UPDATED_EVENT,
     UNSEEN_EVENT,
     UPDATE_STATE_EVENT,
     type Notice,
+    type Settings,
     type UpdateStatus,
   } from "$lib/api";
   import { handleDeepLink, linkActive } from "$lib/deeplink";
@@ -126,6 +128,9 @@
       listen<Notice>(NOTIFY_EVENT, (event) => void showNotice(event.payload)),
       listen<string[]>(UNSEEN_EVENT, (event) => {
         session.unseen = event.payload;
+      }),
+      listen<Settings>(SETTINGS_UPDATED_EVENT, (event) => {
+        settings.current = event.payload;
       }),
       listen<UpdateStatus>(UPDATE_STATE_EVENT, (event) => setUpdate(event.payload)),
       listen(DEEP_LINK_EVENT, () => void handleDeepLink()),

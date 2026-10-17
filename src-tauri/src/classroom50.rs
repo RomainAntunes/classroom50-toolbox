@@ -101,6 +101,29 @@ pub struct Assignment {
     /// `"public"` when accepting creates a public repo; `gh student accept` only warns.
     #[serde(default, alias = "repoVisibility")]
     pub repo_visibility: Option<String>,
+    /// The slug before `gh teacher assignment rename` (one rename at most). Repos the
+    /// rename skipped keep the old name and marker, and clones made before it keep an
+    /// `origin` with the old name (GitHub redirects it), so both still count.
+    #[serde(default, alias = "renamedFrom")]
+    pub renamed_from: Option<String>,
+}
+
+impl Assignment {
+    /// The slug a rename left behind, when there was one.
+    pub fn old_slug(&self) -> Option<&str> {
+        self.renamed_from
+            .as_deref()
+            .filter(|old| !old.is_empty() && !old.eq_ignore_ascii_case(&self.slug))
+    }
+
+    /// Whether a marker naming `slug` belongs to this assignment: its slug or the one it
+    /// was renamed from, without regard to case.
+    pub fn answers_to(&self, slug: &str) -> bool {
+        self.slug.eq_ignore_ascii_case(slug)
+            || self
+                .old_slug()
+                .is_some_and(|old| old.eq_ignore_ascii_case(slug))
+    }
 }
 
 #[derive(Debug, Deserialize)]
@@ -290,27 +313,101 @@ pub fn accept_url(org: &str, classroom: &str, assignment: &str, secret: Option<&
     }
 }
 
+/// How a repo name matched an assignment (`assignment_for_repo`).
+#[derive(Debug, Clone)]
+pub struct NameMatch<'a> {
+    pub assignment: &'a Assignment,
+    /// Through the slug it was renamed from: a repo the rename skipped, or the old name
+    /// of a renamed one.
+    pub old_slug: bool,
+    /// What follows `<classroom>-<slug>-`: the username or `group-<n>`.
+    pub suffix: String,
+}
+
 /// The assignment a repo belongs to by the upstream naming rule
 /// `<classroom>-<assignment>-<username or group>` (all lowercase). Needed because
-/// `no_autograder` and `empty_repo` assignments commit no `.classroom50.yaml`. The longest
-/// slug wins so `lab1` doesn't claim `lab1-extra` repos.
+/// `no_autograder` and `empty_repo` assignments commit no `.classroom50.yaml`. Like
+/// gh-student's markerless submit, a slug or the one it was renamed from (`renamed_from`)
+/// matches, and the longest prefix wins so `lab1` doesn't claim `lab1-extra` repos; a
+/// current slug wins over an old one of the same length.
 pub fn assignment_for_repo<'a>(
     repo: &str,
     classroom: &str,
-    slugs: impl IntoIterator<Item = &'a str>,
-) -> Option<&'a str> {
-    let repo = repo.to_ascii_lowercase();
-    slugs
-        .into_iter()
-        .filter(|slug| {
-            let prefix = format!(
-                "{}-{}-",
-                classroom.to_ascii_lowercase(),
-                slug.to_ascii_lowercase()
-            );
-            repo.len() > prefix.len() && repo.starts_with(&prefix)
+    assignments: &'a [Assignment],
+) -> Option<NameMatch<'a>> {
+    let lower = repo.to_ascii_lowercase();
+    let classroom = classroom.to_ascii_lowercase();
+    assignments
+        .iter()
+        .flat_map(|assignment| {
+            let current = Some((assignment.slug.as_str(), false));
+            let old = assignment.old_slug().map(|old| (old, true));
+            current
+                .into_iter()
+                .chain(old)
+                .map(move |(slug, old_slug)| (assignment, slug, old_slug))
         })
-        .max_by_key(|slug| slug.len())
+        .filter_map(|(assignment, slug, old_slug)| {
+            let prefix = format!("{classroom}-{}-", slug.to_ascii_lowercase());
+            (lower.len() > prefix.len() && lower.starts_with(&prefix)).then(|| {
+                let rank = (prefix.len(), !old_slug);
+                let found = NameMatch {
+                    assignment,
+                    old_slug,
+                    suffix: repo[prefix.len()..].to_owned(),
+                };
+                (rank, found)
+            })
+        })
+        .max_by_key(|(rank, _)| *rank)
+        .map(|(_, found)| found)
+}
+
+/// The assignment a marker's `assignment` names: its slug, else the slug it was renamed
+/// from (a marker the rename didn't rewrite, or a clone not pulled since).
+pub fn assignment_for_slug<'a>(
+    slug: &str,
+    assignments: &'a [Assignment],
+) -> Option<&'a Assignment> {
+    assignments
+        .iter()
+        .find(|a| a.slug.eq_ignore_ascii_case(slug))
+        .or_else(|| assignments.iter().find(|a| a.answers_to(slug)))
+}
+
+/// The name a renamed assignment gave repo `repo` (`gh teacher assignment rename` keeps
+/// the suffix): `None` unless the name matches by the old slug.
+pub fn renamed_repo_name(
+    repo: &str,
+    classroom: &str,
+    assignments: &[Assignment],
+) -> Option<String> {
+    let found = assignment_for_repo(repo, classroom, assignments)?;
+    found.old_slug.then(|| {
+        format!(
+            "{}-{}-{}",
+            classroom.to_ascii_lowercase(),
+            found.assignment.slug.to_ascii_lowercase(),
+            found.suffix.to_ascii_lowercase()
+        )
+    })
+}
+
+/// The name repo `repo` had before its assignment was renamed: `None` unless it matches
+/// the current slug of an assignment with a `renamed_from`.
+pub fn previous_repo_name(
+    repo: &str,
+    classroom: &str,
+    assignments: &[Assignment],
+) -> Option<String> {
+    let found = assignment_for_repo(repo, classroom, assignments)?;
+    let old = found.assignment.old_slug().filter(|_| !found.old_slug)?;
+    Some(format!(
+        "{}-{}-{}",
+        classroom.to_ascii_lowercase(),
+        old.to_ascii_lowercase(),
+        found.suffix.to_ascii_lowercase()
+    ))
 }
 
 /// A classroom or assignment slug as upstream's schemas allow it: `^[a-z0-9][a-z0-9-]{1,99}$`.
@@ -450,19 +547,117 @@ mod tests {
         assert!(Classroom::from_team("o", "developers", None).is_none());
     }
 
+    fn assignment(slug: &str, renamed_from: Option<&str>) -> Assignment {
+        serde_json::from_value(serde_json::json!({
+            "slug": slug, "name": slug, "mode": "individual", "renamed_from": renamed_from
+        }))
+        .unwrap()
+    }
+
     #[test]
     fn matches_repos_by_name() {
-        let slugs = ["lab01", "labo-3-hogwarts", "lab1", "lab1-extra"];
-        let find = |repo: &str, classroom: &str| assignment_for_repo(repo, classroom, slugs);
+        let list: Vec<Assignment> = ["lab01", "labo-3-hogwarts", "lab1", "lab1-extra"]
+            .into_iter()
+            .map(|slug| assignment(slug, None))
+            .collect();
+        let find = |repo: &str, classroom: &str| {
+            assignment_for_repo(repo, classroom, &list).map(|m| m.assignment.slug.clone())
+        };
         assert_eq!(
-            find("26-poo-c-labo-3-hogwarts-group-5", "26-poo-c"),
+            find("26-poo-c-labo-3-hogwarts-group-5", "26-poo-c").as_deref(),
             Some("labo-3-hogwarts")
         );
-        assert_eq!(find("26-POO-C-lab01-alice", "26-poo-c"), Some("lab01"));
-        assert_eq!(find("fall-lab1-extra-bob", "fall"), Some("lab1-extra"));
-        assert_eq!(find("fall-lab1-bob", "fall"), Some("lab1"));
+        assert_eq!(
+            find("26-POO-C-lab01-alice", "26-poo-c").as_deref(),
+            Some("lab01")
+        );
+        assert_eq!(
+            find("fall-lab1-extra-bob", "fall").as_deref(),
+            Some("lab1-extra")
+        );
+        assert_eq!(find("fall-lab1-bob", "fall").as_deref(), Some("lab1"));
         assert_eq!(find("26-poo-c-lab01-", "26-poo-c"), None);
         assert_eq!(find("hogwarts", "26-poo-c"), None);
+        let found = assignment_for_repo("fall-lab1-Bob", "fall", &list).unwrap();
+        assert_eq!((found.suffix.as_str(), found.old_slug), ("Bob", false));
+    }
+
+    #[test]
+    fn matches_renamed_assignments_by_their_old_slug() {
+        let list = vec![
+            assignment("ps3", Some("problem-set-three-with-a-long-name")),
+            assignment("hw", None),
+            assignment("hw-extra", Some("hw-x")),
+        ];
+        let find = |repo: &str| {
+            assignment_for_repo(repo, "cs", &list).map(|m| (m.assignment.slug.as_str(), m.old_slug))
+        };
+        // The new name, and a straggler the rename skipped.
+        assert_eq!(find("cs-ps3-alice"), Some(("ps3", false)));
+        assert_eq!(
+            find("cs-problem-set-three-with-a-long-name-alice"),
+            Some(("ps3", true))
+        );
+        // The longest prefix wins, old slug or not: `hw-x` beats `hw`.
+        assert_eq!(find("cs-hw-x-bob"), Some(("hw-extra", true)));
+        assert_eq!(find("cs-hw-bob"), Some(("hw", false)));
+        assert_eq!(find("cs-hw-extra-bob"), Some(("hw-extra", false)));
+        // A tie between a current slug and an old one: the current one wins.
+        let tie = vec![assignment("lab", Some("old")), assignment("old", None)];
+        let found = assignment_for_repo("cs-old-ada", "cs", &tie).unwrap();
+        assert_eq!(
+            (found.assignment.slug.as_str(), found.old_slug),
+            ("old", false)
+        );
+        let tie = vec![assignment("old", None), assignment("lab", Some("old"))];
+        let found = assignment_for_repo("cs-old-ada", "cs", &tie).unwrap();
+        assert_eq!(found.assignment.slug, "old");
+        // A `renamed_from` equal to the slug, or empty, is no second name.
+        let same = [assignment("lab", Some("LAB")), assignment("x", Some(""))];
+        assert!(same.iter().all(|a| a.old_slug().is_none()));
+    }
+
+    #[test]
+    fn markers_may_name_the_old_slug() {
+        let list = vec![assignment("ps3", Some("ps-three")), assignment("ps4", None)];
+        let slug = |marker: &str| assignment_for_slug(marker, &list).map(|a| a.slug.as_str());
+        assert_eq!(slug("ps3"), Some("ps3"));
+        assert_eq!(slug("PS-Three"), Some("ps3"));
+        assert_eq!(slug("ps4"), Some("ps4"));
+        assert_eq!(slug("ps5"), None);
+        // The current slug wins over another assignment's old one.
+        let tie = vec![assignment("lab", Some("old")), assignment("old", None)];
+        assert_eq!(
+            assignment_for_slug("old", &tie).map(|a| a.slug.as_str()),
+            Some("old")
+        );
+    }
+
+    #[test]
+    fn maps_names_across_a_rename() {
+        let list = vec![
+            assignment("ps3", Some("problem-set-three")),
+            assignment("ps4", None),
+        ];
+        assert_eq!(
+            renamed_repo_name("CS-problem-set-three-Alice", "cs", &list).as_deref(),
+            Some("cs-ps3-alice")
+        );
+        assert_eq!(
+            renamed_repo_name("cs-problem-set-three-group-2", "cs", &list).as_deref(),
+            Some("cs-ps3-group-2")
+        );
+        assert_eq!(renamed_repo_name("cs-ps3-alice", "cs", &list), None);
+        assert_eq!(renamed_repo_name("cs-ps4-alice", "cs", &list), None);
+        assert_eq!(
+            previous_repo_name("cs-ps3-alice", "cs", &list).as_deref(),
+            Some("cs-problem-set-three-alice")
+        );
+        assert_eq!(
+            previous_repo_name("cs-problem-set-three-alice", "cs", &list),
+            None
+        );
+        assert_eq!(previous_repo_name("cs-ps4-alice", "cs", &list), None);
     }
 
     #[test]
@@ -541,12 +736,14 @@ mod tests {
         assert!(algo.iter().all(|a| a.due.is_some()));
         let web = parse_assignments("web", &crate::testenv::golden("manifest-web")).unwrap();
         assert_eq!(
-            assignment_for_repo(
-                "web-portfolio-ada-e2e",
-                "web",
-                web.iter().map(|a| a.slug.as_str())
-            ),
+            assignment_for_repo("web-portfolio-ada-e2e", "web", &web)
+                .map(|m| m.assignment.slug.as_str()),
             Some("portfolio")
+        );
+        assert_eq!(web[0].old_slug(), Some("website"));
+        assert_eq!(
+            renamed_repo_name("web-website-ada-e2e", "web", &web).as_deref(),
+            Some("web-portfolio-ada-e2e")
         );
     }
 }

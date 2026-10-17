@@ -358,11 +358,19 @@ fn resolve_local(snapshot: &Snapshot, link: &Link) -> Option<Target> {
                     link: link.clone(),
                 });
             }
+            // A link made before the assignment was renamed names its old slug.
             let id = unaccepted_id(org, classroom, assignment);
             snapshot
                 .unaccepted
                 .iter()
                 .find(|u| u.id.eq_ignore_ascii_case(&id))
+                .or_else(|| {
+                    snapshot.unaccepted.iter().find(|u| {
+                        u.classroom.org.eq_ignore_ascii_case(org)
+                            && u.classroom.slug.eq_ignore_ascii_case(classroom)
+                            && u.assignment.answers_to(assignment)
+                    })
+                })
                 .map(|u| Target::Accept {
                     item: Box::new(u.clone()),
                     listed: true,
@@ -437,20 +445,15 @@ pub async fn fetch_unlisted(app: &AppHandle) -> Result<Option<Target>> {
     );
     let http = app.state::<Http>();
     let manifest = projects.manifest(&http.0, &classroom).await?;
-    let Some(mut assignment) = manifest
-        .into_iter()
-        .find(|a| a.slug.eq_ignore_ascii_case(wanted) && !a.closed)
-    else {
+    let Some(assignment) = linked_assignment(manifest, wanted) else {
         return Ok(Some(Target::Missing { link }));
     };
-    // The validated slug, not the manifest's spelling, is what reaches gh.
-    assignment.slug = wanted.clone();
     let item = Unaccepted {
-        id: unaccepted_id(org, slug, wanted),
+        id: unaccepted_id(org, slug, &assignment.slug),
         accept_url: classroom50::accept_url(
             &classroom.org,
             &classroom.slug,
-            wanted,
+            &assignment.slug,
             classroom.secret.as_deref(),
         ),
         classroom,
@@ -462,6 +465,25 @@ pub async fn fetch_unlisted(app: &AppHandle) -> Result<Option<Target>> {
         item: Box::new(item),
         listed: false,
     }))
+}
+
+/// The open assignment of `manifest` an accept link names: by its slug, else by the slug
+/// it was renamed from (a link made before the rename). The validated slug, not the
+/// manifest's spelling, is what reaches gh: the link's own, or the current one when the
+/// link has the old one and the manifest's passes the same check.
+fn linked_assignment(
+    manifest: Vec<classroom50::Assignment>,
+    wanted: &str,
+) -> Option<classroom50::Assignment> {
+    let mut assignment = classroom50::assignment_for_slug(wanted, &manifest)
+        .filter(|a| !a.closed)?
+        .clone();
+    if assignment.slug.eq_ignore_ascii_case(wanted) {
+        assignment.slug = wanted.to_owned();
+    } else if !classroom50::valid_slug(&assignment.slug) {
+        return None;
+    }
+    Some(assignment)
 }
 
 /// Dev builds only: handles `url` as if the OS had opened it.
@@ -708,6 +730,45 @@ mod tests {
         ));
         // Not listed: the manifest decides.
         assert!(resolve("classroom50-toolbox://accept/heig-vd/26-poo-c/labo-3").is_none());
+    }
+
+    #[test]
+    fn links_made_before_a_rename_still_lead_there() {
+        let renamed = |slug: &str, old: &str| -> classroom50::Assignment {
+            serde_json::from_value(serde_json::json!({
+                "slug": slug, "name": slug, "mode": "individual", "renamed_from": old
+            }))
+            .unwrap()
+        };
+        let mut snapshot = snapshot();
+        snapshot.projects[0].assignment = Some(renamed("labo-1", "labo-one"));
+        snapshot.unaccepted[0].assignment = renamed("labo-2", "labo-two");
+        let resolve = |url: &str| resolve_local(&snapshot, &parse(url).unwrap());
+        assert!(matches!(
+            resolve("classroom50-toolbox://accept/heig-vd/26-poo-c/labo-one"),
+            Some(Target::Project { id, .. }) if id == "heig-vd/26-poo-c-labo-1-alice"
+        ));
+        assert!(matches!(
+            resolve("classroom50-toolbox://accept/heig-vd/26-poo-c/labo-two"),
+            Some(Target::Accept { item, listed: true }) if item.id == "heig-vd/26-poo-c/labo-2"
+        ));
+        assert!(resolve("classroom50-toolbox://accept/heig-vd/other/labo-two").is_none());
+
+        // Unlisted: the manifest's current slug is what gh gets.
+        let manifest = vec![
+            renamed("ps3", "problem-set-three"),
+            renamed("ps4", "ps-four"),
+        ];
+        let found = linked_assignment(manifest.clone(), "problem-set-three").unwrap();
+        assert_eq!(found.slug, "ps3");
+        assert_eq!(
+            linked_assignment(manifest.clone(), "ps4").unwrap().slug,
+            "ps4"
+        );
+        assert!(linked_assignment(manifest, "ps5").is_none());
+        let mut closed = renamed("ps3", "problem-set-three");
+        closed.closed = true;
+        assert!(linked_assignment(vec![closed], "problem-set-three").is_none());
     }
 
     #[test]
