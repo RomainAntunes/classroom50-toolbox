@@ -735,6 +735,11 @@ pub async fn add_teammates(
 
 /// The clone of project `id`, which must exist and still take submissions.
 fn submittable_clone(state: &ProjectsState, id: &str) -> Result<PathBuf> {
+    submittable(state, id).map(|(path, _)| path)
+}
+
+/// Project `id` and its clone, which must exist and still take submissions.
+fn submittable(state: &ProjectsState, id: &str) -> Result<(PathBuf, Project)> {
     let project = state
         .snapshot()
         .projects
@@ -746,9 +751,20 @@ fn submittable_clone(state: &ProjectsState, id: &str) -> Result<PathBuf> {
     if closed {
         return Err(Error::SubmissionsClosed);
     }
-    project
+    let path = project
         .path
-        .ok_or_else(|| Error::Unsupported(format!("{id} has no local clone")))
+        .clone()
+        .ok_or_else(|| Error::Unsupported(format!("{id} has no local clone")))?;
+    Ok((path, project))
+}
+
+/// What a clone without a marker needs for `gh student submit`: whether the repo's name
+/// matched an assignment of its class's manifest, and the unlisted class's key.
+fn submit_target(project: &Project) -> student::SubmitTarget<'_> {
+    student::SubmitTarget {
+        assignment_known: project.assignment.is_some(),
+        key: project.classroom.as_ref().and_then(|c| c.secret.as_deref()),
+    }
 }
 
 /// What submitting project `id` would send, for the confirmation dialog.
@@ -757,8 +773,8 @@ pub async fn submit_check(
     state: State<'_, ProjectsState>,
     id: String,
 ) -> Result<student::SubmitCheck> {
-    let path = submittable_clone(&state, &id)?;
-    student::check(&path).await
+    let (path, project) = submittable(&state, &id)?;
+    student::check(&path, submit_target(&project)).await
 }
 
 /// Submits project `id` with `gh student submit`, then re-reads its status while the
@@ -769,8 +785,8 @@ pub async fn submit_project(
     state: State<'_, ProjectsState>,
     id: String,
 ) -> Result<student::Submitted> {
-    let path = submittable_clone(&state, &id)?;
-    let submitted = student::submit(&path).await?;
+    let (path, project) = submittable(&state, &id)?;
+    let submitted = student::submit(&path, submit_target(&project)).await?;
     tauri::async_runtime::spawn(async move {
         projects::refresh_after_push(&app).await;
     });
@@ -1197,6 +1213,27 @@ mod tests {
 
         assert!(accepted_project(&snapshot, "heigvd/poo").is_none());
         assert!(accepted_project(&snapshot, "").is_none());
+    }
+
+    /// A clone without a marker submits with its class's key, and only for a known assignment.
+    #[test]
+    fn submits_with_the_classs_key() {
+        let mut p = every_push("main", None);
+        let target = submit_target(&p);
+        assert!(target.assignment_known);
+        assert_eq!(target.key, None);
+        p.classroom = Some(crate::classroom50::Classroom {
+            org: "org".into(),
+            slug: "c".into(),
+            name: None,
+            term: None,
+            active: true,
+            secret: Some("a1b2c3d4".into()),
+            pages_base_url: None,
+        });
+        assert_eq!(submit_target(&p).key, Some("a1b2c3d4"));
+        p.assignment = None;
+        assert!(!submit_target(&p).assignment_known);
     }
 
     /// An every-push project on branch `local_branch`, with GitHub's data when `remote` is

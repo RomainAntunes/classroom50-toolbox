@@ -10,6 +10,7 @@ const api = vi.hoisted(() => ({
   commitOnly: vi.fn(),
   submitCheck: vi.fn(),
   submitProject: vi.fn(),
+  upgradeTool: vi.fn(),
   commitPush: vi.fn(),
   suggestedGitIdentity: vi.fn(),
   setGitIdentity: vi.fn(),
@@ -220,36 +221,62 @@ describe("submitProject without a marker", () => {
   const noMarker = { hasMarker: false, uncommitted: [], editorFiles: [] };
   const withActions = (commitActions: Settings["commitActions"]) =>
     (settings.current = { commitActions } as Settings);
+  const tooOld = {
+    kind: "ghStudentOutdated",
+    message: "too old",
+    params: { version: "v1.52.2", min: "1.56.0" },
+  };
 
-  it("offers Commit & push on every-push assignments", async () => {
+  it("submits like any repo, every-push or not, without offering Commit & push", async () => {
     withActions("push");
-    api.submitCheck.mockResolvedValue(noMarker);
-    api.commitCheck.mockResolvedValue(check());
-    dialog.ask.mockResolvedValue(true);
-    const done = submitProject(project(), "Lab");
-    await answer("First version");
-    expect(await done).toBe(true);
-    expect(api.commitPush).toHaveBeenCalledWith("o/r", "First version");
-  });
-
-  it("only explains when push is off in Settings", async () => {
-    for (const actions of ["none", "commit"] as const) {
-      withActions(actions);
-      dialog.message.mockClear();
+    for (const assignment of [{}, { submissionMode: "tag" as const }]) {
       api.submitCheck.mockResolvedValue(noMarker);
-      expect(await submitProject(project(), "Lab")).toBe(false);
-      expect(dialog.ask).not.toHaveBeenCalled();
-      expect(dialog.message).toHaveBeenCalledOnce();
+      api.submitProject.mockResolvedValue({ url: null });
+      dialog.ask.mockResolvedValue(true);
+      expect(await submitProject(project(assignment), "Lab")).toBe(true);
+      expect(dialog.ask).toHaveBeenCalledWith(
+        expect.stringContaining("This sends your committed work"),
+        expect.anything(),
+      );
+      expect(api.submitProject).toHaveBeenCalledWith("o/r");
+      expect(api.commitCheck).not.toHaveBeenCalled();
     }
   });
 
-  it("only explains on tag-mode assignments", async () => {
-    withActions("push");
-    api.submitCheck.mockResolvedValue(noMarker);
-    expect(await submitProject(project({ submissionMode: "tag" }), "Lab")).toBe(false);
+  it("only explains when the app doesn't know the assignment", async () => {
+    api.submitCheck.mockRejectedValue({ kind: "unknownAssignment", message: "unknown" });
+    expect(await submitProject(project(null), "Lab")).toBe(false);
     expect(dialog.ask).not.toHaveBeenCalled();
-    expect(dialog.message).toHaveBeenCalledOnce();
-    expect(api.pushCheck).not.toHaveBeenCalled();
+    expect(dialog.message).toHaveBeenCalledWith(
+      expect.stringContaining("Commit and push your work with git instead"),
+      expect.anything(),
+    );
+    expect(api.submitProject).not.toHaveBeenCalled();
+  });
+
+  it("offers to update an old gh-student, then checks again", async () => {
+    api.submitCheck.mockRejectedValueOnce(tooOld).mockResolvedValue(noMarker);
+    api.upgradeTool.mockResolvedValue({
+      tool: "gh-student",
+      installed: true,
+      version: "v1.58.1",
+      outdated: false,
+    });
+    // Update, then cancel the submit confirm.
+    dialog.ask.mockResolvedValueOnce(true).mockResolvedValueOnce(false);
+    expect(await submitProject(project(), "Lab")).toBe(false);
+    expect(dialog.ask.mock.calls[0][0]).toContain("v1.52.2 is installed");
+    expect(api.upgradeTool).toHaveBeenCalledWith("gh-student");
+    expect(api.submitCheck).toHaveBeenCalledTimes(2);
+    expect(api.submitProject).not.toHaveBeenCalled();
+  });
+
+  it("updates nothing when the student declines", async () => {
+    api.submitCheck.mockRejectedValue(tooOld);
+    dialog.ask.mockResolvedValue(false);
+    expect(await submitProject(project(), "Lab")).toBe(false);
+    expect(api.upgradeTool).not.toHaveBeenCalled();
+    expect(api.submitProject).not.toHaveBeenCalled();
   });
 });
 

@@ -10,10 +10,11 @@ use std::time::Duration;
 
 use serde::Serialize;
 
-use crate::classroom50::REPO_CONFIG_FILE;
+use crate::classroom50::{self, REPO_CONFIG_FILE};
 use crate::error::{Error, Result};
 use crate::process;
 use crate::push;
+use crate::tools::{self, Tool, ToolStatus};
 
 /// Accept's retry loops are bounded at a minute or two.
 const ACCEPT_TIMEOUT: Duration = Duration::from_secs(180);
@@ -191,8 +192,9 @@ fn accept_args(request: &AcceptRequest<'_>) -> Result<Vec<OsString>> {
 #[derive(Debug, Clone, Default, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct SubmitCheck {
-    /// Submit needs `.classroom50.yaml`; `empty_repo` assignments have none and are pushed
-    /// by hand.
+    /// The clone has `.classroom50.yaml`. Without it (`no_autograder` and `empty_repo`
+    /// assignments, or a deleted marker) gh-student finds the assignment from the repo's name
+    /// (`MIN_GH_STUDENT`), which the check has already made sure it can.
     pub has_marker: bool,
     /// Changes not committed yet (new, modified, deleted, staged or not), editor and OS
     /// files aside: submit refuses while there are any.
@@ -202,14 +204,51 @@ pub struct SubmitCheck {
     pub editor_files: Vec<String>,
 }
 
-/// Lists what `check` reports, without taking the index lock.
-pub async fn check(path: &Path) -> Result<SubmitCheck> {
+/// What the app knows of a clone's assignment, which a clone without `.classroom50.yaml`
+/// needs: gh-student then finds the assignment from the repo's name in the class's published
+/// list, which an unlisted class only opens with its key.
+#[derive(Debug, Clone, Copy, Default)]
+pub struct SubmitTarget<'a> {
+    /// The repo's name matches an assignment of its class's manifest.
+    pub assignment_known: bool,
+    /// The unlisted classroom's key.
+    pub key: Option<&'a str>,
+}
+
+/// Lists what `check` reports, without taking the index lock. A clone without a marker is
+/// refused here (`markerless`) when gh-student couldn't submit it.
+pub async fn check(path: &Path, target: SubmitTarget<'_>) -> Result<SubmitCheck> {
+    let has_marker = path.join(REPO_CONFIG_FILE).is_file();
+    if !has_marker {
+        markerless(target, || tools::status(Tool::GhStudent)).await?;
+    }
     let tree = push::work_tree(path).await?;
     Ok(SubmitCheck {
-        has_marker: path.join(REPO_CONFIG_FILE).is_file(),
+        has_marker,
         uncommitted: tree.files,
         editor_files: tree.skipped,
     })
+}
+
+/// A clone without a marker submits only when its assignment is known (else gh-student
+/// can't find it either: `Error::UnknownAssignment`) and gh-student finds assignments by
+/// name (`MIN_GH_STUDENT`, else `Error::GhStudentOutdated`). gh-student's status is only
+/// read once the assignment is known.
+async fn markerless<F, Fut>(target: SubmitTarget<'_>, gh_student: F) -> Result<()>
+where
+    F: FnOnce() -> Fut,
+    Fut: std::future::Future<Output = ToolStatus>,
+{
+    if !target.assignment_known {
+        return Err(Error::UnknownAssignment);
+    }
+    let status = gh_student().await;
+    if status.outdated {
+        return Err(Error::GhStudentOutdated {
+            version: status.version.unwrap_or_default(),
+        });
+    }
+    Ok(())
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -221,15 +260,32 @@ pub struct Submitted {
 
 /// Runs `gh student submit` in the clone at `path`, which must have nothing uncommitted
 /// (`Error::LocalChanges`): the snapshot would send work the student never committed.
-pub async fn submit(path: &Path) -> Result<Submitted> {
-    if !check(path).await?.uncommitted.is_empty() {
+pub async fn submit(path: &Path, target: SubmitTarget<'_>) -> Result<Submitted> {
+    let check = check(path, target).await?;
+    if !check.uncommitted.is_empty() {
         return Err(Error::LocalChanges);
     }
-    let args = vec![OsString::from("student"), "submit".into()];
-    let output = run(args, path, SUBMIT_TIMEOUT).await?;
+    let output = run(
+        submit_args(check.has_marker, target.key),
+        path,
+        SUBMIT_TIMEOUT,
+    )
+    .await?;
     Ok(Submitted {
         url: submission_url(&output.stdout),
     })
+}
+
+/// `gh student submit`, plus `--key=<key>` for a clone without a marker in an unlisted
+/// class: gh-student reads the class's published list under that key to find the
+/// assignment. Never with a marker, which records its own key (gh-student refuses one that
+/// differs), nor a key that isn't one (`valid_secret`), which gh-student would refuse too.
+fn submit_args(has_marker: bool, key: Option<&str>) -> Vec<OsString> {
+    let mut args = vec![OsString::from("student"), "submit".into()];
+    if let Some(key) = key.filter(|key| !has_marker && classroom50::valid_secret(key)) {
+        args.push(format!("--key={key}").into());
+    }
+    args
 }
 
 /// `View your submission at: https://github.com/o/r/commit/<sha>`.
@@ -464,22 +520,118 @@ mod tests {
         git(&["add", "--all"]);
         git(&["commit", "-q", "-m", "one"]);
         std::fs::write(root.join(".DS_Store"), "x").unwrap();
-        let clean = check(&root).await.unwrap();
+        let clean = check(&root, SubmitTarget::default()).await.unwrap();
         assert!(clean.has_marker);
         assert!(clean.uncommitted.is_empty());
         assert_eq!(clean.editor_files, [".DS_Store"]);
 
         std::fs::remove_file(root.join("a.c")).unwrap();
         std::fs::write(root.join("b.c"), "x").unwrap();
-        assert_eq!(check(&root).await.unwrap().uncommitted, ["a.c", "b.c"]);
-        assert!(matches!(submit(&root).await, Err(Error::LocalChanges)));
+        assert_eq!(
+            check(&root, SubmitTarget::default())
+                .await
+                .unwrap()
+                .uncommitted,
+            ["a.c", "b.c"]
+        );
+        assert!(matches!(
+            submit(&root, SubmitTarget::default()).await,
+            Err(Error::LocalChanges)
+        ));
 
         git(&["add", "--all"]);
         git(&["commit", "-q", "-m", "two"]);
         if cfg!(debug_assertions) {
-            assert!(matches!(submit(&root).await, Err(Error::BlockedInDev(_))));
+            assert!(matches!(
+                submit(&root, SubmitTarget::default()).await,
+                Err(Error::BlockedInDev(_))
+            ));
         }
         let _ = std::fs::remove_dir_all(&root);
+    }
+
+    /// A clone without a marker whose assignment the app doesn't know is refused before gh
+    /// runs, and before its uncommitted work is even looked at.
+    #[tokio::test]
+    async fn refuses_a_markerless_clone_of_an_unknown_assignment() {
+        let root = std::env::temp_dir().join(format!("c50tb-markerless-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&root);
+        std::fs::create_dir_all(&root).unwrap();
+        std::fs::write(root.join("a.c"), "x").unwrap();
+        let unknown = SubmitTarget {
+            assignment_known: false,
+            key: Some("a1b2c3d4"),
+        };
+        assert!(matches!(
+            check(&root, unknown).await,
+            Err(Error::UnknownAssignment)
+        ));
+        assert!(matches!(
+            submit(&root, unknown).await,
+            Err(Error::UnknownAssignment)
+        ));
+        let _ = std::fs::remove_dir_all(&root);
+    }
+
+    #[tokio::test]
+    async fn markerless_submit_needs_a_recent_gh_student() {
+        let gh_student = |version: Option<&str>| {
+            let version = version.map(str::to_owned);
+            move || async move { ToolStatus::new(Tool::GhStudent, version.is_some(), version) }
+        };
+        let known = SubmitTarget {
+            assignment_known: true,
+            key: None,
+        };
+        let err = markerless(known, gh_student(Some("v1.55.0")))
+            .await
+            .unwrap_err();
+        assert!(matches!(&err, Error::GhStudentOutdated { version } if version == "v1.55.0"));
+        assert!(markerless(known, gh_student(Some("v1.56.0"))).await.is_ok());
+        assert!(markerless(known, gh_student(Some("v1.58.1"))).await.is_ok());
+        // A version that can't be told (a git clone of the extension) isn't refused, nor is
+        // a missing gh-student (gh then says so itself).
+        assert!(markerless(known, gh_student(None)).await.is_ok());
+        // An unknown assignment is refused without reading gh-student's status.
+        let unknown = SubmitTarget::default();
+        let never = || async { panic!("gh-student's status was read") };
+        assert!(matches!(
+            markerless(unknown, never).await,
+            Err(Error::UnknownAssignment)
+        ));
+    }
+
+    #[test]
+    fn passes_the_key_only_without_a_marker() {
+        let words = |args: Vec<OsString>| -> Vec<String> {
+            args.iter()
+                .map(|a| a.to_string_lossy().into_owned())
+                .collect()
+        };
+        assert_eq!(words(submit_args(true, None)), ["student", "submit"]);
+        assert_eq!(words(submit_args(false, None)), ["student", "submit"]);
+        assert_eq!(
+            words(submit_args(false, Some("a1b2c3d4"))),
+            ["student", "submit", "--key=a1b2c3d4"]
+        );
+        // The marker records its own key; gh-student refuses one that differs.
+        assert_eq!(
+            words(submit_args(true, Some("a1b2c3d4"))),
+            ["student", "submit"]
+        );
+        // Not a key: never passed, so nothing else can reach gh as a flag.
+        for key in ["", "--verbose", "ABCD", "a b c d", "abc"] {
+            assert_eq!(
+                words(submit_args(false, Some(key))),
+                ["student", "submit"],
+                "{key:?}"
+            );
+        }
+        // The key doesn't hide the write from the dev build guard.
+        assert!(process::writes_to_github(
+            "gh",
+            &submit_args(false, Some("a1b2c3d4"))
+        ));
     }
 
     #[test]

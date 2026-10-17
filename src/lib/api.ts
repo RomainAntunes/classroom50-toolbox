@@ -328,7 +328,9 @@ export interface Accepted {
 
 /** What a submit would send (`submit_check`). */
 export interface SubmitCheck {
-  /** Submit needs `.classroom50.yaml`; empty-repo assignments are pushed by hand. */
+  /** The clone has `.classroom50.yaml`. Without it gh-student finds the assignment from the
+   *  repo's name; the check fails first with `unknownAssignment` (the app doesn't know it
+   *  either) or `ghStudentOutdated` (`params.version`, `params.min`) when it couldn't. */
   hasMarker: boolean;
   /** Changes not committed yet, editor and OS files aside: submit refuses while there are any. */
   uncommitted: string[];
