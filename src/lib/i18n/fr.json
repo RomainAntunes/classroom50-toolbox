@@ -416,6 +416,8 @@
   "details.failedTests": "Tests échoués",
   "details.failedTestsHint": "Tests échoués (Détails de la note indique pourquoi)",
   "details.seeOnGitHub": "Voir la suite sur GitHub",
+  "details.timedOut": "Arrêté après {duration} : le programme tournait encore quand le temps s'est écoulé.",
+  "details.timedOutHint": "Ce qu'il avait affiché sans le vider (flush) est perdu, une invite peut donc manquer.",
   "details.releaseNotes": "Rapport de correction",
   "details.moreTests.one": "et {count} autre",
   "details.moreTests.many": "et {count} autres",

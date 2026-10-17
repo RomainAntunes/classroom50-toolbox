@@ -28,8 +28,11 @@ for (const locale of LOCALES) {
       await expect(page.locator("html")).toHaveAttribute("lang", locale);
       await expect(page.locator("html")).toHaveAttribute("dir", textDirection(locale));
       await expect(page.locator("li[data-item]").first()).toBeVisible();
-      // Open a row's details too: they hold the longest labels.
+      // Open a row's details too: they hold the longest labels, and its failed test, which
+      // the autograder stopped at its time limit.
       await page.locator("[data-row]").first().click();
+      await page.locator(".details button.test").first().click();
+      await expect(page.locator(".details .timeout")).toBeVisible();
 
       expect(await untranslated(page), "raw keys on the main page").toEqual([]);
       expect(await overflow(page), "overflow on the main page").toEqual([]);

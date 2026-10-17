@@ -407,6 +407,8 @@
   "details.failedTests": "Failed tests",
   "details.failedTestsHint": "Failed tests (Open grade details shows why)",
   "details.seeOnGitHub": "See the rest on GitHub",
+  "details.timedOut": "Stopped after {duration}: the program was still running when time ran out.",
+  "details.timedOutHint": "What it printed but hadn't flushed yet is lost, so a prompt may be missing.",
   "details.releaseNotes": "Autograder report",
   "details.moreTests.one": "and {count} more",
   "details.moreTests.other": "and {count} more",

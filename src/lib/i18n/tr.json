@@ -407,6 +407,8 @@
   "details.failedTests": "Başarısız testler",
   "details.failedTestsHint": "Başarısız testler (nedenini Not ayrıntılarını aç gösterir)",
   "details.seeOnGitHub": "Gerisini GitHub'da gör",
+  "details.timedOut": "{duration} sonra durduruldu: süre dolduğunda program hâlâ çalışıyordu.",
+  "details.timedOutHint": "Programın yazdırdığı ama henüz flush etmediği metin kaybolur, bu yüzden bir giriş istemi eksik olabilir.",
   "details.releaseNotes": "Autograder raporu",
   "details.moreTests.one": "ve {count} tane daha",
   "details.moreTests.other": "ve {count} tane daha",

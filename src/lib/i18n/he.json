@@ -416,6 +416,8 @@
   "details.failedTests": "בדיקות שנכשלו",
   "details.failedTestsHint": "בדיקות שנכשלו (“פתיחת פרטי הציון” מראה למה)",
   "details.seeOnGitHub": "השאר ב-GitHub",
+  "details.timedOut": "נעצר אחרי {duration}: התוכנית עדיין רצה כשנגמר הזמן.",
+  "details.timedOutHint": "טקסט שהתוכנית הדפיסה אך עוד לא רוקן מהמאגר (flush) אובד, ולכן ייתכן שהנחיה להזנת קלט חסרה.",
   "details.releaseNotes": "דוח הבודק האוטומטי",
   "details.moreTests.one": "ועוד בדיקה אחת",
   "details.moreTests.two": "ועוד שתי בדיקות",

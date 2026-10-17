@@ -103,6 +103,7 @@ function showcase(over: Partial<Scenario> = {}): Scenario {
                   maxScore: 1,
                   output: null,
                   outputClipped: false,
+                  timedOutAfter: null,
                 },
                 {
                   name: "bubble sort",
@@ -111,6 +112,7 @@ function showcase(over: Partial<Scenario> = {}): Scenario {
                   maxScore: 2,
                   output: null,
                   outputClipped: false,
+                  timedOutAfter: null,
                 },
                 {
                   name: "selection sort",
@@ -119,6 +121,7 @@ function showcase(over: Partial<Scenario> = {}): Scenario {
                   maxScore: 2,
                   output: null,
                   outputClipped: false,
+                  timedOutAfter: null,
                 },
                 {
                   name: "merge sort keeps duplicates",
@@ -127,6 +130,7 @@ function showcase(over: Partial<Scenario> = {}): Scenario {
                   maxScore: 2,
                   output: "$ ./sort merge 5 3 3 1\nexpected: 1 3 3 5\n     got: 1 3 5",
                   outputClipped: false,
+                  timedOutAfter: null,
                 },
                 {
                   name: "handles empty input",
@@ -135,6 +139,7 @@ function showcase(over: Partial<Scenario> = {}): Scenario {
                   maxScore: 3,
                   output: null,
                   outputClipped: false,
+                  timedOutAfter: null,
                 },
               ],
             }),

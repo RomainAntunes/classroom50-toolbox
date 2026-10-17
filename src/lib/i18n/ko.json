@@ -398,6 +398,8 @@
   "details.failedTests": "실패한 테스트",
   "details.failedTestsHint": "실패한 테스트(이유는 '성적 세부 정보 열기'에서 볼 수 있어요)",
   "details.seeOnGitHub": "나머지는 GitHub에서 보기",
+  "details.timedOut": "{duration} 후 중지됐어요. 시간이 다 됐을 때 프로그램이 아직 실행 중이었어요.",
+  "details.timedOutHint": "출력했지만 아직 flush하지 않은 내용은 사라지기 때문에 입력 안내 문구가 빠져 있을 수 있어요.",
   "details.releaseNotes": "자동 채점 보고서",
   "details.moreTests.other": "외 {count}개",
   "alerts.noDeadline": "마감 없음",

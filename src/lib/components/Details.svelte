@@ -1,15 +1,15 @@
 <script lang="ts">
   import { openUrl } from "@tauri-apps/plugin-opener";
   import type { GradeTest, ReleaseNotes } from "$lib/api";
-  import { t } from "$lib/i18n";
+  import { secondsLabel, t } from "$lib/i18n";
 
   /** Failed tests listed before "and N more". */
   const MAX_TESTS = 8;
 
   /**
    * The expanded part of a row: the assignment's description, label/value lines, then the
-   * tests the last grade failed, each opening on why (the autograder's output), and what
-   * else the release says.
+   * tests the last grade failed, each opening on why (the autograder's output, led by a line
+   * when it stopped the program at its time limit), and what else the release says.
    */
   let {
     description,
@@ -30,13 +30,19 @@
   let opened = $state<Record<number, boolean>>({});
   let notesOpen = $state(false);
   // Until the release body is read, only its page says why.
-  const explained = $derived(failed.some((test) => test.output !== null) || !!notes?.notes);
+  const explained = $derived(
+    failed.some((test) => test.output !== null || test.timedOutAfter !== null) || !!notes?.notes,
+  );
 </script>
 
 <!-- Test output is code, left to right whatever the UI; the autograder's report follows its
      own words line by line. -->
-{#snippet output(text: string, clipped: boolean, report = false)}
+{#snippet output(text: string, clipped: boolean, report = false, timedOut: number | null = null)}
   <div class="output">
+    {#if timedOut !== null}
+      <p class="timeout">{t("details.timedOut", { duration: secondsLabel(timedOut) })}</p>
+      <p class="hint">{t("details.timedOutHint")}</p>
+    {/if}
     {#if text}<pre class:report dir={report ? null : "ltr"}>{text}</pre>{/if}
     {#if clipped && gradeUrl}
       <button class="link" onclick={() => gradeUrl && openUrl(gradeUrl)}
@@ -63,7 +69,7 @@
     <ul class="tests" role="list">
       {#each failed.slice(0, MAX_TESTS) as test, i (i)}
         <li>
-          {#if test.output !== null || test.outputClipped}
+          {#if test.output !== null || test.outputClipped || test.timedOutAfter !== null}
             <button
               class="test"
               aria-expanded={!!opened[i]}
@@ -77,7 +83,7 @@
               <span class="points">{test.score}/{test.maxScore}</span>
             </button>
             {#if opened[i]}
-              {@render output(test.output ?? "", test.outputClipped)}
+              {@render output(test.output ?? "", test.outputClipped, false, test.timedOutAfter)}
             {/if}
           {:else}
             <div class="test">
@@ -208,6 +214,15 @@
 
   .output {
     margin: 3px 0 6px;
+  }
+
+  .timeout,
+  .hint {
+    margin: 0 0 4px;
+  }
+
+  .hint {
+    color: var(--fg-muted);
   }
 
   pre {

@@ -1,6 +1,14 @@
 import { afterEach, describe, expect, it } from "vitest";
 import en from "./en.json";
-import { catalogs, formatNumber, languageName, resolveLocale, setLocale, t } from "./index";
+import {
+  catalogs,
+  formatNumber,
+  languageName,
+  resolveLocale,
+  secondsLabel,
+  setLocale,
+  t,
+} from "./index";
 
 afterEach(() => setLocale("en"));
 
@@ -125,6 +133,18 @@ describe("locales", () => {
     expect(formatNumber(1.54, 1)).toBe("1,5");
     setLocale("en");
     expect(formatNumber(2, 1)).toBe("2.0");
+  });
+
+  it("spells a time limit exactly, in the UI's language", () => {
+    setLocale("en");
+    expect(secondsLabel(1)).toBe("1 second");
+    expect(secondsLabel(10)).toBe("10 seconds");
+    expect(secondsLabel(90)).toBe("90 seconds");
+    expect(secondsLabel(120)).toBe("2 minutes");
+    expect(secondsLabel(7200)).toBe("2 hours");
+    setLocale("fr");
+    expect(secondsLabel(10)).toMatch(/^10\s+secondes$/);
+    setLocale("en");
   });
 
   it("names each language in itself", () => {

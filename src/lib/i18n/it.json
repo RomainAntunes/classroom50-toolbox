@@ -416,6 +416,8 @@
   "details.failedTests": "Test non superati",
   "details.failedTestsHint": "Test non superati (Apri i dettagli del voto spiega perché)",
   "details.seeOnGitHub": "Vedi il resto su GitHub",
+  "details.timedOut": "Interrotto dopo {duration}: il programma era ancora in esecuzione quando è scaduto il tempo.",
+  "details.timedOutHint": "Ciò che aveva stampato senza fare il flush va perso, quindi può mancare una richiesta di input.",
   "details.releaseNotes": "Report del correttore automatico",
   "details.moreTests.one": "e un altro",
   "details.moreTests.many": "e altri {count}",
