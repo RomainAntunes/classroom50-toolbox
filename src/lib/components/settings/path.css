@@ -1,0 +1,16 @@
+/* A path cut short at its start (`direction: rtl` puts the ellipsis there), the path
+   itself kept left to right by its `<bdi dir="ltr">` so its leading `/` stays put. */
+.path {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  direction: rtl;
+  text-align: left;
+}
+
+/* `direction: rtl` above only puts the ellipsis at the path's start; the text still lines
+   up with the UI's start edge. */
+:global(:root[dir="rtl"]) .path {
+  text-align: right;
+}

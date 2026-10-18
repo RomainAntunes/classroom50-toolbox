@@ -1,0 +1,8 @@
+/* A settings row: its label at the start, its control at the end. */
+.row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space);
+  padding: 8px 12px;
+}

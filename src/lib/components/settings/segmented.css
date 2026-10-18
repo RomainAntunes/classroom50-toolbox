@@ -1,0 +1,18 @@
+.segmented {
+  display: flex;
+  gap: 2px;
+  padding: 2px;
+  border-radius: var(--radius-control);
+  background: var(--bg-control);
+}
+
+.segmented button {
+  padding: 2px 8px;
+  background: transparent;
+  font-size: 0.9em;
+}
+
+.segmented button[aria-pressed="true"] {
+  background: var(--bg-card);
+  box-shadow: 0 0 0 1px var(--border);
+}
