@@ -16,7 +16,7 @@ use tauri::{AppHandle, Manager};
 use tauri_plugin_updater::{Update, UpdaterExt};
 
 use crate::alerts::Notice;
-use crate::error::{Error, Result};
+use crate::error::{Error, ErrorKind, Result};
 use crate::events::{self, IpcEvent};
 use crate::settings::{SettingsStore, UpdateChannel};
 
@@ -104,14 +104,14 @@ pub fn endpoint(channel: UpdateChannel, bundle: Bundle) -> &'static str {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Failure {
-    kind: &'static str,
+    kind: ErrorKind,
     message: String,
 }
 
 impl From<&Error> for Failure {
     fn from(err: &Error) -> Self {
         Self {
-            kind: err.kind(),
+            kind: err.error_kind(),
             message: err.to_string(),
         }
     }
@@ -878,7 +878,7 @@ mod tests {
                 error: failure.clone()
             }
         );
-        assert_eq!(failure.kind, "offline");
+        assert_eq!(failure.kind.as_str(), "offline");
         // An error doesn't stop the next check.
         assert!(machine.begin_check().is_some());
     }

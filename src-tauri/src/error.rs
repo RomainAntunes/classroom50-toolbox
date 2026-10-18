@@ -196,6 +196,76 @@ pub enum Error {
     Autostart(#[from] tauri_plugin_autostart::Error),
 }
 
+/// What kind of error it is: `kind` in the IPC payload, worded by the UI as `error.<kind>`.
+macro_rules! error_kinds {
+    ($($variant:ident = $name:literal,)*) => {
+        #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+        pub enum ErrorKind {
+            $(
+                #[serde(rename = $name)]
+                $variant,
+            )*
+        }
+
+        impl ErrorKind {
+            pub fn as_str(self) -> &'static str {
+                match self {
+                    $(Self::$variant => $name,)*
+                }
+            }
+        }
+    };
+}
+
+error_kinds! {
+    NotInstalled = "notInstalled",
+    CommandFailed = "commandFailed",
+    TimedOut = "timedOut",
+    Unsupported = "unsupported",
+    ManualInstall = "manualInstall",
+    BlockedInDev = "blockedInDev",
+    Cancelled = "cancelled",
+    Busy = "busy",
+    PathExists = "pathExists",
+    SchemaMismatch = "schemaMismatch",
+    Student = "student",
+    NeedsTeam = "needsTeam",
+    SubmissionsClosed = "submissionsClosed",
+    UnknownAssignment = "unknownAssignment",
+    GhStudentOutdated = "ghStudentOutdated",
+    StaleMarker = "staleMarker",
+    InvalidUsername = "invalidUsername",
+    InvalidTeamName = "invalidTeamName",
+    NoTerminal = "noTerminal",
+    LocalChanges = "localChanges",
+    OtherBranch = "otherBranch",
+    Diverged = "diverged",
+    RemoteAhead = "remoteAhead",
+    GitInProgress = "gitInProgress",
+    NothingToPush = "nothingToPush",
+    NothingToCommit = "nothingToCommit",
+    NoIdentity = "noIdentity",
+    FileTooLarge = "fileTooLarge",
+    PushRejected = "pushRejected",
+    NotSignedIn = "notSignedIn",
+    TokenFromEnv = "tokenFromEnv",
+    RateLimited = "rateLimited",
+    GitHub = "github",
+    Offline = "offline",
+    NoSelfUpdate = "noSelfUpdate",
+    CalendarAccess = "calendarAccess",
+    CalendarUnavailable = "calendarUnavailable",
+    InvalidShortcut = "invalidShortcut",
+    ShortcutTaken = "shortcutTaken",
+    ShortcutUnsupported = "shortcutUnsupported",
+    RepoConfig = "repoConfig",
+    Io = "io",
+    Http = "http",
+    Tauri = "tauri",
+    Updater = "updater",
+    Autostart = "autostart",
+}
+
 /// Why the app can't install a tool itself (`Error::ManualInstall`); the UI words it as
 /// `setup.manualReason.<code>`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -295,78 +365,88 @@ impl Error {
     }
 
     pub fn kind(&self) -> &'static str {
+        self.error_kind().as_str()
+    }
+
+    /// `kind()` as the enum the UI sees (`ErrorKind` in `src/lib/bindings.ts`).
+    pub fn error_kind(&self) -> ErrorKind {
         match self {
-            Error::NotInstalled { .. } => "notInstalled",
-            Error::CommandFailed { .. } => "commandFailed",
-            Error::TimedOut { .. } => "timedOut",
-            Error::Unsupported(_) => "unsupported",
-            Error::ManualInstall { .. } => "manualInstall",
-            Error::BlockedInDev(_) => "blockedInDev",
-            Error::Cancelled => "cancelled",
-            Error::Busy => "busy",
-            Error::PathExists(_) => "pathExists",
-            Error::SchemaMismatch { .. } => "schemaMismatch",
-            Error::Student(_) => "student",
-            Error::NeedsTeam => "needsTeam",
-            Error::SubmissionsClosed => "submissionsClosed",
-            Error::UnknownAssignment => "unknownAssignment",
-            Error::GhStudentOutdated { .. } => "ghStudentOutdated",
-            Error::StaleMarker => "staleMarker",
-            Error::InvalidUsername(_) => "invalidUsername",
-            Error::InvalidTeamName => "invalidTeamName",
-            Error::NoTerminal => "noTerminal",
-            Error::LocalChanges => "localChanges",
-            Error::OtherBranch(_) => "otherBranch",
-            Error::Diverged => "diverged",
-            Error::RemoteAhead => "remoteAhead",
-            Error::GitInProgress => "gitInProgress",
-            Error::NothingToPush => "nothingToPush",
-            Error::NothingToCommit => "nothingToCommit",
-            Error::NoIdentity => "noIdentity",
-            Error::FileTooLarge(_) => "fileTooLarge",
-            Error::PushRejected => "pushRejected",
-            Error::NotSignedIn => "notSignedIn",
-            Error::TokenFromEnv(_) => "tokenFromEnv",
-            Error::RateLimited { .. } => "rateLimited",
-            Error::GitHub(_) => "github",
-            Error::Offline => "offline",
-            Error::NoSelfUpdate => "noSelfUpdate",
-            Error::CalendarAccess => "calendarAccess",
-            Error::CalendarUnavailable => "calendarUnavailable",
-            Error::InvalidShortcut => "invalidShortcut",
-            Error::ShortcutTaken => "shortcutTaken",
-            Error::ShortcutUnsupported => "shortcutUnsupported",
-            Error::RepoConfig(_) => "repoConfig",
-            Error::Io(_) => "io",
-            Error::Http(_) => "http",
-            Error::Tauri(_) => "tauri",
-            Error::Updater(_) => "updater",
-            Error::Autostart(_) => "autostart",
+            Error::NotInstalled { .. } => ErrorKind::NotInstalled,
+            Error::CommandFailed { .. } => ErrorKind::CommandFailed,
+            Error::TimedOut { .. } => ErrorKind::TimedOut,
+            Error::Unsupported(_) => ErrorKind::Unsupported,
+            Error::ManualInstall { .. } => ErrorKind::ManualInstall,
+            Error::BlockedInDev(_) => ErrorKind::BlockedInDev,
+            Error::Cancelled => ErrorKind::Cancelled,
+            Error::Busy => ErrorKind::Busy,
+            Error::PathExists(_) => ErrorKind::PathExists,
+            Error::SchemaMismatch { .. } => ErrorKind::SchemaMismatch,
+            Error::Student(_) => ErrorKind::Student,
+            Error::NeedsTeam => ErrorKind::NeedsTeam,
+            Error::SubmissionsClosed => ErrorKind::SubmissionsClosed,
+            Error::UnknownAssignment => ErrorKind::UnknownAssignment,
+            Error::GhStudentOutdated { .. } => ErrorKind::GhStudentOutdated,
+            Error::StaleMarker => ErrorKind::StaleMarker,
+            Error::InvalidUsername(_) => ErrorKind::InvalidUsername,
+            Error::InvalidTeamName => ErrorKind::InvalidTeamName,
+            Error::NoTerminal => ErrorKind::NoTerminal,
+            Error::LocalChanges => ErrorKind::LocalChanges,
+            Error::OtherBranch(_) => ErrorKind::OtherBranch,
+            Error::Diverged => ErrorKind::Diverged,
+            Error::RemoteAhead => ErrorKind::RemoteAhead,
+            Error::GitInProgress => ErrorKind::GitInProgress,
+            Error::NothingToPush => ErrorKind::NothingToPush,
+            Error::NothingToCommit => ErrorKind::NothingToCommit,
+            Error::NoIdentity => ErrorKind::NoIdentity,
+            Error::FileTooLarge(_) => ErrorKind::FileTooLarge,
+            Error::PushRejected => ErrorKind::PushRejected,
+            Error::NotSignedIn => ErrorKind::NotSignedIn,
+            Error::TokenFromEnv(_) => ErrorKind::TokenFromEnv,
+            Error::RateLimited { .. } => ErrorKind::RateLimited,
+            Error::GitHub(_) => ErrorKind::GitHub,
+            Error::Offline => ErrorKind::Offline,
+            Error::NoSelfUpdate => ErrorKind::NoSelfUpdate,
+            Error::CalendarAccess => ErrorKind::CalendarAccess,
+            Error::CalendarUnavailable => ErrorKind::CalendarUnavailable,
+            Error::InvalidShortcut => ErrorKind::InvalidShortcut,
+            Error::ShortcutTaken => ErrorKind::ShortcutTaken,
+            Error::ShortcutUnsupported => ErrorKind::ShortcutUnsupported,
+            Error::RepoConfig(_) => ErrorKind::RepoConfig,
+            Error::Io(_) => ErrorKind::Io,
+            Error::Http(_) => ErrorKind::Http,
+            Error::Tauri(_) => ErrorKind::Tauri,
+            Error::Updater(_) => ErrorKind::Updater,
+            Error::Autostart(_) => ErrorKind::Autostart,
         }
     }
 }
 
 /// Errors cross the IPC boundary as `{ kind, message, params }` so the UI can branch on
 /// `kind` and show its own wording (`error.<kind>` filled with `params`), else `message`.
+/// What an `Error` serializes to; `CommandError` in `src/lib/bindings.ts`.
+#[derive(Serialize)]
+struct CommandError<'a> {
+    kind: ErrorKind,
+    message: String,
+    /// `manualInstall`: where to download the tool by hand.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    url: Option<&'a str>,
+    /// `manualInstall`: the command to run in a terminal.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    command: Option<&'a str>,
+    /// What the UI's wording of this kind (`error.<kind>`) fills in.
+    #[serde(skip_serializing_if = "BTreeMap::is_empty")]
+    params: BTreeMap<&'static str, String>,
+}
+
 impl Serialize for Error {
     fn serialize<S: Serializer>(&self, serializer: S) -> std::result::Result<S::Ok, S::Error> {
-        #[derive(Serialize)]
-        struct Payload<'a> {
-            kind: &'a str,
-            message: String,
-            #[serde(skip_serializing_if = "Option::is_none")]
-            url: Option<&'a str>,
-            #[serde(skip_serializing_if = "Option::is_none")]
-            command: Option<&'a str>,
-            #[serde(skip_serializing_if = "BTreeMap::is_empty")]
-            params: BTreeMap<&'static str, String>,
-        }
         let (url, command) = match self {
             Error::ManualInstall { url, command, .. } => (url.as_deref(), command.as_deref()),
             _ => (None, None),
         };
-        Payload {
-            kind: self.kind(),
+        CommandError {
+            kind: self.error_kind(),
             message: self.to_string(),
             url,
             command,
