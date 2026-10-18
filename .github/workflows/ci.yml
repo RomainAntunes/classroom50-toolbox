@@ -113,6 +113,56 @@ jobs:
           path: e2e/artifacts
           if-no-files-found: ignore
 
+  # Rust line coverage, report only: a per-file table (least covered first) in the run's
+  # summary. No upload to a coverage service and no threshold; failing tests fail `check`.
+  coverage:
+    runs-on: ubuntu-22.04
+    timeout-minutes: 40
+    continue-on-error: true
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Linux system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libwebkit2gtk-4.1-dev libayatana-appindicator3-dev librsvg2-dev patchelf
+
+      - uses: pnpm/action-setup@0977fd99725f1db4007ccb2928dbb4e90d06cc86 # v6.0.10
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: lts/*
+          cache: pnpm
+      - uses: dtolnay/rust-toolchain@b725eda525362e7cf34af9a7243cac1e3f01a7ec # stable
+        with:
+          components: llvm-tools-preview
+      # Its own key: an instrumented build shares nothing with the other jobs.
+      - uses: swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
+        with:
+          workspaces: src-tauri
+          key: coverage
+      - uses: taiki-e/install-action@8cca0918f8471c33515202b73f56ab27f2bed283 # v2.87.29
+        with:
+          tool: cargo-llvm-cov
+
+      - run: pnpm install --frozen-lockfile
+      # tauri::generate_context! embeds the built frontend.
+      - run: pnpm build
+      - name: Coverage
+        run: cargo llvm-cov --json --summary-only --output-path coverage.json
+        working-directory: src-tauri
+      - name: Summary
+        working-directory: src-tauri
+        run: |
+          {
+            echo "## Rust coverage"
+            echo
+            jq -r -f ../scripts/coverage-summary.jq coverage.json
+          } >> "$GITHUB_STEP_SUMMARY"
+
   # UI flows in WebKit with Rust faked (tests/e2e): no app build, no GitHub access.
   e2e:
     permissions:

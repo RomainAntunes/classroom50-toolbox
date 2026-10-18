@@ -63,6 +63,7 @@ zizmor .github && actionlint                     # lint the workflows (brew inst
 cd src-tauri && cargo test                       # all Rust tests
 cd src-tauri && cargo test parses_github_remotes  # single test (name filter)
 cd src-tauri && UPDATE_GOLDEN=1 cargo test bindings  # rewrite src/lib/bindings.ts after an IPC change
+cd src-tauri && cargo llvm-cov --summary-only     # Rust line coverage per file (cargo-llvm-cov, rustup's llvm-tools); CI's `coverage` job writes it to the run summary, report only
 pnpm test                          # vitest: src/**/*.test.ts, scripts/**/*.test.mjs, e2e/mock
 node scripts/size-budget.mjs       # the built frontend (build/) against scripts/size-budget.json
 pnpm exec playwright install webkit  # once, the browser for the UI flows
