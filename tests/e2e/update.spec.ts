@@ -84,7 +84,7 @@ test("a failed restart shows Rust's words", async ({ app, page }) => {
   await app.start(
     scenario({
       update: updateStatus({ state: ready }),
-      responses: { install_update: [fail("update", "signature mismatch")] },
+      responses: { install_update: [fail("updater", "signature mismatch")] },
     }),
   );
   await page.locator("main .banner").getByRole("button", { name: "Restart now" }).click();

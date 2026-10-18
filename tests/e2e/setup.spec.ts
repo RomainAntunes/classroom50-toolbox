@@ -87,7 +87,7 @@ test("a failed install shows the command's words and the manual command", async 
     scenario({
       tools: tools(["gh"]),
       responses: {
-        install_tool: [fail("install", "brew: formula not found")],
+        install_tool: [fail("commandFailed", "brew: formula not found")],
         install_command: [
           ok({ program: "brew", args: ["install", "gh"], manual: "brew install gh" }),
         ],

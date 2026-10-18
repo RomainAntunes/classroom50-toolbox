@@ -24,9 +24,11 @@ import type {
 } from "../../src/lib/api";
 import pkg from "../../package.json" with { type: "json" };
 
-/** How the fake answers one call: a value, a rejection shaped like Rust's `Error`, a
- *  promise the test settles later (`app.release`), or the fake's default (`pass`). */
-export type Reply = { value: unknown } | { error: CommandError } | { hold: true } | { pass: true };
+/** How the fake answers one call: a value, a rejection shaped like Rust's `Error` (a plugin
+ *  rejects with its message alone), a promise the test settles later (`app.release`), or the
+ *  fake's default (`pass`). */
+export type Reply =
+  { value: unknown } | { error: CommandError | string } | { hold: true } | { pass: true };
 
 export interface Scenario {
   appInfo: AppInfo;
@@ -61,6 +63,9 @@ export function fail(
 ): Reply {
   return { error: { kind, message, ...(params ? { params } : {}) } };
 }
+
+/** A plugin's rejection: Tauri plugins reject with their error's message. */
+export const failPlugin = (message: string): Reply => ({ error: message });
 
 const NOW = Date.now();
 const HOUR = 3_600_000;
