@@ -58,6 +58,8 @@ pnpm tauri build                   # release bundles for the current OS
 pnpm lint                          # prettier --check + svelte-check
 pnpm format                        # prettier --write
 cd src-tauri && cargo fmt && cargo clippy --all-targets -- -D warnings
+cd src-tauri && cargo deny check                 # advisories, licenses, sources (deny.toml; brew install cargo-deny)
+zizmor .github && actionlint                     # lint the workflows (brew install zizmor actionlint)
 cd src-tauri && cargo test                       # all Rust tests
 cd src-tauri && cargo test parses_github_remotes  # single test (name filter)
 pnpm test                          # vitest: src/**/*.test.ts, scripts/**/*.test.mjs, e2e/mock
@@ -132,5 +134,6 @@ The dev build is tray-only (no Dock icon, starts hidden). Open it from the tray 
 - Every call to `gh` or `git` goes through one Rust process wrapper that captures stderr and exit codes and returns typed errors. Never build shell strings; pass arguments as a vector.
 - Rust owns all state and I/O. Svelte only renders and invokes typed Tauri commands, and receives events for progress and refreshes.
 - Tauri permissions are allow-listed in `src-tauri/capabilities/default.json`. A plugin API called from JS needs its permission added there.
+- Supply chain: every action in `.github/workflows` is pinned to a full commit SHA with a `# vX.Y.Z` comment (Dependabot moves both; `dtolnay/rust-toolchain` has no tags, so it is pinned to its `stable` branch and bumped by hand), every workflow sets `permissions: {}` and each job asks for what it needs, a checkout keeps no credentials (`persist-credentials: false`) and a `run:` script reads expressions through `env:`, never `${{ }}` inline. `ci.yml` runs zizmor over the workflows and cargo-deny over the Rust tree: `src-tauri/deny.toml` allows only licenses compatible with shipping GPL-3.0-only and crates.io as the only source, duplicate versions only warn, and each ignored advisory carries why it doesn't apply and when to drop it (its advisories job doesn't block a PR, the other checks do). `.github/dependabot.yml` proposes weekly updates after a 7-day cooldown: minor and patch grouped per ecosystem and folder, majors alone, and every `tauri*` crate with every `@tauri-apps/*` package in one `tauri` PR (a multi-ecosystem group), since a plugin's crate and npm package must share a major.minor. Pinned versions (`rust-ini`) are ignored there until the pin goes.
 - Don't use em-dashes in code, comments or UI strings.
 - **Dev builds never write to GitHub.** The owner develops against their real classes, so `process::checked_args` refuses `gh student submit|accept|invite|team add` and `git push` under `debug_assertions`. Never weaken or bypass this, and never run those commands by hand while testing. Test the write paths with unit tests or a throwaway repo the owner sets up.
