@@ -275,6 +275,7 @@ impl From<&Monitor> for Screen {
 /// logical units. Windows uses the virtual desktop's real pixels throughout.
 #[derive(Debug, Clone, Copy, PartialEq)]
 enum Space {
+    #[cfg_attr(target_os = "windows", allow(dead_code))]
     Points,
     Pixels,
 }
