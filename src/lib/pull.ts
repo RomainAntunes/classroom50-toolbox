@@ -1,9 +1,9 @@
 // Pulling a project from the list. Rust only fast-forwards the default branch and refuses
 // anything that would need a merge, so the refusals are explained here.
 import { message } from "@tauri-apps/plugin-dialog";
-import { api, errorKind, errorMessage, withDialog, type Project } from "$lib/api";
-import { t } from "$lib/i18n";
-import { announce } from "$lib/announce.svelte";
+import { api, errorKind, errorMessage, withDialog, type Project } from "#lib/api.js";
+import { t } from "#lib/i18n/index.js";
+import { announce } from "#lib/announce.svelte.js";
 
 const REASONS = ["localChanges", "otherBranch", "diverged"];
 

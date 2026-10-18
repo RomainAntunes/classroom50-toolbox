@@ -1,7 +1,7 @@
 // Hidden assignments and classes: left out of the list unless a search matches them, and never
 // notified about (Rust filters them out of the alerts). Ids are project or unaccepted-assignment
 // ids; classes go by `classKey`.
-import { saveSettings, settings } from "$lib/settings.svelte";
+import { saveSettings, settings } from "#lib/settings.svelte.js";
 
 export function isHidden(id: string): boolean {
   return settings.current?.hidden.includes(id) ?? false;

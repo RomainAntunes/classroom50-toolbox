@@ -1,13 +1,13 @@
 <script lang="ts">
-  import logo from "$lib/assets/logo.png";
+  import logo from "#lib/assets/logo.png";
   import { onMount, tick } from "svelte";
   import { goto } from "$app/navigation";
   import { page } from "$app/state";
-  import { changelogs, notesFor, versions } from "$lib/changelog";
-  import { compareVersions, KINDS, type Entry, type EntryKind } from "$lib/changelog/versions.js";
-  import { currentLocale, formatDay, t } from "$lib/i18n";
-  import { loadSettings, saveSettings, settings } from "$lib/settings.svelte";
-  import { appVersion, pendingNotes, seenVersion } from "$lib/whatsnew";
+  import { changelogs, notesFor, versions } from "#lib/changelog/index.js";
+  import { compareVersions, KINDS, type Entry, type EntryKind } from "#lib/changelog/versions.js";
+  import { currentLocale, formatDay, t } from "#lib/i18n/index.js";
+  import { loadSettings, saveSettings, settings } from "#lib/settings.svelte.js";
+  import { appVersion, pendingNotes, seenVersion } from "#lib/whatsnew.js";
 
   // After an update, the versions not read yet. `?from=settings` opens it again from
   // Settings with the running version's notes, `&all` (the dev preview) with every version's.

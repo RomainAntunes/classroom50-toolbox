@@ -1,6 +1,6 @@
 // Main-page state kept outside the page component, so going to Settings and back shows
 // the last known values at once instead of an empty list and footer while they reload.
-import type { AuthStatus, Snapshot, SyncProgress, ToolStatus, UpdateStatus } from "$lib/api";
+import type { AuthStatus, Snapshot, SyncProgress, ToolStatus, UpdateStatus } from "#lib/api.js";
 
 export const session = $state<{
   tools: ToolStatus[];

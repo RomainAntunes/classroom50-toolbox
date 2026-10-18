@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import type { Assignment, Group, Project, Unaccepted } from "$lib/api";
-import { inRange, showsProject, showsUnaccepted, type ListQuery } from "$lib/filter";
+import type { Assignment, Group, Project, Unaccepted } from "#lib/api.js";
+import { inRange, showsProject, showsUnaccepted, type ListQuery } from "#lib/filter.js";
 
 const now = new Date("2026-10-15T12:00:00Z");
 const day = 24 * 60 * 60 * 1000;

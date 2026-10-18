@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
-import type { Group, Snapshot } from "$lib/api";
-import { groupDetails, groupName } from "$lib/group";
-import { session } from "$lib/session.svelte";
+import type { Group, Snapshot } from "#lib/api.js";
+import { groupDetails, groupName } from "#lib/group.js";
+import { session } from "#lib/session.svelte.js";
 
 const group = (name: string | null): Group => ({
   org: "o",

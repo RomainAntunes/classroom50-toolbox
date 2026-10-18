@@ -1,19 +1,19 @@
 <script lang="ts">
-  import logo from "$lib/assets/logo.png";
+  import logo from "#lib/assets/logo.png";
   import { onMount } from "svelte";
   import { goto } from "$app/navigation";
-  import { api, type AuthStatus, type ToolStatus } from "$lib/api";
-  import { t } from "$lib/i18n";
-  import { announce } from "$lib/announce.svelte";
-  import { chooseDefaultEditor, defaultEditor, editors, loadEditors } from "$lib/editor.svelte";
-  import { pickCloneFolder } from "$lib/clone";
-  import { loadSettings, saveSettings, settings } from "$lib/settings.svelte";
-  import { session } from "$lib/session.svelte";
-  import { seenVersion } from "$lib/whatsnew";
-  import LoginStatus from "$lib/components/LoginStatus.svelte";
-  import Section from "$lib/components/Section.svelte";
-  import Toggle from "$lib/components/Toggle.svelte";
-  import ToolRow from "$lib/components/ToolRow.svelte";
+  import { api, type AuthStatus, type ToolStatus } from "#lib/api.js";
+  import { t } from "#lib/i18n/index.js";
+  import { announce } from "#lib/announce.svelte.js";
+  import { chooseDefaultEditor, defaultEditor, editors, loadEditors } from "#lib/editor.svelte.js";
+  import { pickCloneFolder } from "#lib/clone.js";
+  import { loadSettings, saveSettings, settings } from "#lib/settings.svelte.js";
+  import { session } from "#lib/session.svelte.js";
+  import { seenVersion } from "#lib/whatsnew.js";
+  import LoginStatus from "#lib/components/LoginStatus.svelte";
+  import Section from "#lib/components/Section.svelte";
+  import Toggle from "#lib/components/Toggle.svelte";
+  import ToolRow from "#lib/components/ToolRow.svelte";
 
   // First run: what the app does, then the three things it needs. Every step can be
   // skipped; Settings has all of it later.

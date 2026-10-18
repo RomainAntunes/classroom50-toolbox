@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it } from "vitest";
-import { errorMessage } from "$lib/api";
-import { setLocale } from "$lib/i18n";
+import { errorMessage } from "#lib/api.js";
+import { setLocale } from "#lib/i18n/index.js";
 
 afterEach(() => {
   setLocale("en");

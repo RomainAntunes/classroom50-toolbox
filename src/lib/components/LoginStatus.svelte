@@ -18,11 +18,11 @@
     withDialog,
     type AuthStatus,
     type DeviceCode,
-  } from "$lib/api";
-  import { announce } from "$lib/announce.svelte";
-  import { popupMenu } from "$lib/keyboard";
-  import { session } from "$lib/session.svelte";
-  import { t } from "$lib/i18n";
+  } from "#lib/api.js";
+  import { announce } from "#lib/announce.svelte.js";
+  import { popupMenu } from "#lib/keyboard.js";
+  import { session } from "#lib/session.svelte.js";
+  import { t } from "#lib/i18n/index.js";
 
   let {
     auth,

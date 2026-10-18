@@ -4,12 +4,12 @@
 import { tick } from "svelte";
 import { goto } from "$app/navigation";
 import { ask, message } from "@tauri-apps/plugin-dialog";
-import { api, errorMessage, withDialog, type DeepLink, type DeepLinkTarget } from "$lib/api";
-import { acceptAssignment, acceptBlocked } from "$lib/accept";
-import { cloneProject } from "$lib/clone";
-import { t } from "$lib/i18n";
-import { session } from "$lib/session.svelte";
-import { loadSettings } from "$lib/settings.svelte";
+import { api, errorMessage, withDialog, type DeepLink, type DeepLinkTarget } from "#lib/api.js";
+import { acceptAssignment, acceptBlocked } from "#lib/accept.js";
+import { cloneProject } from "#lib/clone.js";
+import { t } from "#lib/i18n/index.js";
+import { session } from "#lib/session.svelte.js";
+import { loadSettings } from "#lib/settings.svelte.js";
 
 async function tell(text: string, kind: "info" | "warning" | "error" = "info"): Promise<void> {
   await withDialog(() => message(text, { title: t("link.title"), kind }));

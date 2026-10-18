@@ -1,8 +1,8 @@
 // When the What's new page shows: once the guide is done, after an update, until "Got it".
 // `lastSeenVersion` (Rust's settings) says how far the user has read.
-import { api, type Settings } from "$lib/api";
-import { versions } from "$lib/changelog";
-import { compareVersions, pendingVersions } from "$lib/changelog/versions.js";
+import { api, type Settings } from "#lib/api.js";
+import { versions } from "#lib/changelog/index.js";
+import { compareVersions, pendingVersions } from "#lib/changelog/versions.js";
 
 let version: Promise<string> | null = null;
 

@@ -2,10 +2,10 @@
 // clone opens in, and the launch with failures reported in a dialog.
 import { CheckMenuItem, Menu } from "@tauri-apps/api/menu";
 import { message } from "@tauri-apps/plugin-dialog";
-import { api, errorMessage, withDialog, type EditorInfo, type Project } from "$lib/api";
-import { t } from "$lib/i18n";
-import { popupMenu } from "$lib/keyboard";
-import { saveSettings, settings } from "$lib/settings.svelte";
+import { api, errorMessage, withDialog, type EditorInfo, type Project } from "#lib/api.js";
+import { t } from "#lib/i18n/index.js";
+import { popupMenu } from "#lib/keyboard.js";
+import { saveSettings, settings } from "#lib/settings.svelte.js";
 
 export const editors = $state<{ installed: EditorInfo[]; loaded: boolean }>({
   installed: [],

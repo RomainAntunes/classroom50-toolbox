@@ -2,9 +2,9 @@
 // the keyboard. The rules themselves are in `keys.ts`.
 import { LogicalPosition } from "@tauri-apps/api/dpi";
 import type { Menu } from "@tauri-apps/api/menu";
-import { withDialog } from "$lib/api";
-import { currentDirection } from "$lib/i18n";
-import { isMenuKey, moveIndex } from "$lib/keys";
+import { withDialog } from "#lib/api.js";
+import { currentDirection } from "#lib/i18n/index.js";
+import { isMenuKey, moveIndex } from "#lib/keys.js";
 
 /** When the last menu opened from the keyboard; see `onContextMenu`. */
 let keyboardMenuAt = -Infinity;

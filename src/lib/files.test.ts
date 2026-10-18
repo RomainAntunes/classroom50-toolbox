@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { changedLines } from "$lib/files";
+import { changedLines } from "#lib/files.js";
 
 describe("changedLines", () => {
   it("lists the paths one per line", () => {

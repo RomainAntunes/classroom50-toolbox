@@ -1,15 +1,15 @@
 <script lang="ts">
   import { Menu, MenuItem, PredefinedMenuItem } from "@tauri-apps/api/menu";
   import { openUrl } from "@tauri-apps/plugin-opener";
-  import type { Unaccepted } from "$lib/api";
-  import { menuKey, onContextMenu, popupMenu } from "$lib/keyboard";
-  import { scrollBehavior } from "$lib/motion";
-  import { isHidden, setHidden } from "$lib/hidden";
-  import { acceptAssignment, acceptBlocked, canFoundGroup } from "$lib/accept";
-  import { session } from "$lib/session.svelte";
-  import { acceptLink, copyLink } from "$lib/links";
-  import { groupDetails, groupName } from "$lib/group";
-  import { formatDate, fromNow, t } from "$lib/i18n";
+  import type { Unaccepted } from "#lib/api.js";
+  import { menuKey, onContextMenu, popupMenu } from "#lib/keyboard.js";
+  import { scrollBehavior } from "#lib/motion.js";
+  import { isHidden, setHidden } from "#lib/hidden.js";
+  import { acceptAssignment, acceptBlocked, canFoundGroup } from "#lib/accept.js";
+  import { session } from "#lib/session.svelte.js";
+  import { acceptLink, copyLink } from "#lib/links.js";
+  import { groupDetails, groupName } from "#lib/group.js";
+  import { formatDate, fromNow, t } from "#lib/i18n/index.js";
   import Details from "./Details.svelte";
 
   let { item, now, unseen }: { item: Unaccepted; now: Date; unseen: boolean } = $props();

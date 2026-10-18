@@ -4,17 +4,17 @@
   // off. While it listens the saved shortcut is unregistered, so pressing it again reaches
   // the recorder instead of hiding the popover.
   import { onDestroy } from "svelte";
-  import { api, errorMessage, type Os } from "$lib/api";
-  import { announce } from "$lib/announce.svelte";
-  import { t } from "$lib/i18n";
-  import { saveSettings, settings } from "$lib/settings.svelte";
+  import { api, errorMessage, type Os } from "#lib/api.js";
+  import { announce } from "#lib/announce.svelte.js";
+  import { t } from "#lib/i18n/index.js";
+  import { saveSettings, settings } from "#lib/settings.svelte.js";
   import {
     formatAccelerator,
     formatShortcut,
     heldModifiers,
     recordKey,
     type Modifier,
-  } from "$lib/shortcut";
+  } from "#lib/shortcut.js";
 
   let { os, supported }: { os: Os; supported: boolean } = $props();
 

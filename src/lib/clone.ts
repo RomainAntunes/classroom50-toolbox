@@ -2,13 +2,13 @@
 // clone folder, picked once and remembered in settings), runs the clone and reports failures
 // in a dialog.
 import { ask, message, open } from "@tauri-apps/plugin-dialog";
-import { api, errorKind, errorMessage, withDialog } from "$lib/api";
-import { t } from "$lib/i18n";
-import { announce } from "$lib/announce.svelte";
-import { defaultEditor, loadEditors, openInEditor } from "$lib/editor.svelte";
-import { tildify } from "$lib/paths.svelte";
-import { loadSettings, saveSettings, settings } from "$lib/settings.svelte";
-import { busy, session } from "$lib/session.svelte";
+import { api, errorKind, errorMessage, withDialog } from "#lib/api.js";
+import { t } from "#lib/i18n/index.js";
+import { announce } from "#lib/announce.svelte.js";
+import { defaultEditor, loadEditors, openInEditor } from "#lib/editor.svelte.js";
+import { tildify } from "#lib/paths.svelte.js";
+import { loadSettings, saveSettings, settings } from "#lib/settings.svelte.js";
+import { busy, session } from "#lib/session.svelte.js";
 
 /** How a clone starts: `ask` names the destination first, `choose` picks another folder. */
 export type CloneMode = "ask" | "choose";

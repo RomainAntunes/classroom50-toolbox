@@ -1,6 +1,6 @@
 // The system-wide shortcut's recorder and how a shortcut reads, pure. Rust stores and
 // registers it (`shortcut.rs`, whose `normalize` is the authority); the forms here match.
-import type { Os } from "$lib/api";
+import type { Os } from "#lib/api.js";
 
 export type Modifier = "Control" | "Alt" | "Shift" | "Super";
 

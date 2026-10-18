@@ -3,11 +3,11 @@
 // when chosen, pushes the default branch, refusing anything that would need a merge; the
 // refusals are explained here.
 import { ask, message } from "@tauri-apps/plugin-dialog";
-import { api, errorKind, errorMessage, withDialog, type Project } from "$lib/api";
-import { t } from "$lib/i18n";
-import { announce } from "$lib/announce.svelte";
-import { askTextAction } from "$lib/prompt.svelte";
-import { fileList } from "$lib/files";
+import { api, errorKind, errorMessage, withDialog, type Project } from "#lib/api.js";
+import { t } from "#lib/i18n/index.js";
+import { announce } from "#lib/announce.svelte.js";
+import { askTextAction } from "#lib/prompt.svelte.js";
+import { fileList } from "#lib/files.js";
 
 const REASONS = [
   "otherBranch",

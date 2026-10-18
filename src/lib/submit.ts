@@ -13,14 +13,14 @@ import {
   type CommandError,
   type Project,
   type SubmitCheck,
-} from "$lib/api";
-import { t } from "$lib/i18n";
-import { announce } from "$lib/announce.svelte";
-import { fileList } from "$lib/files";
-import { commitLocal } from "$lib/push";
-import { pullProject } from "$lib/pull";
-import { session } from "$lib/session.svelte";
-import { settings } from "$lib/settings.svelte";
+} from "#lib/api.js";
+import { t } from "#lib/i18n/index.js";
+import { announce } from "#lib/announce.svelte.js";
+import { fileList } from "#lib/files.js";
+import { commitLocal } from "#lib/push.js";
+import { pullProject } from "#lib/pull.js";
+import { session } from "#lib/session.svelte.js";
+import { settings } from "#lib/settings.svelte.js";
 
 async function show(text: string, title: string, kind: "info" | "error" = "info") {
   await withDialog(() => message(text, { title, kind }));

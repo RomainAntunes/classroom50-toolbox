@@ -2,10 +2,10 @@
 // group), `gh student invite` otherwise. Asks for the usernames in the popover first, adds
 // them one by one and offers to add more.
 import { ask, message } from "@tauri-apps/plugin-dialog";
-import { api, errorMessage, withDialog, type Added, type Group, type Project } from "$lib/api";
-import { formatList, t } from "$lib/i18n";
-import { askText } from "$lib/prompt.svelte";
-import { session } from "$lib/session.svelte";
+import { api, errorMessage, withDialog, type Added, type Group, type Project } from "#lib/api.js";
+import { formatList, t } from "#lib/i18n/index.js";
+import { askText } from "#lib/prompt.svelte.js";
+import { session } from "#lib/session.svelte.js";
 
 /** Whether adding goes through the group (team assignments) rather than an invitation. */
 export function joinsGroup(project: Project): boolean {

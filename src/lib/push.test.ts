@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import type { Assignment, CommitCheck, Project, Settings } from "$lib/api";
-import { prompt } from "$lib/prompt.svelte";
-import { settings } from "$lib/settings.svelte";
+import type { Assignment, CommitCheck, Project, Settings } from "#lib/api.js";
+import { prompt } from "#lib/prompt.svelte.js";
+import { settings } from "#lib/settings.svelte.js";
 
 const dialog = vi.hoisted(() => ({ ask: vi.fn(), message: vi.fn() }));
 const api = vi.hoisted(() => ({
@@ -16,14 +16,14 @@ const api = vi.hoisted(() => ({
   setGitIdentity: vi.fn(),
 }));
 vi.mock("@tauri-apps/plugin-dialog", () => dialog);
-vi.mock("$lib/api", async (importOriginal) => ({
-  ...(await importOriginal<typeof import("$lib/api")>()),
+vi.mock("#lib/api.js", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("#lib/api.js")>()),
   api,
   withDialog: <T>(run: () => Promise<T>) => run(),
 }));
 
-const { commitLocal, commitPush, gradedOnPush } = await import("$lib/push");
-const { submitProject } = await import("$lib/submit");
+const { commitLocal, commitPush, gradedOnPush } = await import("#lib/push.js");
+const { submitProject } = await import("#lib/submit.js");
 
 const project = (assignment: Partial<Assignment> | null = {}) =>
   ({

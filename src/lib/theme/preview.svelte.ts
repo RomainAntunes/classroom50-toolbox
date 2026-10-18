@@ -1,5 +1,5 @@
-import type { Os } from "$lib/api";
-import { locale } from "$lib/i18n/locale.svelte";
+import type { Os } from "#lib/api.js";
+import { locale } from "#lib/i18n/locale.svelte.js";
 
 // Dev builds only: wear another platform's skin on this machine, to check every theme
 // without three computers, and lay the UI out right to left with the current language's

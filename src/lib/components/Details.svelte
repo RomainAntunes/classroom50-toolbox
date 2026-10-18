@@ -1,7 +1,7 @@
 <script lang="ts">
   import { openUrl } from "@tauri-apps/plugin-opener";
-  import type { GradeTest, ReleaseNotes } from "$lib/api";
-  import { secondsLabel, t } from "$lib/i18n";
+  import type { GradeTest, ReleaseNotes } from "#lib/api.js";
+  import { secondsLabel, t } from "#lib/i18n/index.js";
 
   /** Failed tests listed before "and N more". */
   const MAX_TESTS = 8;

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { isMenuKey, moveIndex } from "$lib/keys";
+import { isMenuKey, moveIndex } from "#lib/keys.js";
 
 describe("moveIndex", () => {
   it("moves one row up or down and stops at the ends", () => {

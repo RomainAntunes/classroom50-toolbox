@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { duration, scrollBehavior } from "$lib/motion";
+import { duration, scrollBehavior } from "#lib/motion.js";
 
 function reduceMotion(reduce: boolean) {
   vi.stubGlobal("matchMedia", (query: string) => ({

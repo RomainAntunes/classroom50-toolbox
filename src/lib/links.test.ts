@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import type { Project, Unaccepted } from "$lib/api";
-import { acceptLink, cloneUrls, openLink } from "$lib/links";
+import type { Project, Unaccepted } from "#lib/api.js";
+import { acceptLink, cloneUrls, openLink } from "#lib/links.js";
 
 const item = (secret: string | null) =>
   ({

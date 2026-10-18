@@ -1,8 +1,8 @@
 // The installs and updates running, mirrored from Rust (which owns them) so a row shows
 // one still going after the popover was hidden or the page changed.
 import { listen } from "@tauri-apps/api/event";
-import { api, TOOL_JOBS_EVENT, type Tool, type ToolJob } from "$lib/api";
-import { session } from "$lib/session.svelte";
+import { api, TOOL_JOBS_EVENT, type Tool, type ToolJob } from "#lib/api.js";
+import { session } from "#lib/session.svelte.js";
 
 export const toolJobs = $state<{ running: Partial<Record<Tool, ToolJob>> }>({ running: {} });
 

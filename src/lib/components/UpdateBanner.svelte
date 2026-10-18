@@ -1,8 +1,8 @@
 <script lang="ts">
   import { message } from "@tauri-apps/plugin-dialog";
   import { openUrl } from "@tauri-apps/plugin-opener";
-  import { api, errorMessage, withDialog, type UpdateStatus } from "$lib/api";
-  import { formatMegabytes, t } from "$lib/i18n";
+  import { api, errorMessage, withDialog, type UpdateStatus } from "#lib/api.js";
+  import { formatMegabytes, t } from "#lib/i18n/index.js";
 
   const RELEASES_URL = "https://github.com/RomainAntunes/classroom50-toolbox/releases/tag/v";
 
