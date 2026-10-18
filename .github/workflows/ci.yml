@@ -154,3 +154,27 @@ jobs:
             test-results/
           retention-days: 14
 
+  # Rust dependencies: RustSec advisories, licenses compatible with GPL-3.0, crates.io only
+  # (src-tauri/deny.toml). Advisories run apart and don't block: a new advisory against a
+  # crate deep in Tauri's tree would otherwise fail every PR until upstream ships a fix.
+  deny:
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+    strategy:
+      fail-fast: false
+      matrix:
+        checks: [advisories, bans licenses sources]
+    continue-on-error: ${{ matrix.checks == 'advisories' }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: EmbarkStudios/cargo-deny-action@3c6349835b2b7b196a839186cb8b78e02f7b5f25 # v2.1.1
+        with:
+          manifest-path: src-tauri/Cargo.toml
+          # The action passes --all-features by default, over deny.toml's `all-features =
+          # false`; empty, CI checks the same graph as a local `cargo deny check`.
+          arguments: ""
+          command: check ${{ matrix.checks }}
+
