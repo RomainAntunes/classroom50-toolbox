@@ -62,35 +62,25 @@ pub fn setup(app: &AppHandle) -> tauri::Result<()> {
             _ => {}
         })
         .on_tray_icon_event(|tray, event| {
-            tauri_plugin_positioner::on_tray_event(tray.app_handle(), &event);
             if let TrayIconEvent::Click {
                 button: MouseButton::Left,
                 button_state: MouseButtonState::Up,
+                rect,
                 ..
             } = event
             {
-                popover::toggle(tray.app_handle());
+                popover::toggle(tray.app_handle(), Some(rect.into()));
             }
         });
     builder.build(app)?;
     Ok(())
 }
 
-/// Hands the icon's position to the positioner, as a tray event would (`TrayIcon::rect`;
-/// unknown on Linux, where nothing changes).
-pub fn remember_position(app: &AppHandle) {
-    let Some(tray) = app.tray_by_id(ID) else {
-        return;
-    };
-    let Ok(Some(rect)) = tray.rect() else {
-        return;
-    };
-    let event = TrayIconEvent::Move {
-        id: tray.id().clone(),
-        position: rect.position.to_physical(1.0),
-        rect,
-    };
-    tauri_plugin_positioner::on_tray_event(app, &event);
+/// Where the icon is, for opening without a click (the shortcut, the menu's Open). Linux
+/// trays report no position.
+pub fn icon_rect(app: &AppHandle) -> Option<popover::Area> {
+    let rect = app.tray_by_id(ID)?.rect().ok()??;
+    Some(rect.into())
 }
 
 /// Swaps the icon for one with a dot in the top-right corner, or back.
