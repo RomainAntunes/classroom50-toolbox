@@ -1,0 +1,78 @@
+# Weekly dependency updates. Minor and patch updates come grouped, one PR per ecosystem and
+# folder; each major comes alone, since it may need code changes.
+#
+# Tauri checks that a plugin's crate and its npm package share a major.minor version, so
+# every `tauri*` crate and `@tauri-apps/*` package moves together in one `tauri` PR (a
+# multi-ecosystem group), and the other groups leave them out.
+#
+# The cooldown waits a week after a release before proposing it, so a compromised or
+# broken version is usually yanked before it reaches a PR. Security updates skip it.
+version: 2
+
+multi-ecosystem-groups:
+  tauri:
+    schedule:
+      interval: weekly
+      day: monday
+
+updates:
+  - package-ecosystem: cargo
+    directory: /src-tauri
+    schedule:
+      interval: weekly
+      day: monday
+    cooldown:
+      default-days: 7
+    multi-ecosystem-group: tauri
+    patterns: ["tauri", "tauri-*"]
+    groups:
+      cargo-minor:
+        update-types: [minor, patch]
+        exclude-patterns: ["tauri", "tauri-*"]
+    ignore:
+      # Pinned on purpose in Cargo.toml (tauri-plugin-deep-link 2.6.2 doesn't build with a
+      # newer one on Linux); drop this with the pin.
+      - dependency-name: rust-ini
+
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+    cooldown:
+      default-days: 7
+    multi-ecosystem-group: tauri
+    patterns: ["@tauri-apps/*"]
+    groups:
+      npm-minor:
+        update-types: [minor, patch]
+        exclude-patterns: ["@tauri-apps/*"]
+
+  # The WebDriver suite's own package.json (WebdriverIO and mocha).
+  - package-ecosystem: npm
+    directory: /e2e
+    schedule:
+      interval: weekly
+      day: monday
+    cooldown:
+      default-days: 7
+    groups:
+      e2e-minor:
+        update-types: [minor, patch]
+
+  # Actions are pinned to commit SHAs with a `# vX.Y.Z` comment, which Dependabot updates.
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+    cooldown:
+      default-days: 7
+    groups:
+      actions-minor:
+        update-types: [minor, patch]
+    ignore:
+      # Has no release tags: it is pinned to a commit of its `stable` branch, which installs
+      # the current stable Rust at every run. Dependabot would move it to the default branch,
+      # whose action needs a `toolchain` input. Bump the SHA by hand.
+      - dependency-name: dtolnay/rust-toolchain
