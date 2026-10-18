@@ -44,7 +44,7 @@
   async function finish() {
     // A first run starts with this version: its notes are no news.
     await saveSettings({ onboarded: true, lastSeenVersion: await seenVersion(settings.current) });
-    await goto("/", { replaceState: true });
+    await goto("/", { replace: true });
     // Signed in during the guide: start filling the list now.
     if (session.auth?.loggedIn) session.snapshot = await api.refreshProjects();
   }

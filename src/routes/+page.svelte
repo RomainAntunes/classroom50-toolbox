@@ -134,12 +134,12 @@
   async function load() {
     const loaded = await loadSettings();
     if (!loaded.onboarded) {
-      await goto("/welcome", { replaceState: true });
+      await goto("/welcome", { replace: true });
       return;
     }
     // Updated since the notes were last read; a link being handled goes first.
     if (!linkActive() && (await pendingNotes(loaded)).length) {
-      await goto("/whats-new", { replaceState: true });
+      await goto("/whats-new", { replace: true });
       return;
     }
     const [tools, auth, snapshot, progress] = await Promise.all([

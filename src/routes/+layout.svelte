@@ -105,9 +105,9 @@
     if (pathname === "/welcome" || (pathname === "/whats-new" && !again)) return;
     const current = settings.current;
     if (current && !linkActive() && (await pendingNotes(current)).length) {
-      await goto("/whats-new", { replaceState: true });
+      await goto("/whats-new", { replace: true });
     } else if (pathname.startsWith("/settings") || again) {
-      await goto("/", { replaceState: true });
+      await goto("/", { replace: true });
     }
   }
 

@@ -41,7 +41,7 @@
 
   async function done() {
     if (!from) await saveSettings({ lastSeenVersion: await seenVersion(settings.current) });
-    await goto(from === "settings" ? "/settings" : "/", { replaceState: true });
+    await goto(from === "settings" ? "/settings" : "/", { replace: true });
   }
 
   onMount(() => {
