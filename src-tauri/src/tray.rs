@@ -12,6 +12,7 @@ pub const ID: &str = "main";
 /// The menu's words, from the UI's i18n (`set_tray_labels`), sent at startup and when the
 /// language changes.
 #[derive(Debug, Clone, Deserialize)]
+#[cfg_attr(test, derive(specta::Type), serde(rename = "TrayLabels"))]
 #[serde(rename_all = "camelCase")]
 pub struct Labels {
     pub open: String,

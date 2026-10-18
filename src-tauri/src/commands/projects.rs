@@ -7,24 +7,28 @@ use crate::projects::{self, ProjectsState, Snapshot, SyncProgress};
 /// The last synced project list, without waiting for the network. Empty before the first
 /// sync finishes; `projects-updated` follows.
 #[tauri::command]
+#[cfg_attr(test, specta::specta)]
 pub fn list_projects(state: State<'_, ProjectsState>) -> Snapshot {
     state.snapshot()
 }
 
 /// Syncs GitHub, the local clones and the assignment manifests now.
 #[tauri::command]
+#[cfg_attr(test, specta::specta)]
 pub async fn refresh_projects(app: AppHandle) -> Snapshot {
     projects::refresh(&app).await
 }
 
 /// Rescans the disk only (watched folders and editor projects), with no GitHub request.
 #[tauri::command]
+#[cfg_attr(test, specta::specta)]
 pub async fn rescan_local(app: AppHandle) -> Snapshot {
     projects::refresh_local(&app, true).await
 }
 
 /// What the sync engine did lately, for Settings.
 #[derive(serde::Serialize)]
+#[cfg_attr(test, derive(specta::Type))]
 #[serde(rename_all = "camelCase")]
 pub struct SyncDetails {
     login: Option<String>,
@@ -38,6 +42,7 @@ pub struct SyncDetails {
 }
 
 #[tauri::command]
+#[cfg_attr(test, specta::specta)]
 pub fn sync_details(state: State<'_, ProjectsState>) -> SyncDetails {
     let snapshot = state.snapshot();
     SyncDetails {
@@ -58,6 +63,7 @@ pub fn sync_details(state: State<'_, ProjectsState>) -> SyncDetails {
 
 /// Drops the GitHub caches and syncs from scratch.
 #[tauri::command]
+#[cfg_attr(test, specta::specta)]
 pub async fn clear_cache(app: AppHandle) -> Snapshot {
     app.state::<ProjectsState>().clear_cache();
     projects::refresh(&app).await
@@ -66,12 +72,14 @@ pub async fn clear_cache(app: AppHandle) -> Snapshot {
 /// Ids of projects and unaccepted assignments with news not seen yet; `unseen-updated`
 /// follows.
 #[tauri::command]
+#[cfg_attr(test, specta::specta)]
 pub fn unseen(state: State<'_, crate::alerts::AlertsState>) -> Vec<String> {
     state.unseen()
 }
 
 /// Whether a sync is running and how far it is; `sync-progress` follows.
 #[tauri::command]
+#[cfg_attr(test, specta::specta)]
 pub fn sync_progress(state: State<'_, ProjectsState>) -> SyncProgress {
     state.progress()
 }

@@ -76,6 +76,7 @@ pub async fn graphql<T: DeserializeOwned>(
 /// Maps auth and rate-limit statuses to typed errors; other failures stay HTTP errors.
 /// The GraphQL budget as of the last response, for the sync details in Settings.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(test, derive(specta::Type))]
 #[serde(rename_all = "camelCase")]
 pub struct RateLimit {
     pub remaining: u32,

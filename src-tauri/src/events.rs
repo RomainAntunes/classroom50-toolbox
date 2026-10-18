@@ -34,6 +34,18 @@ macro_rules! events {
                 type Payload = $payload;
             }
         )*
+
+        /// The payload of each event, by name: `Events` in `src/lib/bindings.ts`.
+        #[cfg(test)]
+        #[derive(Serialize, specta::Type)]
+        #[allow(non_snake_case, dead_code)]
+        pub struct Events {
+            $(
+                $(#[doc = $doc])*
+                #[serde(rename = $name)]
+                pub $marker: $payload,
+            )*
+        }
     };
 }
 

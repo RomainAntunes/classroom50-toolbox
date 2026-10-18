@@ -22,6 +22,7 @@ const STAFF_ROLES: &[&str] = &["teacher", "hta", "ta"];
 pub const SUBMIT_TAG_PREFIX: &str = "submit/";
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(test, derive(specta::Type))]
 pub struct RepoConfig {
     pub classroom: String,
     pub assignment: String,
@@ -46,6 +47,7 @@ impl RepoConfig {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(test, derive(specta::Type))]
 #[serde(rename_all = "lowercase")]
 pub enum AssignmentMode {
     Individual,
@@ -55,6 +57,7 @@ pub enum AssignmentMode {
 
 /// Who forms the groups of a `team` assignment.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(test, derive(specta::Type))]
 #[serde(rename_all = "lowercase")]
 pub enum TeamFormation {
     Teacher,
@@ -62,6 +65,7 @@ pub enum TeamFormation {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(test, derive(specta::Type))]
 #[serde(rename_all = "kebab-case")]
 pub enum SubmissionMode {
     EveryPush,
@@ -71,6 +75,7 @@ pub enum SubmissionMode {
 /// One entry of a classroom's published `assignments.json` (`assignments-v1`). Read in
 /// snake_case from upstream and, through the aliases, in camelCase from `snapshot.json`.
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(test, derive(specta::Type))]
 #[serde(rename_all(serialize = "camelCase"))]
 pub struct Assignment {
     pub slug: String,
@@ -113,6 +118,7 @@ pub struct Assignment {
 
 /// An assignment's starter repo (`assignments-v1` `template`).
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(test, derive(specta::Type))]
 pub struct Template {
     pub owner: String,
     pub repo: String,
@@ -185,6 +191,7 @@ pub struct TestResult {
 /// team (`classroom-team-v1`), which exists so members can enumerate their classrooms
 /// without access to the private config repo.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(test, derive(specta::Type))]
 #[serde(rename_all = "camelCase")]
 pub struct Classroom {
     pub org: String,

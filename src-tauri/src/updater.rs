@@ -40,6 +40,7 @@ const PROGRESS_EVERY: Duration = Duration::from_millis(100);
 
 /// How the running app was installed, which decides what updating can do.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[cfg_attr(test, derive(specta::Type))]
 #[serde(rename_all = "camelCase")]
 pub enum Bundle {
     /// macOS `.app` (from the dmg).
@@ -102,6 +103,7 @@ pub fn endpoint(channel: UpdateChannel, bundle: Bundle) -> &'static str {
 
 /// An error as the UI shows it (`errorMessage`): `error.<kind>`, else the message.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[cfg_attr(test, derive(specta::Type))]
 #[serde(rename_all = "camelCase")]
 pub struct Failure {
     kind: ErrorKind,
@@ -118,6 +120,7 @@ impl From<&Error> for Failure {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[cfg_attr(test, derive(specta::Type))]
 #[serde(
     tag = "phase",
     rename_all = "camelCase",
@@ -144,6 +147,7 @@ pub enum UpdateState {
 
 /// What `update-state` carries and `update_status` returns.
 #[derive(Debug, Clone, Serialize)]
+#[cfg_attr(test, derive(specta::Type))]
 #[serde(rename_all = "camelCase")]
 pub struct UpdateStatus {
     state: UpdateState,

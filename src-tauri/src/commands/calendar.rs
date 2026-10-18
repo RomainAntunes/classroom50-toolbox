@@ -12,6 +12,7 @@ use crate::settings::{Settings, SettingsStore};
 /// Writes the due dates as an `.ics` file at `path` (chosen in a save dialog), keeps it
 /// updated after each sync from now on, and returns how many events it holds.
 #[tauri::command]
+#[cfg_attr(test, specta::specta)]
 pub fn export_calendar(
     app: AppHandle,
     path: PathBuf,
@@ -32,6 +33,7 @@ pub fn export_calendar(
 /// imports it; importing again updates the events (stable UIDs). Only that file: the path
 /// comes from the settings, not the UI.
 #[tauri::command]
+#[cfg_attr(test, specta::specta)]
 pub fn open_calendar_file(app: AppHandle, settings: State<'_, SettingsStore>) -> Result<()> {
     use tauri_plugin_opener::OpenerExt;
     let path = settings
@@ -45,6 +47,7 @@ pub fn open_calendar_file(app: AppHandle, settings: State<'_, SettingsStore>) ->
 
 /// The words of calendar event notes, from the UI's i18n.
 #[tauri::command]
+#[cfg_attr(test, specta::specta)]
 pub fn set_calendar_labels(
     app: AppHandle,
     state: State<'_, crate::calendar::CalendarState>,
@@ -60,6 +63,7 @@ pub fn set_calendar_labels(
 
 /// The OS calendars the user can write to; asks for access the first time.
 #[tauri::command]
+#[cfg_attr(test, specta::specta)]
 pub async fn native_calendars() -> Result<Vec<platform::NativeCalendar>> {
     tauri::async_runtime::spawn_blocking(|| platform::native_calendars(true))
         .await
@@ -69,6 +73,7 @@ pub async fn native_calendars() -> Result<Vec<platform::NativeCalendar>> {
 /// Picks the OS calendar to keep the due dates in (writing them now), or with `None` stops
 /// and removes the events the app wrote.
 #[tauri::command]
+#[cfg_attr(test, specta::specta)]
 pub async fn set_native_calendar(
     app: AppHandle,
     settings: State<'_, SettingsStore>,

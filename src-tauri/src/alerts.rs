@@ -27,6 +27,7 @@ const FRESH: TimeDelta = TimeDelta::days(1);
 
 /// A notification for the UI to word.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[cfg_attr(test, derive(specta::Type))]
 #[serde(
     tag = "kind",
     rename_all = "camelCase",

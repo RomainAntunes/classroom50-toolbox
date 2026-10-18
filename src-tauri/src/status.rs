@@ -55,6 +55,7 @@ const STATUS_PREFIX: &str = "classroom50 autograde: ";
 
 /// A branch with commits that aren't on the default branch.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(test, derive(specta::Type))]
 #[serde(rename_all = "camelCase")]
 pub struct Branch {
     pub name: String,
@@ -63,6 +64,7 @@ pub struct Branch {
 
 /// The newest autograder result.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(test, derive(specta::Type))]
 #[serde(rename_all = "camelCase")]
 pub struct Grade {
     /// The `submit/*` tag of the graded release; a new tag means a new grade.
@@ -122,6 +124,7 @@ impl Grade {
 
 /// A past grade, for the history: the score without the test list.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(test, derive(specta::Type))]
 #[serde(rename_all = "camelCase")]
 pub struct GradeSummary {
     pub tag: String,
@@ -150,6 +153,7 @@ impl From<&Grade> for GradeSummary {
 /// One test of a grade. Its own type, camelCase both ways, so the saved snapshot reads
 /// back (`TestResult` reads `result.json`'s kebab-case names).
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(test, derive(specta::Type))]
 #[serde(rename_all = "camelCase")]
 pub struct GradeTest {
     pub name: String,
@@ -170,6 +174,7 @@ pub struct GradeTest {
 
 /// The autograder's run on the head commit, while it says something the grade doesn't.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(test, derive(specta::Type))]
 #[serde(rename_all = "camelCase", tag = "state")]
 pub enum Grading {
     /// Queued or running; the grade is published at the end.
@@ -184,6 +189,7 @@ pub enum Grading {
 
 /// Teacher activity on the Feedback PR: comments and reviews not written by the student.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(test, derive(specta::Type))]
 #[serde(rename_all = "camelCase")]
 pub struct Feedback {
     pub url: String,

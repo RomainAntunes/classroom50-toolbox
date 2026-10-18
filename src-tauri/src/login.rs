@@ -45,6 +45,7 @@ pub enum Flow {
 }
 
 #[derive(Debug, Clone, Serialize, PartialEq, Eq)]
+#[cfg_attr(test, derive(specta::Type))]
 #[serde(rename_all = "camelCase")]
 pub struct DeviceCode {
     pub code: String,

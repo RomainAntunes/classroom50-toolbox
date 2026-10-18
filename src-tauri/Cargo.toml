@@ -43,6 +43,13 @@ sys-locale = "0.3"
 tauri-plugin-clipboard-manager = "2.5"
 
 
+# Typed IPC bindings (`src/lib/bindings.ts`), generated and checked by the `bindings` test only:
+# nothing of it is compiled into the app. Specta 2 is still a release candidate, so pin it.
+[dev-dependencies]
+specta = { version = "=2.0.0-rc.25", features = ["derive", "function", "chrono"] }
+specta-typescript = "=0.0.12"
+tauri-specta = { version = "=2.0.0-rc.25", features = ["typescript"] }
+
 # Read the optimization guideline for more details: https://tauri.app/concept/size/#cargo-configuration
 [profile.release]
 codegen-units = 1

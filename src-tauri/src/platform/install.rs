@@ -42,6 +42,7 @@ pub const WINGET_STORE: &str = "https://apps.microsoft.com/detail/9NBLGGH4NNS1";
 
 /// What installing a tool runs.
 #[derive(Debug, Clone, Serialize, PartialEq, Eq)]
+#[cfg_attr(test, derive(specta::Type))]
 #[serde(rename_all = "camelCase")]
 pub struct InstallPlan {
     pub program: String,

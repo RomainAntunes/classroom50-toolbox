@@ -32,6 +32,7 @@ const LOG_LINE_CHARS: usize = 400;
 
 /// What the UI knows and Rust doesn't.
 #[derive(Debug, Clone, Default, Deserialize)]
+#[cfg_attr(test, derive(specta::Type))]
 #[serde(rename_all = "camelCase")]
 pub struct UiFacts {
     /// `__COMMIT__`, the commit the frontend was built from.
@@ -43,6 +44,7 @@ pub struct UiFacts {
 }
 
 #[derive(Debug, Clone, Serialize)]
+#[cfg_attr(test, derive(specta::Type))]
 #[serde(rename_all = "camelCase")]
 pub struct Report {
     pub text: String,

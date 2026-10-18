@@ -27,6 +27,7 @@ const MAX_FILE: u64 = 100 * 1024 * 1024;
 
 /// What Commit & push would do, for the prompt.
 #[derive(Debug, Clone, Default, Serialize)]
+#[cfg_attr(test, derive(specta::Type))]
 #[serde(rename_all = "camelCase")]
 pub struct PushCheck {
     /// Every changed path the commit will hold (new, modified, deleted, renamed).
@@ -48,6 +49,7 @@ pub struct PushCheck {
 
 /// The new head commit (pushed by Commit & push, local only after a commit).
 #[derive(Debug, Clone, Serialize)]
+#[cfg_attr(test, derive(specta::Type))]
 #[serde(rename_all = "camelCase")]
 pub struct Pushed {
     pub commit: String,
@@ -353,6 +355,7 @@ pub fn noreply_email(id: u64, login: &str) -> String {
 /// Who to commit as when git doesn't know: the signed-in GitHub account, with its private
 /// address.
 #[derive(Debug, Clone, Serialize)]
+#[cfg_attr(test, derive(specta::Type))]
 #[serde(rename_all = "camelCase")]
 pub struct Identity {
     pub name: String,

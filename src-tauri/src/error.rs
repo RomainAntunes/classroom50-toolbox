@@ -200,6 +200,7 @@ pub enum Error {
 macro_rules! error_kinds {
     ($($variant:ident = $name:literal,)*) => {
         #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+        #[cfg_attr(test, derive(specta::Type))]
         pub enum ErrorKind {
             $(
                 #[serde(rename = $name)]
@@ -425,6 +426,7 @@ impl Error {
 /// `kind` and show its own wording (`error.<kind>` filled with `params`), else `message`.
 /// What an `Error` serializes to; `CommandError` in `src/lib/bindings.ts`.
 #[derive(Serialize)]
+#[cfg_attr(test, derive(specta::Type))]
 struct CommandError<'a> {
     kind: ErrorKind,
     message: String,
@@ -437,6 +439,13 @@ struct CommandError<'a> {
     /// What the UI's wording of this kind (`error.<kind>`) fills in.
     #[serde(skip_serializing_if = "BTreeMap::is_empty")]
     params: BTreeMap<&'static str, String>,
+}
+
+#[cfg(test)]
+impl specta::Type for Error {
+    fn definition(types: &mut specta::Types) -> specta::datatype::DataType {
+        CommandError::definition(types)
+    }
 }
 
 impl Serialize for Error {

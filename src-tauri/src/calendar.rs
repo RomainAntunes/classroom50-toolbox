@@ -33,6 +33,7 @@ const WRITTEN_FILE: &str = "calendar-events.json";
 /// The words of the event notes, from the UI's i18n (`set_calendar_labels`), so Rust writes
 /// no English of its own. `{name}`, `{n}`, `{score}` and `{max}` are filled in.
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
+#[cfg_attr(test, derive(specta::Type), serde(rename = "CalendarLabels"))]
 #[serde(rename_all = "camelCase")]
 pub struct Labels {
     pub class: String,

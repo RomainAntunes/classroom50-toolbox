@@ -27,6 +27,7 @@ pub const SCHEME: &str = "classroom50-toolbox";
 const MAX_LEN: usize = 400;
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(test, derive(specta::Type))]
 #[serde(tag = "kind", rename_all = "camelCase")]
 pub enum Link {
     Accept {
@@ -125,6 +126,7 @@ fn valid_repo_name(name: &str) -> bool {
 
 /// What a link leads to, as the UI acts on it.
 #[derive(Debug, Clone, Serialize)]
+#[cfg_attr(test, derive(specta::Type))]
 #[serde(tag = "kind", rename_all = "camelCase")]
 pub enum Target {
     /// Show this project: an `open` link, or an `accept` link to an assignment already

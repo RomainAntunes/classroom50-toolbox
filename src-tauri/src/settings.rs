@@ -17,6 +17,7 @@ pub const SYSTEM_LANGUAGE: &str = "system";
 const MAX_NOTIFY_HOURS: u32 = 7 * 24;
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(test, derive(specta::Type))]
 #[serde(rename_all = "camelCase", default)]
 pub struct Settings {
     /// Folders scanned for `.classroom50.yaml` clones.
@@ -67,6 +68,7 @@ pub struct Settings {
 
 /// Releases the app updates to: published stable ones, or also pre-releases.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
+#[cfg_attr(test, derive(specta::Type))]
 #[serde(rename_all = "camelCase")]
 pub enum UpdateChannel {
     #[default]
@@ -76,6 +78,7 @@ pub enum UpdateChannel {
 
 /// The git writes the app offers on a clone.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
+#[cfg_attr(test, derive(specta::Type))]
 #[serde(rename_all = "camelCase")]
 pub enum CommitActions {
     #[default]
@@ -85,6 +88,7 @@ pub enum CommitActions {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
+#[cfg_attr(test, derive(specta::Type))]
 #[serde(rename_all = "camelCase")]
 pub enum Appearance {
     #[default]
@@ -95,6 +99,7 @@ pub enum Appearance {
 
 /// The date filter above the project list.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
+#[cfg_attr(test, derive(specta::Type))]
 #[serde(rename_all = "camelCase")]
 pub enum ListFilter {
     #[default]

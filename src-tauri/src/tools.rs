@@ -37,6 +37,7 @@ const DETACHED_TIMEOUT: Duration = Duration::from_secs(45 * 60);
 const DETACHED_POLL: Duration = Duration::from_secs(3);
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, PartialOrd, Ord)]
+#[cfg_attr(test, derive(specta::Type))]
 #[serde(rename_all = "kebab-case")]
 pub enum Tool {
     Git,
@@ -45,6 +46,7 @@ pub enum Tool {
 }
 
 #[derive(Debug, Clone, Serialize)]
+#[cfg_attr(test, derive(specta::Type))]
 #[serde(rename_all = "camelCase")]
 pub struct ToolStatus {
     pub tool: Tool,
@@ -78,6 +80,7 @@ impl ToolStatus {
 }
 
 #[derive(Debug, Clone, Serialize)]
+#[cfg_attr(test, derive(specta::Type))]
 #[serde(rename_all = "camelCase")]
 pub struct AuthStatus {
     pub logged_in: bool,
@@ -181,6 +184,7 @@ pub fn install_plan(tool: Tool) -> Result<InstallPlan> {
 }
 
 #[derive(Debug, Clone, Copy, Serialize, PartialEq, Eq)]
+#[cfg_attr(test, derive(specta::Type))]
 #[serde(rename_all = "camelCase")]
 pub enum JobKind {
     Install,
@@ -190,6 +194,7 @@ pub enum JobKind {
 /// An install or update in progress, kept in Rust so a view opened later (the popover
 /// hidden and shown again, another page) still shows it.
 #[derive(Debug, Clone, Serialize)]
+#[cfg_attr(test, derive(specta::Type))]
 #[serde(rename_all = "camelCase")]
 pub struct ToolJob {
     pub tool: Tool,
@@ -639,6 +644,7 @@ pub async fn active_login() -> Option<String> {
 
 /// How gh clones github.com repos (`git_protocol`).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[cfg_attr(test, derive(specta::Type))]
 #[serde(rename_all = "lowercase")]
 pub enum GitProtocol {
     Https,

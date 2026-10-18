@@ -33,10 +33,88 @@ mod tray;
 mod updater;
 mod watch;
 
-use tauri::Manager;
+use tauri::{Manager, generate_handler};
 use tauri_plugin_autostart::MacosLauncher;
 
 const USER_AGENT: &str = concat!("classroom50-toolbox/", env!("CARGO_PKG_VERSION"));
+
+/// Every IPC command, listed once: `run` registers them (`tauri::generate_handler!`) and the
+/// `bindings` test types them for `src/lib/bindings.ts` (`tauri_specta::collect_commands!`).
+macro_rules! ipc_commands {
+    ($collect:ident) => {
+        $collect![
+            crate::commands::app_info,
+            crate::commands::diagnostics_report,
+            crate::commands::set_popover_pinned,
+            crate::commands::hide_popover,
+            crate::commands::active_global_shortcut,
+            crate::commands::pause_global_shortcut,
+            crate::commands::tool_statuses,
+            crate::commands::install_command,
+            crate::commands::install_tool,
+            crate::commands::upgrade_tool,
+            crate::commands::tool_jobs,
+            crate::commands::cancel_tool_job,
+            crate::commands::tool_update,
+            crate::commands::auth_status,
+            crate::commands::list_projects,
+            crate::commands::refresh_projects,
+            crate::commands::sync_progress,
+            crate::commands::rescan_local,
+            crate::commands::unseen,
+            crate::commands::sync_details,
+            crate::commands::clear_cache,
+            crate::commands::list_accounts,
+            crate::commands::switch_account,
+            crate::commands::account_avatar,
+            crate::commands::preview_badge,
+            crate::commands::export_calendar,
+            crate::commands::native_calendars,
+            crate::commands::open_calendar_file,
+            crate::commands::set_calendar_labels,
+            crate::commands::set_tray_labels,
+            crate::commands::system_languages,
+            crate::commands::set_native_calendar,
+            crate::commands::simulate_network,
+            crate::commands::simulated_network,
+            crate::commands::take_deep_link,
+            crate::commands::fetch_linked_assignment,
+            crate::commands::deep_link_done,
+            crate::commands::simulate_deep_link,
+            crate::commands::get_settings,
+            crate::commands::update_settings,
+            crate::commands::login,
+            crate::commands::cancel_login,
+            crate::commands::grant_scopes,
+            crate::commands::sign_out,
+            crate::commands::open_terminal,
+            crate::commands::installed_editors,
+            crate::commands::open_in_editor,
+            crate::commands::add_teammates,
+            crate::commands::clone_project,
+            crate::commands::git_protocol,
+            crate::commands::accept_assignment,
+            crate::commands::submit_check,
+            crate::commands::submit_project,
+            crate::commands::pull_project,
+            crate::commands::push_check,
+            crate::commands::commit_push,
+            crate::commands::commit_check,
+            crate::commands::commit_only,
+            crate::commands::suggested_git_identity,
+            crate::commands::set_git_identity,
+            crate::commands::update_status,
+            crate::commands::check_update,
+            crate::commands::install_update,
+            crate::commands::defer_update,
+            crate::commands::quit_app,
+            crate::commands::simulate_update,
+        ]
+    };
+}
+
+#[cfg(test)]
+mod bindings;
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
@@ -124,74 +202,7 @@ pub fn run() {
             updater::start(handle.clone());
             Ok(())
         })
-        .invoke_handler(tauri::generate_handler![
-            commands::app_info,
-            commands::diagnostics_report,
-            commands::set_popover_pinned,
-            commands::hide_popover,
-            commands::active_global_shortcut,
-            commands::pause_global_shortcut,
-            commands::tool_statuses,
-            commands::install_command,
-            commands::install_tool,
-            commands::upgrade_tool,
-            commands::tool_jobs,
-            commands::cancel_tool_job,
-            commands::tool_update,
-            commands::auth_status,
-            commands::list_projects,
-            commands::refresh_projects,
-            commands::sync_progress,
-            commands::rescan_local,
-            commands::unseen,
-            commands::sync_details,
-            commands::clear_cache,
-            commands::list_accounts,
-            commands::switch_account,
-            commands::account_avatar,
-            commands::preview_badge,
-            commands::export_calendar,
-            commands::native_calendars,
-            commands::open_calendar_file,
-            commands::set_calendar_labels,
-            commands::set_tray_labels,
-            commands::system_languages,
-            commands::set_native_calendar,
-            commands::simulate_network,
-            commands::simulated_network,
-            commands::take_deep_link,
-            commands::fetch_linked_assignment,
-            commands::deep_link_done,
-            commands::simulate_deep_link,
-            commands::get_settings,
-            commands::update_settings,
-            commands::login,
-            commands::cancel_login,
-            commands::grant_scopes,
-            commands::sign_out,
-            commands::open_terminal,
-            commands::installed_editors,
-            commands::open_in_editor,
-            commands::add_teammates,
-            commands::clone_project,
-            commands::git_protocol,
-            commands::accept_assignment,
-            commands::submit_check,
-            commands::submit_project,
-            commands::pull_project,
-            commands::push_check,
-            commands::commit_push,
-            commands::commit_check,
-            commands::commit_only,
-            commands::suggested_git_identity,
-            commands::set_git_identity,
-            commands::update_status,
-            commands::check_update,
-            commands::install_update,
-            commands::defer_update,
-            commands::quit_app,
-            commands::simulate_update,
-        ])
+        .invoke_handler(ipc_commands!(generate_handler))
         .build(tauri::generate_context!())
         .expect("error while building tauri application")
         .run(|app, event| {

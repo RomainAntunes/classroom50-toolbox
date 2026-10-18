@@ -9,6 +9,7 @@ use std::time::Instant;
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
+#[cfg_attr(test, derive(specta::Type))]
 #[serde(rename_all = "camelCase")]
 pub enum Phase {
     /// Pages of the repo list, plus the teams query.
@@ -41,8 +42,10 @@ impl Phase {
 
 /// What a phase cost in the last run of a kind of sync.
 #[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(test, derive(specta::Type))]
 #[serde(rename_all = "camelCase")]
 pub struct PhaseCost {
+    #[cfg_attr(test, specta(type = specta_typescript::Number))]
     pub seconds: f32,
     pub steps: usize,
 }

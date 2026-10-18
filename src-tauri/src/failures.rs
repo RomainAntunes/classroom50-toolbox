@@ -87,6 +87,7 @@ pub struct Parsed {
 
 /// What was read from the release body, once per tag.
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(test, derive(specta::Type))]
 #[serde(rename_all = "camelCase")]
 pub struct ReleaseNotes {
     /// The body's text that isn't a test's output (a custom autograder's report, the files
