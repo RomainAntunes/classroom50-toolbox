@@ -174,7 +174,8 @@ jobs:
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
           # Code signing: on hold until the toolbox has more users or funding (see
           # docs/code-signing.md). Add the secrets, then uncomment to sign and notarize the
-          # macOS builds. Windows signing goes through SignPath, set up separately.
+          # macOS builds. Windows signing goes through SignPath, in the `sign-windows` job
+          # below, after the build.
           # APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
           # APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
           # APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
@@ -231,6 +232,89 @@ jobs:
           # job, which uploads them again and runs this job after it.
           node scripts/updater-platforms.mjs latest.json "$PRERELEASE"
           gh release upload "$TAG" latest.json --clobber --repo "$GITHUB_REPOSITORY"
+
+  # Windows code signing through SignPath Foundation: on hold until the project is accepted
+  # (docs/code-signing.md has the plan and the checklist). To switch it on: add the secret
+  # SIGNPATH_API_TOKEN and the variable SIGNPATH_ORGANIZATION_ID, uncomment this job, and add
+  # `sign-windows` to the `needs` of `installer-sizes` so it measures the signed installers.
+  #
+  # It runs after `updater-urls`, which has turned latest.json's links into name-based
+  # download links (replacing an asset changes its API id, not its name). SignPath signs the
+  # installers tauri-action uploaded; Authenticode changes their bytes, so each one is signed
+  # again with the updater key and latest.json gets the new signatures. Every job up to the
+  # signing request runs on GitHub-hosted runners, as SignPath's origin verification requires.
+  #
+  # sign-windows:
+  #   needs: [version, updater-urls]
+  #   runs-on: ubuntu-latest
+  #   permissions:
+  #     # Downloads and replaces the draft's assets.
+  #     contents: write
+  #     # SignPath's action reads the uploaded workflow artifact.
+  #     actions: read
+  #   steps:
+  #     - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+  #       with:
+  #         persist-credentials: false
+  #     - uses: pnpm/action-setup@0977fd99725f1db4007ccb2928dbb4e90d06cc86 # v6.0.10
+  #     - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+  #       with:
+  #         node-version: lts/*
+  #         package-manager-cache: false
+  #     # For `tauri signer`, at the version the build used.
+  #     - run: pnpm install --frozen-lockfile
+  #     - name: Download the unsigned Windows installers
+  #       env:
+  #         GH_TOKEN: ${{ github.token }}
+  #         TAG: v${{ needs.version.outputs.version }}
+  #       run: |
+  #         gh release download "$TAG" --repo "$GITHUB_REPOSITORY" --dir unsigned \
+  #           --pattern '*-setup.exe' --pattern '*.msi'
+  #         ls -l unsigned
+  #     - id: unsigned
+  #       uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+  #       with:
+  #         name: windows-unsigned
+  #         path: unsigned/
+  #         if-no-files-found: error
+  #     # Waits for the signing request to be approved in SignPath (approval is manual), up to
+  #     # just under the 6 hours a GitHub-hosted job may run.
+  #     - uses: signpath/github-action-submit-signing-request@f6d04783b4569d051e0c80105fe66e82819d0092 # v3.0
+  #       with:
+  #         api-token: ${{ secrets.SIGNPATH_API_TOKEN }}
+  #         organization-id: ${{ vars.SIGNPATH_ORGANIZATION_ID }}
+  #         project-slug: classroom50-toolbox
+  #         signing-policy-slug: release-signing
+  #         artifact-configuration-slug: windows-installers
+  #         github-artifact-id: ${{ steps.unsigned.outputs.artifact-id }}
+  #         parameters: |
+  #           version: ${{ toJSON(needs.version.outputs.version) }}
+  #         wait-for-completion: true
+  #         wait-for-completion-timeout-in-seconds: 21000
+  #         output-artifact-directory: signed
+  #     - name: Sign again for the updater, replace the assets and the feed's signatures
+  #       env:
+  #         GH_TOKEN: ${{ github.token }}
+  #         TAG: v${{ needs.version.outputs.version }}
+  #         VERSION: ${{ needs.version.outputs.version }}
+  #         TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+  #         TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+  #       run: |
+  #         gh release download "$TAG" --repo "$GITHUB_REPOSITORY" --pattern latest.json
+  #         for file in signed/*; do
+  #           # Same check as the download: only the installers that went to SignPath.
+  #           cmp -s "$file" "unsigned/$(basename "$file")" && { echo "::error::$file came back unsigned"; exit 1; }
+  #           rm -f "$file.sig"
+  #           pnpm tauri signer sign --app-version "$VERSION" "$file"
+  #           tail=/$(jq -rn --arg name "$(basename "$file")" '$name | @uri')
+  #           jq --arg tail "$tail" --rawfile sig "$file.sig" '
+  #             if ([.platforms[] | select(.url | endswith($tail))] | length) == 0
+  #             then error("no feed entry for \($tail)") else . end
+  #             | .platforms |= map_values(if (.url | endswith($tail)) then .signature = $sig else . end)
+  #           ' latest.json > latest.signed.json
+  #           mv latest.signed.json latest.json
+  #         done
+  #         gh release upload "$TAG" signed/* latest.json --clobber --repo "$GITHUB_REPOSITORY"
 
   # Each installer's size in the run's summary, next to the same installer of the previous
   # published release, with a warning (never a failure) when one grew by more than 20%.
