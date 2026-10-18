@@ -179,6 +179,12 @@ export function install(scenario: Scenario): E2E {
         state.update = { ...state.update, installing: true };
         void emit("update-state", state.update);
         return null;
+      case "export_calendar": {
+        // Rust writes the file and keeps it updated from then on (`calendarFile`).
+        state.settings = { ...state.settings, calendarFile: args.path as string };
+        const { projects, unaccepted } = state.snapshot;
+        return [...projects, ...unaccepted].filter((item) => item.assignment?.due).length;
+      }
       case "active_global_shortcut":
         return state.settings.globalShortcut;
       case "simulated_network":
@@ -217,6 +223,7 @@ export function install(scenario: Scenario): E2E {
         return link;
       }
       case "deep_link_done":
+      case "open_calendar_file":
       case "set_popover_pinned":
       case "hide_popover":
       case "set_calendar_labels":
