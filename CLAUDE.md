@@ -17,7 +17,7 @@ The app is for students only, by design. Teacher and TA tooling (creating classr
 
 ## Stack and decisions (settled, don't re-litigate)
 
-- **Tauri v2.** The Rust core lives in `src-tauri/`, and the UI is **Svelte 5 + TypeScript** (Vite) in `src/`. Performance matters: keep the webview bundle small and do the work in Rust, not JS.
+- **Tauri v2.** The Rust core lives in `src-tauri/`, and the UI is **Svelte 5 + TypeScript** (Vite) in `src/`. Performance matters: keep the webview bundle small and do the work in Rust, not JS. CI holds the bundle to a budget: `scripts/size-budget.mjs` sums `build/`'s JavaScript and CSS, raw and gzipped, and fails above `scripts/size-budget.json` (set about 15% over the bundle of 2026-10-18 before SvelteKit 3 and the module split, which left it about 12% under: JS 920.2 kB raw, 286.8 kB gzip, CSS 30.0 and 9.1 kB; raise a limit only on purpose, saying why), with a table in the run's summary.
 - **Native look per OS through theming, not a cross-platform skin.** macOS gets vibrancy/blur and SF system fonts, Windows 11 gets Mica plus Fluent spacing and controls, and Linux follows GNOME/libadwaita (and respects KDE). Choose the theme from the platform at runtime and follow the system light/dark setting. The main surface is a popover-style window anchored to the tray icon, not a normal app window.
 - **Auth reuses gh.** Sign in through gh's device flow with the scopes `gh student login` requests (`admin:org read:org repo workflow`, plus `user:email` for members' emails), then read the token with `gh auth token`. `gh student login` itself refuses to run without a terminal, so the app runs `gh auth login --web` directly. There is no separate OAuth app, and the app never stores its own token copy.
 - **Installs go through the OS package manager.** That means Homebrew (macOS; git comes from Apple's Command Line Tools), winget (Windows) and apt/dnf/pacman/zypper through `pkexec` (Linux; gh from GitHub's own apt/rpm repository, since the distributions' gh is too old), followed by `gh extension install foundation50/gh-student`. Upgrades use `gh extension upgrade gh-student`. Elevation (sudo/UAC) must be explicit and user-initiated.
@@ -63,6 +63,7 @@ zizmor .github && actionlint                     # lint the workflows (brew inst
 cd src-tauri && cargo test                       # all Rust tests
 cd src-tauri && cargo test parses_github_remotes  # single test (name filter)
 pnpm test                          # vitest: src/**/*.test.ts, scripts/**/*.test.mjs, e2e/mock
+node scripts/size-budget.mjs       # the built frontend (build/) against scripts/size-budget.json
 pnpm exec playwright install webkit  # once, the browser for the UI flows
 pnpm test:e2e                      # UI flows in WebKit with Rust faked (tests/e2e), one worker
 pnpm test:e2e -g "submit"          # the flows whose name matches
