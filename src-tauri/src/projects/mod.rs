@@ -58,9 +58,6 @@ use snapshot::{annotate, full_snapshot, local_snapshot};
 use statuses::{StatusAuth, keep_status, refresh_statuses, status_auth};
 use sync::{Mode, refresh_in_background};
 
-pub const UPDATED_EVENT: &str = "projects-updated";
-pub const PROGRESS_EVENT: &str = "sync-progress";
-
 /// v2 keeps every inspected repo, not only those with a marker file.
 const CACHE_FILE: &str = "repos-v2.json";
 /// The last snapshot and sync stats, so a restart shows everything at once and doesn't

@@ -12,14 +12,13 @@ use std::time::{Duration, Instant};
 
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
-use tauri::{AppHandle, Emitter, Manager};
+use tauri::{AppHandle, Manager};
 use tauri_plugin_updater::{Update, UpdaterExt};
 
-use crate::alerts::{NOTIFY_EVENT, Notice};
+use crate::alerts::Notice;
 use crate::error::{Error, Result};
+use crate::events::{self, IpcEvent};
 use crate::settings::{SettingsStore, UpdateChannel};
-
-pub const STATE_EVENT: &str = "update-state";
 
 const STABLE_URL: &str =
     "https://github.com/RomainAntunes/classroom50-toolbox/releases/latest/download/latest.json";
@@ -447,8 +446,8 @@ impl UpdaterState {
 
 fn emit(app: &AppHandle) {
     let status = app.state::<UpdaterState>().status();
-    if let Err(err) = app.emit(STATE_EVENT, status) {
-        log::warn!("could not emit {STATE_EVENT}: {err}");
+    if let Err(err) = events::UpdateStateChanged::emit(app, &status) {
+        log::warn!("could not emit {}: {err}", events::UpdateStateChanged::NAME);
     }
 }
 
@@ -619,8 +618,8 @@ async fn download(
 
 /// The popover is usually hidden: a system notification says the update is ready.
 fn announce_ready(app: &AppHandle, version: String) {
-    if let Err(err) = app.emit(NOTIFY_EVENT, Notice::UpdateReady { version }) {
-        log::warn!("could not emit {NOTIFY_EVENT}: {err}");
+    if let Err(err) = events::Notify::emit(app, &Notice::UpdateReady { version }) {
+        log::warn!("could not emit {}: {err}", events::Notify::NAME);
     }
 }
 

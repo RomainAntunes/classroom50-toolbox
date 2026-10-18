@@ -9,6 +9,7 @@ mod diagnostics;
 pub mod discovery;
 pub mod editors;
 pub mod error;
+mod events;
 mod failures;
 pub mod github;
 pub mod groups;

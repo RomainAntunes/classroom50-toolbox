@@ -6,10 +6,11 @@ use std::sync::Mutex;
 use std::time::Duration;
 
 use serde::{Deserialize, Serialize};
-use tauri::{AppHandle, Emitter, Manager};
+use tauri::{AppHandle, Manager};
 use tokio::sync::watch;
 
 use crate::error::{Error, Result};
+use crate::events::{IpcEvent, ToolJobsChanged};
 use crate::github::Http;
 use crate::platform::{self, InstallPlan};
 use crate::process::{self, Streaming};
@@ -24,10 +25,6 @@ pub const MIN_GH: (u32, u32, u32) = (2, 81, 0);
 /// repo without `.classroom50.yaml` (`no_autograder` and `empty_repo` assignments) from the
 /// repo's name since 1.56.0. Older ones are updated with `gh extension upgrade`.
 pub const MIN_GH_STUDENT: (u32, u32, u32) = (1, 56, 0);
-
-/// Payload: every running install or update (`ToolJob[]`), sent when one starts, prints a
-/// line or ends.
-pub const JOBS_EVENT: &str = "tool-jobs";
 
 /// Package managers download and unpack; a slow link can take a while, a prompt nobody
 /// can answer takes forever.
@@ -325,7 +322,7 @@ async fn run_job(
     let jobs = app.state::<ToolJobs>();
     let cancel = jobs.start(tool, kind)?;
     let emit = |jobs: &ToolJobs| {
-        let _ = app.emit(JOBS_EVENT, jobs.list());
+        let _ = ToolJobsChanged::emit(app, &jobs.list());
     };
     emit(&jobs);
     let result = run_plan(app, &jobs, tool, plan, timeout, cancel, &emit).await;

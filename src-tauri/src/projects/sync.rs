@@ -5,13 +5,14 @@ use std::path::PathBuf;
 use std::time::Duration;
 
 use chrono::Utc;
-use tauri::{AppHandle, Emitter, Manager};
+use tauri::{AppHandle, Manager};
 
 use super::{
-    LastRun, Progress, ProjectsState, Snapshot, UPDATED_EVENT, annotate, commit_emails,
-    full_snapshot, local_snapshot, may_call_github, scan_local, sync_remote, watch_targets,
+    LastRun, Progress, ProjectsState, Snapshot, annotate, commit_emails, full_snapshot,
+    local_snapshot, may_call_github, scan_local, sync_remote, watch_targets,
 };
 use crate::clones::CloneStore;
+use crate::events::{IpcEvent, ProjectsUpdated};
 use crate::github::{self, Http};
 use crate::settings::{Settings, SettingsStore};
 use crate::status::Grading;
@@ -185,8 +186,8 @@ async fn publish(
     if let Ok(mut current) = state.snapshot.lock() {
         *current = snapshot.clone();
     }
-    if let Err(err) = app.emit(UPDATED_EVENT, &snapshot) {
-        log::warn!("could not emit {UPDATED_EVENT}: {err}");
+    if let Err(err) = ProjectsUpdated::emit(app, &snapshot) {
+        log::warn!("could not emit {}: {err}", ProjectsUpdated::NAME);
     }
     state.save_state();
     watch::rewatch(app, targets);
@@ -222,8 +223,8 @@ async fn sync(
             let mut snapshot =
                 local_snapshot(state, http, locals.clone(), now, false, false, &quiet).await;
             annotate(state, &mut snapshot, recents);
-            if let Err(err) = progress.app.emit(UPDATED_EVENT, &snapshot) {
-                log::warn!("could not emit {UPDATED_EVENT}: {err}");
+            if let Err(err) = ProjectsUpdated::emit(&progress.app, &snapshot) {
+                log::warn!("could not emit {}: {err}", ProjectsUpdated::NAME);
             }
         }
         scanned
