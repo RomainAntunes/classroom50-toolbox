@@ -3,21 +3,46 @@
 // linking to the release page.
 const REPO = "RomainAntunes/classroom50-toolbox";
 
-// Installers only: updater archives, signatures and latest.json are left out.
+// Installers only: updater archives, signatures and latest.json are left out. The order is
+// the order of the "Other platforms" list.
 const KINDS = [
   { test: /_aarch64\.dmg$/, os: "mac-arm", label: "macOS (Apple Silicon)" },
   { test: /_x64\.dmg$/, os: "mac-intel", label: "macOS (Intel)" },
-  { test: /-setup\.exe$/, os: "windows", label: "Windows" },
-  { test: /\.msi$/, os: "windows-msi", label: "Windows (MSI)" },
-  { test: /\.AppImage$/, os: "linux", label: "Linux (AppImage)" },
-  { test: /\.deb$/, os: "linux-deb", label: "Debian, Ubuntu (.deb)" },
-  { test: /\.rpm$/, os: "linux-rpm", label: "Fedora, RHEL (.rpm)" },
+  { test: /_x64-setup\.exe$/, os: "windows", label: "Windows" },
+  { test: /_x64_[^_]+\.msi$/, os: "windows-msi", label: "Windows (MSI)" },
+  { test: /_arm64-setup\.exe$/, os: "windows-arm", label: "Windows on Arm" },
+  { test: /_arm64_[^_]+\.msi$/, os: "windows-arm-msi", label: "Windows on Arm (MSI)" },
+  { test: /_amd64\.AppImage$/, os: "linux", label: "Linux (AppImage)" },
+  { test: /_amd64\.deb$/, os: "linux-deb", label: "Debian, Ubuntu (.deb)" },
+  { test: /\.x86_64\.rpm$/, os: "linux-rpm", label: "Fedora, RHEL (.rpm)" },
+  { test: /_aarch64\.AppImage$/, os: "linux-arm", label: "Linux on Arm (AppImage)" },
+  { test: /_arm64\.deb$/, os: "linux-arm-deb", label: "Debian, Ubuntu on Arm (.deb)" },
+  { test: /\.aarch64\.rpm$/, os: "linux-arm-rpm", label: "Fedora, RHEL on Arm (.rpm)" },
 ];
+
+// Whether the browser runs on a 64-bit Arm CPU, when it says so. Chromium tells the
+// architecture through client hints; Firefox on Linux keeps it in the user agent. Others
+// (Safari, Firefox on Windows, which reports x64 even on Arm) can't tell.
+async function isArm() {
+  if (/aarch64|arm64/i.test(navigator.userAgent)) return true;
+  try {
+    const { architecture, bitness } = await navigator.userAgentData.getHighEntropyValues([
+      "architecture",
+      "bitness",
+    ]);
+    return architecture === "arm" && bitness !== "32";
+  } catch {
+    // Not Chromium.
+  }
+  return false;
+}
 
 async function detectOs() {
   const ua = navigator.userAgent;
-  if (/Windows/.test(ua)) return "windows";
-  if (/Linux/.test(ua) && !/Android/.test(ua)) return "linux";
+  // Windows and Linux default to x64 when the browser can't tell: Windows on Arm runs the x64
+  // build too (emulated), and most Linux desktops are x64.
+  if (/Windows/.test(ua)) return (await isArm()) ? "windows-arm" : "windows";
+  if (/Linux/.test(ua) && !/Android/.test(ua)) return (await isArm()) ? "linux-arm" : "linux";
   if (!/Mac OS X/.test(ua) || /iPhone|iPad/.test(ua)) return null;
   // Safari and Firefox report every Mac as Intel; only Chromium tells the architecture. Most
   // Macs sold since 2020 are Apple Silicon, so that's the default.
@@ -42,7 +67,11 @@ async function main() {
     return asset ? [{ ...kind, url: asset.browser_download_url }] : [];
   });
   const os = await detectOs();
-  const mine = files.find((f) => f.os === os);
+  // A release from before the Arm builds: Windows on Arm runs the x64 build emulated, while
+  // Linux on Arm has nothing to run, so the button keeps pointing at the release page.
+  const mine =
+    files.find((f) => f.os === os) ??
+    (os === "windows-arm" ? files.find((f) => f.os === "windows") : undefined);
   const date = new Date(release.published_at).toLocaleDateString(document.documentElement.lang, {
     dateStyle: "long",
   });
