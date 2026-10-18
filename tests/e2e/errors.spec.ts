@@ -50,7 +50,7 @@ test("a sync issue is worded by kind, Rust's message in its hint", async ({ app,
     scenario({
       snapshot: snapshot({
         projects: [lab],
-        issue: { kind: "somethingNew", message: "GraphQL: Something went wrong" },
+        issue: { kind: "somethingNew", message: "GraphQL: Something went wrong", retryAfter: null },
       }),
     }),
   );

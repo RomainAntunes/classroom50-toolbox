@@ -2,9 +2,9 @@
   import { onMount } from "svelte";
   import { goto } from "$app/navigation";
   import { openUrl } from "@tauri-apps/plugin-opener";
-  import { listen } from "@tauri-apps/api/event";
   import {
     api,
+    onEvent,
     PROJECTS_UPDATED_EVENT,
     type AppInfo,
     type NativeCalendar,
@@ -61,7 +61,7 @@
         }
       },
     );
-    const unlisten = listen(PROJECTS_UPDATED_EVENT, async () => {
+    const unlisten = onEvent(PROJECTS_UPDATED_EVENT, async () => {
       sync = await api.syncDetails();
     });
     return () => void unlisten.then((stop) => stop());

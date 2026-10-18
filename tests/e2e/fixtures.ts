@@ -10,6 +10,7 @@ import type {
   CommandError,
   DeepLinkTarget,
   EditorInfo,
+  ErrorKind,
   Grade,
   GradeTest,
   LocalState,
@@ -57,7 +58,7 @@ export const hold = (): Reply => ({ hold: true });
 /** The fake's own answer, e.g. after a failure: `respond(cmd, fail(...), pass())`. */
 export const pass = (): Reply => ({ pass: true });
 export function fail(
-  kind: string,
+  kind: ErrorKind,
   message = `${kind} (from Rust)`,
   params?: Record<string, string>,
 ): Reply {
@@ -321,6 +322,7 @@ export function scenario(over: Partial<Scenario> = {}): Scenario {
         reposSeen: 0,
         scanRoots: 0,
         watchTargets: 0,
+        phases: {},
       },
       rateLimit: { remaining: 4900, limit: 5000, resetAt: null },
       issue: null,

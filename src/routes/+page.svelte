@@ -3,18 +3,16 @@
   import logo from "#lib/assets/logo.png";
   import { onMount } from "svelte";
   import { goto } from "$app/navigation";
-  import { listen } from "@tauri-apps/api/event";
   import { Menu, MenuItem } from "@tauri-apps/api/menu";
   import {
     api,
+    onEvent,
     errorMessage,
     POPOVER_SHORTCUT_EVENT,
     PROJECTS_UPDATED_EVENT,
     SYNC_PROGRESS_EVENT,
     type AuthStatus,
     type Project,
-    type Snapshot,
-    type SyncProgress,
     type ListFilter,
     type Unaccepted,
     type ToolStatus,
@@ -285,18 +283,18 @@
   onMount(() => {
     load();
     const unlisteners = [
-      listen(POPOVER_SHORTCUT_EVENT, focusList),
-      listen<SyncProgress>(SYNC_PROGRESS_EVENT, (event) => {
-        session.progress = event.payload;
+      onEvent(POPOVER_SHORTCUT_EVENT, focusList),
+      onEvent(SYNC_PROGRESS_EVENT, (progress) => {
+        session.progress = progress;
       }),
-      listen<Snapshot>(PROJECTS_UPDATED_EVENT, (event) => {
+      onEvent(PROJECTS_UPDATED_EVENT, (snapshot) => {
         // `gh auth switch`: the footer follows the account the data now belongs to.
-        if (event.payload.login && event.payload.login !== session.auth?.login) {
+        if (snapshot.login && snapshot.login !== session.auth?.login) {
           void api.authStatus().then((auth) => {
             session.auth = auth;
           });
         }
-        session.snapshot = event.payload;
+        session.snapshot = snapshot;
         now = new Date();
       }),
     ];

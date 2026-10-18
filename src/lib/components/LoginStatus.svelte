@@ -1,6 +1,5 @@
 <script lang="ts">
   import { onMount } from "svelte";
-  import { listen } from "@tauri-apps/api/event";
   import { CheckMenuItem, Menu, MenuItem, PredefinedMenuItem } from "@tauri-apps/api/menu";
   import { openUrl } from "@tauri-apps/plugin-opener";
   import { ask } from "@tauri-apps/plugin-dialog";
@@ -11,6 +10,7 @@
   } from "@tauri-apps/plugin-notification";
   import {
     api,
+    onEvent,
     DEVICE_CODE_EVENT,
     LOGIN_ENDED_EVENT,
     errorKind,
@@ -211,12 +211,12 @@
 
   onMount(() => {
     const unlisteners = [
-      listen<DeviceCode>(DEVICE_CODE_EVENT, (event) => {
-        device = event.payload;
-        announce(`${t("auth.waiting")} ${event.payload.code}`);
+      onEvent(DEVICE_CODE_EVENT, (code) => {
+        device = code;
+        announce(`${t("auth.waiting")} ${code.code}`);
       }),
       // Also resets a view that didn't start the sign-in (e.g. after a reload).
-      listen(LOGIN_ENDED_EVENT, () => {
+      onEvent(LOGIN_ENDED_EVENT, () => {
         device = null;
         pending = false;
       }),

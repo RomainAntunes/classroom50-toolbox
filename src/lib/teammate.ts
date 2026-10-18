@@ -94,7 +94,7 @@ async function addTeammates(target: Target): Promise<void> {
     });
     const usernames = text ? parseUsernames(text) : [];
     if (usernames.length === 0) return;
-    let results: Added[];
+    let results: Outcome[];
     try {
       results = await api.addTeammates(target.id, usernames);
     } catch (err) {
@@ -113,8 +113,11 @@ async function addTeammates(target: Target): Promise<void> {
   }
 }
 
+/** What adding one classmate gave: `Added`, or a failure of the whole call, worded. */
+type Outcome = Pick<Added, "username"> & { error: unknown };
+
 /** One line per username: added, or why not. */
-export function resultsText(results: Added[], target: Omit<Target, "id">): string {
+export function resultsText(results: Outcome[], target: Omit<Target, "id">): string {
   return results
     .map(({ username: user, error }) =>
       error
