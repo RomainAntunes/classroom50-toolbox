@@ -1,7 +1,7 @@
 //! Self-update from GitHub Releases (`latest.json`, signed with the Tauri updater key).
 //!
 //! One state machine (`Machine`) goes idle, checking, downloading, ready (or error) and is
-//! sent as `update-state` on every change. Checks run at every start, daily while the app runs
+//! sent as `update-state` on every change. Checks run at every start, every 6 hours while the app runs
 //! and from Settings; a newer version downloads at once, in memory, and installs on
 //! "Restart now" or, where the platform allows it, when the user quits.
 
@@ -31,8 +31,9 @@ const MEMORY_FILE: &str = "update-check.json";
 const STARTUP_DELAY: Duration = Duration::from_secs(20);
 /// The background tick only compares clocks; a check runs when one is due.
 const TICK: Duration = Duration::from_secs(60);
-/// Checks while the app runs.
-const DAILY: chrono::TimeDelta = chrono::TimeDelta::hours(24);
+/// Checks while the app runs. A check made just before a release is published (or one that
+/// read a stale feed) then hides it for this long at most.
+const INTERVAL: chrono::TimeDelta = chrono::TimeDelta::hours(6);
 /// After a failed check (offline, GitHub down), the next background one waits this long.
 const RETRY: chrono::TimeDelta = chrono::TimeDelta::hours(1);
 /// Progress events at most this often (about 10 a second).
@@ -342,7 +343,7 @@ impl Memory {
     }
 }
 
-/// Whether the daily check is due (every start checks anyway): once `DAILY` has passed
+/// Whether the next check is due (every start checks anyway): once `INTERVAL` has passed
 /// since the last one, measured on the wall clock so the time a laptop slept counts, and
 /// not within `RETRY` of a failure. Another version or channel checks at once, after the
 /// same wait when the last try failed (offline right after an update).
@@ -358,7 +359,7 @@ fn due(memory: &Memory, now: DateTime<Utc>, version: &str, channel: UpdateChanne
     if checked_at > now + chrono::TimeDelta::minutes(5) {
         return true;
     }
-    now - checked_at >= DAILY && rested
+    now - checked_at >= INTERVAL && rested
 }
 
 /// The wall clock moved further than the monotonic one between two ticks: the machine
@@ -530,8 +531,17 @@ pub async fn check(app: &AppHandle, quiet: bool) -> Result<UpdateStatus> {
         let url = endpoint(channel, state.bundle)
             .parse()
             .map_err(|_| Error::Unsupported("bad update URL".into()))?;
+        let running = version.clone();
         app.updater_builder()
             .endpoints(vec![url])?
+            // The plugin's own rule, plus a line saying what the feed held.
+            .version_comparator(move |current, remote| {
+                log::info!(
+                    "update feed ({channel:?}) says {}, running {running}",
+                    remote.version
+                );
+                remote.version > current
+            })
             .build()?
             .check()
             .await
@@ -937,11 +947,11 @@ mod tests {
     }
 
     #[test]
-    fn checks_daily_and_catches_up_after_sleep() {
+    fn checks_every_six_hours_and_catches_up_after_sleep() {
         let stable = UpdateChannel::Stable;
         let memory = checked("2026-10-15T12:00:00Z");
-        assert!(!due(&memory, at("2026-10-16T11:59:00Z"), "0.10.0", stable));
-        assert!(due(&memory, at("2026-10-16T12:00:00Z"), "0.10.0", stable));
+        assert!(!due(&memory, at("2026-10-15T17:59:00Z"), "0.10.0", stable));
+        assert!(due(&memory, at("2026-10-15T18:00:00Z"), "0.10.0", stable));
         // A laptop that slept for three days checks on the first tick after waking.
         assert!(due(&memory, at("2026-10-18T08:00:00Z"), "0.10.0", stable));
         // A clock set back.
