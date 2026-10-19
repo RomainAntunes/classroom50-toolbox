@@ -18,6 +18,8 @@ permissions: {}
 jobs:
   # Dependabot's PRs run nothing until the `run-ci` label is added (then every push to them
   # runs). Other PRs and pushes to main always run; adding `run-ci` to one runs it again.
+  # A version bump alone (or a changelog edit) is scope `bump`: its code is the commit
+  # before's, already checked, so only `release-inputs` runs. Adding `run-ci` checks it all.
   gate:
     if: >-
       github.event_name != 'pull_request' ||
@@ -26,12 +28,57 @@ jobs:
         (github.event.pull_request.user.login != 'dependabot[bot]' ||
           contains(github.event.pull_request.labels.*.name, 'run-ci')))
     runs-on: ubuntu-24.04
-    permissions: {}
+    permissions:
+      contents: read
+    outputs:
+      scope: ${{ steps.scope.outputs.scope }}
     steps:
-      - run: "true"
+      # A PR's merge commit or main's new merge: its first parent is the base.
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          fetch-depth: 2
+      # Compared with the first parent, unless a push brought several commits.
+      - id: scope
+        env:
+          EVENT: ${{ github.event_name }}
+          ACTION: ${{ github.event.action }}
+          BEFORE: ${{ github.event.before }}
+        run: |
+          base=$(git rev-parse --verify --quiet HEAD^1 || true)
+          if [ -z "$base" ] || [ "$ACTION" = labeled ] || { [ "$EVENT" = push ] && [ "$BEFORE" != "$base" ]; }; then
+            scope=full
+          else
+            scope=$(node scripts/ci-scope.mjs "$base") || scope=full
+          fi
+          echo "scope: $scope"
+          echo "scope=$scope" >> "$GITHUB_OUTPUT"
+
+  # Scope `bump`: what the release reads. The versions agree (Cargo.lock refreshed), the
+  # changelogs are formatted and complete in every catalog (changelog.test.ts).
+  release-inputs:
+    needs: gate
+    if: needs.gate.outputs.scope == 'bump'
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: pnpm/action-setup@0977fd99725f1db4007ccb2928dbb4e90d06cc86 # v6.0.10
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: lts/*
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: node scripts/ci-scope.mjs --versions
+      - run: pnpm exec prettier --check package.json src/lib/changelog
+      - run: pnpm exec vitest run src/lib/changelog scripts
 
   check:
     needs: gate
+    if: needs.gate.outputs.scope == 'full'
     permissions:
       contents: read
     strategy:
@@ -82,6 +129,7 @@ jobs:
   # a fake gh. Linux only: tauri-driver needs WebKitWebDriver, and macOS has no WKWebView driver.
   webdriver:
     needs: gate
+    if: needs.gate.outputs.scope == 'full'
     permissions:
       contents: read
     runs-on: ubuntu-22.04
@@ -136,6 +184,7 @@ jobs:
   # summary. No upload to a coverage service and no threshold; failing tests fail `check`.
   coverage:
     needs: gate
+    if: needs.gate.outputs.scope == 'full'
     runs-on: ubuntu-22.04
     timeout-minutes: 40
     continue-on-error: true
@@ -186,6 +235,7 @@ jobs:
   # UI flows in WebKit with Rust faked (tests/e2e): no app build, no GitHub access.
   e2e:
     needs: gate
+    if: needs.gate.outputs.scope == 'full'
     permissions:
       contents: read
     runs-on: ubuntu-24.04
@@ -234,6 +284,7 @@ jobs:
   # crate deep in Tauri's tree would otherwise fail every PR until upstream ships a fix.
   deny:
     needs: gate
+    if: needs.gate.outputs.scope == 'full'
     runs-on: ubuntu-24.04
     permissions:
       contents: read
@@ -258,6 +309,7 @@ jobs:
   # template injection...). Findings go to the log, not to code scanning.
   zizmor:
     needs: gate
+    if: needs.gate.outputs.scope == 'full'
     runs-on: ubuntu-24.04
     permissions:
       contents: read
