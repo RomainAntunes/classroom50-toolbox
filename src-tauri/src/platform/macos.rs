@@ -179,6 +179,7 @@ mod tests {
 }
 
 mod calendar;
+mod login_item;
 
 pub fn global_shortcuts_supported() -> bool {
     true
@@ -189,3 +190,4 @@ pub fn has_native_calendar() -> bool {
 }
 
 pub use calendar::{native_calendars, write_calendar};
+pub use login_item::{login_item_enabled, set_login_item};

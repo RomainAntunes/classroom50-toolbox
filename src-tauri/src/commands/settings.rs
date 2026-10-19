@@ -4,6 +4,7 @@ use tauri::{AppHandle, State};
 use tauri_plugin_autostart::ManagerExt;
 
 use crate::error::Result;
+use crate::platform;
 use crate::popover;
 use crate::projects;
 use crate::settings::{Settings, SettingsStore};
@@ -18,7 +19,9 @@ pub fn get_settings(app: AppHandle, settings: State<'_, SettingsStore>) -> Setti
 /// `settings` as the UI gets them: the OS setting wins, since the user may have removed
 /// the login item outside the app.
 pub fn reported_settings(app: &AppHandle, mut settings: Settings) -> Settings {
-    if let Ok(enabled) = app.autolaunch().is_enabled() {
+    if let Some(enabled) = platform::login_item_enabled() {
+        settings.launch_at_login = enabled;
+    } else if let Ok(enabled) = app.autolaunch().is_enabled() {
         settings.launch_at_login = enabled;
     }
     settings
@@ -80,6 +83,19 @@ pub fn update_settings(
     Ok(saved)
 }
 
+/// Moves a login item from the plugin's Launch Agent to the OS's own API where there is
+/// one, so an update keeps opening at login, now under the app's name and icon.
+pub fn migrate_launch_at_login(app: &AppHandle) {
+    if cfg!(debug_assertions) || platform::login_item_enabled().is_none() {
+        return;
+    }
+    if app.autolaunch().is_enabled().unwrap_or(false)
+        && let Err(err) = apply_launch_at_login(app, true)
+    {
+        log::warn!("moving the login item failed: {err}");
+    }
+}
+
 /// Registers or removes the OS login item. Skipped in debug builds so `tauri dev` never
 /// registers a throwaway binary.
 pub fn apply_launch_at_login(app: &AppHandle, enabled: bool) -> Result<()> {
@@ -87,6 +103,13 @@ pub fn apply_launch_at_login(app: &AppHandle, enabled: bool) -> Result<()> {
         return Ok(());
     }
     let autolaunch = app.autolaunch();
+    if let Some(result) = platform::set_login_item(enabled) {
+        result?;
+        // The plugin's Launch Agent, which earlier versions wrote: it would open the
+        // app a second time and stays listed as an unidentified binary.
+        autolaunch.disable()?;
+        return Ok(());
+    }
     if enabled {
         autolaunch.enable()?;
     } else {

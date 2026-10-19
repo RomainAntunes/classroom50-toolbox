@@ -178,6 +178,8 @@ pub fn run() {
                 {
                     log::warn!("first-run setup failed: {err}");
                 }
+            } else {
+                commands::migrate_launch_at_login(handle);
             }
             app.manage(settings);
             app.manage(clones::CloneStore::load(&app.path().app_config_dir()?));
