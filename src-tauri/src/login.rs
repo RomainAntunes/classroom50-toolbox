@@ -16,17 +16,14 @@ use std::sync::Mutex;
 use std::time::Duration;
 
 use serde::Serialize;
-use tauri::{AppHandle, Emitter};
+use tauri::AppHandle;
 use tokio::io::{AsyncBufReadExt, AsyncRead, BufReader};
 use tokio::sync::{mpsc, oneshot};
 
 use crate::error::{Error, Result};
+use crate::events::{IpcEvent, LoginDeviceCode, LoginEnded};
 use crate::process;
 use crate::tools::{self, AuthStatus};
-
-pub const DEVICE_CODE_EVENT: &str = "login-device-code";
-/// Sent however a sign-in ends (success, failure or cancel), so every view resets.
-pub const ENDED_EVENT: &str = "login-ended";
 
 /// The scopes `gh student login` requests (upstream `contract.RequiredOAuthScopes`), on
 /// top of gh's own `repo read:org gist`; one sign-in covers gh-student too.
@@ -48,6 +45,7 @@ pub enum Flow {
 }
 
 #[derive(Debug, Clone, Serialize, PartialEq, Eq)]
+#[cfg_attr(test, derive(specta::Type))]
 #[serde(rename_all = "camelCase")]
 pub struct DeviceCode {
     pub code: String,
@@ -74,7 +72,7 @@ pub async fn login(app: &AppHandle, state: &LoginState, flow: Flow) -> Result<Au
     if let Ok(mut cancel) = state.cancel.lock() {
         cancel.take();
     }
-    let _ = app.emit(ENDED_EVENT, ());
+    let _ = LoginEnded::emit(app, &());
     result
 }
 
@@ -106,7 +104,7 @@ async fn run(app: &AppHandle, state: &LoginState, flow: Flow) -> Result<AuthStat
         while let Some(line) = rx.recv().await {
             let line = clean(&line);
             if let Some(device) = parser.feed(&line) {
-                let _ = emitter.emit(DEVICE_CODE_EVENT, device);
+                let _ = LoginDeviceCode::emit(&emitter, &device);
             }
             if !line.is_empty() {
                 transcript.push(line);

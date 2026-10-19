@@ -13,6 +13,8 @@ const group: Group = {
   name: "The Sharks",
   founders: null,
   url: "",
+  classroom: null,
+  assignment: null,
   members: [{ login: "jmaendly", name: "Julie Maendly", email: null }],
 };
 

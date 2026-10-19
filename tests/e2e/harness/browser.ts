@@ -279,7 +279,8 @@ export function install(scenario: Scenario): E2E {
       return null;
     }
     unmocked.push(cmd);
-    throw { kind: "unmocked", message: `No e2e mock for ${cmd}` } satisfies CommandError;
+    // Not a kind Rust has: the test fails on it (`unmocked`), whatever the UI does with it.
+    throw { kind: "unmocked", message: `No e2e mock for ${cmd}` };
   }
 
   function answer(cmd: string, args: Record<string, unknown>): unknown {

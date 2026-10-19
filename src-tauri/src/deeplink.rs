@@ -5,28 +5,29 @@
 //! and ignored, with no UI.
 //!
 //! A link waits in `DeepLinkState` until the UI takes it (`take_deep_link`), so one that
-//! started the app before the webview loaded isn't lost; `DEEP_LINK_EVENT` tells a loaded
+//! started the app before the webview loaded isn't lost; `DeepLinkWaiting` tells a loaded
 //! UI to take it now.
 
 use std::sync::Mutex;
 use std::time::{Duration, Instant};
 
 use serde::{Deserialize, Serialize};
-use tauri::{AppHandle, Emitter, Manager};
+use tauri::{AppHandle, Manager};
 
 use crate::classroom50::{self, Classroom};
 use crate::error::Result;
+use crate::events::{DeepLinkWaiting, IpcEvent};
 use crate::github::Http;
 use crate::projects::{self, ProjectsState, Snapshot, Unaccepted};
 use crate::student;
 
 pub const SCHEME: &str = "classroom50-toolbox";
-pub const DEEP_LINK_EVENT: &str = "deep-link";
 
 /// Longer than any valid link (two 39-character logins, two 100-character slugs, a key).
 const MAX_LEN: usize = 400;
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(test, derive(specta::Type))]
 #[serde(tag = "kind", rename_all = "camelCase")]
 pub enum Link {
     Accept {
@@ -125,6 +126,7 @@ fn valid_repo_name(name: &str) -> bool {
 
 /// What a link leads to, as the UI acts on it.
 #[derive(Debug, Clone, Serialize)]
+#[cfg_attr(test, derive(specta::Type))]
 #[serde(tag = "kind", rename_all = "camelCase")]
 pub enum Target {
     /// Show this project: an `open` link, or an `accept` link to an assignment already
@@ -266,7 +268,7 @@ pub fn handle(app: &AppHandle, url: &str) {
     log::info!("link: {}", describe(&link));
     state.set_pending(link);
     crate::popover::show(app);
-    let _ = app.emit(DEEP_LINK_EVENT, ());
+    let _ = DeepLinkWaiting::emit(app, &());
 }
 
 /// The link for the log: its action only. The names it holds may be a class the

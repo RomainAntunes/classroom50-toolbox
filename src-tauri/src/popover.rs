@@ -6,18 +6,13 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::time::{Duration, Instant};
 
 use tauri::{
-    AppHandle, Emitter, LogicalPosition, Manager, Monitor, PhysicalPosition, WebviewWindow,
-    WindowEvent,
+    AppHandle, LogicalPosition, Manager, Monitor, PhysicalPosition, WebviewWindow, WindowEvent,
 };
 
+use crate::events::{IpcEvent, PopoverHidden, PopoverShortcut};
 use crate::settings::{Appearance, SettingsStore};
 
 pub const LABEL: &str = "main";
-/// Sent when the popover hides, so the UI drops what it only showed for the moment.
-pub const HIDDEN_EVENT: &str = "popover-hidden";
-/// Sent when the global shortcut showed the popover, so the list takes the keyboard focus.
-pub const SHORTCUT_EVENT: &str = "popover-shortcut";
-
 /// Clicking the tray icon while the popover is open first blurs (hides) it, then delivers
 /// the click; without this guard that click would immediately reopen it.
 const REOPEN_GUARD: Duration = Duration::from_millis(250);
@@ -108,7 +103,7 @@ pub fn toggle_from_shortcut(app: &AppHandle) {
         return;
     }
     show(app);
-    let _ = app.emit(SHORTCUT_EVENT, ());
+    let _ = PopoverShortcut::emit(app, &());
 }
 
 /// Opens under the tray icon, wherever it is (the shortcut, the menu's Open, a link).
@@ -183,7 +178,7 @@ fn move_to(app: &AppHandle, window: &WebviewWindow, icon: Option<Area>) {
 pub fn hide(app: &AppHandle) {
     if let Some(window) = app.get_webview_window(LABEL) {
         let _ = window.hide();
-        let _ = app.emit(HIDDEN_EVENT, ());
+        let _ = PopoverHidden::emit(app, &());
         crate::alerts::mark_seen(app);
         if let Ok(mut at) = app.state::<PopoverState>().hidden_at.lock() {
             *at = Some(Instant::now());

@@ -11,6 +11,7 @@ use crate::tools;
 /// The "Copy diagnostics" report (`diagnostics.rs`), masked, for the UI to preview and
 /// copy. Reads only what the app already has; nothing is sent anywhere.
 #[tauri::command]
+#[cfg_attr(test, specta::specta)]
 pub async fn diagnostics_report(
     app: AppHandle,
     ui: crate::diagnostics::UiFacts,

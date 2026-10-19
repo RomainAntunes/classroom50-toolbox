@@ -190,6 +190,7 @@ fn accept_args(request: &AcceptRequest<'_>) -> Result<Vec<OsString>> {
 /// default branch as a new commit on top of GitHub's head; the clone itself isn't changed.
 /// The app only submits a clean clone, so what is sent is what is committed.
 #[derive(Debug, Clone, Default, Serialize)]
+#[cfg_attr(test, derive(specta::Type))]
 #[serde(rename_all = "camelCase")]
 pub struct SubmitCheck {
     /// The clone has `.classroom50.yaml`. Without it (`no_autograder` and `empty_repo`
@@ -252,6 +253,7 @@ where
 }
 
 #[derive(Debug, Clone, Serialize)]
+#[cfg_attr(test, derive(specta::Type))]
 #[serde(rename_all = "camelCase")]
 pub struct Submitted {
     /// The submission commit on GitHub.

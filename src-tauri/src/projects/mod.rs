@@ -58,9 +58,6 @@ use snapshot::{annotate, full_snapshot, local_snapshot};
 use statuses::{StatusAuth, keep_status, refresh_statuses, status_auth};
 use sync::{Mode, refresh_in_background};
 
-pub const UPDATED_EVENT: &str = "projects-updated";
-pub const PROGRESS_EVENT: &str = "sync-progress";
-
 /// v2 keeps every inspected repo, not only those with a marker file.
 const CACHE_FILE: &str = "repos-v2.json";
 /// The last snapshot and sync stats, so a restart shows everything at once and doesn't
@@ -71,6 +68,7 @@ const STATE_FILE: &str = "snapshot.json";
 const MANIFEST_MAX_AGE: chrono::TimeDelta = chrono::TimeDelta::minutes(10);
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(test, derive(specta::Type))]
 #[serde(rename_all = "camelCase")]
 pub struct Commit {
     pub oid: String,
@@ -83,6 +81,7 @@ pub struct Commit {
 
 /// The newest `submit/*` tag (names sort chronologically).
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(test, derive(specta::Type))]
 #[serde(rename_all = "camelCase")]
 pub struct Submission {
     pub tag: String,
@@ -92,6 +91,7 @@ pub struct Submission {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(test, derive(specta::Type))]
 #[serde(rename_all = "camelCase")]
 pub struct RemoteRepo {
     pub owner: String,
@@ -129,6 +129,7 @@ pub struct RemoteRepo {
 pub const MAX_CHANGED_PATHS: usize = 20;
 
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(test, derive(specta::Type))]
 #[serde(rename_all = "camelCase")]
 pub struct LocalState {
     pub branch: Option<String>,
@@ -149,6 +150,7 @@ pub struct LocalState {
 
 /// The most pressing reason the graded state lags behind the student's work.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(test, derive(specta::Type))]
 #[serde(rename_all = "camelCase")]
 pub enum Pending {
     /// Someone pushed commits the clone doesn't have while it holds uncommitted or
@@ -164,6 +166,7 @@ pub enum Pending {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(test, derive(specta::Type))]
 #[serde(rename_all = "camelCase")]
 pub struct Project {
     /// `owner/repo` in lowercase, or the clone path when it has no GitHub origin.
@@ -194,6 +197,7 @@ pub struct Project {
 
 /// Why the last sync was partial, as `{ kind, message, params }` like command errors.
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(test, derive(specta::Type))]
 #[serde(rename_all = "camelCase")]
 pub struct SyncIssue {
     pub kind: String,
@@ -233,6 +237,7 @@ impl From<&Error> for SyncIssue {
 }
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[cfg_attr(test, derive(specta::Type))]
 #[serde(rename_all = "camelCase")]
 pub struct Snapshot {
     pub projects: Vec<Project>,
@@ -248,6 +253,7 @@ pub struct Snapshot {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(test, derive(specta::Type))]
 #[serde(rename_all = "camelCase")]
 pub struct Unaccepted {
     /// `org/classroom/assignment`, lowercase.
@@ -288,6 +294,7 @@ impl RemoteCache {
 
 /// How far the sync in flight is (see `sync_progress`).
 #[derive(Debug, Clone, Copy, Default, Serialize)]
+#[cfg_attr(test, derive(specta::Type))]
 #[serde(rename_all = "camelCase")]
 pub struct SyncProgress {
     pub running: bool,
@@ -295,18 +302,22 @@ pub struct SyncProgress {
     /// without a spinner.
     pub foreground: bool,
     /// From 0 to 1, never lower than the last report of the same sync.
+    #[cfg_attr(test, specta(type = specta_typescript::Number))]
     pub fraction: f32,
 }
 
 /// How the last sync of a kind went, for the sync details in Settings.
 #[derive(Debug, Clone, Copy, Serialize, Deserialize)]
+#[cfg_attr(test, derive(specta::Type))]
 #[serde(rename_all = "camelCase")]
 pub struct LastRun {
     pub at: DateTime<Utc>,
+    #[cfg_attr(test, specta(type = specta_typescript::Number))]
     pub seconds: f32,
 }
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[cfg_attr(test, derive(specta::Type))]
 #[serde(rename_all = "camelCase")]
 pub struct SyncStats {
     /// The GraphQL budget as of the last response.

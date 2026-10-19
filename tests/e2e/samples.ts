@@ -79,6 +79,8 @@ export function richScenario(over: Partial<Settings> = {}): Scenario {
             ],
             founders: ["student"],
             url: "https://github.com/orgs/cs50-school/teams/x",
+            classroom: null,
+            assignment: null,
           },
         }),
         project({

@@ -30,6 +30,7 @@ use macos as imp;
 use windows as imp;
 
 #[derive(Debug, Clone, Copy, Serialize, PartialEq, Eq)]
+#[cfg_attr(test, derive(specta::Type))]
 #[serde(rename_all = "lowercase")]
 pub enum Os {
     Macos,
@@ -39,6 +40,7 @@ pub enum Os {
 
 /// A command line to run, possibly with elevation (shown to the user before it runs).
 #[derive(Debug, Clone, Serialize, PartialEq, Eq)]
+#[cfg_attr(test, derive(specta::Type))]
 pub struct CommandSpec {
     pub program: String,
     pub args: Vec<String>,
@@ -235,6 +237,7 @@ pub struct CalendarEvent {
 
 /// A calendar of the OS's calendar app the user can write to.
 #[derive(Debug, Clone, Serialize)]
+#[cfg_attr(test, derive(specta::Type))]
 #[serde(rename_all = "camelCase")]
 pub struct NativeCalendar {
     pub id: String,

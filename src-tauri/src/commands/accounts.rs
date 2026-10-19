@@ -8,18 +8,21 @@ use crate::projects;
 use crate::tools::{self, AuthStatus};
 
 #[tauri::command]
+#[cfg_attr(test, specta::specta)]
 pub async fn auth_status() -> AuthStatus {
     tools::auth_status().await
 }
 
 /// The github.com accounts gh is signed in to, the active one first.
 #[tauri::command]
+#[cfg_attr(test, specta::specta)]
 pub async fn list_accounts() -> Result<Vec<crate::accounts::Account>> {
     crate::accounts::list().await
 }
 
 /// Switches gh to `login`, then syncs that account's projects.
 #[tauri::command]
+#[cfg_attr(test, specta::specta)]
 pub async fn switch_account(app: AppHandle, login: String) -> Result<AuthStatus> {
     crate::accounts::switch(&login).await?;
     let status = tools::auth_status().await;
@@ -31,6 +34,7 @@ pub async fn switch_account(app: AppHandle, login: String) -> Result<AuthStatus>
 
 /// The account's avatar as a `data:` URL (cached for a week).
 #[tauri::command]
+#[cfg_attr(test, specta::specta)]
 pub async fn account_avatar(app: AppHandle, login: String) -> Result<String> {
     let http = app.state::<crate::github::Http>().0.clone();
     let cache_dir = app.path().app_cache_dir()?;
@@ -40,6 +44,7 @@ pub async fn account_avatar(app: AppHandle, login: String) -> Result<String> {
 /// Runs gh's device flow; the code arrives through the `login-device-code` event. The new
 /// account is gh's active one afterwards, so its projects are synced right away.
 #[tauri::command]
+#[cfg_attr(test, specta::specta)]
 pub async fn login(app: AppHandle, state: State<'_, LoginState>) -> Result<AuthStatus> {
     signed_in(
         app.clone(),
@@ -50,6 +55,7 @@ pub async fn login(app: AppHandle, state: State<'_, LoginState>) -> Result<AuthS
 /// Adds gh-student's missing scopes to the active account (`gh auth refresh`), through the
 /// same device flow as `login`.
 #[tauri::command]
+#[cfg_attr(test, specta::specta)]
 pub async fn grant_scopes(app: AppHandle, state: State<'_, LoginState>) -> Result<AuthStatus> {
     signed_in(
         app.clone(),
@@ -69,6 +75,7 @@ fn signed_in(app: AppHandle, result: Result<AuthStatus>) -> Result<AuthStatus> {
 
 /// Signs `login` out of gh, then syncs whichever account is left (or clears the list).
 #[tauri::command]
+#[cfg_attr(test, specta::specta)]
 pub async fn sign_out(app: AppHandle, login: String) -> Result<AuthStatus> {
     crate::accounts::sign_out(&login).await?;
     let status = tools::auth_status().await;
@@ -79,6 +86,7 @@ pub async fn sign_out(app: AppHandle, login: String) -> Result<AuthStatus> {
 }
 
 #[tauri::command]
+#[cfg_attr(test, specta::specta)]
 pub fn cancel_login(state: State<'_, LoginState>) {
     state.cancel();
 }

@@ -12,14 +12,13 @@ use std::time::{Duration, Instant};
 
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
-use tauri::{AppHandle, Emitter, Manager};
+use tauri::{AppHandle, Manager};
 use tauri_plugin_updater::{Update, UpdaterExt};
 
-use crate::alerts::{NOTIFY_EVENT, Notice};
-use crate::error::{Error, Result};
+use crate::alerts::Notice;
+use crate::error::{Error, ErrorKind, Result};
+use crate::events::{self, IpcEvent};
 use crate::settings::{SettingsStore, UpdateChannel};
-
-pub const STATE_EVENT: &str = "update-state";
 
 const STABLE_URL: &str =
     "https://github.com/RomainAntunes/classroom50-toolbox/releases/latest/download/latest.json";
@@ -41,6 +40,7 @@ const PROGRESS_EVERY: Duration = Duration::from_millis(100);
 
 /// How the running app was installed, which decides what updating can do.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[cfg_attr(test, derive(specta::Type))]
 #[serde(rename_all = "camelCase")]
 pub enum Bundle {
     /// macOS `.app` (from the dmg).
@@ -103,22 +103,24 @@ pub fn endpoint(channel: UpdateChannel, bundle: Bundle) -> &'static str {
 
 /// An error as the UI shows it (`errorMessage`): `error.<kind>`, else the message.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[cfg_attr(test, derive(specta::Type))]
 #[serde(rename_all = "camelCase")]
 pub struct Failure {
-    kind: &'static str,
+    kind: ErrorKind,
     message: String,
 }
 
 impl From<&Error> for Failure {
     fn from(err: &Error) -> Self {
         Self {
-            kind: err.kind(),
+            kind: err.error_kind(),
             message: err.to_string(),
         }
     }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[cfg_attr(test, derive(specta::Type))]
 #[serde(
     tag = "phase",
     rename_all = "camelCase",
@@ -145,6 +147,7 @@ pub enum UpdateState {
 
 /// What `update-state` carries and `update_status` returns.
 #[derive(Debug, Clone, Serialize)]
+#[cfg_attr(test, derive(specta::Type))]
 #[serde(rename_all = "camelCase")]
 pub struct UpdateStatus {
     state: UpdateState,
@@ -447,8 +450,8 @@ impl UpdaterState {
 
 fn emit(app: &AppHandle) {
     let status = app.state::<UpdaterState>().status();
-    if let Err(err) = app.emit(STATE_EVENT, status) {
-        log::warn!("could not emit {STATE_EVENT}: {err}");
+    if let Err(err) = events::UpdateStateChanged::emit(app, &status) {
+        log::warn!("could not emit {}: {err}", events::UpdateStateChanged::NAME);
     }
 }
 
@@ -619,8 +622,8 @@ async fn download(
 
 /// The popover is usually hidden: a system notification says the update is ready.
 fn announce_ready(app: &AppHandle, version: String) {
-    if let Err(err) = app.emit(NOTIFY_EVENT, Notice::UpdateReady { version }) {
-        log::warn!("could not emit {NOTIFY_EVENT}: {err}");
+    if let Err(err) = events::Notify::emit(app, &Notice::UpdateReady { version }) {
+        log::warn!("could not emit {}: {err}", events::Notify::NAME);
     }
 }
 
@@ -879,7 +882,7 @@ mod tests {
                 error: failure.clone()
             }
         );
-        assert_eq!(failure.kind, "offline");
+        assert_eq!(failure.kind.as_str(), "offline");
         // An error doesn't stop the next check.
         assert!(machine.begin_check().is_some());
     }

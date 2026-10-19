@@ -11,6 +11,7 @@ use crate::projects::{self, Project, ProjectsState, Snapshot};
 use crate::student;
 
 #[derive(Serialize)]
+#[cfg_attr(test, derive(specta::Type))]
 #[serde(rename_all = "camelCase")]
 pub struct Accepted {
     /// `owner/name` as GitHub spells it.
@@ -23,6 +24,7 @@ pub struct Accepted {
 /// shows up. `team_name` founds a group with that name for a team assignment formed by
 /// students; without it such an assignment fails with `needsTeam`.
 #[tauri::command]
+#[cfg_attr(test, specta::specta)]
 pub async fn accept_assignment(
     app: AppHandle,
     state: State<'_, ProjectsState>,
@@ -107,6 +109,7 @@ fn accepted_project(snapshot: &Snapshot, id: &str) -> Option<Accepted> {
 
 /// What adding one classmate gave.
 #[derive(Serialize)]
+#[cfg_attr(test, derive(specta::Type))]
 #[serde(rename_all = "camelCase")]
 pub struct Added {
     username: String,
@@ -119,6 +122,7 @@ pub struct Added {
 /// assignment of a group just founded from the app whose repo no sync has listed yet. One
 /// full sync follows, so the group's members are read again.
 #[tauri::command]
+#[cfg_attr(test, specta::specta)]
 pub async fn add_teammates(
     app: AppHandle,
     state: State<'_, ProjectsState>,
@@ -249,6 +253,7 @@ fn refuse_stale_marker(state: &ProjectsState, id: &str, path: &Path) -> Result<(
 
 /// What submitting project `id` would send, for the confirmation dialog.
 #[tauri::command]
+#[cfg_attr(test, specta::specta)]
 pub async fn submit_check(
     state: State<'_, ProjectsState>,
     id: String,
@@ -261,6 +266,7 @@ pub async fn submit_check(
 /// Submits project `id` with `gh student submit`, then re-reads its status while the
 /// autograder runs (the clone's refs don't move, so the watcher wouldn't notice).
 #[tauri::command]
+#[cfg_attr(test, specta::specta)]
 pub async fn submit_project(
     app: AppHandle,
     state: State<'_, ProjectsState>,

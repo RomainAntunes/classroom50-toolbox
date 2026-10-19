@@ -1,18 +1,17 @@
 <script lang="ts">
   import "#lib/theme/theme.css";
   import { onMount } from "svelte";
-  import { listen } from "@tauri-apps/api/event";
   import { goto } from "$app/navigation";
   import { page } from "$app/state";
   import {
     api,
+    onEvent,
     DEEP_LINK_EVENT,
     NOTIFY_EVENT,
     POPOVER_HIDDEN_EVENT,
     SETTINGS_UPDATED_EVENT,
     UNSEEN_EVENT,
     UPDATE_STATE_EVENT,
-    type Notice,
     type Settings,
     type UpdateStatus,
   } from "#lib/api.js";
@@ -125,16 +124,16 @@
     // A popover opened mid-download shows where it stands.
     void api.updateStatus().then(setUpdate);
     const unlisteners = [
-      listen<Notice>(NOTIFY_EVENT, (event) => void showNotice(event.payload)),
-      listen<string[]>(UNSEEN_EVENT, (event) => {
-        session.unseen = event.payload;
+      onEvent(NOTIFY_EVENT, (notice) => void showNotice(notice)),
+      onEvent(UNSEEN_EVENT, (ids) => {
+        session.unseen = ids;
       }),
-      listen<Settings>(SETTINGS_UPDATED_EVENT, (event) => {
-        settings.current = event.payload;
+      onEvent(SETTINGS_UPDATED_EVENT, (saved) => {
+        settings.current = saved;
       }),
-      listen<UpdateStatus>(UPDATE_STATE_EVENT, (event) => setUpdate(event.payload)),
-      listen(DEEP_LINK_EVENT, () => void handleDeepLink()),
-      listen(POPOVER_HIDDEN_EVENT, () => {
+      onEvent(UPDATE_STATE_EVENT, (status) => setUpdate(status)),
+      onEvent(DEEP_LINK_EVENT, () => void handleDeepLink()),
+      onEvent(POPOVER_HIDDEN_EVENT, () => {
         session.focus = null;
         void reopenOn();
       }),

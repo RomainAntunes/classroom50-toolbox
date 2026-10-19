@@ -8,11 +8,13 @@ use crate::error::{Error, Result};
 use crate::platform;
 
 #[tauri::command]
+#[cfg_attr(test, specta::specta)]
 pub fn open_terminal(path: PathBuf) -> Result<()> {
     platform::open_terminal(&path)
 }
 
 #[derive(Debug, Serialize)]
+#[cfg_attr(test, derive(specta::Type))]
 pub struct EditorInfo {
     id: &'static str,
     pub(super) name: &'static str,
@@ -20,6 +22,7 @@ pub struct EditorInfo {
 
 /// The editors installed here that can open a folder, in a stable order.
 #[tauri::command]
+#[cfg_attr(test, specta::specta)]
 pub async fn installed_editors() -> Vec<EditorInfo> {
     tauri::async_runtime::spawn_blocking(|| {
         crate::editors::installed()
@@ -35,6 +38,7 @@ pub async fn installed_editors() -> Vec<EditorInfo> {
 }
 
 #[tauri::command]
+#[cfg_attr(test, specta::specta)]
 pub async fn open_in_editor(path: PathBuf, editor: String) -> Result<()> {
     tauri::async_runtime::spawn_blocking(move || crate::editors::open(&editor, &path))
         .await

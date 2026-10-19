@@ -9,6 +9,7 @@ use crate::platform::{self, Os};
 use crate::popover::{self, PopoverState};
 
 #[derive(Serialize)]
+#[cfg_attr(test, derive(specta::Type))]
 #[serde(rename_all = "camelCase")]
 pub struct AppInfo {
     os: Os,
@@ -23,6 +24,7 @@ pub struct AppInfo {
 /// Async, so detecting a calendar store (Linux reads the XDG data dirs and PATH) runs off
 /// the main thread.
 #[tauri::command]
+#[cfg_attr(test, specta::specta)]
 pub async fn app_info(app: AppHandle) -> AppInfo {
     let native_calendar = tauri::async_runtime::spawn_blocking(platform::has_native_calendar)
         .await
@@ -37,6 +39,7 @@ pub async fn app_info(app: AppHandle) -> AppInfo {
 
 /// Keeps the popover open while the UI shows a native dialog.
 #[tauri::command]
+#[cfg_attr(test, specta::specta)]
 pub fn set_popover_pinned(state: State<'_, PopoverState>, pinned: bool) {
     state.set_pinned(pinned);
 }
@@ -44,6 +47,7 @@ pub fn set_popover_pinned(state: State<'_, PopoverState>, pinned: bool) {
 /// The system-wide shortcut registered right now (`None` when the saved one couldn't be).
 /// Sync, like every caller of `shortcut::apply`: it runs on the main thread.
 #[tauri::command]
+#[cfg_attr(test, specta::specta)]
 pub fn active_global_shortcut(app: AppHandle) -> Option<String> {
     app.state::<crate::shortcut::ShortcutRegistration>()
         .active()
@@ -51,12 +55,14 @@ pub fn active_global_shortcut(app: AppHandle) -> Option<String> {
 
 /// Lets the shortcut recorder hear the saved shortcut: unregistered while `paused`.
 #[tauri::command]
+#[cfg_attr(test, specta::specta)]
 pub fn pause_global_shortcut(app: AppHandle, paused: bool) -> Result<()> {
     crate::shortcut::pause(&app, paused)
 }
 
 /// Hides the popover, as a click outside it would (Escape with nothing else to close).
 #[tauri::command]
+#[cfg_attr(test, specta::specta)]
 pub fn hide_popover(app: AppHandle) {
     popover::hide(&app);
 }
@@ -65,12 +71,14 @@ pub fn hide_popover(app: AppHandle) {
 /// `navigator.languages` can't stand in: WKWebView reports the bundle's localizations
 /// there, not the user's.
 #[tauri::command]
+#[cfg_attr(test, specta::specta)]
 pub fn system_languages() -> Vec<String> {
     sys_locale::get_locales().collect()
 }
 
 /// The words of the tray menu, from the UI's i18n.
 #[tauri::command]
+#[cfg_attr(test, specta::specta)]
 pub fn set_tray_labels(app: AppHandle, labels: crate::tray::Labels) {
     crate::tray::set_labels(&app, &labels);
 }

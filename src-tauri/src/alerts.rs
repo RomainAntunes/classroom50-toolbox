@@ -10,19 +10,15 @@ use std::sync::Mutex;
 
 use chrono::{DateTime, TimeDelta, Utc};
 use serde::{Deserialize, Serialize};
-use tauri::{AppHandle, Emitter, Manager};
+use tauri::{AppHandle, Manager};
 
 use crate::classroom50::SubmissionMode;
+use crate::events::{IpcEvent, Notify, SettingsUpdated, UnseenUpdated};
 use crate::github;
 use crate::projects::{Project, Snapshot};
 use crate::settings::{Settings, SettingsStore};
 use crate::status::Grading;
 use crate::tray;
-
-pub const NOTIFY_EVENT: &str = "notify";
-pub const UNSEEN_EVENT: &str = "unseen-updated";
-/// Settings Rust changed by itself (the hidden list after a rename), for the UI's copy.
-pub const SETTINGS_EVENT: &str = "settings-updated";
 
 const FILE_NAME: &str = "alerts.json";
 /// A grade or comment first seen for a repo is announced only if this recent; older ones
@@ -31,6 +27,7 @@ const FRESH: TimeDelta = TimeDelta::days(1);
 
 /// A notification for the UI to word.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[cfg_attr(test, derive(specta::Type))]
 #[serde(
     tag = "kind",
     rename_all = "camelCase",
@@ -178,11 +175,11 @@ pub fn process(app: &AppHandle, snapshot: &Snapshot) {
     drop(memory);
 
     for notice in notices {
-        if let Err(err) = app.emit(NOTIFY_EVENT, &notice) {
-            log::warn!("could not emit {NOTIFY_EVENT}: {err}");
+        if let Err(err) = Notify::emit(app, &notice) {
+            log::warn!("could not emit {}: {err}", Notify::NAME);
         }
     }
-    let _ = app.emit(UNSEEN_EVENT, &unseen);
+    let _ = UnseenUpdated::emit(app, &unseen);
     set_badge(app, attention);
 }
 
@@ -201,7 +198,7 @@ fn carry_hidden(app: &AppHandle, renames: &[(String, String)]) -> Settings {
     match moved {
         Ok(Some(saved)) => {
             let reported = crate::commands::reported_settings(app, saved.clone());
-            let _ = app.emit(SETTINGS_EVENT, &reported);
+            let _ = SettingsUpdated::emit(app, &reported);
             saved
         }
         Ok(None) => store.get(),
@@ -311,7 +308,7 @@ pub fn mark_seen(app: &AppHandle) {
     memory.badge.clear();
     state.save(&memory);
     drop(memory);
-    let _ = app.emit(UNSEEN_EVENT, Vec::<String>::new());
+    let _ = UnseenUpdated::emit(app, &Vec::new());
     set_badge(app, false);
 }
 

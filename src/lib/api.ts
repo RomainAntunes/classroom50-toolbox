@@ -1,700 +1,165 @@
-// Typed wrappers for the Rust commands in src-tauri/src/commands/. Keep the two in sync:
-// Rust serializes with camelCase field names.
-import { invoke } from "@tauri-apps/api/core";
+// The Rust commands in src-tauri/src/commands/, typed from `bindings.ts`, which the
+// `bindings` test generates from the Rust types (`UPDATE_GOLDEN=1 cargo test bindings`
+// rewrites it). A command, argument, field or variant renamed or retyped in Rust fails
+// svelte-check wherever the UI relies on it. Types keep the names the UI always used.
+// Use only the aliases below (built on the `_Serialize` halves, what Rust sends): never import
+// an un-suffixed split type such as `B.Snapshot` or a `_Deserialize` half from bindings.ts,
+// since specta renders the field aliases Rust accepts when reading with the wrong precedence.
+import { listen, type UnlistenFn } from "@tauri-apps/api/event";
+import { commands } from "#lib/bindings.js";
+import type * as B from "#lib/bindings.js";
 import { hasKey, t } from "#lib/i18n/index.js";
 
-export type Os = "macos" | "windows" | "linux";
-export type Tool = "git" | "gh" | "gh-student";
-
-export interface AppInfo {
-  os: Os;
-  version: string;
-  /** The OS has a calendar store the app can write into (macOS; Linux with GNOME's or KDE's). */
-  nativeCalendar: boolean;
-  /** A system-wide shortcut can be registered (not in a Wayland session). */
-  globalShortcuts: boolean;
-}
-
+export type Os = B.Os;
+export type Tool = B.Tool;
+export type AppInfo = B.AppInfo;
 /** What the UI tells `diagnostics_report` about itself. */
-export interface DiagnosticsUi {
-  /** `__COMMIT__`. */
-  commit: string | null;
-  /** The `data-os` skin in use. */
-  skin: string;
-  /** The catalog in use. */
-  locale: string;
-}
-
+export type DiagnosticsUi = B.UiFacts;
 /** The "Copy diagnostics" report, names already masked. */
-export interface DiagnosticsReport {
-  /** Markdown, for a GitHub issue. */
-  text: string;
-  /** Distinct names, keys, emails and tokens the report held, replaced with placeholders. */
-  masked: number;
-}
-
+export type DiagnosticsReport = B.Report;
 /** A calendar of the OS's calendar app the user can write to. */
-export interface NativeCalendar {
-  id: string;
-  title: string;
-  /** The account holding it (iCloud, Google, On My Mac...). */
-  account: string;
-  /** Linux: the store, worded by the UI (`settings.calendar.store.<kind>`) instead of `account`. */
-  kind?: "gnome" | "kde";
-}
-
-export interface ToolStatus {
-  tool: Tool;
-  installed: boolean;
-  version: string | null;
-  /** Installed but older than the app needs (gh, gh-student): installing gh again upgrades
-   *  it, gh-student is upgraded (`upgradeTool`). */
-  outdated: boolean;
-}
-
+export type NativeCalendar = B.NativeCalendar_Serialize;
+export type ToolStatus = B.ToolStatus;
 /** An install or update still running (`tool_jobs`, the `tool-jobs` event). */
-export interface ToolJob {
-  tool: Tool;
-  kind: "install" | "upgrade";
-  /** How far along it is (0 to 1); null until a known step shows up. */
-  progress: number | null;
-}
-
-export interface AuthStatus {
-  loggedIn: boolean;
-  login: string | null;
-  /** gh-student's scopes the token lacks; `grantScopes` adds them. */
-  missingScopes: string[];
-  /** gh uses a token from this environment variable: no sign-in, switch or sign-out. */
-  envToken: string | null;
-}
-
+export type ToolJob = B.ToolJob;
+export type AuthStatus = B.AuthStatus;
 /** A github.com account gh is signed in to. */
-export interface Account {
-  login: string;
-  active: boolean;
-}
-
-export interface CommandSpec {
-  program: string;
-  args: string[];
-}
-
+export type Account = B.Account;
 /** How a tool installs here (`install_command`). */
-export interface InstallPlan extends CommandSpec {
-  /** The same install typed in a terminal, shown when it fails. */
-  manual: string;
-}
-
-export interface RepoConfig {
-  classroom: string;
-  assignment: string;
-  secret: string | null;
-}
-
-export interface Commit {
-  oid: string;
-  at: string | null;
-  /** GitHub login of the author, else the name in the commit. */
-  author: string | null;
-}
-
-export interface Submission {
-  tag: string;
-  commit: string;
-  at: string | null;
-}
-
-export interface RemoteRepo {
-  owner: string;
-  name: string;
-  url: string;
-  archived: boolean;
-  canPush: boolean;
-  defaultBranch: string | null;
-  head: Commit | null;
-  lastSubmission: Submission | null;
-  config: RepoConfig | null;
-  /** `owner/repo` of the template GitHub generated the repo from, when it can tell. */
-  template: string | null;
-  /** Branches with commits missing from the default branch. */
-  unmerged: Branch[];
-  grade: Grade | null;
-  /** Every graded submission still listed (the last 10 releases), newest first. */
-  history: GradeSummary[];
-  /** The autograder's run on the head commit, while running or when it broke. */
-  grading: Grading | null;
-  feedback: Feedback | null;
-}
-
-export type Grading =
-  | { state: "running"; url: string | null }
-  | { state: "failed"; url: string | null; message: string | null };
-
-export interface Branch {
-  name: string;
-  commits: number;
-}
-
+export type InstallPlan = B.InstallPlan;
+export type CommandSpec = Omit<InstallPlan, "manual">;
+export type RepoConfig = B.RepoConfig;
+export type Commit = B.Commit;
+export type Submission = B.Submission;
+export type RemoteRepo = B.RemoteRepo;
+export type Grading = B.Grading;
+export type Branch = B.Branch;
 /** The newest autograder result (`result.json` on the `submit/*` release). */
-export interface Grade {
-  tag: string;
-  score: number;
-  maxScore: number;
-  testsPassed: number;
-  testsTotal: number;
-  /** Each test, in the autograder's order; a failed one carries why, from the release body. */
-  tests: GradeTest[];
-  publishedAt: string | null;
-  url: string;
-  /** The release body beyond each test's output; null until it was read (only when a test failed). */
-  releaseNotes: ReleaseNotes | null;
-}
-
+export type Grade = B.Grade;
 /** A past grade: the score without the test list. */
-export type GradeSummary = Omit<Grade, "tests" | "releaseNotes">;
-
-export interface GradeTest {
-  name: string;
-  passed: boolean;
-  score: number;
-  maxScore: number;
-  /** Why it failed: the autograder's captured output, plain text, capped. */
-  output: string | null;
-  /** The release page has more than `output`. */
-  outputClipped: boolean;
-  /** The autograder stopped it at its time limit, in seconds; `output` is then what it was fed and printed first. */
-  timedOutAfter: number | null;
-}
-
+export type GradeSummary = B.GradeSummary;
+export type GradeTest = B.GradeTest;
 /** The release body's text that isn't a test's output (a custom autograder's report). */
-export interface ReleaseNotes {
-  notes: string | null;
-  notesClipped: boolean;
-}
-
+export type ReleaseNotes = B.ReleaseNotes;
 /** Teacher comments and reviews on the Feedback PR. */
-export interface Feedback {
-  url: string;
-  comments: number;
-  latestAt: string | null;
-}
-
-export interface Classroom {
-  org: string;
-  slug: string;
-  name: string | null;
-  term: string | null;
-  active: boolean;
-  secret: string | null;
-  pagesBaseUrl: string | null;
-}
-
-export interface LocalState {
-  branch: string | null;
-  head: string | null;
-  ahead: number | null;
-  behind: number | null;
-  /** Changes git reports, untracked editor and OS files aside. */
-  changedFiles: number;
-  /** The first 20 of them (a new folder once, ending with `/`). */
-  changedPaths: string[];
-  /** Local branches with commits missing from the local default branch. */
-  unmerged: string[];
-  /** GitHub has commits the clone doesn't (someone pushed since the last pull). */
-  remoteAhead: boolean;
-}
-
-export type Pending = "conflict" | "uncommitted" | "unpushed" | "unmerged" | "unsubmitted";
-
-export interface Assignment {
-  slug: string;
-  name: string;
-  mode: "individual" | "group" | "team";
-  description: string | null;
-  due: string | null;
-  availableFrom: string | null;
-  submissionMode: "every-push" | "tag" | null;
-  locked: boolean;
-  closed: boolean;
-  feedbackPr: boolean;
-  passThreshold: number | null;
-  /** `team` mode only: who forms the groups. */
-  teamFormation: "teacher" | "student" | null;
-  /** `"public"` when accepting creates a public repo. */
-  repoVisibility: string | null;
-  /** The slug before the teacher renamed the assignment, when they did. */
-  renamedFrom: string | null;
-  /** The starter repo student repos are generated from; none on `empty_repo` ones. */
-  template: { owner: string; repo: string; branch: string | null } | null;
-}
-
+export type Feedback = B.Feedback;
+export type Classroom = B.Classroom;
+export type LocalState = B.LocalState;
+export type Pending = B.Pending;
+export type Assignment = B.Assignment_Serialize;
 /** One assignment repo, merged from GitHub, the watched folders and the Pages manifest. */
-export interface Project {
-  id: string;
-  owner: string | null;
-  repo: string | null;
-  config: RepoConfig;
-  path: string | null;
-  local: LocalState | null;
-  remote: RemoteRepo | null;
-  classroom: Classroom | null;
-  assignment: Assignment | null;
-  pending: Pending | null;
-  /** The assignment's page in the Classroom 50 web app. */
-  webUrl: string | null;
-  /** How far past the due date the graded work is; advisory, nothing is blocked. */
-  lateSeconds: number | null;
-  /** The editor that last opened the clone (`EditorInfo.id`), when one did. */
-  editor: string | null;
-  /** The user's group, on a team assignment. */
-  group: Group | null;
-}
-
+export type Project = B.Project_Serialize;
 /** A group team (`classroom50-group-<hash>-<n>`) the user is on. */
-export interface Group {
-  org: string;
-  slug: string;
-  /** The `<n>` of the team name, also in the shared repo's name. */
-  number: number;
-  /** The display name the founders chose, when they did. */
-  name: string | null;
-  members: Member[];
-  /** Logins of the team's maintainers (a student-formed group's founder, the only one who
-   *  can add members); null when the roles weren't read. */
-  founders: string[] | null;
-  /** The team's page on GitHub. */
-  url: string;
-}
-
+export type Group = B.Group;
 /** What adding one classmate gave (`add_teammates`). */
-export interface Added {
-  username: string;
-  /** Why it failed; null when they were added. */
-  error: CommandError | null;
-}
-
-export interface Member {
-  login: string;
-  name: string | null;
-  /** Public GitHub email, else one they commit with in the clone. */
-  email: string | null;
-}
-
+export type Added = B.Added_Serialize;
+export type Member = B.Member;
 /** The words of calendar event notes; `{name}`, `{n}`, `{score}`, `{max}` stay as is. */
-export interface CalendarLabels {
-  class: string;
-  group: string;
-  groupNumber: string;
-  graded: string;
-  submitted: string;
-  notAccepted: string;
-}
-
+export type CalendarLabels = B.CalendarLabels;
 /** The words of the tray icon's menu. */
-export interface TrayLabels {
-  open: string;
-  quit: string;
-}
-
+export type TrayLabels = B.TrayLabels;
 /** A published assignment the user hasn't accepted yet. */
-export interface Unaccepted {
-  id: string;
-  classroom: Classroom;
-  assignment: Assignment;
-  acceptUrl: string;
-  /** The group the user is already on (a teacher-formed group, or one they joined). */
-  group: Group | null;
-}
-
+export type Unaccepted = B.Unaccepted_Serialize;
 /** A `classroom50-toolbox://` link, validated by Rust. */
-export type DeepLink =
-  | { kind: "accept"; org: string; classroom: string; assignment: string; key: string | null }
-  | { kind: "open"; owner: string; repo: string };
-
+export type DeepLink = B.Link;
 /** Where a link leads (`take_deep_link`). */
-export type DeepLinkTarget =
-  /** A project: an open link, or an accept link to an assignment already accepted. */
-  | { kind: "project"; id: string; link: DeepLink }
-  /** An assignment to accept; `listed` is false when the list doesn't show it. */
-  | { kind: "accept"; item: Unaccepted; listed: boolean }
-  /** An accept link outside the list: ask, then `fetchLinkedAssignment` (no request before). */
-  | { kind: "unlisted"; link: DeepLink }
-  /** Not in the list (open), or not published in that class (accept). */
-  | { kind: "missing"; link: DeepLink };
-
-/** Result of `accept_assignment`. */
+export type DeepLinkTarget = B.Target_Serialize;
 /** How gh clones github.com repos. */
-export type GitProtocol = "https" | "ssh";
-
-export interface Accepted {
-  /** `owner/name` as GitHub spells it. */
-  repo: string;
-  /** Null when the sync after the accept hasn't found the repo yet. */
-  projectId: string | null;
-}
-
+export type GitProtocol = B.GitProtocol;
+/** Result of `accept_assignment`. */
+export type Accepted = B.Accepted;
 /** What a submit would send (`submit_check`). */
-export interface SubmitCheck {
-  /** The clone has `.classroom50.yaml`. Without it gh-student finds the assignment from the
-   *  repo's name; the check fails first with `unknownAssignment` (the name doesn't match
-   *  its assignment) or `ghStudentOutdated` (`params.version`, `params.min`) when it couldn't. */
-  hasMarker: boolean;
-  /** Changes not committed yet, editor and OS files aside: submit refuses while there are any. */
-  uncommitted: string[];
-  /** Untracked editor and OS files, which don't block a submit but are sent with it. */
-  editorFiles: string[];
-}
-
-export interface Submitted {
-  /** The submission commit on GitHub. */
-  url: string | null;
-}
-
+export type SubmitCheck = B.SubmitCheck;
+export type Submitted = B.Submitted;
 /** What Commit & push would do (`push_check`). */
-export interface PushCheck {
-  /** Every changed path the commit will hold. */
-  files: string[];
-  /** The new ones among them. */
-  untracked: string[];
-  /** Untracked editor and OS files left out of the commit (`.idea/`, `.DS_Store`). */
-  skipped: string[];
-  /** Over 50 MB: GitHub warns about them. */
-  large: string[];
-  /** Over 100 MB: GitHub refuses them, so nothing is committed. */
-  tooLarge: string[];
-  /** Local commits GitHub doesn't have yet. */
-  ahead: number;
-  /** git has a `user.name` and `user.email` for the clone. */
-  hasIdentity: boolean;
-}
-
+export type PushCheck = B.PushCheck;
 /** What Commit would do (`commit_check`), and whether Commit & push is offered with it. */
-export interface CommitCheck extends PushCheck {
-  /** Why push isn't offered (`tagMode`, `closed`, `notOnGitHub`, `otherBranch`, `remoteAhead`, ...); null when it is. */
-  pushBlocked: string | null;
-}
-
-export interface Pushed {
-  /** The new head commit (local only after `commitOnly`). */
-  commit: string;
-}
-
+export type CommitCheck = B.CommitCheck;
+export type Pushed = B.Pushed;
 /** Who to commit as: the signed-in account and its private GitHub address. */
-export interface GitIdentity {
-  name: string;
-  email: string;
-}
-
-export interface Snapshot {
-  projects: Project[];
-  unaccepted: Unaccepted[];
-  /** Last full sync. */
-  syncedAt: string | null;
-  /** Last GitHub read, full sync or status check. */
-  checkedAt: string | null;
-  /** The GitHub account the data belongs to. */
-  login: string | null;
-  /** Why the last sync was partial; same shape as `CommandError`. */
-  issue: CommandError | null;
-}
-
-export const APPEARANCES = ["system", "light", "dark"] as const;
-export type Appearance = (typeof APPEARANCES)[number];
-
+export type GitIdentity = B.Identity;
+export type Snapshot = B.Snapshot_Serialize;
+export type Appearance = B.Appearance;
 /** The git writes the app offers on a clone, from none to commit and push. */
-export const COMMIT_ACTIONS = ["none", "commit", "push"] as const;
-export type CommitActions = (typeof COMMIT_ACTIONS)[number];
-
+export type CommitActions = B.CommitActions;
 /** Which releases self-update follows: published stable ones, or pre-releases too. */
-export const UPDATE_CHANNELS = ["stable", "beta"] as const;
-export type UpdateChannel = (typeof UPDATE_CHANNELS)[number];
-
-export interface Settings {
-  watchedFolders: string[];
-  scanEditorProjects: boolean;
-  /** Where the app clones assignments; asked the first time. */
-  cloneFolder: string | null;
-  launchAtLogin: boolean;
-  listFilter: ListFilter;
-  notifyHoursBefore: number[];
-  /** Editor for clones no editor has opened yet; `null` picks the first one installed. */
-  defaultEditor: string | null;
-  /** Hidden project and unaccepted-assignment ids: listed only when a search matches. */
-  hidden: string[];
-  /** Classes (`owner/classroom`, lowercase, see `classKey`) hidden whole. */
-  hiddenClasses: string[];
-  /** Classes whose section is folded in the list. */
-  collapsedClasses: string[];
-  appearance: Appearance;
-  /** A catalog code (`en`), or `system` for the OS's language (see `resolveLocale`). */
-  language: string;
-  /** The last exported `.ics`, rewritten by Rust after each sync while set. */
-  calendarFile: string | null;
-  /** The OS calendar the due dates are kept in. */
-  nativeCalendar: string | null;
-  /** The first-run guide was finished or skipped. */
-  onboarded: boolean;
-  /** Commit, or commit and push, from the app; `none` leaves it to git and the editor. */
-  commitActions: CommitActions;
-  updateChannel: UpdateChannel;
-  /** The newest version whose "What's new" was seen; `null` before the page existed. */
-  lastSeenVersion: string | null;
-  /** The system-wide shortcut that shows or hides the popover (`Control+Alt+KeyC`), or off. */
-  globalShortcut: string | null;
-}
-
+export type UpdateChannel = B.UpdateChannel;
+export type Settings = B.Settings;
 /** An editor installed here that can open a folder. */
-export interface EditorInfo {
-  id: string;
-  name: string;
-}
-
+export type EditorInfo = B.EditorInfo;
 /** The date filter above the project list. */
-export type ListFilter = "all" | "open" | "week" | "past";
-
+export type ListFilter = B.ListFilter;
 /** Payload of the `login-device-code` event emitted during `login`. */
-export interface DeviceCode {
-  code: string;
-  url: string;
-}
-
-export const DEVICE_CODE_EVENT = "login-device-code";
-/** However a sign-in ends (success, failure or cancel). */
-export const LOGIN_ENDED_EVENT = "login-ended";
-/** Payload: `UpdateStatus`, on every change of the self-update state. */
-export const UPDATE_STATE_EVENT = "update-state";
-/** Payload: `ToolJob[]`, every install or update running. */
-export const TOOL_JOBS_EVENT = "tool-jobs";
-export const PROJECTS_UPDATED_EVENT = "projects-updated";
-export const SYNC_PROGRESS_EVENT = "sync-progress";
-/** Payload: `Notice`. The UI words it and sends the system notification. */
-export const NOTIFY_EVENT = "notify";
-/** Payload: ids of projects and unaccepted assignments with unseen news. */
-export const UNSEEN_EVENT = "unseen-updated";
-/** Payload: `Settings` Rust changed by itself (hidden ids moved by a rename). */
-export const SETTINGS_UPDATED_EVENT = "settings-updated";
-/** A `classroom50-toolbox://` link is waiting; `takeDeepLink` reads it. */
-export const DEEP_LINK_EVENT = "deep-link";
-/** The popover hid. */
-export const POPOVER_HIDDEN_EVENT = "popover-hidden";
-/** The global shortcut showed the popover: the list takes the keyboard focus. */
-export const POPOVER_SHORTCUT_EVENT = "popover-shortcut";
-
-export type Notice =
-  | { kind: "due"; assignment: string; due: string }
-  | { kind: "grade"; assignment: string; score: number; maxScore: number }
-  | { kind: "gradingFailed"; assignment: string }
-  | { kind: "feedback"; assignment: string; count: number }
-  | { kind: "newAssignment"; assignment: string; classroom: string }
-  | { kind: "teammatePush"; assignment: string; author: string }
-  | { kind: "groupJoined"; assignment: string; members: string[] }
-  | { kind: "deadlineChanged"; assignment: string; due: string | null }
-  | { kind: "closed"; assignment: string }
-  | { kind: "updateReady"; version: string };
-
-export const SIMULATED_NETWORKS = ["normal", "githubDown", "noInternet"] as const;
-export type SimulatedNetwork = (typeof SIMULATED_NETWORKS)[number];
-
+export type DeviceCode = B.DeviceCode;
+export type Notice = B.Notice;
+export type SimulatedNetwork = B.Network;
 /** Payload of `sync-progress`. */
-export interface SyncProgress {
-  running: boolean;
-  /** Started by the user; background checks show no spinner. */
-  foreground: boolean;
-  /** From 0 to 1, each phase weighted by how long it took last time; never steps back. */
-  fraction: number;
-}
-
-export interface LastRun {
-  at: string;
-  seconds: number;
-}
-
-export interface RateLimit {
-  remaining: number;
-  limit: number;
-  resetAt: string | null;
-}
-
+export type SyncProgress = B.SyncProgress;
+export type LastRun = B.LastRun;
+export type RateLimit = B.RateLimit;
 /** What the sync engine did lately (Settings). */
-export interface SyncDetails {
-  login: string | null;
-  syncedAt: string | null;
-  checkedAt: string | null;
-  stats: {
-    rateLimit: RateLimit | null;
-    full: LastRun | null;
-    status: LastRun | null;
-    local: LastRun | null;
-    reposSeen: number;
-    scanRoots: number;
-    watchTargets: number;
-  };
-  rateLimit: RateLimit | null;
-  issue: CommandError | null;
-  assignments: number;
-  clones: number;
-}
-
+export type SyncDetails = B.SyncDetails_Serialize;
 /** Where self-update stands (`updater.rs`). */
-export type UpdateState =
-  | { phase: "idle" }
-  | { phase: "checking" }
-  /** `total` is null when the server sent no length: the bar is indeterminate. */
-  | { phase: "downloading"; version: string; downloaded: number; total: number | null }
-  | { phase: "ready"; version: string; notes: string | null }
-  | { phase: "error"; error: CommandError };
-
+export type UpdateState = B.UpdateState;
 /** How the app was installed, which decides what updating can do. */
-export type Bundle = "app" | "msi" | "nsis" | "appImage" | "deb" | "rpm" | "unbundled";
-
+export type Bundle = B.Bundle;
 /** Payload of `update-state` and `update_status`. */
-export interface UpdateStatus {
-  state: UpdateState;
-  /** "Later" was chosen: the banner stays, without the question. */
-  deferred: boolean;
-  /** "Restart now" is running. */
-  installing: boolean;
-  /** The dev build's fake update: Restart only logs. */
-  simulated: boolean;
-  lastCheck: string | null;
-  bundle: Bundle;
-  canUpdate: boolean;
-  /** Quitting installs a downloaded update (not deb or rpm, which ask for a password). */
-  installOnQuit: boolean;
-  /** Installing asks for the password (deb, rpm). */
-  asksPassword: boolean;
-  /** MSI installs stay on stable: pre-releases ship no MSI. */
-  hasBeta: boolean;
+export type UpdateStatus = B.UpdateStatus;
+export type ErrorKind = B.ErrorKind;
+/** Shape of every error a command rejects with (`CommandError` in src-tauri/src/error.rs). */
+export type CommandError = B.CommandError_Serialize;
+
+/** `values` lists every member of `T`: a variant added in Rust fails svelte-check here. */
+function every<T extends string>() {
+  return <const A extends readonly T[]>(values: A & ([T] extends [A[number]] ? unknown : never)) =>
+    values;
 }
 
-/** Shape of every error a command rejects with (see `Error` in src-tauri/src/error.rs). */
-export interface CommandError {
-  kind: string;
-  message: string;
-  /** `manualInstall`: where to download the tool by hand. */
-  url?: string;
-  /** `manualInstall`: the command to run in a terminal. */
-  command?: string;
-  /** What the UI's wording of this kind (`error.<kind>`) fills in. */
-  params?: Record<string, string>;
+export const APPEARANCES = every<Appearance>()(["system", "light", "dark"]);
+export const COMMIT_ACTIONS = every<CommitActions>()(["none", "commit", "push"]);
+export const UPDATE_CHANNELS = every<UpdateChannel>()(["stable", "beta"]);
+export const SIMULATED_NETWORKS = every<SimulatedNetwork>()(["normal", "githubDown", "noInternet"]);
+
+/** Every event Rust sends, by name, with its payload (`src-tauri/src/events.rs`). */
+export type Events = B.Events_Serialize;
+export type EventName = keyof Events;
+
+export const DEVICE_CODE_EVENT = "login-device-code" satisfies EventName;
+/** However a sign-in ends (success, failure or cancel). */
+export const LOGIN_ENDED_EVENT = "login-ended" satisfies EventName;
+/** Payload: `UpdateStatus`, on every change of the self-update state. */
+export const UPDATE_STATE_EVENT = "update-state" satisfies EventName;
+/** Payload: `ToolJob[]`, every install or update running. */
+export const TOOL_JOBS_EVENT = "tool-jobs" satisfies EventName;
+export const PROJECTS_UPDATED_EVENT = "projects-updated" satisfies EventName;
+export const SYNC_PROGRESS_EVENT = "sync-progress" satisfies EventName;
+/** Payload: `Notice`. The UI words it and sends the system notification. */
+export const NOTIFY_EVENT = "notify" satisfies EventName;
+/** Payload: ids of projects and unaccepted assignments with unseen news. */
+export const UNSEEN_EVENT = "unseen-updated" satisfies EventName;
+/** Payload: `Settings` Rust changed by itself (hidden ids moved by a rename). */
+export const SETTINGS_UPDATED_EVENT = "settings-updated" satisfies EventName;
+/** A `classroom50-toolbox://` link is waiting; `takeDeepLink` reads it. */
+export const DEEP_LINK_EVENT = "deep-link" satisfies EventName;
+/** The popover hid. */
+export const POPOVER_HIDDEN_EVENT = "popover-hidden" satisfies EventName;
+/** The global shortcut showed the popover: the list takes the keyboard focus. */
+export const POPOVER_SHORTCUT_EVENT = "popover-shortcut" satisfies EventName;
+
+/** Listens to a Rust event, its payload typed by `Events`. */
+export function onEvent<K extends EventName>(
+  name: K,
+  handler: (payload: Events[K]) => void,
+): Promise<UnlistenFn> {
+  return listen<Events[K]>(name, (event) => handler(event.payload));
 }
 
-export const api = {
-  appInfo: () => invoke<AppInfo>("app_info"),
-  /** A support report with logins, orgs, classes, keys, repos, emails and home paths masked. */
-  diagnosticsReport: (ui: DiagnosticsUi) => invoke<DiagnosticsReport>("diagnostics_report", { ui }),
-  /** Dev builds only: lights the tray badge 3 s from now. */
-  previewBadge: () => invoke<void>("preview_badge"),
-  /** Writes the due dates as an `.ics` file; returns the number of events. */
-  exportCalendar: (path: string) => invoke<number>("export_calendar", { path }),
-  /** Opens the exported `.ics` file (`calendarFile`) with the default app, which imports it. */
-  openCalendarFile: () => invoke<void>("open_calendar_file"),
-  setCalendarLabels: (labels: CalendarLabels) => invoke<void>("set_calendar_labels", { labels }),
-  setTrayLabels: (labels: TrayLabels) => invoke<void>("set_tray_labels", { labels }),
-  /** The OS's preferred languages, most wanted first (BCP 47). */
-  systemLanguages: () => invoke<string[]>("system_languages"),
-  /** Asks for calendar access the first time. */
-  nativeCalendars: () => invoke<NativeCalendar[]>("native_calendars"),
-  /** Writes the due dates into that calendar from now on; `null` removes them. */
-  setNativeCalendar: (id: string | null) => invoke<Settings>("set_native_calendar", { id }),
-  /** Dev builds only: pretends GitHub is down or the device is offline. */
-  simulateNetwork: (network: SimulatedNetwork) => invoke<void>("simulate_network", { network }),
-  simulatedNetwork: () => invoke<SimulatedNetwork>("simulated_network"),
-  /** The link the app was opened with, once, and where it leads. */
-  takeDeepLink: () => invoke<DeepLinkTarget | null>("take_deep_link"),
-  /** Done with the link `takeDeepLink` gave; Rust drops new ones until then. */
-  deepLinkDone: () => invoke<void>("deep_link_done"),
-  /** Reads the class's manifest for the `unlisted` link the student agreed to open. */
-  fetchLinkedAssignment: () => invoke<DeepLinkTarget | null>("fetch_linked_assignment"),
-  /** Dev builds only: handles `url` as if the OS had opened it. */
-  simulateDeepLink: (url: string) => invoke<void>("simulate_deep_link", { url }),
-  setPopoverPinned: (pinned: boolean) => invoke<void>("set_popover_pinned", { pinned }),
-  /** Hides the popover, like a click outside it. */
-  hidePopover: () => invoke<void>("hide_popover"),
-  /** The system-wide shortcut registered now; `null` when the saved one couldn't be. */
-  activeGlobalShortcut: () => invoke<string | null>("active_global_shortcut"),
-  /** Unregisters the saved shortcut while the recorder listens, or registers it again. */
-  pauseGlobalShortcut: (paused: boolean) => invoke<void>("pause_global_shortcut", { paused }),
-  toolStatuses: () => invoke<ToolStatus[]>("tool_statuses"),
-  installCommand: (tool: Tool) => invoke<InstallPlan>("install_command", { tool }),
-  /** The newer version `upgradeTool` would install; always null for git and gh. */
-  toolUpdate: (tool: Tool) => invoke<string | null>("tool_update", { tool }),
-  /** gh-student only; git and gh follow the OS package manager. */
-  upgradeTool: (tool: Tool) => invoke<ToolStatus>("upgrade_tool", { tool }),
-  /** Every tool's status afterwards (gh-student depends on gh); `tool-jobs` reports output. */
-  installTool: (tool: Tool) => invoke<ToolStatus[]>("install_tool", { tool }),
-  toolJobs: () => invoke<ToolJob[]>("tool_jobs"),
-  /** Stops an install or update; its command then rejects with `cancelled`. */
-  cancelToolJob: (tool: Tool) => invoke<void>("cancel_tool_job", { tool }),
-  authStatus: () => invoke<AuthStatus>("auth_status"),
-  listProjects: () => invoke<Snapshot>("list_projects"),
-  refreshProjects: () => invoke<Snapshot>("refresh_projects"),
-  syncProgress: () => invoke<SyncProgress>("sync_progress"),
-  rescanLocal: () => invoke<Snapshot>("rescan_local"),
-  unseen: () => invoke<string[]>("unseen"),
-  syncDetails: () => invoke<SyncDetails>("sync_details"),
-  listAccounts: () => invoke<Account[]>("list_accounts"),
-  switchAccount: (login: string) => invoke<AuthStatus>("switch_account", { login }),
-  /** A `data:` URL, cached on disk for a week. */
-  accountAvatar: (login: string) => invoke<string>("account_avatar", { login }),
-  clearCache: () => invoke<Snapshot>("clear_cache"),
-  getSettings: () => invoke<Settings>("get_settings"),
-  updateSettings: (next: Settings) => invoke<Settings>("update_settings", { next }),
-  login: () => invoke<AuthStatus>("login"),
-  /** `gh auth refresh` with gh-student's scopes, through the same device flow as `login`. */
-  grantScopes: () => invoke<AuthStatus>("grant_scopes"),
-  cancelLogin: () => invoke<void>("cancel_login"),
-  signOut: (login: string) => invoke<AuthStatus>("sign_out", { login }),
-  openTerminal: (path: string) => invoke<void>("open_terminal", { path }),
-  installedEditors: () => invoke<EditorInfo[]>("installed_editors"),
-  /** Adds classmates one by one (`team add` or `invite`), then syncs; one result each.
-   *  `id` may be the assignment of a group just founded, before its repo is listed. */
-  addTeammates: (id: string, usernames: string[]) =>
-    invoke<Added[]>("add_teammates", { id, usernames }),
-  openInEditor: (path: string, editor: string) => invoke<void>("open_in_editor", { path, editor }),
-  /** Runs `gh student accept`, then syncs; rejects with `needsTeam` when a group is needed.
-   *  `teamName` founds a group with that name (`--new-team --team-name`). */
-  acceptAssignment: (id: string, teamName: string | null) =>
-    invoke<Accepted>("accept_assignment", { id, teamName }),
-  submitCheck: (id: string) => invoke<SubmitCheck>("submit_check", { id }),
-  /** Runs `gh student submit` in the clone, then re-reads the status while it's graded. */
-  submitProject: (id: string) => invoke<Submitted>("submit_project", { id }),
-  /** Clones into `parent/<repo>` and returns the new folder; `projects-updated` follows. */
-  cloneProject: (id: string, parent: string) => invoke<string>("clone_project", { id, parent }),
-  /** gh's `git_protocol` for github.com (local config, no network). */
-  gitProtocol: () => invoke<GitProtocol>("git_protocol"),
-  /** Fast-forwards the clone's default branch; rejects with `localChanges`, `otherBranch` or `diverged`. */
-  pullProject: (id: string) => invoke<void>("pull_project", { id }),
-  /** What Commit & push would send; rejects with `otherBranch`, `gitInProgress`, `remoteAhead` or `nothingToPush`. */
-  pushCheck: (id: string) => invoke<PushCheck>("push_check", { id }),
-  /** Commits every change with `message` (unless only commits are waiting) and pushes the default branch. */
-  commitPush: (id: string, message: string | null) =>
-    invoke<Pushed>("commit_push", { id, message }),
-  /** What a local commit would hold, on any branch; rejects with `gitInProgress` or `nothingToCommit`. */
-  commitCheck: (id: string) => invoke<CommitCheck>("commit_check", { id }),
-  /** Commits every change with `message` in the clone, without pushing. */
-  commitOnly: (id: string, message: string) => invoke<Pushed>("commit_only", { id, message }),
-  suggestedGitIdentity: () => invoke<GitIdentity>("suggested_git_identity"),
-  /** Writes `user.name` and `user.email` to the clone's own git config. */
-  setGitIdentity: (id: string, name: string, email: string) =>
-    invoke<void>("set_git_identity", { id, name, email }),
-  updateStatus: () => invoke<UpdateStatus>("update_status"),
-  /** Checks now; a newer version starts downloading (`update-state` follows). */
-  checkUpdate: () => invoke<UpdateStatus>("check_update"),
-  /** Installs the downloaded update and relaunches ("Restart now"). */
-  installUpdate: () => invoke<void>("install_update"),
-  /** "Later": the banner stays, without the question. */
-  deferUpdate: () => invoke<void>("defer_update"),
-  /** Quits, installing a downloaded update first where the platform allows it. */
-  quitApp: () => invoke<void>("quit_app"),
-  /** Dev builds only: a fake update, from the check to the ready banner. */
-  simulateUpdate: () => invoke<void>("simulate_update"),
-};
+/** Every command; each rejects with a `CommandError`. */
+export const api = commands;
 
-export function errorKind(err: unknown): string | null {
+export function errorKind(err: unknown): ErrorKind | null {
   return typeof err === "object" && err !== null && "kind" in err
-    ? String((err as CommandError).kind)
+    ? ((err as CommandError).kind as ErrorKind)
     : null;
 }
 

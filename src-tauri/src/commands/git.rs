@@ -16,6 +16,7 @@ use crate::settings::{CommitActions, SettingsStore};
 /// Clones a project that has no local copy into `parent/<repo>`, registers the clone and
 /// rescans the disk. Returns the new folder; `projects-updated` follows.
 #[tauri::command]
+#[cfg_attr(test, specta::specta)]
 pub async fn clone_project(
     app: AppHandle,
     state: State<'_, ProjectsState>,
@@ -43,6 +44,7 @@ pub async fn clone_project(
 /// Fast-forwards project `id`'s clone to GitHub's default branch (`pull.rs` says when it
 /// refuses). The watcher sees the remote refs move and re-reads the status.
 #[tauri::command]
+#[cfg_attr(test, specta::specta)]
 pub async fn pull_project(
     app: AppHandle,
     state: State<'_, ProjectsState>,
@@ -147,6 +149,7 @@ pub(super) fn allow_commit(actions: CommitActions, push: bool) -> Result<()> {
 
 /// What Commit & push would send for project `id`, or why it can't (`push.rs`).
 #[tauri::command]
+#[cfg_attr(test, specta::specta)]
 pub async fn push_check(
     state: State<'_, ProjectsState>,
     settings: State<'_, SettingsStore>,
@@ -160,6 +163,7 @@ pub async fn push_check(
 /// Commits project `id`'s changes with `message` and pushes its default branch, then
 /// re-reads the status while the autograder runs.
 #[tauri::command]
+#[cfg_attr(test, specta::specta)]
 pub async fn commit_push(
     app: AppHandle,
     state: State<'_, ProjectsState>,
@@ -191,6 +195,7 @@ fn local_clone(state: &ProjectsState, id: &str) -> Result<PathBuf> {
 
 /// What a commit of project `id` would hold, and whether Commit & push is offered with it.
 #[derive(Debug, Clone, serde::Serialize)]
+#[cfg_attr(test, derive(specta::Type))]
 #[serde(rename_all = "camelCase")]
 pub struct CommitCheck {
     #[serde(flatten)]
@@ -203,6 +208,7 @@ pub struct CommitCheck {
 /// What Commit (and Commit & push, when it applies) would do for project `id`. Refuses
 /// only what blocks a local commit (`push::commit_check`).
 #[tauri::command]
+#[cfg_attr(test, specta::specta)]
 pub async fn commit_check(
     state: State<'_, ProjectsState>,
     settings: State<'_, SettingsStore>,
@@ -250,6 +256,7 @@ pub async fn commit_check(
 /// Commits project `id`'s changes with `message` in its clone and nothing else: no push, so
 /// dev builds allow it, and only the local state is re-read.
 #[tauri::command]
+#[cfg_attr(test, specta::specta)]
 pub async fn commit_only(
     app: AppHandle,
     state: State<'_, ProjectsState>,
@@ -266,12 +273,14 @@ pub async fn commit_only(
 
 /// The name and private email of the signed-in account, offered when git has no identity.
 #[tauri::command]
+#[cfg_attr(test, specta::specta)]
 pub async fn suggested_git_identity() -> Result<push::Identity> {
     push::suggested_identity().await
 }
 
 /// Sets project `id`'s clone's own `user.name` and `user.email` (not the global config).
 #[tauri::command]
+#[cfg_attr(test, specta::specta)]
 pub async fn set_git_identity(
     state: State<'_, ProjectsState>,
     id: String,

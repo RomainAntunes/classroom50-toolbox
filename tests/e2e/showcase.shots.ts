@@ -188,6 +188,8 @@ function showcase(over: Partial<Scenario> = {}): Scenario {
             ],
             founders: [LOGIN],
             url: "https://github.com/orgs/northfield-cs/teams/x",
+            classroom: null,
+            assignment: null,
           },
         }),
       ],

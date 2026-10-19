@@ -2,9 +2,10 @@
 
 use std::sync::Mutex;
 
-use tauri::{AppHandle, Emitter, Manager};
+use tauri::{AppHandle, Manager};
 
-use super::{Mode, PROGRESS_EVENT, ProjectsState, SyncProgress};
+use super::{Mode, ProjectsState, SyncProgress};
+use crate::events::{IpcEvent, SyncProgressed};
 use crate::sync_progress::{Costs, Phase, Tracker};
 
 /// Reports sync progress to the UI as `sync-progress`.
@@ -100,8 +101,8 @@ impl Progress {
             return;
         };
         change(&mut progress);
-        if let Err(err) = self.app.emit(PROGRESS_EVENT, *progress) {
-            log::debug!("could not emit {PROGRESS_EVENT}: {err}");
+        if let Err(err) = SyncProgressed::emit(&self.app, &progress) {
+            log::debug!("could not emit {}: {err}", SyncProgressed::NAME);
         }
     }
 }

@@ -84,7 +84,9 @@ The [CLAUDE.md](../CLAUDE.md) file at the repository root describes the architec
 upstream contracts in detail. The short version:
 
 - The Rust core in `src-tauri/` owns all state and I/O. The Svelte UI in `src/` only renders and
-  calls typed Tauri commands; each command in `commands/` has a twin in `src/lib/api.ts`.
+  calls typed Tauri commands through `src/lib/api.ts`, typed from `src/lib/bindings.ts`, which
+  `cargo test` generates from the Rust types: after changing a command, a type it carries or an
+  event, run `UPDATE_GOLDEN=1 cargo test bindings` in `src-tauri` and commit the new file.
 - Every `gh` or `git` call goes through `process.rs`, with arguments as a vector, never a shell
   string. Mutations shell out to `gh student` instead of reimplementing it.
 - OS-specific behavior lives in `src-tauri/src/platform/`, one file per OS with the same

@@ -6,10 +6,11 @@ use std::sync::Mutex;
 use std::time::Duration;
 
 use serde::{Deserialize, Serialize};
-use tauri::{AppHandle, Emitter, Manager};
+use tauri::{AppHandle, Manager};
 use tokio::sync::watch;
 
 use crate::error::{Error, Result};
+use crate::events::{IpcEvent, ToolJobsChanged};
 use crate::github::Http;
 use crate::platform::{self, InstallPlan};
 use crate::process::{self, Streaming};
@@ -25,10 +26,6 @@ pub const MIN_GH: (u32, u32, u32) = (2, 81, 0);
 /// repo's name since 1.56.0. Older ones are updated with `gh extension upgrade`.
 pub const MIN_GH_STUDENT: (u32, u32, u32) = (1, 56, 0);
 
-/// Payload: every running install or update (`ToolJob[]`), sent when one starts, prints a
-/// line or ends.
-pub const JOBS_EVENT: &str = "tool-jobs";
-
 /// Package managers download and unpack; a slow link can take a while, a prompt nobody
 /// can answer takes forever.
 const PACKAGE_MANAGER_TIMEOUT: Duration = Duration::from_secs(15 * 60);
@@ -40,6 +37,7 @@ const DETACHED_TIMEOUT: Duration = Duration::from_secs(45 * 60);
 const DETACHED_POLL: Duration = Duration::from_secs(3);
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, PartialOrd, Ord)]
+#[cfg_attr(test, derive(specta::Type))]
 #[serde(rename_all = "kebab-case")]
 pub enum Tool {
     Git,
@@ -48,6 +46,7 @@ pub enum Tool {
 }
 
 #[derive(Debug, Clone, Serialize)]
+#[cfg_attr(test, derive(specta::Type))]
 #[serde(rename_all = "camelCase")]
 pub struct ToolStatus {
     pub tool: Tool,
@@ -81,6 +80,7 @@ impl ToolStatus {
 }
 
 #[derive(Debug, Clone, Serialize)]
+#[cfg_attr(test, derive(specta::Type))]
 #[serde(rename_all = "camelCase")]
 pub struct AuthStatus {
     pub logged_in: bool,
@@ -184,6 +184,7 @@ pub fn install_plan(tool: Tool) -> Result<InstallPlan> {
 }
 
 #[derive(Debug, Clone, Copy, Serialize, PartialEq, Eq)]
+#[cfg_attr(test, derive(specta::Type))]
 #[serde(rename_all = "camelCase")]
 pub enum JobKind {
     Install,
@@ -193,6 +194,7 @@ pub enum JobKind {
 /// An install or update in progress, kept in Rust so a view opened later (the popover
 /// hidden and shown again, another page) still shows it.
 #[derive(Debug, Clone, Serialize)]
+#[cfg_attr(test, derive(specta::Type))]
 #[serde(rename_all = "camelCase")]
 pub struct ToolJob {
     pub tool: Tool,
@@ -325,7 +327,7 @@ async fn run_job(
     let jobs = app.state::<ToolJobs>();
     let cancel = jobs.start(tool, kind)?;
     let emit = |jobs: &ToolJobs| {
-        let _ = app.emit(JOBS_EVENT, jobs.list());
+        let _ = ToolJobsChanged::emit(app, &jobs.list());
     };
     emit(&jobs);
     let result = run_plan(app, &jobs, tool, plan, timeout, cancel, &emit).await;
@@ -642,6 +644,7 @@ pub async fn active_login() -> Option<String> {
 
 /// How gh clones github.com repos (`git_protocol`).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[cfg_attr(test, derive(specta::Type))]
 #[serde(rename_all = "lowercase")]
 pub enum GitProtocol {
     Https,

@@ -10,6 +10,7 @@ use crate::settings::{Settings, SettingsStore};
 use crate::updater;
 
 #[tauri::command]
+#[cfg_attr(test, specta::specta)]
 pub fn get_settings(app: AppHandle, settings: State<'_, SettingsStore>) -> Settings {
     reported_settings(&app, settings.get())
 }
@@ -24,6 +25,7 @@ pub fn reported_settings(app: &AppHandle, mut settings: Settings) -> Settings {
 }
 
 #[tauri::command]
+#[cfg_attr(test, specta::specta)]
 pub fn update_settings(
     app: AppHandle,
     settings: State<'_, SettingsStore>,

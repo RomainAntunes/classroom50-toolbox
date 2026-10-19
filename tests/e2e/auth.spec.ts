@@ -1,7 +1,7 @@
 // Signing in through gh's device flow: the code arrives as `login-device-code`, the app
 // opens GitHub, and the result (or the failure) shows in the footer.
 import { expect, test } from "./app";
-import { fail, hold, ok, scenario, snapshot } from "./fixtures";
+import { fail, failPlugin, hold, ok, scenario, snapshot } from "./fixtures";
 
 const signedOut = { loggedIn: false, login: null, missingScopes: [], envToken: null };
 const signedIn = { loggedIn: true, login: "student", missingScopes: [], envToken: null };
@@ -46,7 +46,7 @@ test("no browser: the URL is spelled out", async ({ app, page }) => {
   await app.start(
     scenario({
       auth: signedOut,
-      responses: { login: [hold()], "plugin:opener|open_url": [fail("opener", "no xdg-open")] },
+      responses: { login: [hold()], "plugin:opener|open_url": [failPlugin("no xdg-open")] },
     }),
   );
   await page.getByRole("button", { name: "Sign in" }).click();
@@ -94,7 +94,7 @@ test("an unknown failure shows gh's own words", async ({ app, page }) => {
   await app.start(
     scenario({
       auth: signedOut,
-      responses: { login: [fail("command", "gh: HTTP 502 from api.github.com")] },
+      responses: { login: [fail("commandFailed", "gh: HTTP 502 from api.github.com")] },
     }),
   );
   await page.getByRole("button", { name: "Sign in" }).click();

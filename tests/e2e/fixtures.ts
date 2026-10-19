@@ -10,6 +10,7 @@ import type {
   CommandError,
   DeepLinkTarget,
   EditorInfo,
+  ErrorKind,
   Grade,
   GradeTest,
   LocalState,
@@ -24,9 +25,11 @@ import type {
 } from "../../src/lib/api";
 import pkg from "../../package.json" with { type: "json" };
 
-/** How the fake answers one call: a value, a rejection shaped like Rust's `Error`, a
- *  promise the test settles later (`app.release`), or the fake's default (`pass`). */
-export type Reply = { value: unknown } | { error: CommandError } | { hold: true } | { pass: true };
+/** How the fake answers one call: a value, a rejection shaped like Rust's `Error` (a plugin
+ *  rejects with its message alone), a promise the test settles later (`app.release`), or the
+ *  fake's default (`pass`). */
+export type Reply =
+  { value: unknown } | { error: CommandError | string } | { hold: true } | { pass: true };
 
 export interface Scenario {
   appInfo: AppInfo;
@@ -55,12 +58,15 @@ export const hold = (): Reply => ({ hold: true });
 /** The fake's own answer, e.g. after a failure: `respond(cmd, fail(...), pass())`. */
 export const pass = (): Reply => ({ pass: true });
 export function fail(
-  kind: string,
+  kind: ErrorKind,
   message = `${kind} (from Rust)`,
   params?: Record<string, string>,
 ): Reply {
   return { error: { kind, message, ...(params ? { params } : {}) } };
 }
+
+/** A plugin's rejection: Tauri plugins reject with their error's message. */
+export const failPlugin = (message: string): Reply => ({ error: message });
 
 const NOW = Date.now();
 const HOUR = 3_600_000;
@@ -316,6 +322,7 @@ export function scenario(over: Partial<Scenario> = {}): Scenario {
         reposSeen: 0,
         scanRoots: 0,
         watchTargets: 0,
+        phases: {},
       },
       rateLimit: { remaining: 4900, limit: 5000, resetAt: null },
       issue: null,

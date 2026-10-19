@@ -20,6 +20,10 @@ version = 2
 yanked = "deny"
 # Each entry: why it doesn't apply or can't be fixed from here, and when to drop it.
 ignore = [
+    # paste (unmaintained) comes only with specta, a dev-dependency used by the
+    # `bindings_are_current` test to generate src/lib/bindings.ts; the app never compiles it.
+    # Drop this once specta no longer depends on paste.
+    { id = "RUSTSEC-2024-0436", reason = "dev-only, via specta for the IPC bindings test; never built into the app" },
     # proc-macro-error (unmaintained) is a build-time dependency of glib-macros 0.18, the
     # gtk-rs generation Tauri's Linux webview (webkit2gtk 2.0, tao, wry, muda) is built on.
     # Nothing to do until Tauri moves to a newer gtk stack.
