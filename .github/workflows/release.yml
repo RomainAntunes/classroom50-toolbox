@@ -231,3 +231,25 @@ jobs:
           # job, which uploads them again and runs this job after it.
           node scripts/updater-platforms.mjs latest.json "$PRERELEASE"
           gh release upload "$TAG" latest.json --clobber --repo "$GITHUB_REPOSITORY"
+
+  # Each installer's size in the run's summary, next to the same installer of the previous
+  # published release, with a warning (never a failure) when one grew by more than 20%.
+  installer-sizes:
+    needs: [version, build]
+    # Also after a failed leg, to show what the others built.
+    if: ${{ !cancelled() && needs.version.outputs.release == 'true' }}
+    runs-on: ubuntu-latest
+    permissions:
+      # Write, not read: the draft this run made is only listed to a token that can push.
+      contents: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: v${{ needs.version.outputs.version }}
+          RELEASE_ID: ${{ needs.version.outputs.release-id }}
+        run: |
+          gh api "repos/$GITHUB_REPOSITORY/releases" --paginate --slurp > releases.json
+          node scripts/installer-sizes.mjs releases.json "$TAG" "$RELEASE_ID"

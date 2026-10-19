@@ -49,6 +49,10 @@ jobs:
       - run: pnpm test
       # tauri::generate_context! embeds the built frontend, so it must exist before cargo runs.
       - run: pnpm build
+      # The webview bundle against scripts/size-budget.json; the table goes to the summary.
+      - name: Bundle size budget
+        if: runner.os == 'Linux'
+        run: node scripts/size-budget.mjs build
       - run: cargo fmt --check
         working-directory: src-tauri
       - run: cargo clippy --all-targets -- -D warnings
