@@ -7,8 +7,8 @@ vi.mock("@tauri-apps/plugin-notification", () => ({
   sendNotification: (notice: { title: string; body: string }) => sent.push(notice),
 }));
 
-const { sampleNotices, showNotice } = await import("$lib/notices");
-const en: Record<string, string> = (await import("$lib/i18n/en.json")).default;
+const { sampleNotices, showNotice } = await import("#lib/notices.js");
+const en: Record<string, string> = (await import("#lib/i18n/en.json")).default;
 
 describe("notices", () => {
   it("has a dev label, a title and a body for every kind", () => {

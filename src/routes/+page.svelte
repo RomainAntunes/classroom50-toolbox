@@ -1,6 +1,6 @@
 <script lang="ts">
   // A PNG at 3x: WebKit rasterizes an SVG's drop-shadow filters at 1x, which blurs it.
-  import logo from "$lib/assets/logo.png";
+  import logo from "#lib/assets/logo.png";
   import { onMount } from "svelte";
   import { goto } from "$app/navigation";
   import { listen } from "@tauri-apps/api/event";
@@ -18,23 +18,23 @@
     type ListFilter,
     type Unaccepted,
     type ToolStatus,
-  } from "$lib/api";
-  import { announce } from "$lib/announce.svelte";
-  import { menuKey, onContextMenu, popupMenu, rovingList } from "$lib/keyboard";
-  import { moveIndex } from "$lib/keys";
-  import { currentDirection, fromNow, t } from "$lib/i18n";
-  import { session } from "$lib/session.svelte";
-  import { loadSettings, saveSettings, settings } from "$lib/settings.svelte";
-  import Section from "$lib/components/Section.svelte";
-  import ToolRow from "$lib/components/ToolRow.svelte";
-  import ProjectRow from "$lib/components/ProjectRow.svelte";
-  import { classKey, showsProject, showsUnaccepted } from "$lib/filter";
-  import { isClassHidden, isCollapsed, setClassHidden, setCollapsed } from "$lib/hidden";
-  import UnacceptedRow from "$lib/components/UnacceptedRow.svelte";
-  import LoginStatus from "$lib/components/LoginStatus.svelte";
-  import UpdateBanner from "$lib/components/UpdateBanner.svelte";
-  import { linkActive } from "$lib/deeplink";
-  import { pendingNotes } from "$lib/whatsnew";
+  } from "#lib/api.js";
+  import { announce } from "#lib/announce.svelte.js";
+  import { menuKey, onContextMenu, popupMenu, rovingList } from "#lib/keyboard.js";
+  import { moveIndex } from "#lib/keys.js";
+  import { currentDirection, fromNow, t } from "#lib/i18n/index.js";
+  import { session } from "#lib/session.svelte.js";
+  import { loadSettings, saveSettings, settings } from "#lib/settings.svelte.js";
+  import Section from "#lib/components/Section.svelte";
+  import ToolRow from "#lib/components/ToolRow.svelte";
+  import ProjectRow from "#lib/components/ProjectRow.svelte";
+  import { classKey, showsProject, showsUnaccepted } from "#lib/filter.js";
+  import { isClassHidden, isCollapsed, setClassHidden, setCollapsed } from "#lib/hidden.js";
+  import UnacceptedRow from "#lib/components/UnacceptedRow.svelte";
+  import LoginStatus from "#lib/components/LoginStatus.svelte";
+  import UpdateBanner from "#lib/components/UpdateBanner.svelte";
+  import { linkActive } from "#lib/deeplink.js";
+  import { pendingNotes } from "#lib/whatsnew.js";
 
   interface ClassGroup {
     key: string;
@@ -134,12 +134,12 @@
   async function load() {
     const loaded = await loadSettings();
     if (!loaded.onboarded) {
-      await goto("/welcome", { replaceState: true });
+      await goto("/welcome", { replace: true });
       return;
     }
     // Updated since the notes were last read; a link being handled goes first.
     if (!linkActive() && (await pendingNotes(loaded)).length) {
-      await goto("/whats-new", { replaceState: true });
+      await goto("/whats-new", { replace: true });
       return;
     }
     const [tools, auth, snapshot, progress] = await Promise.all([

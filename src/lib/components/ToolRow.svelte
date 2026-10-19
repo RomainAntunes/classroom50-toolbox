@@ -8,11 +8,11 @@
     withDialog,
     type CommandError,
     type ToolStatus,
-  } from "$lib/api";
-  import { hasKey, t } from "$lib/i18n";
-  import { announce } from "$lib/announce.svelte";
-  import { session } from "$lib/session.svelte";
-  import { toolJobs, watchToolJobs } from "$lib/toolJobs.svelte";
+  } from "#lib/api.js";
+  import { hasKey, t } from "#lib/i18n/index.js";
+  import { announce } from "#lib/announce.svelte.js";
+  import { session } from "#lib/session.svelte.js";
+  import { toolJobs, watchToolJobs } from "#lib/toolJobs.svelte.js";
 
   let {
     status,

@@ -1,5 +1,5 @@
 <script lang="ts">
-  import "$lib/theme/theme.css";
+  import "#lib/theme/theme.css";
   import { onMount } from "svelte";
   import { listen } from "@tauri-apps/api/event";
   import { goto } from "$app/navigation";
@@ -15,18 +15,18 @@
     type Notice,
     type Settings,
     type UpdateStatus,
-  } from "$lib/api";
-  import { handleDeepLink, linkActive } from "$lib/deeplink";
-  import { currentDirection, currentLocale, setLocale, t } from "$lib/i18n";
-  import { showNotice } from "$lib/notices";
-  import { loadEditors } from "$lib/editor.svelte";
-  import { initTheme } from "$lib/theme/preview.svelte";
-  import Prompt from "$lib/components/Prompt.svelte";
-  import { announce, announcer } from "$lib/announce.svelte";
-  import { prompt } from "$lib/prompt.svelte";
-  import { session } from "$lib/session.svelte";
-  import { loadSettings, settings } from "$lib/settings.svelte";
-  import { pendingNotes } from "$lib/whatsnew";
+  } from "#lib/api.js";
+  import { handleDeepLink, linkActive } from "#lib/deeplink.js";
+  import { currentDirection, currentLocale, setLocale, t } from "#lib/i18n/index.js";
+  import { showNotice } from "#lib/notices.js";
+  import { loadEditors } from "#lib/editor.svelte.js";
+  import { initTheme } from "#lib/theme/preview.svelte.js";
+  import Prompt from "#lib/components/Prompt.svelte";
+  import { announce, announcer } from "#lib/announce.svelte.js";
+  import { prompt } from "#lib/prompt.svelte.js";
+  import { session } from "#lib/session.svelte.js";
+  import { loadSettings, settings } from "#lib/settings.svelte.js";
+  import { pendingNotes } from "#lib/whatsnew.js";
 
   let { children } = $props();
 
@@ -105,9 +105,9 @@
     if (pathname === "/welcome" || (pathname === "/whats-new" && !again)) return;
     const current = settings.current;
     if (current && !linkActive() && (await pendingNotes(current)).length) {
-      await goto("/whats-new", { replaceState: true });
+      await goto("/whats-new", { replace: true });
     } else if (pathname.startsWith("/settings") || again) {
-      await goto("/", { replaceState: true });
+      await goto("/", { replace: true });
     }
   }
 

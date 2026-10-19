@@ -1,7 +1,7 @@
 <script lang="ts">
   import type { Snippet } from "svelte";
-  import { t } from "$lib/i18n";
-  import { menuKey, onContextMenu } from "$lib/keyboard";
+  import { t } from "#lib/i18n/index.js";
+  import { menuKey, onContextMenu } from "#lib/keyboard.js";
 
   let {
     title,

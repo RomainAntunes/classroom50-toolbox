@@ -1,6 +1,6 @@
 // Which rows the list shows: the date filter, the search, and hidden assignments and classes
 // (only shown when a search matches them). `query` is trimmed and lowercased by the caller.
-import type { ListFilter, Project, Unaccepted } from "$lib/api";
+import type { ListFilter, Project, Unaccepted } from "#lib/api.js";
 
 const WEEK = 7 * 24 * 60 * 60 * 1000;
 

@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import pkg from "../../../package.json";
 import i18nSource from "../i18n/index.ts?raw";
-import { catalogs } from "$lib/i18n";
+import { catalogs } from "#lib/i18n/index.js";
 import { changelogs, notesFor, versions } from "./index";
 import {
   KINDS,

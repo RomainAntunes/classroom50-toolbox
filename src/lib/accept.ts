@@ -1,14 +1,21 @@
 // Accepting an assignment from the list. `gh student accept` never asks anything, so the
 // confirmations it would need (public repo, groups) are asked here first.
 import { ask, message } from "@tauri-apps/plugin-dialog";
-import { api, errorKind, errorMessage, withDialog, type Accepted, type Unaccepted } from "$lib/api";
-import { cloneProject } from "$lib/clone";
-import { formatDate, t } from "$lib/i18n";
-import { groupName } from "$lib/group";
-import { announce } from "$lib/announce.svelte";
-import { busy, session } from "$lib/session.svelte";
-import { askText } from "$lib/prompt.svelte";
-import { addToNewGroup } from "$lib/teammate";
+import {
+  api,
+  errorKind,
+  errorMessage,
+  withDialog,
+  type Accepted,
+  type Unaccepted,
+} from "#lib/api.js";
+import { cloneProject } from "#lib/clone.js";
+import { formatDate, t } from "#lib/i18n/index.js";
+import { groupName } from "#lib/group.js";
+import { announce } from "#lib/announce.svelte.js";
+import { busy, session } from "#lib/session.svelte.js";
+import { askText } from "#lib/prompt.svelte.js";
+import { addToNewGroup } from "#lib/teammate.js";
 
 /** The longest group name, as `student::MAX_TEAM_NAME` (upstream's web app) allows. */
 export const MAX_GROUP_NAME = 80;

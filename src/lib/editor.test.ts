@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it } from "vitest";
-import type { Project, Settings } from "$lib/api";
-import { defaultEditor, editorFor, editors } from "$lib/editor.svelte";
-import { settings } from "$lib/settings.svelte";
+import type { Project, Settings } from "#lib/api.js";
+import { defaultEditor, editorFor, editors } from "#lib/editor.svelte.js";
+import { settings } from "#lib/settings.svelte.js";
 
 const idea = { id: "idea", name: "IntelliJ IDEA" };
 const vscode = { id: "vscode", name: "Visual Studio Code" };

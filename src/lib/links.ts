@@ -1,7 +1,7 @@
 // What a row's "Copy" menu puts on the clipboard: the `classroom50-toolbox://` links (they
 // must read back with Rust's `deeplink::parse`), the repo's GitHub page and its clone URLs.
 import { writeText } from "@tauri-apps/plugin-clipboard-manager";
-import { api, type GitProtocol, type Project, type Unaccepted } from "$lib/api";
+import { api, type GitProtocol, type Project, type Unaccepted } from "#lib/api.js";
 
 export const SCHEME = "classroom50-toolbox";
 

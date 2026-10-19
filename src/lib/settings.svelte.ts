@@ -1,7 +1,7 @@
 // Shared settings state for the main and settings pages. Rust is the source of truth:
 // every change goes through `update_settings` and the normalized result is stored back.
 import { open } from "@tauri-apps/plugin-dialog";
-import { api, withDialog, type Settings } from "$lib/api";
+import { api, withDialog, type Settings } from "#lib/api.js";
 
 // Before settings moved to Rust (v0.1.0), watched folders lived in localStorage.
 const LEGACY_FOLDERS_KEY = "watchedFolders";

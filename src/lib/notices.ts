@@ -3,8 +3,8 @@ import {
   requestPermission,
   sendNotification,
 } from "@tauri-apps/plugin-notification";
-import type { Notice } from "$lib/api";
-import { formatDate, formatList, fromNow, t } from "$lib/i18n";
+import type { Notice } from "#lib/api.js";
+import { formatDate, formatList, fromNow, t } from "#lib/i18n/index.js";
 
 /** Words a notice from Rust (`alerts.rs`) and shows it as a system notification. */
 export async function showNotice(notice: Notice) {

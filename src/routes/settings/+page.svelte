@@ -19,7 +19,7 @@
     type SimulatedNetwork,
     type SyncDetails,
     type ToolStatus,
-  } from "$lib/api";
+  } from "#lib/api.js";
   import { writeText } from "@tauri-apps/plugin-clipboard-manager";
   import {
     catalogs,
@@ -31,22 +31,22 @@
     hoursLabel,
     languageName,
     t,
-  } from "$lib/i18n";
-  import { sampleNotices, showNotice } from "$lib/notices";
-  import { loadSettings, pickWatchedFolder, saveSettings, settings } from "$lib/settings.svelte";
+  } from "#lib/i18n/index.js";
+  import { sampleNotices, showNotice } from "#lib/notices.js";
+  import { loadSettings, pickWatchedFolder, saveSettings, settings } from "#lib/settings.svelte.js";
   import { CheckMenuItem, Menu, MenuItem, PredefinedMenuItem } from "@tauri-apps/api/menu";
-  import { pickCloneFolder } from "$lib/clone";
-  import { chooseDefaultEditor, defaultEditor, editors, loadEditors } from "$lib/editor.svelte";
-  import Section from "$lib/components/Section.svelte";
-  import Toggle from "$lib/components/Toggle.svelte";
-  import ToolRow from "$lib/components/ToolRow.svelte";
-  import UpdateBanner from "$lib/components/UpdateBanner.svelte";
-  import ShortcutRecorder from "$lib/components/ShortcutRecorder.svelte";
-  import { popupMenu } from "$lib/keyboard";
-  import { session } from "$lib/session.svelte";
-  import { showText } from "$lib/prompt.svelte";
-  import { OS_CHOICES, preview, setPreviewOs, setPreviewRtl } from "$lib/theme/preview.svelte";
-  import { locale } from "$lib/i18n/locale.svelte";
+  import { pickCloneFolder } from "#lib/clone.js";
+  import { chooseDefaultEditor, defaultEditor, editors, loadEditors } from "#lib/editor.svelte.js";
+  import Section from "#lib/components/Section.svelte";
+  import Toggle from "#lib/components/Toggle.svelte";
+  import ToolRow from "#lib/components/ToolRow.svelte";
+  import UpdateBanner from "#lib/components/UpdateBanner.svelte";
+  import ShortcutRecorder from "#lib/components/ShortcutRecorder.svelte";
+  import { popupMenu } from "#lib/keyboard.js";
+  import { session } from "#lib/session.svelte.js";
+  import { showText } from "#lib/prompt.svelte.js";
+  import { OS_CHOICES, preview, setPreviewOs, setPreviewRtl } from "#lib/theme/preview.svelte.js";
+  import { locale } from "#lib/i18n/locale.svelte.js";
 
   const REMINDER_CHOICES = [72, 24, 6, 1];
   const REPO_URL = "https://github.com/RomainAntunes/classroom50-toolbox";

@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
-import type { Assignment, Group, Project } from "$lib/api";
-import { askText, prompt } from "$lib/prompt.svelte";
-import { joinsGroup, notFounderReason, parseUsernames, resultsText } from "$lib/teammate";
+import type { Assignment, Group, Project } from "#lib/api.js";
+import { askText, prompt } from "#lib/prompt.svelte.js";
+import { joinsGroup, notFounderReason, parseUsernames, resultsText } from "#lib/teammate.js";
 
 describe("joinsGroup", () => {
   const project = (mode: Assignment["mode"] | null, group: Group | null = null) =>

@@ -1,6 +1,6 @@
 <script lang="ts">
-  import { t } from "$lib/i18n";
-  import { prompt } from "$lib/prompt.svelte";
+  import { t } from "#lib/i18n/index.js";
+  import { prompt } from "#lib/prompt.svelte.js";
 
   let value = $state("");
   let input = $state<HTMLInputElement | null>(null);

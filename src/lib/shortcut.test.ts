@@ -6,7 +6,7 @@ import {
   parseShortcut,
   recordKey,
   type KeyPress,
-} from "$lib/shortcut";
+} from "#lib/shortcut.js";
 
 function press(code: string, key: string, mods: Partial<KeyPress> = {}): KeyPress {
   return { code, key, ctrlKey: false, altKey: false, shiftKey: false, metaKey: false, ...mods };

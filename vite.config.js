@@ -1,5 +1,7 @@
 import { defineConfig } from "vite";
 import { sveltekit } from "@sveltejs/kit/vite";
+import adapter from "@sveltejs/adapter-static";
+import { vitePreprocess } from "@sveltejs/vite-plugin-svelte";
 import process from "node:process";
 import { execSync } from "node:child_process";
 const host = process.env.TAURI_DEV_HOST;
@@ -18,7 +20,21 @@ function commit() {
 
 // https://vite.dev/config/
 export default defineConfig(() => ({
-  plugins: [sveltekit()],
+  plugins: [
+    // SvelteKit's own options (no svelte.config.js since SvelteKit 3).
+    sveltekit({
+      preprocess: vitePreprocess(),
+      // Tauri has no Node server for SSR, so adapter-static with a fallback page runs the app
+      // as an SPA: https://svelte.dev/docs/kit/single-page-apps and
+      // https://v2.tauri.app/start/frontend/sveltekit/
+      adapter: adapter({ fallback: "index.html" }),
+      // The app updates through Tauri's updater, never a redeploy: no hourly version.json poll
+      // (SvelteKit 3's default). Kit still checks on every window focus and visibility change,
+      // with no option to turn it off; the CSP's connect-src refuses that fetch and kit ignores
+      // the failure.
+      version: { pollInterval: 0 },
+    }),
+  ],
   define: {
     __COMMIT__: JSON.stringify(commit()),
   },

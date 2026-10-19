@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import type { Assignment, Classroom, Group, Unaccepted } from "$lib/api";
-import { canFoundGroup, notes, repoName } from "$lib/accept";
+import type { Assignment, Classroom, Group, Unaccepted } from "#lib/api.js";
+import { canFoundGroup, notes, repoName } from "#lib/accept.js";
 
 const item = (assignment: Partial<Assignment>, group: Group | null = null): Unaccepted => ({
   id: "heigvd-poo/26-poo-c/labo-3",

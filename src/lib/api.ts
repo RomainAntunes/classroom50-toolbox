@@ -1,7 +1,7 @@
 // Typed wrappers for the Rust commands in src-tauri/src/commands.rs. Keep the two in sync:
 // Rust serializes with camelCase field names.
 import { invoke } from "@tauri-apps/api/core";
-import { hasKey, t } from "$lib/i18n";
+import { hasKey, t } from "#lib/i18n/index.js";
 
 export type Os = "macos" | "windows" | "linux";
 export type Tool = "git" | "gh" | "gh-student";
