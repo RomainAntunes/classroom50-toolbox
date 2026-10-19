@@ -4,16 +4,34 @@ on:
   push:
     branches: [main]
   pull_request:
+    types: [opened, synchronize, reopened, labeled]
 
+# A label other than `run-ci` starts a run whose jobs all skip; its own group keeps it from
+# cancelling a real run of the same PR.
 concurrency:
-  group: ci-${{ github.ref }}
+  group: ci-${{ github.ref }}${{ github.event.action == 'labeled' && github.event.label.name != 'run-ci' && format('-{0}', github.run_id) || '' }}
   cancel-in-progress: true
 
 # Every job only reads the repository; none needs a token that can write.
 permissions: {}
 
 jobs:
+  # Dependabot's PRs run nothing until the `run-ci` label is added (then every push to them
+  # runs). Other PRs and pushes to main always run; adding `run-ci` to one runs it again.
+  gate:
+    if: >-
+      github.event_name != 'pull_request' ||
+      (github.event.action == 'labeled' && github.event.label.name == 'run-ci') ||
+      (github.event.action != 'labeled' &&
+        (github.event.pull_request.user.login != 'dependabot[bot]' ||
+          contains(github.event.pull_request.labels.*.name, 'run-ci')))
+    runs-on: ubuntu-24.04
+    permissions: {}
+    steps:
+      - run: "true"
+
   check:
+    needs: gate
     permissions:
       contents: read
     strategy:
@@ -63,6 +81,7 @@ jobs:
   # The WebDriver smoke suite (e2e/): the real app, a debug build, against a mock GitHub and
   # a fake gh. Linux only: tauri-driver needs WebKitWebDriver, and macOS has no WKWebView driver.
   webdriver:
+    needs: gate
     permissions:
       contents: read
     runs-on: ubuntu-22.04
@@ -116,6 +135,7 @@ jobs:
   # Rust line coverage, report only: a per-file table (least covered first) in the run's
   # summary. No upload to a coverage service and no threshold; failing tests fail `check`.
   coverage:
+    needs: gate
     runs-on: ubuntu-22.04
     timeout-minutes: 40
     continue-on-error: true
@@ -165,6 +185,7 @@ jobs:
 
   # UI flows in WebKit with Rust faked (tests/e2e): no app build, no GitHub access.
   e2e:
+    needs: gate
     permissions:
       contents: read
     runs-on: ubuntu-24.04
@@ -212,6 +233,7 @@ jobs:
   # (src-tauri/deny.toml). Advisories run apart and don't block: a new advisory against a
   # crate deep in Tauri's tree would otherwise fail every PR until upstream ships a fix.
   deny:
+    needs: gate
     runs-on: ubuntu-24.04
     permissions:
       contents: read
@@ -235,6 +257,7 @@ jobs:
   # Static analysis of the workflows themselves (unpinned actions, token permissions,
   # template injection...). Findings go to the log, not to code scanning.
   zizmor:
+    needs: gate
     runs-on: ubuntu-24.04
     permissions:
       contents: read
