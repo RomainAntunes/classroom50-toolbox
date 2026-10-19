@@ -166,6 +166,14 @@ mod calendar;
 
 pub use calendar::{has_native_calendar, native_calendars, write_calendar};
 
+pub fn set_login_item(_enabled: bool) -> Option<Result<()>> {
+    None
+}
+
+pub fn login_item_enabled() -> Option<bool> {
+    None
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

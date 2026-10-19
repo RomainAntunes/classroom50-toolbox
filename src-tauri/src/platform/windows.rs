@@ -282,6 +282,14 @@ pub fn has_native_calendar() -> bool {
     false
 }
 
+pub fn set_login_item(_enabled: bool) -> Option<Result<()>> {
+    None
+}
+
+pub fn login_item_enabled() -> Option<bool> {
+    None
+}
+
 pub fn native_calendars(_ask: bool) -> Result<Vec<super::NativeCalendar>> {
     Err(Error::Unsupported("no calendar store on this OS".into()))
 }

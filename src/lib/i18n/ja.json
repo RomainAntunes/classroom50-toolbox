@@ -69,6 +69,7 @@
   "settings.folders.remove": "削除",
   "settings.general.title": "一般",
   "settings.launchAtLogin": "ログイン時に開く",
+  "settings.launchAtLoginHint": "コンピューターにログインするとバックグラウンドで起動し、リマインダーや新しい成績が届き続けます。",
   "settings.shortcut": "キーボードショートカット",
   "settings.shortcut.hint": "どのアプリからでもツールボックスを開いたり閉じたりできます。",
   "settings.shortcut.wayland": "Waylandでは使えません。デスクトップのキーボード設定でツールボックスを起動するショートカットを設定すると開けます。",

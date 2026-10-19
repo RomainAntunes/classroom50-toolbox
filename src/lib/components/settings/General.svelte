@@ -153,6 +153,7 @@
   {/if}
   <Toggle
     label={t("settings.launchAtLogin")}
+    hint={t("settings.launchAtLoginHint")}
     checked={current.launchAtLogin}
     onchange={(on) => save({ launchAtLogin: on })}
   />

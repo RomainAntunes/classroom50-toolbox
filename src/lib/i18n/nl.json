@@ -69,6 +69,7 @@
   "settings.folders.remove": "Verwijderen",
   "settings.general.title": "Algemeen",
   "settings.launchAtLogin": "Openen bij inloggen",
+  "settings.launchAtLoginHint": "Start op de achtergrond als je inlogt op je computer, zodat herinneringen en nieuwe cijfers je blijven bereiken.",
   "settings.shortcut": "Sneltoets",
   "settings.shortcut.hint": "Opent en sluit de toolbox vanuit elke app.",
   "settings.shortcut.wayland": "Niet beschikbaar onder Wayland. Een sneltoets die de toolbox start, ingesteld in de toetsenbordinstellingen van je desktop, opent hem.",

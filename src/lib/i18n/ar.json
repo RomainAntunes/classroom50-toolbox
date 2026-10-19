@@ -69,6 +69,7 @@
   "settings.folders.remove": "إزالة",
   "settings.general.title": "عام",
   "settings.launchAtLogin": "الفتح عند تسجيل الدخول",
+  "settings.launchAtLoginHint": "يبدأ في الخلفية عند تسجيل الدخول إلى الحاسوب، لتستمر التذكيرات والدرجات الجديدة في الوصول.",
   "settings.shortcut": "اختصار لوحة المفاتيح",
   "settings.shortcut.hint": "يفتح التطبيق ويغلقه من أي تطبيق آخر.",
   "settings.shortcut.wayland": "غير متاح في Wayland. يمكن فتح التطبيق باختصار يشغّله، يُضبط في إعدادات لوحة المفاتيح لسطح المكتب.",

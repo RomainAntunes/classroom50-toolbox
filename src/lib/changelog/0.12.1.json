@@ -1,0 +1,155 @@
+{
+  "date": "2026-10-19",
+  "notes": {
+    "en": [
+      {
+        "kind": "fixed",
+        "text": "On a Mac, System Settings now lists the toolbox under its own name and icon among the apps that open at login, instead of an item from an unidentified developer."
+      },
+      {
+        "kind": "improved",
+        "text": "Settings now explains what opening at login does: the toolbox starts in the background, so reminders and new grades keep reaching you."
+      }
+    ],
+    "fr": [
+      {
+        "kind": "fixed",
+        "text": "Sur Mac, les Réglages Système affichent maintenant la boîte à outils avec son nom et son icône parmi les apps ouvertes à l'ouverture de session, au lieu d'un élément d'un développeur non identifié."
+      },
+      {
+        "kind": "improved",
+        "text": "Les réglages expliquent maintenant l'ouverture à l'ouverture de session, avec les mêmes mots que macOS : la boîte à outils démarre en arrière-plan, pour que les rappels et les nouvelles notes vous parviennent."
+      }
+    ],
+    "es": [
+      {
+        "kind": "fixed",
+        "text": "En Mac, Ajustes del Sistema ahora muestra la caja de herramientas con su nombre y su icono entre las apps que se abren al iniciar sesión, en lugar de un elemento de un desarrollador no identificado."
+      },
+      {
+        "kind": "improved",
+        "text": "Los ajustes ahora explican qué hace abrir al iniciar sesión: la caja de herramientas se inicia en segundo plano, para que te sigan llegando los recordatorios y las calificaciones nuevas."
+      }
+    ],
+    "de": [
+      {
+        "kind": "fixed",
+        "text": "Auf dem Mac zeigen die Systemeinstellungen die Toolbox jetzt mit ihrem Namen und Symbol bei den Apps, die sich bei der Anmeldung öffnen, statt als Objekt eines nicht identifizierten Entwicklers."
+      },
+      {
+        "kind": "improved",
+        "text": "Die Einstellungen erklären jetzt, was das Öffnen bei der Anmeldung bewirkt: Die Toolbox startet im Hintergrund, damit dich Erinnerungen und neue Noten weiter erreichen."
+      }
+    ],
+    "it": [
+      {
+        "kind": "fixed",
+        "text": "Su Mac, Impostazioni di Sistema ora mostra il toolbox con il suo nome e la sua icona tra le app aperte al login, invece di un elemento di uno sviluppatore non identificato."
+      },
+      {
+        "kind": "improved",
+        "text": "Le impostazioni ora spiegano cosa fa l'apertura al login: il toolbox si avvia in background, così promemoria e nuovi voti continuano ad arrivarti."
+      }
+    ],
+    "pt-BR": [
+      {
+        "kind": "fixed",
+        "text": "No Mac, os Ajustes do Sistema agora mostram a caixa de ferramentas com seu nome e ícone entre os apps abertos ao fazer login, em vez de um item de um desenvolvedor não identificado."
+      },
+      {
+        "kind": "improved",
+        "text": "As configurações agora explicam o que faz abrir ao fazer login: a caixa de ferramentas inicia em segundo plano, para que os lembretes e as notas novas continuem chegando."
+      }
+    ],
+    "pt-PT": [
+      {
+        "kind": "fixed",
+        "text": "No Mac, as Definições do Sistema mostram agora a caixa de ferramentas com o seu nome e ícone entre as apps abertas ao iniciar sessão, em vez de um elemento de um programador não identificado."
+      },
+      {
+        "kind": "improved",
+        "text": "As definições explicam agora o que faz abrir ao iniciar sessão: a caixa de ferramentas inicia em segundo plano, para que os lembretes e as novas notas continuem a chegar-te."
+      }
+    ],
+    "nl": [
+      {
+        "kind": "fixed",
+        "text": "Op een Mac toont Systeeminstellingen de toolbox nu met zijn eigen naam en symbool bij de apps die openen bij inloggen, in plaats van een onderdeel van een niet-geïdentificeerde ontwikkelaar."
+      },
+      {
+        "kind": "improved",
+        "text": "De instellingen leggen nu uit wat openen bij inloggen doet: de toolbox start op de achtergrond, zodat herinneringen en nieuwe cijfers je blijven bereiken."
+      }
+    ],
+    "pl": [
+      {
+        "kind": "fixed",
+        "text": "Na Macu Ustawienia systemowe pokazują teraz przybornik pod jego nazwą i ikoną wśród aplikacji otwieranych po zalogowaniu, zamiast elementu od niezidentyfikowanego dewelopera."
+      },
+      {
+        "kind": "improved",
+        "text": "Ustawienia wyjaśniają teraz, co daje otwieranie po zalogowaniu: przybornik uruchamia się w tle, aby przypomnienia i nowe oceny nadal do ciebie docierały."
+      }
+    ],
+    "tr": [
+      {
+        "kind": "fixed",
+        "text": "Mac'te Sistem Ayarları artık araç kutusunu, oturum açılınca açılan uygulamalar arasında tanımlanamayan bir geliştiricinin öğesi olarak değil, kendi adı ve simgesiyle gösteriyor."
+      },
+      {
+        "kind": "improved",
+        "text": "Ayarlar artık oturum açılınca başlatmanın ne yaptığını açıklıyor: araç kutusu arka planda başlar, böylece hatırlatıcılar ve yeni notlar size ulaşmaya devam eder."
+      }
+    ],
+    "ar": [
+      {
+        "kind": "fixed",
+        "text": "على Mac، تعرض إعدادات النظام الآن صندوق الأدوات باسمه وأيقونته ضمن التطبيقات التي تُفتح عند تسجيل الدخول، بدلًا من عنصر لمطوّر غير معروف."
+      },
+      {
+        "kind": "improved",
+        "text": "توضّح الإعدادات الآن ما يفعله الفتح عند تسجيل الدخول: يبدأ صندوق الأدوات في الخلفية، لتستمر التذكيرات والدرجات الجديدة في الوصول."
+      }
+    ],
+    "he": [
+      {
+        "kind": "fixed",
+        "text": "ב-Mac, הגדרות המערכת מציגות עכשיו את ארגז הכלים בשמו ובסמל שלו בין היישומים שנפתחים בכניסה, במקום פריט של מפתח לא מזוהה."
+      },
+      {
+        "kind": "improved",
+        "text": "ההגדרות מסבירות עכשיו מה עושה הפתיחה בכניסה למערכת: ארגז הכלים מופעל ברקע, כדי שתזכורות וציונים חדשים ימשיכו להגיע."
+      }
+    ],
+    "zh-Hans": [
+      {
+        "kind": "fixed",
+        "text": "在 Mac 上，系统设置现在会在登录时打开的 App 中以工具箱自己的名称和图标显示它，而不是显示为来自身份不明开发者的项目。"
+      },
+      {
+        "kind": "improved",
+        "text": "设置现在会说明登录时打开的作用：工具箱在后台启动，让你继续收到提醒和新成绩。"
+      }
+    ],
+    "ja": [
+      {
+        "kind": "fixed",
+        "text": "Mac のシステム設定で、ログイン時に開く項目にツールボックスが元の名前とアイコンで表示されるようになりました。これまでは開発元が未確認の項目として表示されていました。"
+      },
+      {
+        "kind": "improved",
+        "text": "設定で、ログイン時に開く機能の説明を表示するようになりました。ツールボックスがバックグラウンドで起動し、リマインダーや新しい成績が届き続けます。"
+      }
+    ],
+    "ko": [
+      {
+        "kind": "fixed",
+        "text": "Mac의 시스템 설정에서 로그인 시 열리는 앱 목록에 툴박스가 확인되지 않은 개발자의 항목 대신 원래 이름과 아이콘으로 표시돼요."
+      },
+      {
+        "kind": "improved",
+        "text": "설정에서 로그인 시 열기가 어떤 기능인지 설명해요. 툴박스가 백그라운드에서 시작돼서 알림과 새 성적을 계속 받을 수 있어요."
+      }
+    ]
+  }
+}

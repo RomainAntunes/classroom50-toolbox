@@ -175,6 +175,17 @@ fn is_wayland(session_type: Option<&str>, wayland_display: Option<&str>) -> bool
     }
 }
 
+/// Registers or removes the app as a login item through the OS's own API, `None` where
+/// the autostart plugin does it (macOS before 13, Windows, Linux).
+pub fn set_login_item(enabled: bool) -> Option<Result<()>> {
+    imp::set_login_item(enabled)
+}
+
+/// Whether that login item is on, `None` where the autostart plugin knows.
+pub fn login_item_enabled() -> Option<bool> {
+    imp::login_item_enabled()
+}
+
 pub fn home_dir() -> Option<PathBuf> {
     std::env::var_os(if cfg!(windows) { "USERPROFILE" } else { "HOME" }).map(PathBuf::from)
 }

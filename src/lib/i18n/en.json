@@ -69,6 +69,7 @@
   "settings.folders.remove": "Remove",
   "settings.general.title": "General",
   "settings.launchAtLogin": "Open at login",
+  "settings.launchAtLoginHint": "Starts in the background when you log in to your computer, so reminders and new grades still reach you.",
   "settings.shortcut": "Keyboard shortcut",
   "settings.shortcut.hint": "Opens and closes the toolbox from any app.",
   "settings.shortcut.wayland": "Not available under Wayland. A shortcut that runs the toolbox, set in your desktop's keyboard settings, opens it.",
