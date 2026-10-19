@@ -1,5 +1,5 @@
 // A mock GitHub for the WebDriver suite: answers the app's GraphQL queries (told apart by
-// their shape, as `projects.rs`, `status.rs` and `groups.rs` build them), the REST profile,
+// their shape, as `projects/remote.rs`, `status.rs` and `groups.rs` build them), the REST profile,
 // avatars, the Pages manifests and the `result.json` assets, from a `world.js` fixture.
 // The app reaches it through the `C50_TEST_GITHUB` hook (`src-tauri/src/testenv.rs`). Node's
 // standard library only, so `pnpm test` can check it without the suite's dependencies.
@@ -32,7 +32,7 @@ const findRepo = (world, owner, name) =>
       r.name.toLowerCase() === name?.toLowerCase(),
   );
 
-/** The `Repo` fragment of `projects.rs`. The student made every commit. */
+/** The `Repo` fragment of `projects/remote.rs`. The student made every commit. */
 function repoNode(repo, login) {
   return {
     name: repo.name,

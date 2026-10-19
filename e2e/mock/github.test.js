@@ -1,7 +1,7 @@
 // The mock GitHub, checked without the app: it must recognize the queries the Rust code
 // really sends (read from its source, so a changed query fails here first), answer them in
 // the shapes Rust reads, and keep the golden answers in `golden/` current. Rust's own tests
-// (`e2e_golden` in projects.rs, status.rs and classroom50.rs) deserialize those same files,
+// (`e2e_golden` in projects/, status.rs and classroom50.rs) deserialize those same files,
 // so the two sides can't drift apart. `UPDATE_GOLDEN=1 pnpm test` rewrites them.
 
 import { readFileSync, writeFileSync } from "node:fs";
@@ -19,9 +19,9 @@ function rustConst(file, name) {
   return match[1];
 }
 
-const LIST = rustConst("projects.rs", "LIST_QUERY");
-const TEAMS = rustConst("projects.rs", "TEAMS_QUERY");
-const REPO = rustConst("projects.rs", "REPO_FRAGMENT");
+const LIST = rustConst("projects/remote.rs", "LIST_QUERY");
+const TEAMS = rustConst("projects/remote.rs", "TEAMS_QUERY");
+const REPO = rustConst("projects/remote.rs", "REPO_FRAGMENT");
 const STATUS = rustConst("status.rs", "FRAGMENT");
 const BODY = rustConst("status.rs", "RELEASE_BODY");
 

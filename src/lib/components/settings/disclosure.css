@@ -1,0 +1,26 @@
+.disclosure {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  padding: 8px 12px;
+  border-radius: 0;
+  background: transparent;
+  text-align: start;
+  color: var(--fg-muted);
+}
+
+.disclosure svg {
+  width: 14px;
+  height: 14px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  transition: transform 0.15s;
+}
+
+.disclosure[aria-expanded="true"] svg {
+  transform: rotate(90deg);
+}

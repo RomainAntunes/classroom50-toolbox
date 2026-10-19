@@ -1,0 +1,12 @@
+/* A row's label with a muted line under it. */
+.text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.sub {
+  font-size: 0.85em;
+  color: var(--fg-muted);
+}
