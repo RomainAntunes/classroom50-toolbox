@@ -119,12 +119,14 @@ It follows each system's look, in light and dark:
 Download the installer for your platform from the
 [latest release](https://github.com/RomainAntunes/classroom50-toolbox/releases/latest):
 
-| Platform              | File                                                          |
-| --------------------- | ------------------------------------------------------------- |
-| macOS (Apple Silicon) | `_aarch64.dmg`                                                |
-| macOS (Intel)         | `_x64.dmg`                                                    |
-| Windows               | `_x64-setup.exe` (or the `.msi`)                              |
-| Linux                 | `.AppImage`, `.deb` (Debian, Ubuntu) or `.rpm` (Fedora, RHEL) |
+| Platform              | File                                                                                |
+| --------------------- | ----------------------------------------------------------------------------------- |
+| macOS (Apple Silicon) | `_aarch64.dmg`                                                                      |
+| macOS (Intel)         | `_x64.dmg`                                                                          |
+| Windows               | `_x64-setup.exe` (or the `_x64_….msi`)                                              |
+| Windows on Arm        | `_arm64-setup.exe` (or the `_arm64_….msi`)                                          |
+| Linux                 | `_amd64.AppImage`, `_amd64.deb` (Debian, Ubuntu) or `.x86_64.rpm` (Fedora, RHEL)    |
+| Linux on Arm          | `_aarch64.AppImage`, `_arm64.deb` (Debian, Ubuntu) or `.aarch64.rpm` (Fedora, RHEL) |
 
 Builds aren't code-signed yet, so the first launch needs one extra step:
 

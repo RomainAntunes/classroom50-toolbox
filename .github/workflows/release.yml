@@ -6,6 +6,7 @@ name: Release
 # installed apps. A version like 0.11.0-beta.1 makes a draft pre-release instead, without
 # the MSI (WiX only takes numeric pre-release labels): publishing it reaches the beta
 # channel only (beta-channel.yml), since GitHub's "latest" never points at a pre-release.
+# Builds: macOS Apple Silicon and Intel, Linux x64 and Arm64, Windows x64 and Arm64.
 on:
   push:
     branches: [main]
@@ -22,13 +23,14 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       # Write, not read: the releases API only shows drafts to a token that can push, and
-      # the check below must see an unpublished draft of this version.
+      # the check below must see an unpublished draft of this version. Also creates it.
       contents: write
     outputs:
       version: ${{ steps.check.outputs.version }}
       release: ${{ steps.check.outputs.release }}
       prerelease: ${{ steps.check.outputs.prerelease }}
       body: ${{ steps.notes.outputs.body }}
+      release-id: ${{ steps.draft.outputs.id }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -53,9 +55,18 @@ jobs:
             *) echo "prerelease=false" >> "$GITHUB_OUTPUT" ;;
           esac
           # Drafts have no git tag yet, so ask the releases API (it sees drafts with this token).
-          if gh release view "v$version" --repo "$GITHUB_REPOSITORY" > /dev/null 2>&1; then
-            echo "v$version already released; nothing to build"
-            echo "release=false" >> "$GITHUB_OUTPUT"
+          # A draft with no assets is what a run whose builds all failed leaves: build into it
+          # again, as if there were none. A published release, or a draft with assets, is done.
+          if existing=$(gh release view "v$version" --repo "$GITHUB_REPOSITORY" --json isDraft,assets,databaseId 2> /dev/null); then
+            empty_draft=$(echo "$existing" | jq -r 'if .isDraft and (.assets | length) == 0 then .databaseId else empty end')
+            if [ -n "$empty_draft" ]; then
+              echo "v$version has an empty draft ($empty_draft) from a failed run; building into it"
+              echo "release=true" >> "$GITHUB_OUTPUT"
+              echo "draft-id=$empty_draft" >> "$GITHUB_OUTPUT"
+            else
+              echo "v$version already released; nothing to build"
+              echo "release=false" >> "$GITHUB_OUTPUT"
+            fi
           else
             echo "release=true" >> "$GITHUB_OUTPUT"
           fi
@@ -70,6 +81,30 @@ jobs:
             node scripts/release-notes.mjs "$VERSION"
             echo "RELEASE_NOTES_EOF"
           } >> "$GITHUB_OUTPUT"
+      # The draft every leg uploads to, made once here: tauri-action would otherwise look for
+      # it after each build and create it when missing, and two legs finishing together could
+      # make two drafts for one tag. An empty draft left by a failed run is reused, moved to
+      # this commit with this run's name, body and pre-release flag.
+      - id: draft
+        if: steps.check.outputs.release == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ steps.check.outputs.version }}
+          PRERELEASE: ${{ steps.check.outputs.prerelease }}
+          DRAFT_ID: ${{ steps.check.outputs.draft-id }}
+        run: |
+          node scripts/release-notes.mjs "$VERSION" > notes.md
+          if [ -n "$DRAFT_ID" ]; then
+            method=PATCH endpoint="repos/$GITHUB_REPOSITORY/releases/$DRAFT_ID"
+          else
+            method=POST endpoint="repos/$GITHUB_REPOSITORY/releases"
+          fi
+          id=$(gh api --method "$method" "$endpoint" \
+            -f tag_name="v$VERSION" -f target_commitish="$GITHUB_SHA" \
+            -f name="Classroom 50 Toolbox v$VERSION" -F body=@notes.md \
+            -F draft=true -F prerelease="$PRERELEASE" --jq .id)
+          echo "Draft release $id ($method) for v$VERSION at $GITHUB_SHA"
+          echo "id=$id" >> "$GITHUB_OUTPUT"
 
   build:
     needs: version
@@ -87,23 +122,34 @@ jobs:
           - platform: ubuntu-22.04
             args: ""
             rust-targets: ""
+          # Native Arm runner, on the same Ubuntu (and glibc) as the x64 build.
+          - platform: ubuntu-22.04-arm
+            args: ""
+            rust-targets: ""
           - platform: windows-latest
             args: ""
             rust-targets: ""
+          # Cross-compiled on the x64 image, as Tauri documents it (its Visual Studio has the
+          # ARM64 build tools); NSIS and WiX themselves run x64.
+          - platform: windows-latest
+            args: --target aarch64-pc-windows-msvc
+            rust-targets: aarch64-pc-windows-msvc
     runs-on: ${{ matrix.platform }}
     permissions:
-      # tauri-action creates the draft release and uploads the installers to it.
+      # tauri-action uploads the installers and latest.json to the draft.
       contents: write
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
 
+      # xdg-utils: the AppImage bundles xdg-open. The x64 image has it already; the Arm one
+      # may not.
       - name: Linux system dependencies
         if: runner.os == 'Linux'
         run: |
           sudo apt-get update
-          sudo apt-get install -y libwebkit2gtk-4.1-dev libayatana-appindicator3-dev librsvg2-dev patchelf
+          sudo apt-get install -y libwebkit2gtk-4.1-dev libayatana-appindicator3-dev librsvg2-dev patchelf xdg-utils
 
       - uses: pnpm/action-setup@0977fd99725f1db4007ccb2928dbb4e90d06cc86 # v6.0.10
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
@@ -116,6 +162,8 @@ jobs:
       - uses: swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
         with:
           workspaces: src-tauri
+          # Legs on the same runner image build different targets: one cache each.
+          key: ${{ matrix.rust-targets }}
 
       - run: pnpm install --frozen-lockfile
 
@@ -135,12 +183,11 @@ jobs:
           # APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
           # KEYCHAIN_PASSWORD: ${{ secrets.KEYCHAIN_PASSWORD }}
         with:
-          tagName: v${{ needs.version.outputs.version }}
-          releaseCommitish: ${{ github.sha }}
-          releaseName: Classroom 50 Toolbox v${{ needs.version.outputs.version }}
+          # The draft the version job made (tag, name, body, pre-release): with an id,
+          # tauri-action only uploads to it and never creates a release.
+          releaseId: ${{ needs.version.outputs.release-id }}
+          # Only for latest.json's `notes` here; the draft already has this body.
           releaseBody: ${{ needs.version.outputs.body }}
-          releaseDraft: true
-          prerelease: ${{ needs.version.outputs.prerelease == 'true' }}
           # Pre-releases: NSIS only on Windows. Their latest.json then has no
           # windows-x86_64-msi entry, and MSI installs never read the beta channel anyway
           # (updater.rs keeps them on stable).
@@ -149,7 +196,8 @@ jobs:
   # tauri-action points latest.json at api.github.com asset URLs, which allow 60
   # unauthenticated requests an hour per IP: on a campus network every student shares one,
   # and the update download fails with 403. Point it at the release's download links
-  # instead (they work once the draft is published under its tag).
+  # instead (they work once the draft is published under its tag). An entry already pointing
+  # at one of those links is kept, so re-running this job alone is safe.
   updater-urls:
     needs: [version, build]
     runs-on: ubuntu-latest
@@ -157,19 +205,29 @@ jobs:
       # Reads the draft's assets and uploads the rewritten latest.json.
       contents: write
     steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
       - env:
           GH_TOKEN: ${{ github.token }}
           TAG: v${{ needs.version.outputs.version }}
+          PRERELEASE: ${{ needs.version.outputs.prerelease }}
+          RELEASE_ID: ${{ needs.version.outputs.release-id }}
         run: |
-          id=$(gh api "repos/$GITHUB_REPOSITORY/releases" --paginate \
-            --jq ".[] | select(.tag_name == \"$TAG\") | .id")
-          gh api "repos/$GITHUB_REPOSITORY/releases/$id/assets" --paginate > assets.json
+          gh api "repos/$GITHUB_REPOSITORY/releases/$RELEASE_ID/assets" --paginate > assets.json
           gh release download "$TAG" --repo "$GITHUB_REPOSITORY" --pattern latest.json
           jq --slurpfile assets assets.json \
             --arg base "https://github.com/$GITHUB_REPOSITORY/releases/download/$TAG/" '
             ($assets | add | map({key: .url, value: ($base + (.name | @uri))}) | from_entries) as $links
-            | .platforms |= map_values(.url = ($links[.url] // error("no asset for \(.url)")))
+            | [$links[]] as $rewritten
+            | .platforms |= map_values(.url as $url | .url = ($links[$url]
+                // if any($rewritten[]; . == $url) then $url else error("no asset for \($url)") end))
           ' latest.json > latest.fixed.json
           mv latest.fixed.json latest.json
           cat latest.json
+          # Every leg adds its entries to the same file; refuse a feed missing one, which
+          # would leave those installs without updates (scripts/updater-platforms.mjs). Two
+          # legs merging the file at once can drop one's entries: re-run that leg's build
+          # job, which uploads them again and runs this job after it.
+          node scripts/updater-platforms.mjs latest.json "$PRERELEASE"
           gh release upload "$TAG" latest.json --clobber --repo "$GITHUB_REPOSITORY"
