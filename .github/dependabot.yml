@@ -7,6 +7,8 @@
 #
 # The cooldown waits a week after a release before proposing it, so a compromised or
 # broken version is usually yanked before it reaches a PR. Security updates skip it.
+#
+# CI skips these PRs until the `run-ci` label is added to one (see ci.yml's `gate` job).
 version: 2
 
 multi-ecosystem-groups:
