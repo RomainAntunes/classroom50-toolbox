@@ -4,7 +4,7 @@ import { readdirSync, readFileSync } from "node:fs";
 import { expect, test } from "./app";
 import { scenario, settings, VERSION } from "./fixtures";
 import type { DeepLinkTarget } from "../../src/lib/api";
-import { compareVersions } from "../../src/lib/changelog/versions.js";
+import { compareVersions, pendingVersions } from "../../src/lib/changelog/versions.js";
 
 /** The versions with notes, as `src/lib/changelog` bundles them, newest first. */
 const DIR = new URL("../../src/lib/changelog/", import.meta.url);
@@ -56,7 +56,9 @@ test("a settings file from before the page shows the current notes once", async 
 });
 
 test("several versions show newest first", async ({ app, page }) => {
-  test.skip(NOTES.length < 2, "only one version has notes so far");
+  // A stable version leaves out its own betas, whose notes it includes.
+  const shown = pendingVersions(NOTES, NEWEST, "0.0.1");
+  test.skip(shown.length < 2, "only one version has notes so far");
   await app.start(
     scenario({
       settings: settings({ lastSeenVersion: "0.0.1" }),
@@ -65,7 +67,7 @@ test("several versions show newest first", async ({ app, page }) => {
   );
   await expect(page.getByRole("heading", { level: 1 })).toHaveText("What's new");
   await expect(page.locator(".version-title h2")).toHaveText(
-    NOTES.map((version) => `Version ${version}`),
+    shown.map((version) => `Version ${version}`),
   );
 });
 
