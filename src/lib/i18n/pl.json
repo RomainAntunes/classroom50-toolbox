@@ -69,6 +69,7 @@
   "settings.folders.remove": "Usuń",
   "settings.general.title": "Ogólne",
   "settings.launchAtLogin": "Otwieraj po zalogowaniu",
+  "settings.launchAtLoginHint": "Uruchamia się w tle po zalogowaniu do komputera, aby przypomnienia i nowe oceny nadal do ciebie docierały.",
   "settings.shortcut": "Skrót klawiszowy",
   "settings.shortcut.hint": "Otwiera i zamyka Toolbox z dowolnej aplikacji.",
   "settings.shortcut.wayland": "Niedostępne w Waylandzie. Otworzy go skrót uruchamiający Toolbox, ustawiony w ustawieniach klawiatury twojego pulpitu.",

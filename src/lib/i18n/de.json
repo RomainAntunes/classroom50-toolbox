@@ -69,6 +69,7 @@
   "settings.folders.remove": "Entfernen",
   "settings.general.title": "Allgemein",
   "settings.launchAtLogin": "Bei der Anmeldung öffnen",
+  "settings.launchAtLoginHint": "Startet im Hintergrund, wenn du dich an deinem Computer anmeldest, damit dich Erinnerungen und neue Noten weiter erreichen.",
   "settings.shortcut": "Tastenkürzel",
   "settings.shortcut.hint": "Öffnet und schließt die Toolbox aus jeder App.",
   "settings.shortcut.wayland": "Unter Wayland nicht verfügbar. Ein Kürzel, das die Toolbox startet, in den Tastatureinstellungen deines Desktops angelegt, öffnet sie.",

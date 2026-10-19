@@ -69,6 +69,7 @@
   "settings.folders.remove": "移除",
   "settings.general.title": "通用",
   "settings.launchAtLogin": "登录时打开",
+  "settings.launchAtLoginHint": "登录电脑时在后台启动，让你继续收到提醒和新成绩。",
   "settings.shortcut": "键盘快捷键",
   "settings.shortcut.hint": "在任何应用中打开或关闭工具箱。",
   "settings.shortcut.wayland": "在Wayland下不可用。可在桌面的键盘设置中设置一个运行工具箱的快捷键来打开它。",

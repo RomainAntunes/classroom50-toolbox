@@ -69,6 +69,7 @@
   "settings.folders.remove": "제거",
   "settings.general.title": "일반",
   "settings.launchAtLogin": "로그인 시 열기",
+  "settings.launchAtLoginHint": "컴퓨터에 로그인하면 백그라운드에서 시작돼서 알림과 새 성적을 계속 받을 수 있어요.",
   "settings.shortcut": "키보드 단축키",
   "settings.shortcut.hint": "어느 앱에서든 도구 상자를 열고 닫아요.",
   "settings.shortcut.wayland": "Wayland에서는 사용할 수 없어요. 데스크톱의 키보드 설정에서 도구 상자를 실행하는 단축키를 만들면 열 수 있어요.",

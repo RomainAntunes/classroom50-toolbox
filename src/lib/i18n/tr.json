@@ -69,6 +69,7 @@
   "settings.folders.remove": "Kaldır",
   "settings.general.title": "Genel",
   "settings.launchAtLogin": "Oturum açılınca başlat",
+  "settings.launchAtLoginHint": "Bilgisayarınızda oturum açtığınızda arka planda başlar, böylece hatırlatıcılar ve yeni notlar size ulaşmaya devam eder.",
   "settings.shortcut": "Klavye kısayolu",
   "settings.shortcut.hint": "Toolbox'ı herhangi bir uygulamadan açar ve kapatır.",
   "settings.shortcut.wayland": "Wayland altında kullanılamaz. Masaüstünüzün klavye ayarlarında tanımlanan ve Toolbox'ı çalıştıran bir kısayol onu açar.",

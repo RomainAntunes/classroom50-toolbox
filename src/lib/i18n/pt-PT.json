@@ -69,6 +69,7 @@
   "settings.folders.remove": "Remover",
   "settings.general.title": "Geral",
   "settings.launchAtLogin": "Abrir ao iniciar sessão",
+  "settings.launchAtLoginHint": "Inicia em segundo plano quando inicias sessão no computador, para que os lembretes e as novas notas continuem a chegar-te.",
   "settings.shortcut": "Atalho de teclado",
   "settings.shortcut.hint": "Abre e fecha o Classroom 50 Toolbox a partir de qualquer app.",
   "settings.shortcut.wayland": "Indisponível no Wayland. Um atalho que execute a app, definido nas definições de teclado do teu ambiente de trabalho, abre a janela.",

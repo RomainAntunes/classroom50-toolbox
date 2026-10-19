@@ -69,6 +69,7 @@
   "settings.folders.remove": "Rimuovi",
   "settings.general.title": "Generali",
   "settings.launchAtLogin": "Apri al login",
+  "settings.launchAtLoginHint": "Si avvia in background quando accedi al computer, così promemoria e nuovi voti continuano ad arrivarti.",
   "settings.shortcut": "Scorciatoia da tastiera",
   "settings.shortcut.hint": "Apre e chiude Classroom 50 Toolbox da qualsiasi app.",
   "settings.shortcut.wayland": "Non disponibile con Wayland. Una scorciatoia che avvia l'app, impostata nelle impostazioni della tastiera del tuo desktop, la apre.",

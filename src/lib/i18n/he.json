@@ -69,6 +69,7 @@
   "settings.folders.remove": "הסרה",
   "settings.general.title": "כללי",
   "settings.launchAtLogin": "פתיחה בכניסה למערכת",
+  "settings.launchAtLoginHint": "מופעל ברקע בכניסה למחשב, כדי שתזכורות וציונים חדשים ימשיכו להגיע.",
   "settings.shortcut": "קיצור מקלדת",
   "settings.shortcut.hint": "פותח וסוגר את האפליקציה מכל אפליקציה אחרת.",
   "settings.shortcut.wayland": "לא זמין ב-Wayland. אפשר לפתוח את האפליקציה עם קיצור שמפעיל אותה, שמוגדר בהגדרות המקלדת של שולחן העבודה.",

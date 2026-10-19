@@ -69,6 +69,7 @@
   "settings.folders.remove": "Quitar",
   "settings.general.title": "General",
   "settings.launchAtLogin": "Abrir al iniciar sesión",
+  "settings.launchAtLoginHint": "Se inicia en segundo plano al iniciar sesión en tu equipo, para que te sigan llegando los recordatorios y las calificaciones nuevas.",
   "settings.shortcut": "Atajo de teclado",
   "settings.shortcut.hint": "Abre y cierra la caja de herramientas desde cualquier app.",
   "settings.shortcut.wayland": "No disponible en Wayland. Un atajo que ejecute la caja de herramientas, creado en los ajustes de teclado de tu escritorio, la abre.",
