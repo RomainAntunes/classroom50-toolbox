@@ -1,0 +1,155 @@
+{
+  "date": "2026-10-20",
+  "notes": {
+    "en": [
+      {
+        "kind": "new",
+        "text": "In Settings, under Tools, click a tool's version to read its release notes on GitHub and see what Update brings before you run it."
+      },
+      {
+        "kind": "fixed",
+        "text": "The toolbox now checks for its own updates every 6 hours instead of once a day, so a new version no longer stays hidden for a whole day."
+      }
+    ],
+    "fr": [
+      {
+        "kind": "new",
+        "text": "Dans les réglages, sous Outils, cliquez sur la version d'un outil pour lire ses notes de version sur GitHub et voir ce qu'apporte Mettre à jour avant de le lancer."
+      },
+      {
+        "kind": "fixed",
+        "text": "La boîte à outils cherche maintenant ses mises à jour toutes les 6 heures au lieu d'une fois par jour, pour qu'une nouvelle version ne reste plus cachée toute une journée."
+      }
+    ],
+    "es": [
+      {
+        "kind": "new",
+        "text": "En los ajustes, en Herramientas, haz clic en la versión de una herramienta para leer sus notas de la versión en GitHub y ver qué trae Actualizar antes de usarlo."
+      },
+      {
+        "kind": "fixed",
+        "text": "La caja de herramientas ahora busca sus actualizaciones cada 6 horas en lugar de una vez al día, así una versión nueva ya no queda oculta un día entero."
+      }
+    ],
+    "de": [
+      {
+        "kind": "new",
+        "text": "In den Einstellungen unter Tools öffnet ein Klick auf die Version eines Tools seine Versionshinweise auf GitHub, damit du vor dem Aktualisieren siehst, was das Update bringt."
+      },
+      {
+        "kind": "fixed",
+        "text": "Die Toolbox sucht jetzt alle 6 Stunden statt einmal am Tag nach eigenen Updates, damit eine neue Version nicht mehr einen ganzen Tag unbemerkt bleibt."
+      }
+    ],
+    "it": [
+      {
+        "kind": "new",
+        "text": "Nelle impostazioni, in Strumenti, clicca sulla versione di uno strumento per leggerne le note di rilascio su GitHub e vedere cosa porta Aggiorna prima di avviarlo."
+      },
+      {
+        "kind": "fixed",
+        "text": "Il toolbox ora cerca i propri aggiornamenti ogni 6 ore invece di una volta al giorno, così una nuova versione non resta più nascosta per un giorno intero."
+      }
+    ],
+    "pt-BR": [
+      {
+        "kind": "new",
+        "text": "Nas configurações, em Ferramentas, clique na versão de uma ferramenta para ler as notas da versão no GitHub e ver o que Atualizar traz antes de usar."
+      },
+      {
+        "kind": "fixed",
+        "text": "A caixa de ferramentas agora procura as próprias atualizações a cada 6 horas em vez de uma vez por dia, então uma versão nova não fica mais escondida por um dia inteiro."
+      }
+    ],
+    "pt-PT": [
+      {
+        "kind": "new",
+        "text": "Nas definições, em Ferramentas, clica na versão de uma ferramenta para leres as notas da versão no GitHub e veres o que Atualizar traz antes de o usares."
+      },
+      {
+        "kind": "fixed",
+        "text": "A caixa de ferramentas procura agora as suas atualizações a cada 6 horas em vez de uma vez por dia, por isso uma nova versão já não fica escondida durante um dia inteiro."
+      }
+    ],
+    "nl": [
+      {
+        "kind": "new",
+        "text": "Klik in de instellingen onder Tools op de versie van een tool om de release notes op GitHub te lezen en te zien wat Bijwerken brengt voordat je het uitvoert."
+      },
+      {
+        "kind": "fixed",
+        "text": "De toolbox zoekt nu elke 6 uur naar eigen updates in plaats van één keer per dag, zodat een nieuwe versie niet meer een hele dag verborgen blijft."
+      }
+    ],
+    "pl": [
+      {
+        "kind": "new",
+        "text": "W ustawieniach, w sekcji Narzędzia, kliknij wersję narzędzia, aby przeczytać informacje o wydaniu na GitHubie i sprawdzić, co przyniesie Aktualizuj, zanim go użyjesz."
+      },
+      {
+        "kind": "fixed",
+        "text": "Przybornik sprawdza teraz swoje aktualizacje co 6 godzin zamiast raz dziennie, więc nowa wersja nie pozostaje już ukryta przez cały dzień."
+      }
+    ],
+    "tr": [
+      {
+        "kind": "new",
+        "text": "Ayarlar'da Araçlar bölümünde bir aracın sürümüne tıklayarak GitHub'daki sürüm notlarını okuyabilir ve Güncelle'yi çalıştırmadan önce neler getireceğini görebilirsiniz."
+      },
+      {
+        "kind": "fixed",
+        "text": "Araç kutusu artık kendi güncellemelerini günde bir kez yerine 6 saatte bir denetliyor, böylece yeni bir sürüm bütün gün gizli kalmıyor."
+      }
+    ],
+    "ar": [
+      {
+        "kind": "new",
+        "text": "في الإعدادات، ضمن الأدوات، يفتح النقر على إصدار أداة ملاحظات إصدارها على GitHub، لمعرفة ما يجلبه التحديث قبل تشغيله."
+      },
+      {
+        "kind": "fixed",
+        "text": "يبحث صندوق الأدوات الآن عن تحديثاته كل 6 ساعات بدلًا من مرة في اليوم، فلا يبقى إصدار جديد مخفيًا طوال يوم كامل."
+      }
+    ],
+    "he": [
+      {
+        "kind": "new",
+        "text": "בהגדרות, תחת כלים, לחיצה על הגרסה של כלי פותחת את הערות הגרסה שלו ב-GitHub, כדי לראות מה העדכון מביא לפני שמריצים אותו."
+      },
+      {
+        "kind": "fixed",
+        "text": "ארגז הכלים בודק עכשיו אם יש לו עדכונים כל 6 שעות במקום פעם ביום, כך שגרסה חדשה כבר לא נשארת מוסתרת יום שלם."
+      }
+    ],
+    "zh-Hans": [
+      {
+        "kind": "new",
+        "text": "在设置的工具中，点击某个工具的版本号，就能在 GitHub 上查看它的版本说明，在更新之前了解更新会带来什么。"
+      },
+      {
+        "kind": "fixed",
+        "text": "工具箱现在每 6 小时检查一次自身更新，而不是每天一次，新版本不会再被隐藏一整天。"
+      }
+    ],
+    "ja": [
+      {
+        "kind": "new",
+        "text": "設定のツールで、ツールのバージョンをクリックすると GitHub のリリースノートが開き、アップデートする前に何が変わるかを確認できます。"
+      },
+      {
+        "kind": "fixed",
+        "text": "ツールボックスが自身のアップデートを 1 日 1 回ではなく 6 時間ごとに確認するようになりました。新しいバージョンが丸 1 日見つからないことはなくなります。"
+      }
+    ],
+    "ko": [
+      {
+        "kind": "new",
+        "text": "설정의 도구에서 도구 버전을 클릭하면 GitHub의 릴리스 노트가 열려서, 업데이트하기 전에 무엇이 바뀌는지 확인할 수 있어요."
+      },
+      {
+        "kind": "fixed",
+        "text": "툴박스가 이제 하루에 한 번이 아니라 6시간마다 자체 업데이트를 확인해요. 새 버전이 하루 종일 보이지 않는 일이 없어요."
+      }
+    ]
+  }
+}
