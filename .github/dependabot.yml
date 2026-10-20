@@ -49,6 +49,11 @@ updates:
       npm-minor:
         update-types: [minor, patch]
         exclude-patterns: ["@tauri-apps/*"]
+    ignore:
+      # Pinned on purpose in package.json: 2.12.3 bundles rpm 0.30, which refuses a version
+      # with a `-`, so every X.Y.Z-beta.N fails its .rpm. Drop this with the pin once
+      # tauri-apps/tauri#16336 ships in a CLI release.
+      - dependency-name: "@tauri-apps/cli"
 
   # The WebDriver suite's own package.json (WebdriverIO and mocha).
   - package-ecosystem: npm
