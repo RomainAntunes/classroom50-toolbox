@@ -10,6 +10,7 @@
   "setup.update": "更新",
   "setup.updating": "正在更新…",
   "setup.newVersion": "{current} → {latest}",
+  "setup.releaseNotes": "{version} 的新内容",
   "setup.recheck": "重新检查",
   "settings.tools.title": "工具",
   "settings.tools.hint": "本工具箱通过git、GitHub CLI及其Classroom 50扩展工作。缺少的工具会通过你的包管理器安装（Homebrew、winget、apt、dnf、pacman或zypper；在Mac上，git随Apple的Command Line Tools提供），包管理器也会让git和GitHub CLI保持最新。",

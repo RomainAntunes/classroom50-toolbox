@@ -10,6 +10,7 @@
   "setup.update": "Actualizar",
   "setup.updating": "Actualizando…",
   "setup.newVersion": "{current} → {latest}",
+  "setup.releaseNotes": "Novedades de la {version}",
   "setup.recheck": "Comprobar de nuevo",
   "settings.tools.title": "Herramientas",
   "settings.tools.hint": "La toolbox funciona con git, GitHub CLI y su extensión de Classroom 50. Lo que falte se instala con tu gestor de paquetes (Homebrew, winget, apt, dnf, pacman o zypper; en un Mac, git viene con las Command Line Tools de Apple), que también mantiene git y GitHub CLI al día.",

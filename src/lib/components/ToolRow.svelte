@@ -11,6 +11,7 @@
   } from "#lib/api.js";
   import { hasKey, t } from "#lib/i18n/index.js";
   import { announce } from "#lib/announce.svelte.js";
+  import { releaseNotesUrl } from "#lib/releaseNotes.js";
   import { session } from "#lib/session.svelte.js";
   import { toolJobs, watchToolJobs } from "#lib/toolJobs.svelte.js";
 
@@ -37,6 +38,10 @@
   /** The newer version an update would install. */
   let latest = $state<string | null>(null);
   const busy = $derived(installing || upgrading);
+  /** The notes of the version an update brings, else of the installed one. None for a
+   * version that's too old with nothing newer known: its notes don't say what Update does. */
+  const notesVersion = $derived(latest ?? (status.outdated ? null : status.version));
+  const notesUrl = $derived(releaseNotesUrl(status.tool, notesVersion));
   // gh-student is a gh extension: it can't be installed before gh. Follows the shared
   // statuses, so the button enables as soon as gh is installed or found by Check again.
   const needsGh = $derived(
@@ -141,17 +146,26 @@
         >{/if}</span
     >
     {#if status.installed}
-      <span
-        class="meta"
-        class:update={latest}
-        class:outdated={status.outdated}
-        title={status.outdated ? t("setup.outdatedHint") : undefined}
-        >{latest
-          ? t("setup.newVersion", { current: status.version ?? "", latest })
-          : status.outdated
-            ? t("setup.outdated", { version: status.version ?? "" })
-            : status.version}</span
-      >
+      {@const label = latest
+        ? t("setup.newVersion", { current: status.version ?? "", latest })
+        : status.outdated
+          ? t("setup.outdated", { version: status.version ?? "" })
+          : status.version}
+      {#if notesUrl}
+        <button
+          class="meta version"
+          class:update={latest}
+          class:outdated={status.outdated}
+          title={t("setup.releaseNotes", { version: notesVersion ?? "" })}
+          onclick={() => openUrl(notesUrl)}>{label}</button
+        >
+      {:else}
+        <span
+          class="meta"
+          class:outdated={status.outdated}
+          title={status.outdated ? t("setup.outdatedHint") : undefined}>{label}</span
+        >
+      {/if}
       {#if upgrading || installing}
         <button onclick={cancel} disabled={!job}>{t("setup.cancel")}</button>
       {:else if status.outdated}
@@ -209,6 +223,21 @@
 
   .meta.update {
     color: var(--accent-text);
+  }
+
+  /* The version, opening its release notes: text until hovered. */
+  .version {
+    padding: 0;
+    border-radius: 0;
+    background: transparent;
+    cursor: pointer;
+  }
+
+  /* Beats the global `button:hover` background, which would draw a box behind the text. */
+  .version:hover:not(:disabled) {
+    background: transparent;
+    text-decoration: underline;
+    text-underline-offset: 2px;
   }
 
   .meta.outdated {
