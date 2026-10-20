@@ -1,11 +1,12 @@
 // Sets the app version everywhere it lives: package.json (read by tauri.conf.json and the
-// release workflow) and src-tauri/Cargo.toml, then drafts the version's changelog from the
-// commits since the previous tag. Usage: pnpm bump 0.2.0 [--force], or pnpm bump
+// release workflow), src-tauri/Cargo.toml and its Cargo.lock entry, then drafts the
+// version's changelog from the commits since the previous tag. Usage: pnpm bump 0.2.0 [--force], or pnpm bump
 // 0.3.0-beta.1 for a pre-release (beta channel only; the release workflow accepts no other
 // pre-release label).
 import { execFileSync } from "node:child_process";
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { catalogCodes, draftChangelog, previousTag } from "../src/lib/changelog/versions.js";
+import { withVersion } from "./ci-scope.mjs";
 
 const args = process.argv.slice(2);
 const force = args.includes("--force");
@@ -15,21 +16,24 @@ if (!/^\d+\.\d+\.\d+(-beta\.\d+)?$/.test(version ?? "")) {
   process.exit(1);
 }
 
-const pkgPath = "package.json";
-const pkg = JSON.parse(readFileSync(pkgPath, "utf8"));
-pkg.version = version;
-writeFileSync(pkgPath, JSON.stringify(pkg, null, 2) + "\n");
-
-const cargoPath = "src-tauri/Cargo.toml";
-const cargo = readFileSync(cargoPath, "utf8");
-const bumped = cargo.replace(/^version = ".*"$/m, `version = "${version}"`);
-if (bumped === cargo && !cargo.includes(`version = "${version}"`)) {
-  console.error(`no package version found in ${cargoPath}`);
-  process.exit(1);
+const paths = {
+  pkg: "package.json",
+  cargo: "src-tauri/Cargo.toml",
+  lock: "src-tauri/Cargo.lock",
+};
+const bumped = withVersion(
+  {
+    pkg: readFileSync(paths.pkg, "utf8"),
+    cargo: readFileSync(paths.cargo, "utf8"),
+    lock: readFileSync(paths.lock, "utf8"),
+  },
+  version,
+);
+for (const key of /** @type {const} */ (["pkg", "cargo", "lock"])) {
+  writeFileSync(paths[key], bumped[key]);
 }
-writeFileSync(cargoPath, bumped);
 
-console.log(`version set to ${version}; run cargo check in src-tauri to refresh Cargo.lock`);
+console.log(`version set to ${version} in package.json, Cargo.toml and Cargo.lock`);
 
 const notesPath = `src/lib/changelog/${version}.json`;
 if (existsSync(notesPath) && !force) {
@@ -59,7 +63,8 @@ writeFileSync(notesPath, JSON.stringify(changelog, null, 2) + "\n");
 const others = codes.filter((code) => code !== "en");
 console.log(`
 drafted ${notesPath}: ${changelog.notes.en.length} entries from ${subjects.length} commits since ${since ?? "the first commit"}
-next, in this PR:
+next, either run node scripts/changelog-ai.mjs ${version} (ANTHROPIC_API_KEY set; the Bump
+workflow does it), or by hand in this PR:
   1. rewrite the English entries in students' words: short, plain, what changes for them,
      no internal names (modules, settings keys, commands); drop what they won't notice
   2. translate them into ${others.join(", ") || "every other catalog"} (same entries, same order)
