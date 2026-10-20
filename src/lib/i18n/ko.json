@@ -10,6 +10,7 @@
   "setup.update": "업데이트",
   "setup.updating": "업데이트 중…",
   "setup.newVersion": "{current} → {latest}",
+  "setup.releaseNotes": "{version}의 새로운 기능",
   "setup.recheck": "다시 확인",
   "settings.tools.title": "도구",
   "settings.tools.hint": "이 도구 상자는 git, GitHub CLI, 그리고 그 Classroom 50 확장으로 작동해요. 없는 도구는 패키지 관리자(Homebrew, winget, apt, dnf, pacman 또는 zypper, Mac에서는 git이 Apple의 Command Line Tools에 포함돼요)로 설치되고, 패키지 관리자가 git과 GitHub CLI도 최신 상태로 유지해요.",

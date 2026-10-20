@@ -10,6 +10,7 @@
   "setup.update": "アップデート",
   "setup.updating": "アップデート中…",
   "setup.newVersion": "{current} → {latest}",
+  "setup.releaseNotes": "{version} の新機能",
   "setup.recheck": "再確認",
   "settings.tools.title": "ツール",
   "settings.tools.hint": "このツールボックスはgit、GitHub CLI、そのClassroom 50拡張機能を使って動作します。足りないものはパッケージマネージャー（Homebrew、winget、apt、dnf、pacman、zypper。MacではgitはAppleのCommand Line Toolsに含まれます）でインストールされ、gitとGitHub CLIも最新の状態に保たれます。",

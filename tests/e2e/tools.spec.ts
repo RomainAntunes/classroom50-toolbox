@@ -31,7 +31,8 @@ test("every tool is listed with its version, and nothing to do", async ({ app })
   await expect(row(app, "Git")).toContainText("2.50.1");
   await expect(row(app, "GitHub CLI")).toContainText("2.83.0");
   await expect(row(app, "Classroom 50 (gh student)")).toContainText("v1.4.0");
-  await expect(section.locator(".tool button")).toHaveCount(0);
+  // Only the versions, which open their notes.
+  await expect(section.locator(".tool button:not(.version)")).toHaveCount(0);
   // Settings asks whether a newer gh-student exists; git and gh are the package manager's.
   expect((await app.calls("tool_update")).map((c) => c.args)).toEqual([{ tool: "gh-student" }]);
 });
@@ -44,7 +45,7 @@ test("Check again reads the statuses again and shows them", async ({ app }) => {
   await section.getByRole("button", { name: "Check again" }).click();
   await app.waitForCall("tool_statuses", before + 1);
   await expect(row(app, "GitHub CLI")).toContainText("2.83.0");
-  await expect(row(app, "GitHub CLI").getByRole("button")).toHaveCount(0);
+  await expect(row(app, "GitHub CLI").locator("button:not(.version)")).toHaveCount(0);
   expect(await app.writes()).toEqual([]);
 });
 
@@ -133,6 +134,36 @@ test("a newer gh-student on GitHub offers Update", async ({ app }) => {
   await expect(student.locator(".meta")).toHaveText("v1.60.0");
   await expect(student.getByRole("button", { name: "Update" })).toHaveCount(0);
   expect(await app.calls("tool_update")).toHaveLength(2);
+});
+
+test("a version opens its release notes, the update's when there is one", async ({ app }) => {
+  await openTools(app, { responses: { tool_update: [ok("v1.60.0")] } });
+  await row(app, "GitHub CLI").getByRole("button", { name: "2.83.0" }).click();
+  let opened = await app.waitForCall("plugin:opener|open_url");
+  expect(opened[0].args.url).toBe("https://github.com/cli/cli/releases/tag/v2.83.0");
+
+  const student = row(app, "Classroom 50 (gh student)").getByRole("button", {
+    name: "v1.4.0 → v1.60.0",
+  });
+  await expect(student).toHaveAttribute("title", "What's new in v1.60.0");
+  await student.click();
+  opened = await app.waitForCall("plugin:opener|open_url", 2);
+  expect(opened[1].args.url).toBe(
+    "https://github.com/foundation50/classroom50/releases/tag/cli-v1.60.0",
+  );
+  // Git's notes aren't GitHub releases.
+  await expect(row(app, "Git").getByRole("button")).toHaveCount(0);
+  expect(await app.writes()).toEqual([]);
+});
+
+test("a version too old with nothing newer known links nowhere", async ({ app }) => {
+  await openTools(app, {
+    tools: withTool("gh-student", { version: "v1.52.2", outdated: true }),
+    responses: { tool_update: [ok(null)] },
+  });
+  const student = row(app, "Classroom 50 (gh student)");
+  await expect(student.locator(".meta")).toHaveText("v1.52.2, too old");
+  await expect(student.getByRole("button")).toHaveText(["Update"]);
 });
 
 test("an update signed out says to sign in, without the terminal command", async ({ app }) => {

@@ -10,6 +10,7 @@
   "setup.update": "تحديث",
   "setup.updating": "جارٍ التحديث…",
   "setup.newVersion": "{current} ← {latest}",
+  "setup.releaseNotes": "الجديد في {version}",
   "setup.recheck": "إعادة الفحص",
   "settings.tools.title": "الأدوات",
   "settings.tools.hint": "يعمل التطبيق من خلال git وGitHub CLI وإضافته الخاصة بـClassroom 50. تُثبَّت الأدوات الناقصة عبر مدير الحزم (Homebrew أو winget أو apt أو dnf أو pacman أو zypper؛ وعلى Mac يأتي git مع Command Line Tools من Apple)، وهو الذي يُبقي git وGitHub CLI محدَّثين أيضًا.",

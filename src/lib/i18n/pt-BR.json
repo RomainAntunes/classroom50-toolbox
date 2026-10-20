@@ -10,6 +10,7 @@
   "setup.update": "Atualizar",
   "setup.updating": "Atualizando…",
   "setup.newVersion": "{current} → {latest}",
+  "setup.releaseNotes": "Novidades da {version}",
   "setup.recheck": "Verificar de novo",
   "settings.tools.title": "Ferramentas",
   "settings.tools.hint": "O app funciona com o git, o GitHub CLI e a extensão Classroom 50 dele. O que faltar é instalado pelo seu gerenciador de pacotes (Homebrew, winget, apt, dnf, pacman ou zypper; no Mac, o git vem com as Command Line Tools da Apple), que também mantém o git e o GitHub CLI atualizados.",

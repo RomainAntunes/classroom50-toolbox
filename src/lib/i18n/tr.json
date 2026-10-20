@@ -10,6 +10,7 @@
   "setup.update": "Güncelle",
   "setup.updating": "Güncelleniyor…",
   "setup.newVersion": "{current} → {latest}",
+  "setup.releaseNotes": "{version} sürümündeki yenilikler",
   "setup.recheck": "Yeniden denetle",
   "settings.tools.title": "Araçlar",
   "settings.tools.hint": "Toolbox; git, GitHub CLI ve onun Classroom 50 uzantısıyla çalışır. Eksik olanlar paket yöneticiniz (Homebrew, winget, apt, dnf, pacman veya zypper; Mac'te git, Apple'ın Command Line Tools paketiyle gelir) üzerinden yüklenir. Paket yöneticiniz git ve GitHub CLI'ı da güncel tutar.",
