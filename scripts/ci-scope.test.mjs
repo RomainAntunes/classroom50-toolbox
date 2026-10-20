@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { ciScope, versions } from "./ci-scope.mjs";
+import { ciScope, versions, withVersion } from "./ci-scope.mjs";
 
 const pkg = (version, extra = {}) =>
   JSON.stringify({ name: "classroom50-toolbox", version, private: true, ...extra }, null, 2);
@@ -88,5 +88,28 @@ describe("versions", () => {
       cargo: null,
       lock: null,
     });
+  });
+
+  it("writes a version into all three homes, so they agree", () => {
+    const files = { pkg: pkg("0.12.1"), cargo: cargo("0.12.1"), lock: lock("0.12.1") };
+    const bumped = withVersion(files, "0.13.0-beta.1");
+    expect(versions(bumped)).toEqual({
+      pkg: "0.13.0-beta.1",
+      cargo: "0.13.0-beta.1",
+      lock: "0.13.0-beta.1",
+    });
+    expect(bumped.lock).toContain('name = "serde"\nversion = "1.0.0"');
+    expect(
+      ciScope(
+        Object.entries({
+          "package.json": "pkg",
+          "src-tauri/Cargo.toml": "cargo",
+          "src-tauri/Cargo.lock": "lock",
+        }).map(([path, key]) => ({ path, before: files[key], after: bumped[key] })),
+      ),
+    ).toBe("bump");
+    expect(() =>
+      withVersion({ ...files, lock: lock("1").replace("classroom50-toolbox", "x") }, "1.0.0"),
+    ).toThrow();
   });
 });

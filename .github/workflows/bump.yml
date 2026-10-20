@@ -1,0 +1,107 @@
+name: Bump
+
+# Releases a version without a bump PR: run it by hand on main with the version (X.Y.Z or
+# X.Y.Z-beta.N). It sets the version (`pnpm bump`), has Claude write the changelog in
+# students' words in every catalog (scripts/changelog-ai.mjs; a changelog already filled in
+# every catalog, from a PR, is kept), runs the checks ci.yml runs on a bump, commits to main
+# and starts release.yml, which builds the draft release to review and publish by hand. A
+# push made with the workflow's token starts no other workflow, hence the checks here and
+# the explicit dispatch. Dry run stops before the commit; the run's summary shows the notes.
+# ANTHROPIC_API_KEY is a secret of the `release` environment, limited to main.
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: Version to release (X.Y.Z or X.Y.Z-beta.N)
+        required: true
+        type: string
+      dry-run:
+        description: Write the changelog and run the checks, but commit nothing
+        required: false
+        type: boolean
+        default: false
+
+permissions: {}
+
+concurrency:
+  group: bump
+  cancel-in-progress: false
+
+jobs:
+  bump:
+    runs-on: ubuntu-24.04
+    environment: release
+    permissions:
+      # Push the bump commit to main; the releases API needs write to see drafts.
+      contents: write
+      # Start release.yml, which a push with this token wouldn't.
+      actions: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          # The tags, for the previous version the changelog starts from.
+          fetch-depth: 0
+      - name: Check the version
+        env:
+          VERSION: ${{ inputs.version }}
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if [ "$GITHUB_REF" != "refs/heads/main" ]; then
+            echo "::error::run it on main, not $GITHUB_REF"
+            exit 1
+          fi
+          if ! echo "$VERSION" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+(-beta\.[0-9]+)?$'; then
+            echo "::error::$VERSION is neither X.Y.Z nor X.Y.Z-beta.N"
+            exit 1
+          fi
+          if git rev-parse -q --verify "refs/tags/v$VERSION" > /dev/null \
+            || gh release view "v$VERSION" --repo "$GITHUB_REPOSITORY" > /dev/null 2>&1; then
+            echo "::error::v$VERSION already has a tag or a release"
+            exit 1
+          fi
+          current=$(node -p "require('./package.json').version")
+          newer=$(node --input-type=module -e "
+            import { compareVersions } from './src/lib/changelog/versions.js';
+            console.log(compareVersions(process.argv[1], process.argv[2]) > 0);
+          " "$VERSION" "$current")
+          if [ "$newer" != "true" ]; then
+            echo "::error::$VERSION is not newer than $current"
+            exit 1
+          fi
+      - uses: pnpm/action-setup@0977fd99725f1db4007ccb2928dbb4e90d06cc86 # v6.0.10
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: lts/*
+      - run: pnpm install --frozen-lockfile
+      - name: Set the version and write the changelog
+        env:
+          VERSION: ${{ inputs.version }}
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          pnpm bump "$VERSION"
+          node scripts/changelog-ai.mjs "$VERSION"
+          pnpm exec prettier --write package.json "src/lib/changelog/$VERSION.json"
+      # What ci.yml's release-inputs job checks on a bump PR.
+      - run: node scripts/ci-scope.mjs --versions
+      - run: pnpm exec prettier --check package.json src/lib/changelog
+      - run: pnpm exec vitest run src/lib/changelog scripts
+      - name: Commit to main and start the release
+        if: ${{ !inputs.dry-run }}
+        env:
+          VERSION: ${{ inputs.version }}
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add package.json src-tauri/Cargo.toml src-tauri/Cargo.lock "src/lib/changelog/$VERSION.json"
+          git status --short
+          git commit --quiet --message "chore: bump version to $VERSION"
+          auth=$(printf 'x-access-token:%s' "$GH_TOKEN" | base64 -w0)
+          echo "::add-mask::$auth"
+          # Not forced: when main moved since the run started, the push fails and nothing ships.
+          git -c "http.https://github.com/.extraheader=AUTHORIZATION: basic $auth" \
+            push origin "HEAD:refs/heads/main"
+          gh workflow run release.yml --repo "$GITHUB_REPOSITORY" --ref main
+          echo "Pushed $(git rev-parse --short HEAD) to main and started release.yml" >> "$GITHUB_STEP_SUMMARY"

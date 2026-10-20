@@ -67,6 +67,23 @@ export function versions({ pkg, cargo, lock }) {
   };
 }
 
+/**
+ * The three homes of the app version with `version` written in each (`pnpm bump`): the
+ * Cargo.lock entry too, so a bump needs no cargo run. Throws when one has no version.
+ * @param {{ pkg: string, cargo: string, lock: string }} files
+ * @param {string} version
+ * @returns {{ pkg: string, cargo: string, lock: string }}
+ */
+export function withVersion({ pkg, cargo, lock }, version) {
+  if (!CARGO_VERSION.test(cargo)) throw new Error("no package version in Cargo.toml");
+  if (!LOCK_VERSION.test(lock)) throw new Error("no classroom50-toolbox entry in Cargo.lock");
+  return {
+    pkg: JSON.stringify({ ...JSON.parse(pkg), version }, null, 2) + "\n",
+    cargo: cargo.replace(CARGO_VERSION, `version = "${version}"`),
+    lock: lock.replace(LOCK_VERSION, `name = "classroom50-toolbox"\nversion = "${version}"`),
+  };
+}
+
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
   const git = (/** @type {string[]} */ args) =>
     execFileSync("git", args, { encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] });
@@ -85,7 +102,7 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
     });
     if (!found.pkg || found.cargo !== found.pkg || found.lock !== found.pkg) {
       console.error(
-        `versions disagree: package.json ${found.pkg}, Cargo.toml ${found.cargo}, Cargo.lock ${found.lock} (run cargo check in src-tauri)`,
+        `versions disagree: package.json ${found.pkg}, Cargo.toml ${found.cargo}, Cargo.lock ${found.lock} (use pnpm bump)`,
       );
       process.exit(1);
     }
