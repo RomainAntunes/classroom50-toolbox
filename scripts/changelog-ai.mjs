@@ -18,7 +18,7 @@ import {
 /** @typedef {import("../src/lib/changelog/versions.js").Changelog} Changelog */
 /** @typedef {import("../src/lib/changelog/versions.js").Entry} Entry */
 
-export const MODEL = "claude-opus-5";
+export const MODEL = "claude-opus-5-5";
 const CHANGELOG_DIR = "src/lib/changelog";
 
 /**
