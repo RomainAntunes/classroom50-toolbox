@@ -6,6 +6,8 @@
   import { currentLocale, fromNow, t } from "#lib/i18n/index.js";
   import UpdateBanner from "#lib/components/UpdateBanner.svelte";
   import Section from "#lib/components/Section.svelte";
+  import Spinner from "#lib/components/Spinner.svelte";
+  import { atLeast } from "#lib/busy.js";
   import { session } from "#lib/session.svelte.js";
   import { showText } from "#lib/prompt.svelte.js";
 
@@ -19,7 +21,7 @@
     checking = true;
     upToDate = false;
     try {
-      const status = await api.checkUpdate();
+      const status = await atLeast(api.checkUpdate());
       upToDate = status.state.phase === "idle";
     } catch (err) {
       await withDialog(() => message(errorMessage(err), { kind: "error" }));
@@ -29,6 +31,8 @@
   }
 
   const update = $derived(session.update);
+  /** The spinner: a check running, not a download or a version waiting for Restart. */
+  const updateChecking = $derived(checking || update?.state.phase === "checking");
   const updateBusy = $derived(
     checking ||
       update?.state.phase === "checking" ||
@@ -53,11 +57,13 @@
     diagnosing = true;
     diagnosticsCopied = false;
     try {
-      const report = await api.diagnosticsReport({
-        commit: __COMMIT__ || null,
-        skin: document.documentElement.dataset.os ?? info?.os ?? "",
-        locale: currentLocale(),
-      });
+      const report = await atLeast(
+        api.diagnosticsReport({
+          commit: __COMMIT__ || null,
+          skin: document.documentElement.dataset.os ?? info?.os ?? "",
+          locale: currentLocale(),
+        }),
+      );
       diagnosing = false;
       const copy = await showText({
         title: t("settings.diagnostics.previewTitle"),
@@ -95,8 +101,14 @@
         <span class="sub" class:issue={update?.state.phase === "error"}>{updateNote}</span>
       {/if}
     </span>
-    <button disabled={updateBusy || update?.canUpdate === false} onclick={checkUpdates}>
-      {upToDate ? t("settings.about.upToDate") : t("settings.about.checkUpdates")}
+    <button
+      disabled={updateBusy || update?.canUpdate === false}
+      aria-busy={updateChecking}
+      onclick={checkUpdates}
+    >
+      {#if updateChecking}<Spinner />{/if}{upToDate
+        ? t("settings.about.upToDate")
+        : t("settings.about.checkUpdates")}
     </button>
   </div>
   {#if update}
@@ -107,8 +119,10 @@
       <span>{t("settings.diagnostics.label")}</span>
       <span class="sub">{t("settings.diagnostics.hint")}</span>
     </span>
-    <button disabled={diagnosing} onclick={copyDiagnostics}>
-      {diagnosticsCopied ? t("settings.diagnostics.copied") : t("settings.diagnostics.action")}
+    <button disabled={diagnosing} aria-busy={diagnosing} onclick={copyDiagnostics}>
+      {#if diagnosing}<Spinner />{/if}{diagnosticsCopied
+        ? t("settings.diagnostics.copied")
+        : t("settings.diagnostics.action")}
     </button>
   </div>
   <div class="row">

@@ -18,7 +18,9 @@
   import { menuKey, onContextMenu, popupMenu } from "#lib/keyboard.js";
   import { scrollBehavior } from "#lib/motion.js";
   import { changedLines } from "#lib/files.js";
+  import { atLeast } from "#lib/busy.js";
   import Details from "./Details.svelte";
+  import Spinner from "./Spinner.svelte";
 
   let { project, now, unseen }: { project: Project; now: Date; unseen: boolean } = $props();
   const uid = $props.id();
@@ -150,7 +152,7 @@
   async function pull() {
     pulling = true;
     try {
-      await pullProject(project, name);
+      await atLeast(pullProject(project, name));
     } finally {
       pulling = false;
     }
@@ -178,12 +180,14 @@
   const committable = $derived(Boolean(path) && (project.local?.changedFiles ?? 0) > 0);
 
   let submitting = $state(false);
+  /** The button spins while the check and gh-student run, not behind the questions. */
+  let submitWorking = $state(false);
   async function submit() {
     submitting = true;
     try {
-      await submitProject(project, name);
+      await submitProject(project, name, (on) => (submitWorking = on));
     } finally {
-      submitting = false;
+      submitting = submitWorking = false;
     }
   }
 
@@ -460,19 +464,23 @@
       {/if}
     </button>
     {#if pullable}
-      <button title={t("projects.pullHint")} disabled={pulling} onclick={pull}
-        >{t("projects.pullAction")}</button
+      <button title={t("projects.pullHint")} disabled={pulling} aria-busy={pulling} onclick={pull}
+        >{#if pulling}<Spinner />{/if}{t("projects.pullAction")}</button
       >
     {/if}
     {#if ready && !everyPush}
-      <button class="primary" disabled={submitting} onclick={submit}>{t("submit.ok")}</button>
+      <button class="primary" disabled={submitting} aria-busy={submitWorking} onclick={submit}
+        >{#if submitWorking}<Spinner />{/if}{t("submit.ok")}</button
+      >
     {/if}
     {#if cloneable}
       <button
         title={t("projects.clone")}
         aria-label={t("projects.clone")}
         disabled={cloning}
-        onclick={() => clone()}><span aria-hidden="true">⤓</span></button
+        aria-busy={cloning}
+        onclick={() => clone()}
+        >{#if cloning}<Spinner alone />{:else}<span aria-hidden="true">⤓</span>{/if}</button
       >
     {/if}
     {#if openTarget}

@@ -2,6 +2,8 @@
   import { api, errorMessage, type LastRun, type SyncDetails } from "#lib/api.js";
   import { formatDate, formatNumber, fromNow, t } from "#lib/i18n/index.js";
   import Section from "#lib/components/Section.svelte";
+  import Spinner from "#lib/components/Spinner.svelte";
+  import { atLeast } from "#lib/busy.js";
   import { session } from "#lib/session.svelte.js";
 
   let { sync = $bindable() }: { sync: SyncDetails | null } = $props();
@@ -23,7 +25,7 @@
   async function clearCache() {
     clearing = true;
     try {
-      session.snapshot = await api.clearCache();
+      session.snapshot = await atLeast(api.clearCache());
     } finally {
       clearing = false;
       sync = await api.syncDetails();
@@ -34,7 +36,9 @@
 {#if sync}
   <Section title={t("settings.sync.title")}>
     {#snippet actions()}
-      <button disabled={clearing} onclick={clearCache}>{t("settings.sync.clear")}</button>
+      <button disabled={clearing} aria-busy={clearing} onclick={clearCache}
+        >{#if clearing}<Spinner />{/if}{t("settings.sync.clear")}</button
+      >
     {/snippet}
     <button class="disclosure" aria-expanded={showSync} onclick={() => (showSync = !showSync)}>
       <svg class="mirror-rtl" viewBox="0 0 24 24" aria-hidden="true"><path d="m9 18 6-6-6-6" /></svg

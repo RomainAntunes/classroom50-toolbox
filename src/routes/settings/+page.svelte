@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { onMount } from "svelte";
+  import { onMount, tick } from "svelte";
   import { goto } from "$app/navigation";
   import { openUrl } from "@tauri-apps/plugin-opener";
   import {
@@ -12,6 +12,7 @@
     type SyncDetails,
   } from "#lib/api.js";
   import { t } from "#lib/i18n/index.js";
+  import { atLeast } from "#lib/busy.js";
   import { loadSettings, settings } from "#lib/settings.svelte.js";
   import { loadEditors } from "#lib/editor.svelte.js";
   import { session } from "#lib/session.svelte.js";
@@ -38,7 +39,9 @@
   async function checkTools() {
     checkingTools = true;
     try {
-      session.tools = await api.toolStatuses();
+      session.tools = await atLeast(api.toolStatuses());
+      // The rows' newer-version lookups start on this change; they keep the button busy.
+      await tick();
     } finally {
       checkingTools = false;
     }

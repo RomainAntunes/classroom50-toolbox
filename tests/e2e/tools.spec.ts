@@ -49,6 +49,32 @@ test("Check again reads the statuses again and shows them", async ({ app }) => {
   expect(await app.writes()).toEqual([]);
 });
 
+test("Check again spins until the versions and the newer-version lookup are both in", async ({
+  app,
+}) => {
+  const section = await openTools(app);
+  const check = section.getByRole("button", { name: "Check again" });
+  // Opening Settings asks for a newer gh-student once; wait for it to settle.
+  await app.waitForCall("tool_update");
+  await expect(check).toHaveAttribute("aria-busy", "false");
+  const lookups = (await app.calls("tool_update")).length;
+  await app.respond("tool_statuses", hold());
+  await app.respond("tool_update", hold());
+  await check.click();
+  await expect(check).toHaveAttribute("aria-busy", "true");
+  await expect(check.locator(".spinner")).toBeVisible();
+  await expect(check).toBeDisabled();
+  // The versions are in; the row now asks GitHub, and the button keeps spinning.
+  await app.release("tool_statuses", ok(tools()));
+  await app.waitForCall("tool_update", lookups + 1);
+  await expect(check).toHaveAttribute("aria-busy", "true");
+  await app.release("tool_update", ok(null));
+  await expect(check).toHaveAttribute("aria-busy", "false");
+  await expect(check.locator(".spinner")).toHaveCount(0);
+  await expect(check).toBeEnabled();
+  expect(await app.writes()).toEqual([]);
+});
+
 test("Install follows the job: bar, Cancel, then the new version", async ({ app, page }) => {
   await openTools(app, { tools: tools(["gh"]), responses: { install_tool: [hold()] } });
   const gh = row(app, "GitHub CLI");

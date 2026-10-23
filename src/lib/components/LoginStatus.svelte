@@ -23,6 +23,7 @@
   import { popupMenu } from "#lib/keyboard.js";
   import { session } from "#lib/session.svelte.js";
   import { t } from "#lib/i18n/index.js";
+  import Spinner from "./Spinner.svelte";
 
   let {
     auth,
@@ -244,8 +245,8 @@
     {#if needsScopes}
       <div class="row grant">
         <span>{t("auth.needsScopes")}</span>
-        <button class="primary" disabled={pending} onclick={() => signIn(true)}>
-          {t("auth.grant")}
+        <button class="primary" disabled={pending} aria-busy={pending} onclick={() => signIn(true)}>
+          {#if pending}<Spinner />{/if}{t("auth.grant")}
         </button>
       </div>
     {/if}
@@ -272,8 +273,13 @@
 {:else if auth}
   <div class="row">
     <span>{ghInstalled ? t("auth.loggedOut") : t("auth.needsGh")}</span>
-    <button class="primary" disabled={!ghInstalled || pending} onclick={() => signIn()}>
-      {t("auth.signIn")}
+    <button
+      class="primary"
+      disabled={!ghInstalled || pending}
+      aria-busy={pending}
+      onclick={() => signIn()}
+    >
+      {#if pending}<Spinner />{/if}{t("auth.signIn")}
     </button>
   </div>
   {#if error}

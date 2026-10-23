@@ -18,6 +18,7 @@
     type ToolStatus,
   } from "#lib/api.js";
   import { announce } from "#lib/announce.svelte.js";
+  import { atLeast } from "#lib/busy.js";
   import { menuKey, onContextMenu, popupMenu, rovingList } from "#lib/keyboard.js";
   import { moveIndex } from "#lib/keys.js";
   import { currentDirection, fromNow, t } from "#lib/i18n/index.js";
@@ -159,11 +160,9 @@
     loading = true;
     try {
       await loadSettings();
-      const [tools, auth, snapshot] = await Promise.all([
-        api.toolStatuses(),
-        api.authStatus(),
-        api.refreshProjects(),
-      ]);
+      const [tools, auth, snapshot] = await atLeast(
+        Promise.all([api.toolStatuses(), api.authStatus(), api.refreshProjects()]),
+      );
       Object.assign(session, { tools, auth, snapshot });
       now = new Date();
       announce(snapshot.issue ? t("a11y.syncFailed") : t("a11y.synced"));
@@ -179,7 +178,7 @@
   async function rescan() {
     loading = true;
     try {
-      session.snapshot = await api.rescanLocal();
+      session.snapshot = await atLeast(api.rescanLocal());
       now = new Date();
       announce(t("a11y.rescanned"));
     } finally {
