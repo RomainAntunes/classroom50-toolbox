@@ -4,6 +4,7 @@ mod calendar;
 pub mod classroom50;
 pub mod clones;
 mod commands;
+mod cooldown;
 mod deeplink;
 mod diagnostics;
 pub mod discovery;
@@ -153,6 +154,7 @@ pub fn run() {
         .manage(student::FoundedGroups::default())
         .manage(login::LoginState::default())
         .manage(tools::ToolJobs::default())
+        .manage(tools::ToolChecks::default())
         .manage(watch::FolderWatcher::default())
         .manage(github::Http(
             reqwest::Client::builder()

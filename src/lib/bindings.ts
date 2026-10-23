@@ -27,6 +27,7 @@ export const commands = {
 	activeGlobalShortcut: () => __TAURI_INVOKE<string | null>("active_global_shortcut"),
 	/**  Lets the shortcut recorder hear the saved shortcut: unregistered while `paused`. */
 	pauseGlobalShortcut: (paused: boolean) => __TAURI_INVOKE<null>("pause_global_shortcut", { paused }),
+	/**  Reused for a few seconds (`ToolChecks`), so a burst of Check again runs gh once. */
 	toolStatuses: () => __TAURI_INVOKE<ToolStatus[]>("tool_statuses"),
 	/**  What `install_tool` will run, so the UI can show it before asking for elevation. */
 	installCommand: (tool: Tool) => __TAURI_INVOKE<InstallPlan>("install_command", { tool }),
@@ -41,7 +42,10 @@ export const commands = {
 	toolJobs: () => __TAURI_INVOKE<ToolJob[]>("tool_jobs"),
 	/**  Stops the install or update of `tool`; its command then fails with `cancelled`. */
 	cancelToolJob: (tool: Tool) => __TAURI_INVOKE<void>("cancel_tool_job", { tool }),
-	/**  The newer version `upgrade_tool` would install, if any. */
+	/**
+	 *  The newer version `upgrade_tool` would install, if any; reused for a while
+	 *  (`ToolChecks`), since it asks GitHub.
+	 */
 	toolUpdate: (tool: Tool) => __TAURI_INVOKE<string | null>("tool_update", { tool }),
 	authStatus: () => __TAURI_INVOKE<AuthStatus>("auth_status"),
 	/**

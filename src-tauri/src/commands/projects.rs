@@ -1,8 +1,16 @@
 //! The project list and the sync engine.
 
+use chrono::{TimeDelta, Utc};
 use tauri::{AppHandle, Manager, State};
 
+use crate::cooldown;
 use crate::projects::{self, ProjectsState, Snapshot, SyncProgress};
+
+/// A refresh this soon after a full sync that worked gets that sync's list: clicking again
+/// and again doesn't spend GitHub's budget.
+const REFRESH_COOLDOWN: TimeDelta = TimeDelta::seconds(5);
+/// Clearing the cache again this soon after a clear only shows the list it just rebuilt.
+const CLEAR_COOLDOWN: TimeDelta = TimeDelta::seconds(10);
 
 /// The last synced project list, without waiting for the network. Empty before the first
 /// sync finishes; `projects-updated` follows.
@@ -16,6 +24,12 @@ pub fn list_projects(state: State<'_, ProjectsState>) -> Snapshot {
 #[tauri::command]
 #[cfg_attr(test, specta::specta)]
 pub async fn refresh_projects(app: AppHandle) -> Snapshot {
+    let snapshot = app.state::<ProjectsState>().snapshot();
+    if snapshot.issue.is_none()
+        && cooldown::within(snapshot.synced_at, Utc::now(), REFRESH_COOLDOWN)
+    {
+        return snapshot;
+    }
     projects::refresh(&app).await
 }
 
@@ -65,8 +79,14 @@ pub fn sync_details(state: State<'_, ProjectsState>) -> SyncDetails {
 #[tauri::command]
 #[cfg_attr(test, specta::specta)]
 pub async fn clear_cache(app: AppHandle) -> Snapshot {
-    app.state::<ProjectsState>().clear_cache();
-    projects::refresh(&app).await
+    let state = app.state::<ProjectsState>();
+    if cooldown::within(state.cleared_at(), Utc::now(), CLEAR_COOLDOWN) {
+        return state.snapshot();
+    }
+    state.clear_cache();
+    let snapshot = projects::refresh(&app).await;
+    state.set_cleared_at(Utc::now());
+    snapshot
 }
 
 /// Ids of projects and unaccepted assignments with news not seen yet; `unseen-updated`
