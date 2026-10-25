@@ -1,0 +1,215 @@
+{
+  "date": "2026-10-25",
+  "notes": {
+    "en": [
+      {
+        "kind": "new",
+        "text": "In Settings, under Tools, a new row lets git use your GitHub account, so git push and pull in a terminal or an editor work without a password. The toolbox asks before changing anything."
+      },
+      {
+        "kind": "fixed",
+        "text": "Comments that bots leave on your feedback pull request no longer show up as new feedback from your teacher."
+      },
+      {
+        "kind": "fixed",
+        "text": "On Windows on Arm, when the Classroom 50 extension can't install, the toolbox now explains why and how to fix it: install the x64 GitHub CLI, which Windows runs emulated."
+      }
+    ],
+    "fr": [
+      {
+        "kind": "new",
+        "text": "Dans Réglages, sous Outils, une nouvelle ligne permet à git d'utiliser votre compte GitHub : git push et pull dans un terminal ou un éditeur fonctionnent sans mot de passe. La toolbox demande avant de modifier quoi que ce soit."
+      },
+      {
+        "kind": "fixed",
+        "text": "Les commentaires laissés par des bots sur votre pull request Feedback ne s'affichent plus comme de nouveaux retours de votre enseignant."
+      },
+      {
+        "kind": "fixed",
+        "text": "Sur Windows sur Arm, quand l'extension Classroom 50 ne peut pas s'installer, la toolbox explique maintenant pourquoi et comment y remédier : installer la version x64 de GitHub CLI, que Windows exécute en émulation."
+      }
+    ],
+    "es": [
+      {
+        "kind": "new",
+        "text": "En Ajustes, en Herramientas, una nueva fila permite que git use tu cuenta de GitHub, así git push y pull en una terminal o un editor funcionan sin contraseña. La toolbox pregunta antes de cambiar nada."
+      },
+      {
+        "kind": "fixed",
+        "text": "Los comentarios que dejan los bots en tu pull request Feedback ya no aparecen como nuevos comentarios de tu docente."
+      },
+      {
+        "kind": "fixed",
+        "text": "En Windows en Arm, cuando la extensión de Classroom 50 no se puede instalar, la toolbox ahora explica por qué y cómo solucionarlo: instalar la versión x64 de GitHub CLI, que Windows ejecuta emulada."
+      }
+    ],
+    "de": [
+      {
+        "kind": "new",
+        "text": "In den Einstellungen unter Werkzeuge gibt es eine neue Zeile, mit der git dein GitHub-Konto verwendet, sodass git push und pull im Terminal oder in einem Editor ohne Passwort funktionieren. Die Toolbox fragt, bevor sie etwas ändert."
+      },
+      {
+        "kind": "fixed",
+        "text": "Kommentare, die Bots in deinem Feedback-Pull-Request hinterlassen, erscheinen nicht mehr als neues Feedback deiner Lehrperson."
+      },
+      {
+        "kind": "fixed",
+        "text": "Unter Windows on Arm erklärt die Toolbox jetzt, warum sich die Classroom 50-Erweiterung nicht installieren lässt und wie du das löst: mit der x64-Version der GitHub CLI, die Windows emuliert ausführt."
+      }
+    ],
+    "it": [
+      {
+        "kind": "new",
+        "text": "In Impostazioni, sotto Strumenti, una nuova riga permette a git di usare il tuo account GitHub, così git push e pull in un terminale o in un editor funzionano senza password. L'app chiede prima di cambiare qualcosa."
+      },
+      {
+        "kind": "fixed",
+        "text": "I commenti lasciati dai bot sulla tua pull request Feedback non compaiono più come nuovo feedback dell'insegnante."
+      },
+      {
+        "kind": "fixed",
+        "text": "Su Windows su Arm, quando l'estensione Classroom 50 non si può installare, l'app ora spiega perché e come risolvere: installare la versione x64 di GitHub CLI, che Windows esegue in emulazione."
+      }
+    ],
+    "pt-BR": [
+      {
+        "kind": "new",
+        "text": "Em Configurações, em Ferramentas, uma nova linha permite que o git use sua conta do GitHub, então git push e pull em um terminal ou editor funcionam sem senha. O app pergunta antes de mudar qualquer coisa."
+      },
+      {
+        "kind": "fixed",
+        "text": "Comentários deixados por bots no seu pull request Feedback não aparecem mais como novo feedback do seu professor."
+      },
+      {
+        "kind": "fixed",
+        "text": "No Windows no Arm, quando a extensão do Classroom 50 não consegue ser instalada, o app agora explica por quê e como resolver: instalar a versão x64 do GitHub CLI, que o Windows executa por emulação."
+      }
+    ],
+    "pt-PT": [
+      {
+        "kind": "new",
+        "text": "Em Definições, em Ferramentas, uma nova linha permite que o git use a tua conta GitHub, para que git push e pull num terminal ou editor funcionem sem palavra-passe. A app pergunta antes de alterar o que quer que seja."
+      },
+      {
+        "kind": "fixed",
+        "text": "Os comentários deixados por bots no teu pull request Feedback já não aparecem como novo feedback do teu professor."
+      },
+      {
+        "kind": "fixed",
+        "text": "No Windows em Arm, quando a extensão do Classroom 50 não se consegue instalar, a app explica agora porquê e como resolver: instalar a versão x64 do GitHub CLI, que o Windows executa em emulação."
+      }
+    ],
+    "nl": [
+      {
+        "kind": "new",
+        "text": "In Instellingen, onder Tools, kun je git met een nieuwe regel je GitHub-account laten gebruiken, zodat git push en pull in een terminal of editor zonder wachtwoord werken. De toolbox vraagt het eerst voordat er iets verandert."
+      },
+      {
+        "kind": "fixed",
+        "text": "Opmerkingen die bots in je Feedback-pull request plaatsen, verschijnen niet meer als nieuwe feedback van je docent."
+      },
+      {
+        "kind": "fixed",
+        "text": "Op Windows on Arm legt de toolbox nu uit waarom de Classroom 50-extensie niet kan worden geïnstalleerd en hoe je dat oplost: met de x64-versie van GitHub CLI, die Windows geëmuleerd uitvoert."
+      }
+    ],
+    "pl": [
+      {
+        "kind": "new",
+        "text": "W Ustawieniach, w sekcji Narzędzia, nowy wiersz pozwala git używać twojego konta GitHub, więc git push i pull w terminalu lub edytorze działają bez hasła. Toolbox pyta, zanim cokolwiek zmieni."
+      },
+      {
+        "kind": "fixed",
+        "text": "Komentarze botów w twoim pull requeście Feedback nie pojawiają się już jako nowe uwagi od nauczyciela."
+      },
+      {
+        "kind": "fixed",
+        "text": "Na Windows na Arm, gdy nie da się zainstalować rozszerzenia Classroom 50, Toolbox wyjaśnia teraz dlaczego i jak to naprawić: zainstalować wersję x64 GitHub CLI, którą Windows uruchamia w emulacji."
+      }
+    ],
+    "tr": [
+      {
+        "kind": "new",
+        "text": "Ayarlar'da, Araçlar altında yeni bir satır git'in GitHub hesabınızı kullanmasını sağlar; böylece terminalde veya bir düzenleyicide git push ve pull parolasız çalışır. Toolbox bir şeyi değiştirmeden önce sorar."
+      },
+      {
+        "kind": "fixed",
+        "text": "Botların Feedback pull request'inize bıraktığı yorumlar artık öğretmeninizden gelen yeni geri bildirim olarak görünmüyor."
+      },
+      {
+        "kind": "fixed",
+        "text": "Arm üzerinde Windows'ta Classroom 50 uzantısı yüklenemediğinde Toolbox artık nedenini ve nasıl çözüleceğini açıklıyor: Windows'un emülasyonla çalıştırdığı x64 GitHub CLI'ı yükleyin."
+      }
+    ],
+    "ar": [
+      {
+        "kind": "new",
+        "text": "في الإعدادات، ضمن الأدوات، يتيح سطر جديد لـ git استخدام حساب GitHub، فيعمل git push وpull في الطرفية أو المحرر دون كلمة مرور. يطلب التطبيق التأكيد قبل أي تغيير."
+      },
+      {
+        "kind": "fixed",
+        "text": "لم تعد التعليقات التي تتركها الروبوتات على pull request الملاحظات تظهر كملاحظات جديدة من فريق التدريس."
+      },
+      {
+        "kind": "fixed",
+        "text": "على Windows على Arm، عند تعذّر تثبيت إضافة Classroom 50، يوضّح التطبيق الآن السبب وطريقة الحل: تثبيت إصدار x64 من GitHub CLI، الذي يشغّله Windows بالمحاكاة."
+      }
+    ],
+    "he": [
+      {
+        "kind": "new",
+        "text": "בהגדרות, תחת כלים, שורה חדשה מאפשרת ל-git להשתמש בחשבון GitHub, כך ש-git push ו-pull בטרמינל או בעורך עובדים בלי סיסמה. האפליקציה מבקשת אישור לפני כל שינוי."
+      },
+      {
+        "kind": "fixed",
+        "text": "תגובות שבוטים משאירים ב-pull request של המשוב כבר לא מופיעות כמשוב חדש מצוות הקורס."
+      },
+      {
+        "kind": "fixed",
+        "text": "ב-Windows על Arm, כשאי אפשר להתקין את התוסף של Classroom 50, האפליקציה מסבירה עכשיו למה ואיך לפתור את זה: להתקין את גרסת x64 של GitHub CLI, ש-Windows מריץ באמולציה."
+      }
+    ],
+    "zh-Hans": [
+      {
+        "kind": "new",
+        "text": "在设置的工具下，新增一行可让git使用你的GitHub账号，这样在终端或编辑器中git push和pull无需密码。工具箱在更改任何内容前都会先询问。"
+      },
+      {
+        "kind": "fixed",
+        "text": "机器人在你的反馈拉取请求中留下的评论，不再显示为老师的新反馈。"
+      },
+      {
+        "kind": "fixed",
+        "text": "在Windows on Arm上，当Classroom 50扩展无法安装时，工具箱现在会说明原因和解决方法：安装x64版GitHub CLI，Windows会以仿真方式运行它。"
+      }
+    ],
+    "ja": [
+      {
+        "kind": "new",
+        "text": "設定の「ツール」に新しい項目が加わり、gitがGitHubアカウントを使えるようになりました。ターミナルやエディターでのgit pushとpullがパスワードなしで動作します。変更する前に必ず確認します。"
+      },
+      {
+        "kind": "fixed",
+        "text": "ボットがフィードバックのpull requestに残したコメントは、先生からの新しいフィードバックとして表示されなくなりました。"
+      },
+      {
+        "kind": "fixed",
+        "text": "Windows on ArmでClassroom 50の拡張機能をインストールできないとき、その理由と解決方法を説明するようになりました。Windowsがエミュレーションで実行するx64版のGitHub CLIをインストールしてください。"
+      }
+    ],
+    "ko": [
+      {
+        "kind": "new",
+        "text": "설정의 도구에 새 항목이 생겨 git이 GitHub 계정을 사용할 수 있어요. 그래서 터미널이나 편집기에서 git push와 pull이 암호 없이 작동해요. 무언가를 바꾸기 전에 먼저 물어봐요."
+      },
+      {
+        "kind": "fixed",
+        "text": "봇이 피드백 끌어오기 요청에 남긴 의견은 더 이상 선생님의 새 피드백으로 표시되지 않아요."
+      },
+      {
+        "kind": "fixed",
+        "text": "Arm용 Windows에서 Classroom 50 확장을 설치할 수 없을 때, 이제 도구 상자가 이유와 해결 방법을 알려 줘요. Windows가 에뮬레이션으로 실행하는 x64용 GitHub CLI를 설치하면 돼요."
+      }
+    ]
+  }
+}
