@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it } from "vitest";
-import { errorMessage } from "#lib/api.js";
-import { setLocale } from "#lib/i18n/index.js";
+import { CALENDAR_STORES, errorMessage } from "#lib/api.js";
+import { hasKey, setLocale } from "#lib/i18n/index.js";
 
 afterEach(() => {
   setLocale("en");
@@ -29,5 +29,13 @@ describe("errorMessage", () => {
 
   it("shows anything else as text", () => {
     expect(errorMessage("plain")).toBe("plain");
+  });
+});
+
+describe("CALENDAR_STORES", () => {
+  it("has a name in the catalog for every store Rust can report", () => {
+    for (const store of CALENDAR_STORES) {
+      expect(hasKey(`settings.calendar.store.${store}`), store).toBe(true);
+    }
   });
 });

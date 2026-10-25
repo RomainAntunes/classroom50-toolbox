@@ -436,6 +436,16 @@ export type CalendarLabels = {
 };
 
 /**
+ *  A Linux calendar store the app can add its calendar to. Serialized as its `id`, which the
+ *  UI words as `settings.calendar.store.<id>`.
+ */
+export type CalendarStore = 
+/**  Evolution Data Server: GNOME Calendar, Evolution. */
+"gnome" | 
+/**  Akonadi: KOrganizer, Merkuro. */
+"kde";
+
+/**
  *  A classroom the student belongs to. Read from the description of its secret student
  *  team (`classroom-team-v1`), which exists so members can enumerate their classrooms
  *  without access to the private config repo.
@@ -769,8 +779,8 @@ export type NativeCalendar_Deserialize = {
 	title: string,
 	/**  The account holding it (iCloud, Google, On My Mac...). */
 	account: string,
-	/**  The store the UI names itself instead of `account` (Linux: `gnome`, `kde`). */
-	kind: string | null,
+	/**  The store the UI names itself instead of `account` (Linux). */
+	kind: CalendarStore | null,
 };
 
 /**  A calendar of the OS's calendar app the user can write to. */
@@ -779,8 +789,8 @@ export type NativeCalendar_Serialize = {
 	title: string,
 	/**  The account holding it (iCloud, Google, On My Mac...). */
 	account: string,
-	/**  The store the UI names itself instead of `account` (Linux: `gnome`, `kde`). */
-	kind?: string | null,
+	/**  The store the UI names itself instead of `account` (Linux). */
+	kind?: CalendarStore | null,
 };
 
 export type Network = "normal" | 
