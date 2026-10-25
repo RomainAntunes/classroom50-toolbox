@@ -5,6 +5,7 @@ pub mod classroom50;
 pub mod clones;
 mod commands;
 mod cooldown;
+pub mod credentials;
 mod deeplink;
 mod diagnostics;
 pub mod discovery;
@@ -94,6 +95,8 @@ macro_rules! ipc_commands {
             crate::commands::add_teammates,
             crate::commands::clone_project,
             crate::commands::git_protocol,
+            crate::commands::git_credentials,
+            crate::commands::set_up_git_credentials,
             crate::commands::accept_assignment,
             crate::commands::submit_check,
             crate::commands::submit_project,

@@ -283,3 +283,58 @@ test("ManualInstall, Not now: no page opens", async ({ app }) => {
   await app.answer("cancel");
   expect(await app.calls("plugin:opener|open_url")).toEqual([]);
 });
+
+const gitRow = (app: App) => app.page.locator(".git");
+
+test("git sign-in: Set up asks first, names what it replaces, then shows On", async ({ app }) => {
+  await openTools(app, {
+    responses: { git_credentials: [ok({ usesGh: false, others: ["osxkeychain"] })] },
+  });
+  await expect(gitRow(app)).toContainText("Git with your GitHub account");
+  await gitRow(app).getByRole("button", { name: "Set up" }).click();
+  const dialog = await app.dialog();
+  expect(dialog.message).toContain("gh auth setup-git");
+  expect(dialog.message).toContain("this replaces what git uses now (osxkeychain)");
+  expect(dialog.labels).toEqual({ ok: "Set up", cancel: "Cancel" });
+  await app.answer("ok");
+  await app.waitForCall("set_up_git_credentials");
+  await expect(gitRow(app)).toContainText("On");
+  await expect(gitRow(app).getByRole("button", { name: "Set up" })).toHaveCount(0);
+});
+
+test("git sign-in: Cancel changes nothing", async ({ app }) => {
+  await openTools(app);
+  await gitRow(app).getByRole("button", { name: "Set up" }).click();
+  const dialog = await app.dialog();
+  expect(dialog.message).not.toContain("replaces");
+  await app.answer("cancel");
+  expect(await app.writes()).toEqual([]);
+  await expect(gitRow(app).getByRole("button", { name: "Set up" })).toBeVisible();
+});
+
+test("git sign-in: already set up, no button", async ({ app }) => {
+  await openTools(app, {
+    responses: { git_credentials: [ok({ usesGh: true, others: [] })] },
+  });
+  await expect(gitRow(app)).toContainText("On");
+  await expect(gitRow(app).getByRole("button")).toHaveCount(0);
+});
+
+test("git sign-in: hidden while gh is missing", async ({ app }) => {
+  await openTools(app, { tools: tools(["gh"]) });
+  await expect(row(app, "GitHub CLI")).toBeVisible();
+  await expect(gitRow(app)).toHaveCount(0);
+  expect(await app.calls("git_credentials")).toEqual([]);
+});
+
+test("git sign-in: a failure says why and keeps the button", async ({ app }) => {
+  await openTools(app, {
+    responses: { set_up_git_credentials: [fail("notSignedIn", "not signed in")] },
+  });
+  await gitRow(app).getByRole("button", { name: "Set up" }).click();
+  await app.answer("ok");
+  const error = await app.dialog();
+  expect(error.message).toBe("Couldn't set up git: Sign in to GitHub first.");
+  await app.answer("ok");
+  await expect(gitRow(app).getByRole("button", { name: "Set up" })).toBeVisible();
+});

@@ -3,6 +3,7 @@
   import { t } from "#lib/i18n/index.js";
   import Section from "#lib/components/Section.svelte";
   import ToolRow from "#lib/components/ToolRow.svelte";
+  import GitLogin from "#lib/components/settings/GitLogin.svelte";
   import Spinner from "#lib/components/Spinner.svelte";
   import { session } from "#lib/session.svelte.js";
 
@@ -32,6 +33,7 @@
       onlookup={(busy) => (lookups[status.tool] = busy)}
     />
   {/each}
+  <GitLogin />
 </Section>
 
 <style>

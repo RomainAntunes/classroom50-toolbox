@@ -184,6 +184,13 @@ export const commands = {
 	cloneProject: (id: string, parent: string) => __TAURI_INVOKE<string>("clone_project", { id, parent }),
 	/**  How gh clones github.com repos, so the row's clone URLs lead with the one it uses. */
 	gitProtocol: () => __TAURI_INVOKE<GitProtocol>("git_protocol"),
+	/**  Whether git signs in to github.com with gh's account outside the app. */
+	gitCredentials: () => __TAURI_INVOKE<GitCredentials>("git_credentials"),
+	/**
+	 *  `gh auth setup-git`: git signs in to github.com with gh's account everywhere. Writes the
+	 *  user's global git config, so only from a click the UI confirmed.
+	 */
+	setUpGitCredentials: () => __TAURI_INVOKE<GitCredentials>("set_up_git_credentials"),
 	/**
 	 *  Accepts an unaccepted assignment with `gh student accept`, then syncs so the new repo
 	 *  shows up. `team_name` founds a group with that name for a team assignment formed by
@@ -585,6 +592,17 @@ export type Feedback = {
 	url: string,
 	comments: number,
 	latestAt: string | null,
+};
+
+/**  The helpers git asks for github.com's passwords, in order. */
+export type GitCredentials = {
+	/**  gh is one of them: `git push` to github.com signs in with gh's account. */
+	usesGh: boolean,
+	/**
+	 *  The others by short name (`osxkeychain`, `manager`, `store`...), which setting up gh
+	 *  replaces for github.com (it resets the list there first).
+	 */
+	others: string[],
 };
 
 /**  How gh clones github.com repos (`git_protocol`). */
