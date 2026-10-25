@@ -251,6 +251,32 @@ test("ManualInstall offers the download page, worded by reason", async ({ app })
   expect(opened[0].args.url).toBe("https://github.com/cli/cli#installation");
 });
 
+test("gh-student on Windows on Arm points to the x64 GitHub CLI", async ({ app }) => {
+  const windowsArm: Reply = {
+    error: {
+      kind: "manualInstall",
+      message: "gh-student has no Windows on Arm version yet",
+      url: "https://github.com/cli/cli/releases/latest",
+      command:
+        "winget uninstall --id GitHub.cli --exact\nwinget install --id GitHub.cli --exact --source winget --architecture x64",
+      params: { reason: "windowsArm" },
+    },
+  };
+  await openTools(app, {
+    tools: tools(["gh-student"]),
+    responses: { install_tool: [windowsArm] },
+  });
+  await row(app, "Classroom 50 (gh student)").getByRole("button", { name: "Install" }).click();
+  const dialog = await app.dialog();
+  expect(dialog.message).toContain(
+    "The toolbox can't install Classroom 50 (gh student) on this computer: gh-student has no Windows on Arm version yet; it works with the x64 GitHub CLI instead, which Windows runs emulated.",
+  );
+  expect(dialog.message).toContain("--architecture x64");
+  await app.answer("ok");
+  const opened = await app.waitForCall("plugin:opener|open_url");
+  expect(opened[0].args.url).toBe("https://github.com/cli/cli/releases/latest");
+});
+
 test("ManualInstall, Not now: no page opens", async ({ app }) => {
   await openTools(app, { tools: tools(["gh"]), responses: { install_tool: [manualInstall] } });
   await row(app, "GitHub CLI").getByRole("button", { name: "Install" }).click();

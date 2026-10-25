@@ -27,6 +27,7 @@
   "setup.manualReason.readOnlySystem": "החבילות של המערכת הזו לקריאה בלבד; אפשר להתקין עם Homebrew או בתוך toolbox",
   "setup.manualReason.noPackageManager": "לא נמצא מנהל חבילות נתמך (apt, dnf, pacman, zypper)",
   "setup.manualReason.noPkexec": "pkexec (polkit) לא מותקן, ולכן האפליקציה לא יכולה לבקש את הסיסמה",
+  "setup.manualReason.windowsArm": "עדיין אין גרסה של gh-student ל-Windows על Arm; הוא עובד עם גרסת x64 של GitHub CLI, ש-Windows מריץ באמולציה",
   "setup.openDownload": "פתיחת דף ההורדה",
   "setup.notNow": "לא עכשיו",
   "setup.signInFirst": "יש להתחבר קודם ל-GitHub.",

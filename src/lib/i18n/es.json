@@ -27,6 +27,7 @@
   "setup.manualReason.readOnlySystem": "los paquetes de este sistema son de solo lectura; instálalo con Homebrew o en una toolbox",
   "setup.manualReason.noPackageManager": "no se encontró ningún gestor de paquetes compatible (apt, dnf, pacman, zypper)",
   "setup.manualReason.noPkexec": "pkexec (polkit) no está instalado, así que la app no puede pedir tu contraseña",
+  "setup.manualReason.windowsArm": "gh-student aún no tiene versión para Windows en Arm; funciona con la versión x64 de GitHub CLI, que Windows ejecuta emulada",
   "setup.openDownload": "Abrir página de descarga",
   "setup.notNow": "Ahora no",
   "setup.signInFirst": "Inicia sesión en GitHub primero.",

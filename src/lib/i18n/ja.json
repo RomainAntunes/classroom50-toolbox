@@ -27,6 +27,7 @@
   "setup.manualReason.readOnlySystem": "このシステムのパッケージは読み取り専用です。Homebrewかtoolboxコンテナーでインストールしてください",
   "setup.manualReason.noPackageManager": "対応するパッケージマネージャー（apt、dnf、pacman、zypper）が見つかりません",
   "setup.manualReason.noPkexec": "pkexec（polkit）がインストールされていないため、アプリがパスワードを求められません",
+  "setup.manualReason.windowsArm": "gh-studentにはまだWindows on Arm版がありません。代わりにx64版のGitHub CLIで動作します（Windowsがエミュレーションで実行します）",
   "setup.openDownload": "ダウンロードページを開く",
   "setup.notNow": "後で",
   "setup.signInFirst": "先にGitHubにサインインしてください。",

@@ -27,6 +27,7 @@
   "setup.manualReason.readOnlySystem": "이 시스템의 패키지는 읽기 전용이에요. Homebrew나 toolbox 컨테이너에서 설치하세요",
   "setup.manualReason.noPackageManager": "지원하는 패키지 관리자(apt, dnf, pacman, zypper)를 찾지 못했어요",
   "setup.manualReason.noPkexec": "pkexec(polkit)이 설치되어 있지 않아서 앱이 암호를 요청할 수 없어요",
+  "setup.manualReason.windowsArm": "gh-student는 아직 Arm용 Windows 버전이 없어요. 대신 Windows가 에뮬레이션으로 실행하는 x64용 GitHub CLI에서 작동해요",
   "setup.openDownload": "다운로드 페이지 열기",
   "setup.notNow": "나중에",
   "setup.signInFirst": "먼저 GitHub에 로그인하세요.",

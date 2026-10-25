@@ -27,6 +27,7 @@
   "setup.manualReason.readOnlySystem": "bu sistemin paketleri salt okunur; Homebrew ile veya bir toolbox içinde yükleyin",
   "setup.manualReason.noPackageManager": "desteklenen bir paket yöneticisi bulunamadı (apt, dnf, pacman, zypper)",
   "setup.manualReason.noPkexec": "pkexec (polkit) yüklü değil, bu yüzden uygulama parolanızı soramıyor",
+  "setup.manualReason.windowsArm": "gh-student'in henüz Arm üzerinde Windows için bir sürümü yok; bunun yerine Windows'un emülasyonla çalıştırdığı x64 GitHub CLI ile çalışır",
   "setup.openDownload": "İndirme sayfasını aç",
   "setup.notNow": "Şimdi değil",
   "setup.signInFirst": "Önce GitHub'a giriş yapın.",

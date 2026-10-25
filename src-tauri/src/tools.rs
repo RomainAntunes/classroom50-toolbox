@@ -434,11 +434,13 @@ async fn run_plan(
             program,
             code,
             stderr,
-        }) => platform::interpret_failure(&program, code).unwrap_or(Err(Error::CommandFailed {
-            program,
-            code,
-            stderr,
-        })),
+        }) => platform::interpret_failure(&program, code, &stderr).unwrap_or(Err(
+            Error::CommandFailed {
+                program,
+                code,
+                stderr,
+            },
+        )),
         other => other,
     }
     .map_err(signed_out);
