@@ -71,6 +71,7 @@ pub fn extra_path_dirs() -> Vec<PathBuf> {
 }
 
 pub use install::{InstallPlan, interpret_failure};
+pub use linux_calendar::CalendarStore;
 
 /// How to install `tool` with this OS's package manager (see `install`). `GhStudent` is the
 /// same everywhere and is handled by the caller.
@@ -255,9 +256,9 @@ pub struct NativeCalendar {
     pub title: String,
     /// The account holding it (iCloud, Google, On My Mac...).
     pub account: String,
-    /// The store the UI names itself instead of `account` (Linux: `gnome`, `kde`).
+    /// The store the UI names itself instead of `account` (Linux).
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub kind: Option<&'static str>,
+    pub kind: Option<CalendarStore>,
 }
 
 /// An event the app wrote, by `CalendarEvent::uid`.

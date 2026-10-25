@@ -6,7 +6,7 @@ use std::path::Path;
 use std::time::{Duration, Instant};
 
 use crate::error::{Error, Result};
-use crate::platform::linux_calendar::{self as cal, Bus, Call, Step, Target};
+use crate::platform::linux_calendar::{self as cal, Bus, CalendarStore, Call, Step};
 use crate::platform::{CalendarEvent, NativeCalendar, Written, WrittenEvents, home_dir};
 use crate::process;
 
@@ -59,7 +59,7 @@ fn akonadi_installed() -> bool {
         && bus().is_some()
 }
 
-fn detected() -> Vec<Target> {
+fn detected() -> Vec<CalendarStore> {
     cal::targets(
         eds_installed(),
         akonadi_installed(),
@@ -79,7 +79,7 @@ pub fn native_calendars(_ask: bool) -> Result<Vec<NativeCalendar>> {
             id: t.id().to_owned(),
             title: cal::DISPLAY_NAME.to_owned(),
             account: String::new(),
-            kind: Some(t.id()),
+            kind: Some(t),
         })
         .collect())
 }
@@ -90,7 +90,7 @@ pub fn write_calendar(
     written: &mut WrittenEvents,
     dir: &Path,
 ) -> Result<()> {
-    let target = Target::from_id(calendar_id);
+    let target = CalendarStore::from_id(calendar_id);
     if !calendar_id.is_empty() && target.is_none() {
         return Err(Error::Unsupported("that calendar no longer exists".into()));
     }
@@ -159,9 +159,9 @@ fn write_file(ics: &Path, events: &[CalendarEvent], written: &mut WrittenEvents)
 
 /// Adds the calendar to `target`; returns what to remove later (the source file, the
 /// Akonadi instance id).
-fn register(target: Target, ics: &Path, deadline: Instant) -> Result<String> {
+fn register(target: CalendarStore, ics: &Path, deadline: Instant) -> Result<String> {
     match target {
-        Target::Gnome => {
+        CalendarStore::Gnome => {
             let dir = sources_dir().ok_or(Error::CalendarUnavailable)?;
             let text = cal::eds_source(ics)
                 .ok_or_else(|| Error::Unsupported("the calendar file's path isn't UTF-8".into()))?;
@@ -170,7 +170,7 @@ fn register(target: Target, ics: &Path, deadline: Instant) -> Result<String> {
             crate::github::write_atomic(&file, text.as_bytes())?;
             Ok(file.display().to_string())
         }
-        Target::Kde => {
+        CalendarStore::Kde => {
             let bus = bus().ok_or(Error::CalendarUnavailable)?;
             let instance = env("AKONADI_INSTANCE");
             let instance = instance.as_deref();
@@ -195,9 +195,9 @@ fn register(target: Target, ics: &Path, deadline: Instant) -> Result<String> {
     }
 }
 
-fn unregister(target: Target, id: Option<&str>, deadline: Instant) -> Result<()> {
+fn unregister(target: CalendarStore, id: Option<&str>, deadline: Instant) -> Result<()> {
     match target {
-        Target::Gnome => {
+        CalendarStore::Gnome => {
             // Recomputed, never the stored path: only ever delete our own file.
             let Some(dir) = sources_dir() else {
                 return Ok(());
@@ -207,7 +207,7 @@ fn unregister(target: Target, id: Option<&str>, deadline: Instant) -> Result<()>
                 _ => Ok(()),
             }
         }
-        Target::Kde => {
+        CalendarStore::Kde => {
             let Some(id) = id.filter(|id| cal::valid_instance_id(id)) else {
                 return Ok(());
             };

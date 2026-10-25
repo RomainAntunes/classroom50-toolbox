@@ -67,6 +67,8 @@ export type DeepLinkTarget = B.Target_Serialize;
 /** How gh clones github.com repos. */
 export type GitProtocol = B.GitProtocol;
 export type GitCredentials = B.GitCredentials;
+/** A Linux calendar store (`NativeCalendar.kind`), worded as `settings.calendar.store.<kind>`. */
+export type CalendarStore = B.CalendarStore;
 /** Result of `accept_assignment`. */
 export type Accepted = B.Accepted;
 /** What a submit would send (`submit_check`). */
@@ -119,6 +121,7 @@ function every<T extends string>() {
 export const APPEARANCES = every<Appearance>()(["system", "light", "dark"]);
 export const COMMIT_ACTIONS = every<CommitActions>()(["none", "commit", "push"]);
 export const UPDATE_CHANNELS = every<UpdateChannel>()(["stable", "beta"]);
+export const CALENDAR_STORES = every<CalendarStore>()(["gnome", "kde"]);
 export const SIMULATED_NETWORKS = every<SimulatedNetwork>()(["normal", "githubDown", "noInternet"]);
 
 /** Every event Rust sends, by name, with its payload (`src-tauri/src/events.rs`). */

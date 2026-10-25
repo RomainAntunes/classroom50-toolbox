@@ -23,6 +23,8 @@
 use std::path::{Path, PathBuf};
 use std::time::{Duration, Instant};
 
+use serde::Serialize;
+
 /// The EDS source's UID, and so its file name (`<uid>.source`).
 pub const SOURCE_UID: &str = "classroom50-toolbox";
 /// The calendar's name in the calendar app: the product's, the same in every language.
@@ -36,23 +38,26 @@ pub const AKONADI_AGENT: &str = "akonadi_ical_resource";
 /// `WrittenEvents` key of the `.ics` file's fingerprint; list ids never start with `@`.
 pub const ICS_KEY: &str = "@linux/ics";
 
-/// A Linux calendar store the app can add its calendar to.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum Target {
+/// A Linux calendar store the app can add its calendar to. Serialized as its `id`, which the
+/// UI words as `settings.calendar.store.<id>`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[cfg_attr(test, derive(specta::Type))]
+#[serde(rename_all = "lowercase")]
+pub enum CalendarStore {
     /// Evolution Data Server: GNOME Calendar, Evolution.
     Gnome,
     /// Akonadi: KOrganizer, Merkuro.
     Kde,
 }
 
-impl Target {
-    pub const ALL: [Target; 2] = [Target::Gnome, Target::Kde];
+impl CalendarStore {
+    pub const ALL: [CalendarStore; 2] = [CalendarStore::Gnome, CalendarStore::Kde];
 
     /// The id in the `nativeCalendar` setting, and the `kind` the UI words.
     pub fn id(self) -> &'static str {
         match self {
-            Target::Gnome => "gnome",
-            Target::Kde => "kde",
+            CalendarStore::Gnome => "gnome",
+            CalendarStore::Kde => "kde",
         }
     }
 
@@ -63,19 +68,19 @@ impl Target {
     /// `WrittenEvents` key of what was registered in this store.
     pub fn key(self) -> &'static str {
         match self {
-            Target::Gnome => "@linux/gnome",
-            Target::Kde => "@linux/kde",
+            CalendarStore::Gnome => "@linux/gnome",
+            CalendarStore::Kde => "@linux/kde",
         }
     }
 }
 
 /// The stores found, the one matching the desktop first (both can be installed).
-pub fn targets(eds: bool, akonadi: bool, desktop: Option<&str>) -> Vec<Target> {
-    let mut list: Vec<Target> = Target::ALL
+pub fn targets(eds: bool, akonadi: bool, desktop: Option<&str>) -> Vec<CalendarStore> {
+    let mut list: Vec<CalendarStore> = CalendarStore::ALL
         .into_iter()
         .filter(|t| match t {
-            Target::Gnome => eds,
-            Target::Kde => akonadi,
+            CalendarStore::Gnome => eds,
+            CalendarStore::Kde => akonadi,
         })
         .collect();
     let kde = desktop.is_some_and(|d| d.split(':').any(|d| d.eq_ignore_ascii_case("KDE")));
@@ -88,15 +93,18 @@ pub fn targets(eds: bool, akonadi: bool, desktop: Option<&str>) -> Vec<Target> {
 /// What to do to make the stores hold exactly `target`'s calendar.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Step {
-    Register(Target),
-    Unregister(Target),
+    Register(CalendarStore),
+    Unregister(CalendarStore),
 }
 
 /// `registered` says which stores hold the calendar now (`WrittenEvents` keys).
-pub fn plan(target: Option<Target>, registered: impl Fn(Target) -> bool) -> Vec<Step> {
+pub fn plan(
+    target: Option<CalendarStore>,
+    registered: impl Fn(CalendarStore) -> bool,
+) -> Vec<Step> {
     let mut steps = Vec::new();
     // Remove first: switching stores never leaves two calendars behind on a failure.
-    for t in Target::ALL {
+    for t in CalendarStore::ALL {
         if registered(t) && target != Some(t) {
             steps.push(Step::Unregister(t));
         }
@@ -467,51 +475,58 @@ mod tests {
     fn targets_follow_the_desktop() {
         assert_eq!(
             targets(true, true, Some("GNOME")),
-            [Target::Gnome, Target::Kde]
+            [CalendarStore::Gnome, CalendarStore::Kde]
         );
         assert_eq!(
             targets(true, true, Some("KDE")),
-            [Target::Kde, Target::Gnome]
+            [CalendarStore::Kde, CalendarStore::Gnome]
         );
-        assert_eq!(targets(true, false, Some("KDE")), [Target::Gnome]);
-        assert_eq!(targets(false, true, None), [Target::Kde]);
+        assert_eq!(targets(true, false, Some("KDE")), [CalendarStore::Gnome]);
+        assert_eq!(targets(false, true, None), [CalendarStore::Kde]);
         assert!(targets(false, false, Some("KDE")).is_empty());
         assert_eq!(
             targets(true, true, Some("ubuntu:KDE")),
-            [Target::Kde, Target::Gnome]
+            [CalendarStore::Kde, CalendarStore::Gnome]
         );
     }
 
     #[test]
     fn ids_round_trip() {
-        for t in Target::ALL {
-            assert_eq!(Target::from_id(t.id()), Some(t));
+        for t in CalendarStore::ALL {
+            assert_eq!(CalendarStore::from_id(t.id()), Some(t));
             assert!(t.key().starts_with('@'));
         }
-        assert_eq!(Target::from_id(""), None);
-        assert_eq!(Target::from_id("GNOME"), None);
+        assert_eq!(CalendarStore::from_id(""), None);
+        assert_eq!(CalendarStore::from_id("GNOME"), None);
+        // The UI reads the serialized form as the id.
+        for t in CalendarStore::ALL {
+            assert_eq!(serde_json::to_value(t).unwrap(), t.id());
+        }
     }
 
     #[test]
     fn plans_switches_by_removing_first() {
         let none = |_| false;
         assert_eq!(
-            plan(Some(Target::Gnome), none),
-            [Step::Register(Target::Gnome)]
+            plan(Some(CalendarStore::Gnome), none),
+            [Step::Register(CalendarStore::Gnome)]
         );
         assert!(plan(None, none).is_empty());
-        let gnome = |t| t == Target::Gnome;
-        assert!(plan(Some(Target::Gnome), gnome).is_empty());
+        let gnome = |t| t == CalendarStore::Gnome;
+        assert!(plan(Some(CalendarStore::Gnome), gnome).is_empty());
         assert_eq!(
-            plan(Some(Target::Kde), gnome),
-            [Step::Unregister(Target::Gnome), Step::Register(Target::Kde)]
+            plan(Some(CalendarStore::Kde), gnome),
+            [
+                Step::Unregister(CalendarStore::Gnome),
+                Step::Register(CalendarStore::Kde)
+            ]
         );
         let both = |_| true;
         assert_eq!(
             plan(None, both),
             [
-                Step::Unregister(Target::Gnome),
-                Step::Unregister(Target::Kde)
+                Step::Unregister(CalendarStore::Gnome),
+                Step::Unregister(CalendarStore::Kde)
             ]
         );
     }
