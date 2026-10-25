@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { untrack } from "svelte";
   import { ask, message } from "@tauri-apps/plugin-dialog";
   import { openUrl } from "@tauri-apps/plugin-opener";
   import {
@@ -19,11 +20,14 @@
     status,
     onchange,
     checkUpdates = false,
+    onlookup,
   }: {
     status: ToolStatus;
     onchange: (s: ToolStatus) => void;
     /** Ask GitHub whether a newer gh-student exists (Settings only). */
     checkUpdates?: boolean;
+    /** Told when that question starts and ends, so Check again spins until it's answered. */
+    onlookup?: (busy: boolean) => void;
   } = $props();
 
   watchToolJobs();
@@ -55,14 +59,20 @@
     latest = null;
     if (!checkUpdates || !status.installed || status.tool !== "gh-student") return;
     let current = true;
+    // Untracked: a new callback from the parent isn't a reason to ask GitHub again.
+    untrack(() => onlookup?.(true));
     api
       .toolUpdate(status.tool)
       .then((version) => {
         if (current) latest = version;
       })
-      .catch(() => {});
+      .catch(() => {})
+      .finally(() => {
+        if (current) onlookup?.(false);
+      });
     return () => {
       current = false;
+      untrack(() => onlookup?.(false));
     };
   });
 

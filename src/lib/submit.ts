@@ -98,13 +98,20 @@ async function pullFirst(project: Project, name: string) {
   if (pull) await pullProject(project, name);
 }
 
-/** Confirms, submits and reports. Returns true when the submission went through. */
-export async function submitProject(project: Project, name: string): Promise<boolean> {
+/** Confirms, submits and reports. Returns true when the submission went through. `busy`
+ * follows the work itself (the check, then gh-student), not the questions in between. */
+export async function submitProject(
+  project: Project,
+  name: string,
+  busy?: (on: boolean) => void,
+): Promise<boolean> {
   try {
     let check: SubmitCheck;
     try {
+      busy?.(true);
       check = await api.submitCheck(project.id);
     } catch (err) {
+      busy?.(false);
       // No marker: gh-student finds the assignment from the repo's name, which needs the
       // app to know it too, and a recent enough gh-student (then the check runs again).
       if (errorKind(err) === "unknownAssignment") {
@@ -112,10 +119,13 @@ export async function submitProject(project: Project, name: string): Promise<boo
         return false;
       }
       if (errorKind(err) === "ghStudentOutdated") {
-        return (await updateGhStudent(err as CommandError, name)) && submitProject(project, name);
+        return (
+          (await updateGhStudent(err as CommandError, name)) && submitProject(project, name, busy)
+        );
       }
       throw err;
     }
+    busy?.(false);
     if (check.uncommitted.length) {
       await commitFirst(project, name, check.uncommitted);
       return false;
@@ -151,7 +161,8 @@ export async function submitProject(project: Project, name: string): Promise<boo
       }),
     );
     if (!confirmed) return false;
-    const { url } = await api.submitProject(project.id);
+    busy?.(true);
+    const { url } = await api.submitProject(project.id).finally(() => busy?.(false));
     announce(t("a11y.submitted", { name }));
     if (!url) {
       await show(t("submit.done"), name);

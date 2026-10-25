@@ -355,6 +355,8 @@ pub struct ProjectsState {
     remote: Mutex<RemoteCache>,
     remote_path: PathBuf,
     http_cache: HttpCache,
+    /// When the last Clear cache finished rebuilding the list.
+    cleared_at: Mutex<Option<DateTime<Utc>>>,
 }
 
 impl ProjectsState {
@@ -381,6 +383,7 @@ impl ProjectsState {
             remote: Mutex::new(remote),
             remote_path,
             http_cache: HttpCache::load(cache_dir),
+            cleared_at: Mutex::default(),
         }
     }
 
@@ -397,6 +400,17 @@ impl ProjectsState {
         self.store_remote(RemoteCache::default());
         self.http_cache.clear();
         let _ = std::fs::remove_file(&self.state_path);
+    }
+
+    /// When the last Clear cache finished, for its cooldown.
+    pub fn cleared_at(&self) -> Option<DateTime<Utc>> {
+        self.cleared_at.lock().ok().and_then(|at| *at)
+    }
+
+    pub fn set_cleared_at(&self, at: DateTime<Utc>) {
+        if let Ok(mut cleared) = self.cleared_at.lock() {
+            *cleared = Some(at);
+        }
     }
 
     fn save_state(&self) {

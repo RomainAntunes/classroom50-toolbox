@@ -1,7 +1,7 @@
 // Self-update: `update-state` drives the main page's banner and Settings > About; the
 // student picks Restart now or Later, and Settings holds the check and the channel.
 import { expect, test, type App } from "./app";
-import { fail, scenario, settings, updateStatus } from "./fixtures";
+import { fail, hold, ok, scenario, settings, updateStatus } from "./fixtures";
 import type { UpdateState } from "../../src/lib/api";
 
 const downloading = (downloaded: number, total: number | null): UpdateState => ({
@@ -116,6 +116,19 @@ test("Check for updates says when it's up to date", async ({ app, page }) => {
   await page.getByRole("button", { name: "Check for updates" }).click();
   await app.waitForCall("check_update");
   await expect(page.getByRole("button", { name: "You're up to date" })).toBeVisible();
+});
+
+test("Check for updates spins while it asks", async ({ app, page }) => {
+  await app.start(scenario({ responses: { check_update: [hold()] } }));
+  await app.openSettings();
+  const check = page.getByRole("button", { name: "Check for updates" });
+  await check.click();
+  await expect(check).toHaveAttribute("aria-busy", "true");
+  await expect(check.locator(".spinner")).toBeVisible();
+  await app.release("check_update", ok(updateStatus()));
+  const done = page.getByRole("button", { name: "You're up to date" });
+  await expect(done).toHaveAttribute("aria-busy", "false");
+  await expect(done.locator(".spinner")).toHaveCount(0);
 });
 
 test("a failed check is worded by its kind", async ({ app, page }) => {

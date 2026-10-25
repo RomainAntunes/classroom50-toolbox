@@ -3,6 +3,7 @@
   import { openUrl } from "@tauri-apps/plugin-opener";
   import { api, errorMessage, withDialog, type UpdateStatus } from "#lib/api.js";
   import { formatMegabytes, t } from "#lib/i18n/index.js";
+  import Spinner from "./Spinner.svelte";
 
   const RELEASES_URL = "https://github.com/RomainAntunes/classroom50-toolbox/releases/tag/v";
 
@@ -84,8 +85,14 @@
       {:else if !status.deferred}
         <button onclick={() => api.deferUpdate()}>{t("update.later")}</button>
       {/if}
-      <button class="primary" disabled={status.installing} onclick={restart}
-        >{t(status.installing ? "update.installing" : "update.restart")}</button
+      <button
+        class="primary"
+        disabled={status.installing}
+        aria-busy={status.installing}
+        onclick={restart}
+        >{#if status.installing}<Spinner />{/if}{t(
+          status.installing ? "update.installing" : "update.restart",
+        )}</button
       >
     </div>
   </div>

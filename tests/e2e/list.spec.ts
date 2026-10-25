@@ -4,7 +4,9 @@ import {
   classroom,
   grade,
   gradeTest,
+  hold,
   hoursFromNow,
+  ok,
   project,
   scenario,
   settings,
@@ -173,4 +175,16 @@ test("a test the autograder stopped says so before what it printed", async ({ ap
   // Reading a grade is read-only.
   expect(await app.writes()).toEqual([]);
   await expect(page.locator(".timeout")).toHaveCount(2);
+});
+
+test("Clear cache spins until the list is rebuilt", async ({ app, page }) => {
+  await app.start(scenario({ responses: { clear_cache: [hold()] } }));
+  await app.openSettings();
+  const clear = page.getByRole("button", { name: "Clear cache" });
+  await clear.click();
+  await expect(clear).toHaveAttribute("aria-busy", "true");
+  await expect(clear.locator(".spinner")).toBeVisible();
+  await app.release("clear_cache", ok(snapshot()));
+  await expect(clear).toHaveAttribute("aria-busy", "false");
+  await expect(clear).toBeEnabled();
 });

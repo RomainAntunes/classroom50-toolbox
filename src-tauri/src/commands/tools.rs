@@ -1,15 +1,16 @@
 //! git, gh and gh-student: their status, installs and updates.
 
-use tauri::{AppHandle, State};
+use tauri::{AppHandle, Manager, State};
 
 use crate::error::Result;
 use crate::platform;
-use crate::tools::{self, Tool, ToolJob, ToolJobs, ToolStatus};
+use crate::tools::{self, Tool, ToolChecks, ToolJob, ToolJobs, ToolStatus};
 
 #[tauri::command]
 #[cfg_attr(test, specta::specta)]
-pub async fn tool_statuses() -> Vec<ToolStatus> {
-    tools::statuses().await
+/// Reused for a few seconds (`ToolChecks`), so a burst of Check again runs gh once.
+pub async fn tool_statuses(app: AppHandle) -> Vec<ToolStatus> {
+    app.state::<ToolChecks>().statuses().await
 }
 
 /// What `install_tool` will run, so the UI can show it before asking for elevation.
@@ -23,9 +24,16 @@ pub fn install_command(tool: Tool) -> Result<platform::InstallPlan> {
 /// gh-student depends on gh, so installing gh changes what the other rows can do.
 #[tauri::command]
 #[cfg_attr(test, specta::specta)]
-pub async fn install_tool(app: AppHandle, tool: Tool) -> Result<Vec<ToolStatus>> {
+pub async fn install_tool(
+    app: AppHandle,
+    checks: State<'_, ToolChecks>,
+    tool: Tool,
+) -> Result<Vec<ToolStatus>> {
+    checks.forget(tool).await;
     tools::install(&app, tool).await?;
-    Ok(tools::statuses().await)
+    let statuses = tools::statuses().await;
+    checks.store(statuses.clone()).await;
+    Ok(statuses)
 }
 
 /// The installs and updates still running, for a view opened after they started.
@@ -42,18 +50,27 @@ pub fn cancel_tool_job(state: State<'_, ToolJobs>, tool: Tool) {
     state.cancel(tool);
 }
 
-/// The newer version `upgrade_tool` would install, if any.
+/// The newer version `upgrade_tool` would install, if any; reused for a while
+/// (`ToolChecks`), since it asks GitHub.
 #[tauri::command]
 #[cfg_attr(test, specta::specta)]
-pub async fn tool_update(tool: Tool) -> Result<Option<String>> {
-    tools::available_update(tool).await
+pub async fn tool_update(checks: State<'_, ToolChecks>, tool: Tool) -> Result<Option<String>> {
+    checks.update(tool).await
 }
 
 /// Updates gh-student and returns its new status.
 #[tauri::command]
 #[cfg_attr(test, specta::specta)]
-pub async fn upgrade_tool(app: AppHandle, tool: Tool) -> Result<ToolStatus> {
-    tools::upgrade(&app, tool).await?;
+pub async fn upgrade_tool(
+    app: AppHandle,
+    checks: State<'_, ToolChecks>,
+    tool: Tool,
+) -> Result<ToolStatus> {
+    checks.forget(tool).await;
+    let upgraded = tools::upgrade(&app, tool).await;
+    // Whether or not it worked, the version may have moved: read it afresh next time.
+    checks.forget(tool).await;
+    upgraded?;
     Ok(tools::status(tool).await)
 }
 

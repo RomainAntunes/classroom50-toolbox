@@ -16,6 +16,7 @@ use tauri::{AppHandle, Manager};
 use tauri_plugin_updater::{Update, UpdaterExt};
 
 use crate::alerts::Notice;
+use crate::cooldown;
 use crate::error::{Error, ErrorKind, Result};
 use crate::events::{self, IpcEvent};
 use crate::settings::{SettingsStore, UpdateChannel};
@@ -37,6 +38,8 @@ const INTERVAL: chrono::TimeDelta = chrono::TimeDelta::hours(6);
 /// After a failed check (offline, GitHub down), the next background one waits this long.
 const RETRY: chrono::TimeDelta = chrono::TimeDelta::hours(1);
 /// Progress events at most this often (about 10 a second).
+/// "Check for updates" clicked again this soon after a check that got an answer reuses it.
+const MANUAL_COOLDOWN: chrono::TimeDelta = chrono::TimeDelta::seconds(30);
 const PROGRESS_EVERY: Duration = Duration::from_millis(100);
 
 /// How the running app was installed, which decides what updating can do.
@@ -362,6 +365,19 @@ fn due(memory: &Memory, now: DateTime<Utc>, version: &str, channel: UpdateChanne
     now - checked_at >= INTERVAL && rested
 }
 
+/// Whether a check of this version and channel got an answer under `MANUAL_COOLDOWN` ago,
+/// so a manual check can answer with it instead of asking the feed again.
+fn just_checked(
+    memory: &Memory,
+    now: DateTime<Utc>,
+    version: &str,
+    channel: UpdateChannel,
+) -> bool {
+    memory.version.as_deref() == Some(version)
+        && memory.channel == Some(channel)
+        && cooldown::within(memory.checked_at, now, MANUAL_COOLDOWN)
+}
+
 /// The wall clock moved further than the monotonic one between two ticks: the machine
 /// slept. The check then waits a tick, for the network to come back.
 fn woke(wall: chrono::TimeDelta, monotonic: Duration) -> bool {
@@ -520,13 +536,20 @@ pub async fn check(app: &AppHandle, quiet: bool) -> Result<UpdateStatus> {
     if !state.bundle.can_update() {
         return Err(Error::NoSelfUpdate);
     }
+    let channel = channel(app);
+    let version = app.package_info().version.to_string();
+    let fresh = state
+        .memory
+        .lock()
+        .map(|memory| just_checked(&memory, Utc::now(), &version, channel))
+        .unwrap_or(false);
+    if !quiet && fresh {
+        return Ok(state.status());
+    }
     let Some(generation) = state.with(Machine::begin_check) else {
         return Ok(state.status());
     };
     emit(app);
-
-    let channel = channel(app);
-    let version = app.package_info().version.to_string();
     let found = async {
         let url = endpoint(channel, state.bundle)
             .parse()
@@ -825,6 +848,42 @@ mod tests {
             channel: Some(UpdateChannel::Stable),
             failed_at: None,
         }
+    }
+
+    #[test]
+    fn a_manual_check_reuses_a_fresh_answer_for_the_same_version_and_channel() {
+        let memory = checked("2026-10-23T12:00:00Z");
+        let stable = UpdateChannel::Stable;
+        assert!(just_checked(
+            &memory,
+            at("2026-10-23T12:00:29Z"),
+            "0.10.0",
+            stable
+        ));
+        assert!(!just_checked(
+            &memory,
+            at("2026-10-23T12:00:30Z"),
+            "0.10.0",
+            stable
+        ));
+        assert!(!just_checked(
+            &memory,
+            at("2026-10-23T12:00:05Z"),
+            "0.11.0",
+            stable
+        ));
+        assert!(!just_checked(
+            &memory,
+            at("2026-10-23T12:00:05Z"),
+            "0.10.0",
+            UpdateChannel::Beta
+        ));
+        assert!(!just_checked(
+            &Memory::default(),
+            at("2026-10-23T12:00:05Z"),
+            "0.10.0",
+            stable
+        ));
     }
 
     #[test]

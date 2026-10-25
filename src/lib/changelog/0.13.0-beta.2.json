@@ -1,0 +1,95 @@
+{
+  "date": "2026-10-23",
+  "notes": {
+    "en": [
+      {
+        "kind": "improved",
+        "text": "Buttons such as Check again, Check for updates, Pull and Submit now show a spinner while they work, so a quick click no longer looks like it did nothing."
+      }
+    ],
+    "fr": [
+      {
+        "kind": "improved",
+        "text": "Les boutons comme Vérifier à nouveau, Rechercher des mises à jour, Pull et Rendre affichent maintenant un indicateur de chargement pendant qu'ils travaillent, pour qu'un clic rapide ne semble plus sans effet."
+      }
+    ],
+    "es": [
+      {
+        "kind": "improved",
+        "text": "Los botones como Comprobar de nuevo, Buscar actualizaciones, Pull y Entregar ahora muestran un indicador de carga mientras trabajan, así un clic rápido ya no parece no haber hecho nada."
+      }
+    ],
+    "de": [
+      {
+        "kind": "improved",
+        "text": "Schaltflächen wie Erneut prüfen, Nach Updates suchen, Pull und Abgeben zeigen jetzt ein Ladesymbol, solange sie arbeiten, damit ein schneller Klick nicht mehr wirkungslos aussieht."
+      }
+    ],
+    "it": [
+      {
+        "kind": "improved",
+        "text": "I pulsanti come Controlla di nuovo, Controlla aggiornamenti, Pull e Consegna ora mostrano un indicatore di caricamento mentre lavorano, così un clic veloce non sembra più senza effetto."
+      }
+    ],
+    "pt-BR": [
+      {
+        "kind": "improved",
+        "text": "Botões como Verificar de novo, Verificar atualizações, Pull e Entregar agora mostram um indicador de carregamento enquanto trabalham, então um clique rápido não parece mais que não fez nada."
+      }
+    ],
+    "pt-PT": [
+      {
+        "kind": "improved",
+        "text": "Botões como Verificar novamente, Procurar atualizações, Pull e Entregar mostram agora um indicador de carregamento enquanto trabalham, para que um clique rápido já não pareça não ter feito nada."
+      }
+    ],
+    "nl": [
+      {
+        "kind": "improved",
+        "text": "Knoppen zoals Opnieuw controleren, Controleren op updates, Pull en Inleveren tonen nu een laadindicator terwijl ze bezig zijn, zodat een snelle klik niet meer lijkt alsof er niets gebeurde."
+      }
+    ],
+    "pl": [
+      {
+        "kind": "improved",
+        "text": "Przyciski takie jak Sprawdź ponownie, Sprawdź aktualizacje, Pull i Oddaj pokazują teraz wskaźnik ładowania podczas pracy, więc szybkie kliknięcie nie wygląda już, jakby nic nie zrobiło."
+      }
+    ],
+    "tr": [
+      {
+        "kind": "improved",
+        "text": "Yeniden denetle, Güncellemeleri denetle, Pull ve Teslim et gibi düğmeler artık çalışırken bir yükleniyor göstergesi gösteriyor; böylece hızlı bir tıklama artık hiçbir şey yapmamış gibi görünmüyor."
+      }
+    ],
+    "ar": [
+      {
+        "kind": "improved",
+        "text": "تعرض الأزرار مثل إعادة الفحص والبحث عن تحديثات وPull وتسليم الآن مؤشر تحميل أثناء عملها، فلا تبدو النقرة السريعة وكأنها لم تفعل شيئًا."
+      }
+    ],
+    "he": [
+      {
+        "kind": "improved",
+        "text": "כפתורים כמו בדיקה חוזרת, בדיקת עדכונים, Pull והגשה מציגים עכשיו סמל טעינה בזמן שהם פועלים, כך שלחיצה מהירה כבר לא נראית כאילו לא קרה כלום."
+      }
+    ],
+    "zh-Hans": [
+      {
+        "kind": "improved",
+        "text": "重新检查、检查更新、拉取和上交等按钮现在会在运行时显示加载图标，快速点击后不会再像没有反应一样。"
+      }
+    ],
+    "ja": [
+      {
+        "kind": "improved",
+        "text": "再確認、アップデートを確認、プル、提出などのボタンは、処理中に読み込みアイコンを表示するようになりました。すぐに終わるクリックでも、何も起きなかったように見えなくなります。"
+      }
+    ],
+    "ko": [
+      {
+        "kind": "improved",
+        "text": "다시 확인, 업데이트 확인, 끌어오기, 제출 같은 버튼이 이제 작업하는 동안 로딩 아이콘을 보여 줘요. 그래서 빠르게 끝나는 클릭도 아무 일도 없었던 것처럼 보이지 않아요."
+      }
+    ]
+  }
+}

@@ -3,12 +3,13 @@
 use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
 use std::sync::Mutex;
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
 use serde::{Deserialize, Serialize};
 use tauri::{AppHandle, Manager};
 use tokio::sync::watch;
 
+use crate::cooldown::Recent;
 use crate::error::{Error, Result};
 use crate::events::{IpcEvent, ToolJobsChanged};
 use crate::github::Http;
@@ -168,6 +169,60 @@ pub async fn statuses() -> Vec<ToolStatus> {
     let (git, gh, gh_student) =
         tokio::join!(status(Tool::Git), status(Tool::Gh), status(Tool::GhStudent));
     vec![git, gh, gh_student]
+}
+
+/// How long Check again reuses the statuses it just read (gh runs three times for them).
+const STATUSES_COOLDOWN: Duration = Duration::from_secs(3);
+/// How long the newer-gh-student lookup is reused: it asks GitHub.
+const UPDATE_COOLDOWN: Duration = Duration::from_secs(30);
+
+/// The last statuses and newer-version lookups, reused for a moment so clicking Check again
+/// over and over doesn't run gh each time. Each lock is held across the read, so calls that
+/// overlap share one run. Installs and updates replace what they make stale.
+#[derive(Default)]
+pub struct ToolChecks {
+    statuses: tokio::sync::Mutex<Option<Recent<Vec<ToolStatus>>>>,
+    updates: tokio::sync::Mutex<BTreeMap<Tool, Recent<Option<String>>>>,
+}
+
+impl ToolChecks {
+    pub async fn statuses(&self) -> Vec<ToolStatus> {
+        let mut last = self.statuses.lock().await;
+        if let Some(statuses) = last
+            .as_ref()
+            .and_then(|recent| recent.fresh(Instant::now(), STATUSES_COOLDOWN))
+        {
+            return statuses.clone();
+        }
+        let fresh = statuses().await;
+        *last = Some(Recent::new(Instant::now(), fresh.clone()));
+        fresh
+    }
+
+    /// `available_update`, reused for `UPDATE_COOLDOWN`. A failure isn't kept.
+    pub async fn update(&self, tool: Tool) -> Result<Option<String>> {
+        let mut updates = self.updates.lock().await;
+        if let Some(version) = updates
+            .get(&tool)
+            .and_then(|recent| recent.fresh(Instant::now(), UPDATE_COOLDOWN))
+        {
+            return Ok(version.clone());
+        }
+        let version = available_update(tool).await?;
+        updates.insert(tool, Recent::new(Instant::now(), version.clone()));
+        Ok(version)
+    }
+
+    /// Before an install or update: what was read before it no longer holds.
+    pub async fn forget(&self, tool: Tool) {
+        *self.statuses.lock().await = None;
+        self.updates.lock().await.remove(&tool);
+    }
+
+    /// The statuses an install just read, so the next Check again starts from them.
+    pub async fn store(&self, statuses: Vec<ToolStatus>) {
+        *self.statuses.lock().await = Some(Recent::new(Instant::now(), statuses));
+    }
 }
 
 /// What installing `tool` runs here. gh-student goes through gh (`gh extension install`
