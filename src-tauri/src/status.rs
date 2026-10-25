@@ -38,8 +38,8 @@ fragment Status on Repository {
                          orderBy: {field: CREATED_AT, direction: DESC}) {
     nodes {
       url
-      comments(last: 50) { nodes { author { login } createdAt } }
-      reviews(last: 50) { nodes { author { login } submittedAt } }
+      comments(last: 50) { nodes { author { __typename login } createdAt } }
+      reviews(last: 50) { nodes { author { __typename login } submittedAt } }
     }
   }
 }"#;
@@ -308,6 +308,9 @@ struct Activity {
 #[derive(Debug, Deserialize)]
 struct Author {
     login: String,
+    /// `User`, `Bot` (an app such as GitHub Actions), `Organization`...
+    #[serde(rename = "__typename", default)]
+    kind: Option<String>,
 }
 
 /// The newest graded release, still to be downloaded.
@@ -398,7 +401,8 @@ impl StatusFields {
         })
     }
 
-    /// Comments and reviews on the Feedback PR by anyone but `login` (the student).
+    /// Comments and reviews on the Feedback PR by anyone but `login` (the student) and apps:
+    /// a bot (a workflow posting its results, say) is not the teaching staff.
     pub fn feedback(&mut self, login: &str) -> Option<Feedback> {
         let pull = self.feedback.take()?.into_iter().next()?;
         let mut feedback = Feedback {
@@ -411,9 +415,9 @@ impl StatusFields {
             .into_iter()
             .chain(pull.reviews.into_iter())
             .filter(|a| {
-                a.author
-                    .as_ref()
-                    .is_some_and(|au| !au.login.eq_ignore_ascii_case(login))
+                a.author.as_ref().is_some_and(|au| {
+                    !au.login.eq_ignore_ascii_case(login) && au.kind.as_deref() != Some("Bot")
+                })
             });
         for activity in others {
             feedback.comments += 1;
@@ -539,8 +543,12 @@ mod tests {
       "feedback": {"nodes": [{
         "url": "https://github.com/o/r/pull/1",
         "comments": {"nodes": [
-          {"author": {"login": "teacher"}, "createdAt": "2026-10-14T08:00:00Z"},
-          {"author": {"login": "Alice"}, "createdAt": "2026-10-14T09:00:00Z"}
+          {"author": {"__typename": "User", "login": "teacher"},
+           "createdAt": "2026-10-14T08:00:00Z"},
+          {"author": {"__typename": "User", "login": "Alice"},
+           "createdAt": "2026-10-14T09:00:00Z"},
+          {"author": {"__typename": "Bot", "login": "github-actions"},
+           "createdAt": "2026-10-14T11:00:00Z"}
         ]},
         "reviews": {"nodes": [
           {"author": {"login": "ta"}, "submittedAt": "2026-10-14T10:00:00Z"}
