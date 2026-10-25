@@ -217,6 +217,10 @@ export function install(scenario: Scenario): E2E {
         throw { kind: "offline", message: "no avatar in tests" } satisfies CommandError;
       case "git_protocol":
         return "https";
+      case "git_credentials":
+        return { usesGh: false, others: [] };
+      case "set_up_git_credentials":
+        return { usesGh: true, others: [] };
       case "take_deep_link": {
         const link = state.deepLink;
         state.deepLink = null;

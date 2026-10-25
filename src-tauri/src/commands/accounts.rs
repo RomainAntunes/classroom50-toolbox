@@ -90,3 +90,18 @@ pub async fn sign_out(app: AppHandle, login: String) -> Result<AuthStatus> {
 pub fn cancel_login(state: State<'_, LoginState>) {
     state.cancel();
 }
+
+/// Whether git signs in to github.com with gh's account outside the app.
+#[tauri::command]
+#[cfg_attr(test, specta::specta)]
+pub async fn git_credentials() -> Result<crate::credentials::GitCredentials> {
+    crate::credentials::status().await
+}
+
+/// `gh auth setup-git`: git signs in to github.com with gh's account everywhere. Writes the
+/// user's global git config, so only from a click the UI confirmed.
+#[tauri::command]
+#[cfg_attr(test, specta::specta)]
+pub async fn set_up_git_credentials() -> Result<crate::credentials::GitCredentials> {
+    crate::credentials::set_up().await
+}

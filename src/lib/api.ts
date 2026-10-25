@@ -66,6 +66,7 @@ export type DeepLink = B.Link;
 export type DeepLinkTarget = B.Target_Serialize;
 /** How gh clones github.com repos. */
 export type GitProtocol = B.GitProtocol;
+export type GitCredentials = B.GitCredentials;
 /** Result of `accept_assignment`. */
 export type Accepted = B.Accepted;
 /** What a submit would send (`submit_check`). */
