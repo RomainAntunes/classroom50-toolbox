@@ -277,16 +277,19 @@ pub enum ManualReason {
     ReadOnlySystem,
     NoPackageManager,
     NoPkexec,
+    /// gh-student has no Windows on Arm build and the gh here is the Arm64 one.
+    WindowsArm,
 }
 
 impl ManualReason {
-    pub const ALL: [Self; 6] = [
+    pub const ALL: [Self; 7] = [
         Self::NoHomebrew,
         Self::NoWinget,
         Self::OldWinget,
         Self::ReadOnlySystem,
         Self::NoPackageManager,
         Self::NoPkexec,
+        Self::WindowsArm,
     ];
 
     pub fn code(self) -> &'static str {
@@ -297,6 +300,7 @@ impl ManualReason {
             Self::ReadOnlySystem => "readOnlySystem",
             Self::NoPackageManager => "noPackageManager",
             Self::NoPkexec => "noPkexec",
+            Self::WindowsArm => "windowsArm",
         }
     }
 }
@@ -317,6 +321,9 @@ impl std::fmt::Display for ManualReason {
             }
             Self::NoPkexec => {
                 "pkexec (polkit) isn't installed, so the app can't ask for your password"
+            }
+            Self::WindowsArm => {
+                "gh-student has no Windows on Arm version yet; it works with the x64 GitHub CLI instead, which Windows runs emulated"
             }
         })
     }

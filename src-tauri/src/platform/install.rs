@@ -39,6 +39,11 @@ pub const GH_LINUX_DOCS: &str = "https://github.com/cli/cli/blob/trunk/docs/inst
 /// App Installer, which brings winget (the Microsoft Store's web page: the opener only
 /// allows http and https links).
 pub const WINGET_STORE: &str = "https://apps.microsoft.com/detail/9NBLGGH4NNS1";
+/// gh's own releases, which list the installer of every architecture (`windows_amd64.msi`).
+pub const GH_RELEASES: &str = "https://github.com/cli/cli/releases/latest";
+/// Swaps an Arm64 gh for the x64 one, which Windows on Arm runs emulated. gh keeps its
+/// sign-in (the credential store and its config folder outlive the uninstall).
+pub const GH_X64: &str = "winget uninstall --id GitHub.cli --exact\nwinget install --id GitHub.cli --exact --source winget --architecture x64";
 
 /// What installing a tool runs.
 #[derive(Debug, Clone, Serialize, PartialEq, Eq)]
@@ -332,9 +337,19 @@ fn linux_plan(manager: &str, tool: Tool) -> (String, Vec<String>) {
     }
 }
 
-/// What a failed install's exit code means beyond "it failed".
-pub fn interpret_failure(program: &str, code: Option<i32>) -> Option<Result<()>> {
+/// What a failed install's exit code, or the tail of its `output`, means beyond "it failed".
+pub fn interpret_failure(program: &str, code: Option<i32>, output: &str) -> Option<Result<()>> {
     use winget_code::*;
+    // gh-student ships no `windows-arm64` binary, and gh only falls back to amd64 on Macs
+    // (Rosetta), so an Arm64 gh refuses the extension (`<name> unsupported for <platform>.`).
+    // gh suggests an issue on gh-student's repo, which has issues turned off.
+    if program == "gh" && output.contains("gh-student unsupported for windows-arm64") {
+        return Some(Err(Error::ManualInstall {
+            reason: ManualReason::WindowsArm,
+            url: Some(GH_RELEASES.into()),
+            command: Some(GH_X64.into()),
+        }));
+    }
     match (program, code?) {
         // Installed after all (only the app didn't see it, e.g. PATH not refreshed), or up
         // to date: a success, and the status is read again.
@@ -422,28 +437,51 @@ mod tests {
     fn reads_wingets_result_codes() {
         // As `ExitStatus::code` reports them on Windows.
         assert!(matches!(
-            interpret_failure("winget", Some(-1_978_335_189)),
+            interpret_failure("winget", Some(-1_978_335_189), ""),
             Some(Ok(()))
         ));
         assert!(matches!(
-            interpret_failure("winget", Some(-1_978_335_135)),
+            interpret_failure("winget", Some(-1_978_335_135), ""),
             Some(Ok(()))
         ));
         assert!(matches!(
-            interpret_failure("winget", Some(-1_978_334_964)),
+            interpret_failure("winget", Some(-1_978_334_964), ""),
             Some(Err(Error::Cancelled))
         ));
         assert!(matches!(
-            interpret_failure("winget", Some(-1_978_335_230)),
+            interpret_failure("winget", Some(-1_978_335_230), ""),
             Some(Err(Error::ManualInstall { .. }))
         ));
-        assert!(interpret_failure("winget", Some(1)).is_none());
+        assert!(interpret_failure("winget", Some(1), "").is_none());
         assert!(matches!(
-            interpret_failure("pkexec", Some(126)),
+            interpret_failure("pkexec", Some(126), ""),
             Some(Err(Error::Cancelled))
         ));
-        assert!(interpret_failure("pkexec", Some(127)).is_none());
-        assert!(interpret_failure("brew", None).is_none());
+        assert!(interpret_failure("pkexec", Some(127), "").is_none());
+        assert!(interpret_failure("brew", None, "").is_none());
+    }
+
+    #[test]
+    fn sends_windows_on_arm_to_the_x64_gh() {
+        // gh 2.81's words, its issue command cut short.
+        let output = "gh-student unsupported for windows-arm64.\n\nTo request support for \
+            windows-arm64, open an issue on the extension's repo by running the following \
+            command:\n\n\t`gh issue create -R foundation50/gh-student --title ...`";
+        let Some(Err(Error::ManualInstall {
+            reason,
+            url,
+            command,
+        })) = interpret_failure("gh", Some(1), output)
+        else {
+            panic!("not a manual install");
+        };
+        assert_eq!(reason, ManualReason::WindowsArm);
+        assert_eq!(url.as_deref(), Some(GH_RELEASES));
+        assert!(command.unwrap().contains("--architecture x64"));
+        // Another platform, or another program, keeps gh's own words.
+        let freebsd = output.replace("windows-arm64", "freebsd-arm64");
+        assert!(interpret_failure("gh", Some(1), &freebsd).is_none());
+        assert!(interpret_failure("winget", Some(1), output).is_none());
     }
 
     #[test]

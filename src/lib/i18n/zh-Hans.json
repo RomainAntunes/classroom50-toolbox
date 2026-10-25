@@ -27,6 +27,7 @@
   "setup.manualReason.readOnlySystem": "此系统的软件包是只读的，请用Homebrew或在toolbox容器中安装",
   "setup.manualReason.noPackageManager": "未找到支持的包管理器（apt、dnf、pacman、zypper）",
   "setup.manualReason.noPkexec": "未安装pkexec（polkit），因此应用无法请求你的密码",
+  "setup.manualReason.windowsArm": "gh-student暂无Windows on Arm版本，可改用x64版GitHub CLI，Windows会以仿真方式运行它",
   "setup.openDownload": "打开下载页面",
   "setup.notNow": "以后再说",
   "setup.signInFirst": "请先登录GitHub。",
