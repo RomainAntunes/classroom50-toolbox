@@ -135,6 +135,9 @@ jobs:
             args: --target aarch64-pc-windows-msvc
             rust-targets: aarch64-pc-windows-msvc
     runs-on: ${{ matrix.platform }}
+    # The updater signing key is a secret of the `release` environment, which only main can
+    # deploy to, so a run started by hand on another branch can't sign anything.
+    environment: release
     permissions:
       # tauri-action uploads the installers and latest.json to the draft.
       contents: write
@@ -247,6 +250,8 @@ jobs:
   # sign-windows:
   #   needs: [version, updater-urls]
   #   runs-on: ubuntu-latest
+  #   # The updater key, to sign the signed installers again.
+  #   environment: release
   #   permissions:
   #     # Downloads and replaces the draft's assets.
   #     contents: write
