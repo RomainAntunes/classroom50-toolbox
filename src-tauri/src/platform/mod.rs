@@ -278,6 +278,12 @@ pub fn has_native_calendar() -> bool {
     imp::has_native_calendar()
 }
 
+/// The system settings page where calendar access turned off is allowed again, where the
+/// OS's calendar store asks for it (macOS).
+pub fn calendar_privacy_url() -> Option<&'static str> {
+    imp::calendar_privacy_url()
+}
+
 /// The writable calendars. With `ask`, asks for access first when it was never asked;
 /// without, fails rather than prompting (background syncs).
 pub fn native_calendars(ask: bool) -> Result<Vec<NativeCalendar>> {

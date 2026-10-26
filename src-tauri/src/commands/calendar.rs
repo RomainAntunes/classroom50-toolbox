@@ -45,6 +45,19 @@ pub fn open_calendar_file(app: AppHandle, settings: State<'_, SettingsStore>) ->
         .map_err(|err| Error::Unsupported(err.to_string()))
 }
 
+/// Opens the OS's privacy settings for calendars, where access turned off since the
+/// calendar was chosen is allowed again (macOS). The URL comes from Rust, not the UI.
+#[tauri::command]
+#[cfg_attr(test, specta::specta)]
+pub fn open_calendar_privacy(app: AppHandle) -> Result<()> {
+    use tauri_plugin_opener::OpenerExt;
+    let url = platform::calendar_privacy_url()
+        .ok_or_else(|| Error::Unsupported("no calendar privacy settings on this OS".into()))?;
+    app.opener()
+        .open_url(url, None::<&str>)
+        .map_err(|err| Error::Unsupported(err.to_string()))
+}
+
 /// The words of calendar event notes, from the UI's i18n.
 #[tauri::command]
 #[cfg_attr(test, specta::specta)]

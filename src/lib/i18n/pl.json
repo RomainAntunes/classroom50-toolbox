@@ -129,6 +129,8 @@
   "settings.calendar.openLabel": "Dodaj do aplikacji kalendarza",
   "settings.calendar.openHint": "Otwiera plik z terminami w aplikacji kalendarza, aby go zaimportować. Po zmianie otwórz go ponownie, aby zaimportować nowe daty; większość aplikacji kalendarza aktualizuje wtedy wydarzenia zamiast dodawać je drugi raz.",
   "settings.calendar.open": "Otwórz w Kalendarzu",
+  "settings.calendar.denied": "macOS nie daje Toolboxowi dostępu do twoich kalendarzy, więc twoje terminy nie są aktualizowane.",
+  "settings.calendar.openPrivacy": "Otwórz Ustawienia systemowe",
   "calendar.error.calendarAccess": "Toolbox nie ma dostępu do twoich kalendarzy. Zezwól na niego w Ustawieniach systemowych > Prywatność i ochrona > Kalendarze.",
   "calendar.error.calendarUnavailable": "Usługa kalendarza nie odpowiedziała. Otwórz raz aplikację kalendarza i spróbuj ponownie.",
   "calendar.error.fallback": "Nie udało się zaktualizować kalendarza.",

@@ -126,6 +126,8 @@
   "settings.calendar.openLabel": "캘린더 앱에 추가",
   "settings.calendar.openHint": "마감일 파일을 캘린더 앱에서 열어 가져와요. 변경 후 다시 열면 새 마감일을 가져와요. 대부분의 캘린더 앱은 일정을 두 번 추가하지 않고 업데이트해요.",
   "settings.calendar.open": "캘린더에서 열기",
+  "settings.calendar.denied": "macOS에서 도구 상자의 캘린더 사용을 허용하지 않아서 마감일이 업데이트되지 않아요.",
+  "settings.calendar.openPrivacy": "시스템 설정 열기",
   "calendar.error.calendarAccess": "도구 상자가 캘린더를 사용할 권한이 없어요. 시스템 설정 > 개인정보 보호 및 보안 > 캘린더에서 허용하세요.",
   "calendar.error.calendarUnavailable": "캘린더 서비스가 응답하지 않았어요. 캘린더 앱을 한 번 연 다음 다시 시도하세요.",
   "calendar.error.fallback": "캘린더를 업데이트하지 못했어요.",

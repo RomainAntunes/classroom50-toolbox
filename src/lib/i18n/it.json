@@ -128,6 +128,8 @@
   "settings.calendar.openLabel": "Aggiungi alla tua app di calendario",
   "settings.calendar.openHint": "Apre il file delle scadenze nella tua app di calendario per importarlo. Aprilo di nuovo dopo una modifica per importare le nuove date; la maggior parte delle app di calendario aggiorna gli eventi invece di aggiungerli due volte.",
   "settings.calendar.open": "Apri in Calendario",
+  "settings.calendar.denied": "macOS non permette all'app di usare i tuoi calendari, quindi le tue scadenze non vengono aggiornate.",
+  "settings.calendar.openPrivacy": "Apri Impostazioni di Sistema",
   "calendar.error.calendarAccess": "L'app non ha il permesso di usare i tuoi calendari. Consentilo in Impostazioni di Sistema > Privacy e sicurezza > Calendari.",
   "calendar.error.calendarUnavailable": "Il servizio di calendario non ha risposto. Apri una volta la tua app di calendario, poi riprova.",
   "calendar.error.fallback": "Impossibile aggiornare il calendario.",

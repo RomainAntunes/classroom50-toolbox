@@ -126,6 +126,8 @@
   "settings.calendar.openLabel": "添加到你的日历应用",
   "settings.calendar.openHint": "在日历应用中打开截止日期文件以导入。有变化后再次打开即可导入新日期；大多数日历应用会更新事件，而不是重复添加。",
   "settings.calendar.open": "在日历中打开",
+  "settings.calendar.denied": "macOS 不允许工具箱使用你的日历，因此你的截止日期没有更新。",
+  "settings.calendar.openPrivacy": "打开系统设置",
   "calendar.error.calendarAccess": "工具箱没有使用日历的权限。请在“系统设置”>“隐私与安全性”>“日历”中允许。",
   "calendar.error.calendarUnavailable": "你的日历服务没有响应。请先打开一次日历应用，然后重试。",
   "calendar.error.fallback": "无法更新日历。",

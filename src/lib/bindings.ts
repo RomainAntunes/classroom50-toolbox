@@ -91,6 +91,11 @@ export const commands = {
 	 *  comes from the settings, not the UI.
 	 */
 	openCalendarFile: () => __TAURI_INVOKE<null>("open_calendar_file"),
+	/**
+	 *  Opens the OS's privacy settings for calendars, where access turned off since the
+	 *  calendar was chosen is allowed again (macOS). The URL comes from Rust, not the UI.
+	 */
+	openCalendarPrivacy: () => __TAURI_INVOKE<null>("open_calendar_privacy"),
 	/**  The words of calendar event notes, from the UI's i18n. */
 	setCalendarLabels: (labels: CalendarLabels) => __TAURI_INVOKE<void>("set_calendar_labels", { labels }),
 	/**  The words of the tray menu, from the UI's i18n. */

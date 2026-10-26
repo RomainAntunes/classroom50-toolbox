@@ -128,6 +128,8 @@
   "settings.calendar.openLabel": "Ajouter à votre app de calendrier",
   "settings.calendar.openHint": "Ouvre le fichier des échéances dans votre app de calendrier pour l'importer. Ouvrez-le à nouveau après un changement pour importer les nouvelles dates ; la plupart des apps de calendrier mettent à jour les événements au lieu de les dupliquer.",
   "settings.calendar.open": "Ouvrir dans Calendrier",
+  "settings.calendar.denied": "macOS n'autorise pas la toolbox à utiliser vos calendriers : vos échéances ne sont plus mises à jour.",
+  "settings.calendar.openPrivacy": "Ouvrir Réglages Système",
   "calendar.error.calendarAccess": "La toolbox n'a pas accès à vos calendriers. Autorisez-la dans Réglages Système > Confidentialité et sécurité > Calendriers.",
   "calendar.error.calendarUnavailable": "Votre service de calendrier n'a pas répondu. Ouvrez une fois votre app de calendrier, puis réessayez.",
   "calendar.error.fallback": "Impossible de mettre à jour le calendrier.",

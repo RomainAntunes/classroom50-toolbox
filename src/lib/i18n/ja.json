@@ -126,6 +126,8 @@
   "settings.calendar.openLabel": "カレンダーアプリに追加",
   "settings.calendar.openHint": "期限のファイルをカレンダーアプリで開いて読み込みます。変更後にもう一度開くと新しい期限が読み込まれます。ほとんどのカレンダーアプリでは予定が重複せずに更新されます。",
   "settings.calendar.open": "カレンダーで開く",
+  "settings.calendar.denied": "macOS でツールボックスによるカレンダーの使用が許可されていないため、期限が更新されていません。",
+  "settings.calendar.openPrivacy": "システム設定を開く",
   "calendar.error.calendarAccess": "ツールボックスにカレンダーの使用が許可されていません。「システム設定」>「プライバシーとセキュリティ」>「カレンダー」で許可してください。",
   "calendar.error.calendarUnavailable": "カレンダーサービスが応答しませんでした。カレンダーアプリを一度開いてから、もう一度お試しください。",
   "calendar.error.fallback": "カレンダーを更新できませんでした。",

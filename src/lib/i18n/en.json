@@ -127,6 +127,8 @@
   "settings.calendar.openLabel": "Add to your calendar app",
   "settings.calendar.openHint": "Opens the due dates file in your calendar app to import it. Open it again after a change to import the new dates; most calendar apps update the events instead of adding them twice.",
   "settings.calendar.open": "Open in Calendar",
+  "settings.calendar.denied": "macOS doesn't allow the toolbox to use your calendars, so your due dates aren't updated.",
+  "settings.calendar.openPrivacy": "Open System Settings",
   "calendar.error.calendarAccess": "The toolbox isn't allowed to use your calendars. Allow it in System Settings > Privacy & Security > Calendars.",
   "calendar.error.calendarUnavailable": "Your calendar service didn't respond. Open your calendar app once, then try again.",
   "calendar.error.fallback": "Couldn't update the calendar.",

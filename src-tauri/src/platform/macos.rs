@@ -189,5 +189,9 @@ pub fn has_native_calendar() -> bool {
     true
 }
 
+pub fn calendar_privacy_url() -> Option<&'static str> {
+    Some("x-apple.systempreferences:com.apple.preference.security?Privacy_Calendars")
+}
+
 pub use calendar::{native_calendars, write_calendar};
 pub use login_item::{login_item_enabled, set_login_item};
