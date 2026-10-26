@@ -1,0 +1,395 @@
+{
+  "date": "2026-10-26",
+  "notes": {
+    "en": [
+      {
+        "kind": "new",
+        "text": "In Settings, under Tools, a new row lets git use your GitHub account, so git push and pull in a terminal or an editor work without a password. The toolbox asks before changing anything."
+      },
+      {
+        "kind": "new",
+        "text": "In Settings, under Tools, a tool's version is now a link to its release notes, so you can see what an update brings before running it."
+      },
+      {
+        "kind": "improved",
+        "text": "Buttons such as Check again, Check for updates, Pull and Submit now show a spinner while they work, so a quick click no longer looks like it did nothing."
+      },
+      {
+        "kind": "fixed",
+        "text": "The toolbox now checks for updates every 6 hours instead of once a day, so a new version no longer goes unnoticed for a whole day."
+      },
+      {
+        "kind": "fixed",
+        "text": "Comments that bots leave on your feedback pull request no longer show up as new feedback from your teacher."
+      },
+      {
+        "kind": "fixed",
+        "text": "On Windows on Arm, when the Classroom 50 extension can't install, the toolbox now explains why and how to fix it: install the x64 GitHub CLI, which Windows runs emulated."
+      }
+    ],
+    "fr": [
+      {
+        "kind": "new",
+        "text": "Dans Réglages, sous Outils, une nouvelle ligne permet à git d'utiliser votre compte GitHub : git push et pull dans un terminal ou un éditeur fonctionnent sans mot de passe. La toolbox demande avant de modifier quoi que ce soit."
+      },
+      {
+        "kind": "new",
+        "text": "Dans Réglages, sous Outils, la version d'un outil est maintenant un lien vers ses notes de version : vous pouvez voir ce qu'une mise à jour apporte avant de la lancer."
+      },
+      {
+        "kind": "improved",
+        "text": "Les boutons comme Vérifier à nouveau, Rechercher des mises à jour, Pull et Rendre affichent maintenant un indicateur de chargement pendant qu'ils travaillent, pour qu'un clic rapide ne semble plus sans effet."
+      },
+      {
+        "kind": "fixed",
+        "text": "La toolbox recherche maintenant les mises à jour toutes les 6 heures au lieu d'une fois par jour : une nouvelle version ne passe plus inaperçue pendant toute une journée."
+      },
+      {
+        "kind": "fixed",
+        "text": "Les commentaires laissés par des bots sur votre pull request Feedback ne s'affichent plus comme de nouveaux retours de votre enseignant."
+      },
+      {
+        "kind": "fixed",
+        "text": "Sur Windows sur Arm, quand l'extension Classroom 50 ne peut pas s'installer, la toolbox explique maintenant pourquoi et comment y remédier : installer la version x64 de GitHub CLI, que Windows exécute en émulation."
+      }
+    ],
+    "es": [
+      {
+        "kind": "new",
+        "text": "En Ajustes, en Herramientas, una nueva fila permite que git use tu cuenta de GitHub, así git push y pull en una terminal o un editor funcionan sin contraseña. La toolbox pregunta antes de cambiar nada."
+      },
+      {
+        "kind": "new",
+        "text": "En Ajustes, en Herramientas, la versión de cada herramienta ahora es un enlace a sus notas de la versión, así puedes ver qué trae una actualización antes de instalarla."
+      },
+      {
+        "kind": "improved",
+        "text": "Los botones como Comprobar de nuevo, Buscar actualizaciones, Pull y Entregar ahora muestran un indicador de carga mientras trabajan, así un clic rápido ya no parece no haber hecho nada."
+      },
+      {
+        "kind": "fixed",
+        "text": "La toolbox ahora busca actualizaciones cada 6 horas en lugar de una vez al día, así una nueva versión ya no pasa desapercibida durante un día entero."
+      },
+      {
+        "kind": "fixed",
+        "text": "Los comentarios que dejan los bots en tu pull request Feedback ya no aparecen como nuevos comentarios de tu docente."
+      },
+      {
+        "kind": "fixed",
+        "text": "En Windows en Arm, cuando la extensión de Classroom 50 no se puede instalar, la toolbox ahora explica por qué y cómo solucionarlo: instalar la versión x64 de GitHub CLI, que Windows ejecuta emulada."
+      }
+    ],
+    "de": [
+      {
+        "kind": "new",
+        "text": "In den Einstellungen unter Werkzeuge gibt es eine neue Zeile, mit der git dein GitHub-Konto verwendet, sodass git push und pull im Terminal oder in einem Editor ohne Passwort funktionieren. Die Toolbox fragt, bevor sie etwas ändert."
+      },
+      {
+        "kind": "new",
+        "text": "In den Einstellungen unter Werkzeuge ist die Version eines Werkzeugs jetzt ein Link zu seinen Versionshinweisen, sodass du vor dem Aktualisieren siehst, was ein Update bringt."
+      },
+      {
+        "kind": "improved",
+        "text": "Schaltflächen wie Erneut prüfen, Nach Updates suchen, Pull und Abgeben zeigen jetzt ein Ladesymbol, solange sie arbeiten, damit ein schneller Klick nicht mehr wirkungslos aussieht."
+      },
+      {
+        "kind": "fixed",
+        "text": "Die Toolbox sucht jetzt alle 6 Stunden statt einmal am Tag nach Updates, sodass eine neue Version nicht mehr einen ganzen Tag lang unbemerkt bleibt."
+      },
+      {
+        "kind": "fixed",
+        "text": "Kommentare, die Bots in deinem Feedback-Pull-Request hinterlassen, erscheinen nicht mehr als neues Feedback deiner Lehrperson."
+      },
+      {
+        "kind": "fixed",
+        "text": "Unter Windows on Arm erklärt die Toolbox jetzt, warum sich die Classroom 50-Erweiterung nicht installieren lässt und wie du das löst: mit der x64-Version der GitHub CLI, die Windows emuliert ausführt."
+      }
+    ],
+    "it": [
+      {
+        "kind": "new",
+        "text": "In Impostazioni, sotto Strumenti, una nuova riga permette a git di usare il tuo account GitHub, così git push e pull in un terminale o in un editor funzionano senza password. L'app chiede prima di cambiare qualcosa."
+      },
+      {
+        "kind": "new",
+        "text": "In Impostazioni, sotto Strumenti, la versione di uno strumento ora è un link alle sue note di rilascio, così puoi vedere cosa porta un aggiornamento prima di avviarlo."
+      },
+      {
+        "kind": "improved",
+        "text": "I pulsanti come Controlla di nuovo, Controlla aggiornamenti, Pull e Consegna ora mostrano un indicatore di caricamento mentre lavorano, così un clic veloce non sembra più senza effetto."
+      },
+      {
+        "kind": "fixed",
+        "text": "L'app ora controlla gli aggiornamenti ogni 6 ore invece che una volta al giorno, così una nuova versione non passa più inosservata per un giorno intero."
+      },
+      {
+        "kind": "fixed",
+        "text": "I commenti lasciati dai bot sulla tua pull request Feedback non compaiono più come nuovo feedback dell'insegnante."
+      },
+      {
+        "kind": "fixed",
+        "text": "Su Windows su Arm, quando l'estensione Classroom 50 non si può installare, l'app ora spiega perché e come risolvere: installare la versione x64 di GitHub CLI, che Windows esegue in emulazione."
+      }
+    ],
+    "pt-BR": [
+      {
+        "kind": "new",
+        "text": "Em Configurações, em Ferramentas, uma nova linha permite que o git use sua conta do GitHub, então git push e pull em um terminal ou editor funcionam sem senha. O app pergunta antes de mudar qualquer coisa."
+      },
+      {
+        "kind": "new",
+        "text": "Em Configurações, em Ferramentas, a versão de cada ferramenta agora é um link para as notas da versão, então você pode ver o que uma atualização traz antes de instalá-la."
+      },
+      {
+        "kind": "improved",
+        "text": "Botões como Verificar de novo, Verificar atualizações, Pull e Entregar agora mostram um indicador de carregamento enquanto trabalham, então um clique rápido não parece mais que não fez nada."
+      },
+      {
+        "kind": "fixed",
+        "text": "O app agora verifica atualizações a cada 6 horas em vez de uma vez por dia, então uma nova versão não passa mais despercebida por um dia inteiro."
+      },
+      {
+        "kind": "fixed",
+        "text": "Comentários deixados por bots no seu pull request Feedback não aparecem mais como novo feedback do seu professor."
+      },
+      {
+        "kind": "fixed",
+        "text": "No Windows no Arm, quando a extensão do Classroom 50 não consegue ser instalada, o app agora explica por quê e como resolver: instalar a versão x64 do GitHub CLI, que o Windows executa por emulação."
+      }
+    ],
+    "pt-PT": [
+      {
+        "kind": "new",
+        "text": "Em Definições, em Ferramentas, uma nova linha permite que o git use a tua conta GitHub, para que git push e pull num terminal ou editor funcionem sem palavra-passe. A app pergunta antes de alterar o que quer que seja."
+      },
+      {
+        "kind": "new",
+        "text": "Em Definições, em Ferramentas, a versão de cada ferramenta é agora uma ligação para as notas de versão, para que possas ver o que uma atualização traz antes de a instalar."
+      },
+      {
+        "kind": "improved",
+        "text": "Botões como Verificar novamente, Procurar atualizações, Pull e Entregar mostram agora um indicador de carregamento enquanto trabalham, para que um clique rápido já não pareça não ter feito nada."
+      },
+      {
+        "kind": "fixed",
+        "text": "A app procura agora atualizações a cada 6 horas em vez de uma vez por dia, para que uma nova versão já não passe despercebida durante um dia inteiro."
+      },
+      {
+        "kind": "fixed",
+        "text": "Os comentários deixados por bots no teu pull request Feedback já não aparecem como novo feedback do teu professor."
+      },
+      {
+        "kind": "fixed",
+        "text": "No Windows em Arm, quando a extensão do Classroom 50 não se consegue instalar, a app explica agora porquê e como resolver: instalar a versão x64 do GitHub CLI, que o Windows executa em emulação."
+      }
+    ],
+    "nl": [
+      {
+        "kind": "new",
+        "text": "In Instellingen, onder Tools, kun je git met een nieuwe regel je GitHub-account laten gebruiken, zodat git push en pull in een terminal of editor zonder wachtwoord werken. De toolbox vraagt het eerst voordat er iets verandert."
+      },
+      {
+        "kind": "new",
+        "text": "In Instellingen, onder Tools, is de versie van een tool nu een link naar de releasenotes, zodat je kunt zien wat een update brengt voordat je die uitvoert."
+      },
+      {
+        "kind": "improved",
+        "text": "Knoppen zoals Opnieuw controleren, Controleren op updates, Pull en Inleveren tonen nu een laadindicator terwijl ze bezig zijn, zodat een snelle klik niet meer lijkt alsof er niets gebeurde."
+      },
+      {
+        "kind": "fixed",
+        "text": "De toolbox controleert nu elke 6 uur op updates in plaats van één keer per dag, zodat een nieuwe versie niet meer een hele dag onopgemerkt blijft."
+      },
+      {
+        "kind": "fixed",
+        "text": "Opmerkingen die bots in je Feedback-pull request plaatsen, verschijnen niet meer als nieuwe feedback van je docent."
+      },
+      {
+        "kind": "fixed",
+        "text": "Op Windows on Arm legt de toolbox nu uit waarom de Classroom 50-extensie niet kan worden geïnstalleerd en hoe je dat oplost: met de x64-versie van GitHub CLI, die Windows geëmuleerd uitvoert."
+      }
+    ],
+    "pl": [
+      {
+        "kind": "new",
+        "text": "W Ustawieniach, w sekcji Narzędzia, nowy wiersz pozwala git używać twojego konta GitHub, więc git push i pull w terminalu lub edytorze działają bez hasła. Toolbox pyta, zanim cokolwiek zmieni."
+      },
+      {
+        "kind": "new",
+        "text": "W Ustawieniach, w sekcji Narzędzia, wersja narzędzia jest teraz linkiem do informacji o wydaniu, więc możesz zobaczyć, co przynosi aktualizacja, zanim ją uruchomisz."
+      },
+      {
+        "kind": "improved",
+        "text": "Przyciski takie jak Sprawdź ponownie, Sprawdź aktualizacje, Pull i Oddaj pokazują teraz wskaźnik ładowania podczas pracy, więc szybkie kliknięcie nie wygląda już, jakby nic nie zrobiło."
+      },
+      {
+        "kind": "fixed",
+        "text": "Toolbox sprawdza teraz aktualizacje co 6 godzin zamiast raz dziennie, więc nowa wersja nie pozostaje już niezauważona przez cały dzień."
+      },
+      {
+        "kind": "fixed",
+        "text": "Komentarze botów w twoim pull requeście Feedback nie pojawiają się już jako nowe uwagi od nauczyciela."
+      },
+      {
+        "kind": "fixed",
+        "text": "Na Windows na Arm, gdy nie da się zainstalować rozszerzenia Classroom 50, Toolbox wyjaśnia teraz dlaczego i jak to naprawić: zainstalować wersję x64 GitHub CLI, którą Windows uruchamia w emulacji."
+      }
+    ],
+    "tr": [
+      {
+        "kind": "new",
+        "text": "Ayarlar'da, Araçlar altında yeni bir satır git'in GitHub hesabınızı kullanmasını sağlar; böylece terminalde veya bir düzenleyicide git push ve pull parolasız çalışır. Toolbox bir şeyi değiştirmeden önce sorar."
+      },
+      {
+        "kind": "new",
+        "text": "Ayarlar'da, Araçlar altında bir aracın sürümü artık sürüm notlarına giden bir bağlantı; böylece bir güncellemenin ne getirdiğini çalıştırmadan önce görebilirsiniz."
+      },
+      {
+        "kind": "improved",
+        "text": "Yeniden denetle, Güncellemeleri denetle, Pull ve Teslim et gibi düğmeler artık çalışırken bir yükleniyor göstergesi gösteriyor; böylece hızlı bir tıklama artık hiçbir şey yapmamış gibi görünmüyor."
+      },
+      {
+        "kind": "fixed",
+        "text": "Toolbox artık güncellemeleri günde bir kez yerine 6 saatte bir denetliyor; böylece yeni bir sürüm artık bütün gün fark edilmeden kalmıyor."
+      },
+      {
+        "kind": "fixed",
+        "text": "Botların Feedback pull request'inize bıraktığı yorumlar artık öğretmeninizden gelen yeni geri bildirim olarak görünmüyor."
+      },
+      {
+        "kind": "fixed",
+        "text": "Arm üzerinde Windows'ta Classroom 50 uzantısı yüklenemediğinde Toolbox artık nedenini ve nasıl çözüleceğini açıklıyor: Windows'un emülasyonla çalıştırdığı x64 GitHub CLI'ı yükleyin."
+      }
+    ],
+    "ar": [
+      {
+        "kind": "new",
+        "text": "في الإعدادات، ضمن الأدوات، يتيح سطر جديد لـ git استخدام حساب GitHub، فيعمل git push وpull في الطرفية أو المحرر دون كلمة مرور. يطلب التطبيق التأكيد قبل أي تغيير."
+      },
+      {
+        "kind": "new",
+        "text": "في الإعدادات، ضمن الأدوات، أصبح إصدار كل أداة رابطًا إلى ملاحظات الإصدار، لمعرفة ما يحمله التحديث قبل تشغيله."
+      },
+      {
+        "kind": "improved",
+        "text": "تعرض الأزرار مثل إعادة الفحص والبحث عن تحديثات وPull وتسليم الآن مؤشر تحميل أثناء عملها، فلا تبدو النقرة السريعة وكأنها لم تفعل شيئًا."
+      },
+      {
+        "kind": "fixed",
+        "text": "يبحث التطبيق الآن عن التحديثات كل 6 ساعات بدلًا من مرة واحدة يوميًا، فلم يعد الإصدار الجديد يمرّ دون ملاحظة طوال يوم كامل."
+      },
+      {
+        "kind": "fixed",
+        "text": "لم تعد التعليقات التي تتركها الروبوتات على pull request الملاحظات تظهر كملاحظات جديدة من فريق التدريس."
+      },
+      {
+        "kind": "fixed",
+        "text": "على Windows على Arm، عند تعذّر تثبيت إضافة Classroom 50، يوضّح التطبيق الآن السبب وطريقة الحل: تثبيت إصدار x64 من GitHub CLI، الذي يشغّله Windows بالمحاكاة."
+      }
+    ],
+    "he": [
+      {
+        "kind": "new",
+        "text": "בהגדרות, תחת כלים, שורה חדשה מאפשרת ל-git להשתמש בחשבון GitHub, כך ש-git push ו-pull בטרמינל או בעורך עובדים בלי סיסמה. האפליקציה מבקשת אישור לפני כל שינוי."
+      },
+      {
+        "kind": "new",
+        "text": "בהגדרות, תחת כלים, הגרסה של כל כלי היא עכשיו קישור להערות הגרסה שלו, כך שאפשר לראות מה עדכון מביא לפני שמריצים אותו."
+      },
+      {
+        "kind": "improved",
+        "text": "כפתורים כמו בדיקה חוזרת, בדיקת עדכונים, Pull והגשה מציגים עכשיו סמל טעינה בזמן שהם פועלים, כך שלחיצה מהירה כבר לא נראית כאילו לא קרה כלום."
+      },
+      {
+        "kind": "fixed",
+        "text": "האפליקציה בודקת עכשיו עדכונים כל 6 שעות במקום פעם ביום, כך שגרסה חדשה כבר לא מתעכבת יום שלם עד שהיא מופיעה."
+      },
+      {
+        "kind": "fixed",
+        "text": "תגובות שבוטים משאירים ב-pull request של המשוב כבר לא מופיעות כמשוב חדש מצוות הקורס."
+      },
+      {
+        "kind": "fixed",
+        "text": "ב-Windows על Arm, כשאי אפשר להתקין את התוסף של Classroom 50, האפליקציה מסבירה עכשיו למה ואיך לפתור את זה: להתקין את גרסת x64 של GitHub CLI, ש-Windows מריץ באמולציה."
+      }
+    ],
+    "zh-Hans": [
+      {
+        "kind": "new",
+        "text": "在设置的工具下，新增一行可让git使用你的GitHub账号，这样在终端或编辑器中git push和pull无需密码。工具箱在更改任何内容前都会先询问。"
+      },
+      {
+        "kind": "new",
+        "text": "在设置的工具下，每个工具的版本号现在是指向其发行说明的链接，你可以在更新前先看看更新带来了什么。"
+      },
+      {
+        "kind": "improved",
+        "text": "重新检查、检查更新、拉取和上交等按钮现在会在运行时显示加载图标，快速点击后不会再像没有反应一样。"
+      },
+      {
+        "kind": "fixed",
+        "text": "工具箱现在每6小时检查一次更新，而不是每天一次，新版本不会再整整一天都没被发现。"
+      },
+      {
+        "kind": "fixed",
+        "text": "机器人在你的反馈拉取请求中留下的评论，不再显示为老师的新反馈。"
+      },
+      {
+        "kind": "fixed",
+        "text": "在Windows on Arm上，当Classroom 50扩展无法安装时，工具箱现在会说明原因和解决方法：安装x64版GitHub CLI，Windows会以仿真方式运行它。"
+      }
+    ],
+    "ja": [
+      {
+        "kind": "new",
+        "text": "設定の「ツール」に新しい項目が加わり、gitがGitHubアカウントを使えるようになりました。ターミナルやエディターでのgit pushとpullがパスワードなしで動作します。変更する前に必ず確認します。"
+      },
+      {
+        "kind": "new",
+        "text": "設定の「ツール」で、各ツールのバージョンがリリースノートへのリンクになりました。アップデートする前に、その内容を確認できます。"
+      },
+      {
+        "kind": "improved",
+        "text": "再確認、アップデートを確認、プル、提出などのボタンは、処理中に読み込みアイコンを表示するようになりました。すぐに終わるクリックでも、何も起きなかったように見えなくなります。"
+      },
+      {
+        "kind": "fixed",
+        "text": "アップデートの確認が1日1回から6時間ごとになりました。新しいバージョンが丸1日気づかれないままになることはなくなります。"
+      },
+      {
+        "kind": "fixed",
+        "text": "ボットがフィードバックのpull requestに残したコメントは、先生からの新しいフィードバックとして表示されなくなりました。"
+      },
+      {
+        "kind": "fixed",
+        "text": "Windows on ArmでClassroom 50の拡張機能をインストールできないとき、その理由と解決方法を説明するようになりました。Windowsがエミュレーションで実行するx64版のGitHub CLIをインストールしてください。"
+      }
+    ],
+    "ko": [
+      {
+        "kind": "new",
+        "text": "설정의 도구에 새 항목이 생겨 git이 GitHub 계정을 사용할 수 있어요. 그래서 터미널이나 편집기에서 git push와 pull이 암호 없이 작동해요. 무언가를 바꾸기 전에 먼저 물어봐요."
+      },
+      {
+        "kind": "new",
+        "text": "설정의 도구에서 각 도구의 버전이 이제 릴리스 노트로 연결되는 링크가 됐어요. 그래서 업데이트하기 전에 무엇이 바뀌는지 볼 수 있어요."
+      },
+      {
+        "kind": "improved",
+        "text": "다시 확인, 업데이트 확인, 끌어오기, 제출 같은 버튼이 이제 작업하는 동안 로딩 아이콘을 보여 줘요. 그래서 빠르게 끝나는 클릭도 아무 일도 없었던 것처럼 보이지 않아요."
+      },
+      {
+        "kind": "fixed",
+        "text": "이제 도구 상자가 하루에 한 번이 아니라 6시간마다 업데이트를 확인해요. 그래서 새 버전을 하루 종일 놓치는 일이 없어요."
+      },
+      {
+        "kind": "fixed",
+        "text": "봇이 피드백 끌어오기 요청에 남긴 의견은 더 이상 선생님의 새 피드백으로 표시되지 않아요."
+      },
+      {
+        "kind": "fixed",
+        "text": "Arm용 Windows에서 Classroom 50 확장을 설치할 수 없을 때, 이제 도구 상자가 이유와 해결 방법을 알려 줘요. Windows가 에뮬레이션으로 실행하는 x64용 GitHub CLI를 설치하면 돼요."
+      }
+    ]
+  }
+}
