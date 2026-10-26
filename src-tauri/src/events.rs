@@ -72,6 +72,8 @@ events! {
     DeepLinkWaiting = "deep-link" => ();
     /// The popover hid: the UI drops what it only showed for the moment.
     PopoverHidden = "popover-hidden" => ();
+    /// The popover showed: the UI refreshes what it paused while hidden.
+    PopoverShown = "popover-shown" => ();
     /// The global shortcut showed the popover: the list takes the keyboard focus.
     PopoverShortcut = "popover-shortcut" => ();
 }

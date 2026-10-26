@@ -559,6 +559,8 @@ export type Events_Deserialize = {
 	"deep-link": null,
 	/**  The popover hid: the UI drops what it only showed for the moment. */
 	"popover-hidden": null,
+	/**  The popover showed: the UI refreshes what it paused while hidden. */
+	"popover-shown": null,
 	/**  The global shortcut showed the popover: the list takes the keyboard focus. */
 	"popover-shortcut": null,
 };
@@ -587,6 +589,8 @@ export type Events_Serialize = {
 	"deep-link": null,
 	/**  The popover hid: the UI drops what it only showed for the moment. */
 	"popover-hidden": null,
+	/**  The popover showed: the UI refreshes what it paused while hidden. */
+	"popover-shown": null,
 	/**  The global shortcut showed the popover: the list takes the keyboard focus. */
 	"popover-shortcut": null,
 };

@@ -3,12 +3,15 @@
   import logo from "#lib/assets/logo.png";
   import { onMount } from "svelte";
   import { goto } from "$app/navigation";
+  import { getCurrentWindow } from "@tauri-apps/api/window";
   import { Menu, MenuItem } from "@tauri-apps/api/menu";
   import {
     api,
     onEvent,
     errorMessage,
+    POPOVER_HIDDEN_EVENT,
     POPOVER_SHORTCUT_EVENT,
+    POPOVER_SHOWN_EVENT,
     PROJECTS_UPDATED_EVENT,
     SYNC_PROGRESS_EVENT,
     type AuthStatus,
@@ -279,9 +282,32 @@
     (row ?? searchField)?.focus();
   }
 
+  // Keeps "due in ..." labels current while the popover is open. Hidden, it stops: every
+  // tick re-renders each row, which nobody would see.
+  let tick: ReturnType<typeof setInterval> | undefined;
+  function startTick() {
+    stopTick();
+    tick = setInterval(() => (now = new Date()), 60_000);
+  }
+  function stopTick() {
+    clearInterval(tick);
+    tick = undefined;
+  }
+
   onMount(() => {
     load();
+    // This page also mounts hidden: at startup, and when the popover hides on Settings.
+    void getCurrentWindow()
+      .isVisible()
+      .then((visible) => {
+        if (visible) startTick();
+      });
     const unlisteners = [
+      onEvent(POPOVER_SHOWN_EVENT, () => {
+        now = new Date();
+        startTick();
+      }),
+      onEvent(POPOVER_HIDDEN_EVENT, stopTick),
       onEvent(POPOVER_SHORTCUT_EVENT, focusList),
       onEvent(SYNC_PROGRESS_EVENT, (progress) => {
         session.progress = progress;
@@ -297,10 +323,8 @@
         now = new Date();
       }),
     ];
-    // Keeps "due in ..." labels current while the popover stays open.
-    const tick = setInterval(() => (now = new Date()), 60_000);
     return () => {
-      clearInterval(tick);
+      stopTick();
       for (const unlisten of unlisteners) void unlisten.then((stop) => stop());
     };
   });

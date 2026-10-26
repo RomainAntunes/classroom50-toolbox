@@ -147,6 +147,8 @@ export const SETTINGS_UPDATED_EVENT = "settings-updated" satisfies EventName;
 export const DEEP_LINK_EVENT = "deep-link" satisfies EventName;
 /** The popover hid. */
 export const POPOVER_HIDDEN_EVENT = "popover-hidden" satisfies EventName;
+/** The popover showed. */
+export const POPOVER_SHOWN_EVENT = "popover-shown" satisfies EventName;
 /** The global shortcut showed the popover: the list takes the keyboard focus. */
 export const POPOVER_SHORTCUT_EVENT = "popover-shortcut" satisfies EventName;
 

@@ -9,7 +9,7 @@ use tauri::{
     AppHandle, LogicalPosition, Manager, Monitor, PhysicalPosition, WebviewWindow, WindowEvent,
 };
 
-use crate::events::{IpcEvent, PopoverHidden, PopoverShortcut};
+use crate::events::{IpcEvent, PopoverHidden, PopoverShortcut, PopoverShown};
 use crate::settings::{Appearance, SettingsStore};
 
 pub const LABEL: &str = "main";
@@ -124,6 +124,7 @@ fn show_at(app: &AppHandle, icon: Option<Area>) {
     }
     let _ = window.show();
     let _ = window.set_focus();
+    let _ = PopoverShown::emit(app, &());
     crate::projects::refresh_if_stale(app);
 }
 
