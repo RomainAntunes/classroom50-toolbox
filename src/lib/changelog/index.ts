@@ -2,7 +2,14 @@
 // and translated in the bump PR). The What's new page shows them after an update.
 import { compareVersions, type Changelog, type Entry } from "./versions.js";
 
-const files = import.meta.glob<Changelog>("./*.json", { eager: true, import: "default" });
+// No type argument on the call: Vitest's module cache keeps a module whose source holds
+// `import.meta.glob(` out of the cache, since its result depends on other files, and
+// `glob<Changelog>(` would get cached with the files of the run that cached it, so a new
+// changelog file wouldn't be seen.
+const files = import.meta.glob("./*.json", { eager: true, import: "default" }) as Record<
+  string,
+  Changelog
+>;
 
 /** Every changelog, by version (`0.10.0`). */
 export const changelogs: Record<string, Changelog> = Object.fromEntries(
