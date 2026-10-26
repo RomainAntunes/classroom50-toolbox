@@ -73,6 +73,8 @@ pnpm test:e2e -g "submit"          # the flows whose name matches
 pnpm test:e2e:debug                # headed, with Playwright's inspector
 pnpm e2e:shots                     # screenshots per skin, light and dark, into e2e-shots/ (SHOTS_LOCALE=de)
 pnpm site:shots                    # the site's and README's screenshots, into site/screenshots/ (needs cwebp)
+pnpm profile:power [min] [dir]     # macOS: the running app's CPU, energy, memory and wakeups every 2 s, into profile-out/<date>/
+node scripts/profile-power/report.mjs <dir> [--compare <older dir>]  # its report.html, before/after against an older capture
 # WebDriver smoke suite, Linux only (tauri-driver, webkit2gtk-driver, xvfb); CI runs it
 pnpm tauri build --debug --no-bundle
 cd e2e && pnpm install && dbus-run-session -- xvfb-run -a -s "-screen 0 1280x1024x24" pnpm test
