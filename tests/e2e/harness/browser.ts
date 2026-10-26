@@ -277,6 +277,8 @@ export function install(scenario: Scenario): E2E {
       }
       case "plugin:notification|is_permission_granted":
         return true;
+      case "plugin:window|is_visible":
+        return true;
     }
     if (
       cmd.startsWith("plugin:menu|") ||

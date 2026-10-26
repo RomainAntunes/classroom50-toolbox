@@ -282,6 +282,10 @@ pub fn has_native_calendar() -> bool {
     false
 }
 
+pub fn calendar_privacy_url() -> Option<&'static str> {
+    None
+}
+
 pub fn set_login_item(_enabled: bool) -> Option<Result<()>> {
     None
 }

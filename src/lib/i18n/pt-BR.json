@@ -128,6 +128,8 @@
   "settings.calendar.openLabel": "Adicionar ao seu app de calendário",
   "settings.calendar.openHint": "Abre o arquivo de prazos no seu app de calendário para importá-lo. Abra de novo depois de uma mudança para importar as novas datas; a maioria dos apps de calendário atualiza os eventos em vez de adicioná-los duas vezes.",
   "settings.calendar.open": "Abrir no Calendário",
+  "settings.calendar.denied": "O macOS não permite que o app use seus calendários, então seus prazos não estão sendo atualizados.",
+  "settings.calendar.openPrivacy": "Abrir Ajustes do Sistema",
   "calendar.error.calendarAccess": "O app não tem permissão para usar seus calendários. Permita em Ajustes do Sistema > Privacidade e Segurança > Calendários.",
   "calendar.error.calendarUnavailable": "Seu serviço de calendário não respondeu. Abra seu app de calendário uma vez e tente de novo.",
   "calendar.error.fallback": "Não foi possível atualizar o calendário.",

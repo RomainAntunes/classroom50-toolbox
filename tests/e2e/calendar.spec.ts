@@ -172,3 +172,32 @@ test("calendar access refused is worded by kind", async ({ app }) => {
   await app.expectDialog(["Allow it in System Settings > Privacy & Security > Calendars."], "ok");
   expect(await app.calls("set_native_calendar")).toEqual([]);
 });
+
+test("access turned off since the calendar was chosen says so and opens System Settings", async ({
+  app,
+}) => {
+  const section = await openCalendar(app, {
+    settings: settings({ nativeCalendar: "cal-2" }),
+    responses: {
+      native_calendars: [fail("calendarAccess")],
+      open_calendar_privacy: [ok()],
+    },
+  });
+  await expect(section).toContainText(
+    "macOS doesn't allow the toolbox to use your calendars, so your due dates aren't updated.",
+  );
+  await section.getByRole("button", { name: "Open System Settings" }).click();
+  await app.waitForCall("open_calendar_privacy");
+  expect(await app.writes()).toEqual([]);
+});
+
+test("a chosen calendar with access shows no warning", async ({ app }) => {
+  const section = await openCalendar(app, {
+    settings: settings({ nativeCalendar: "cal-2" }),
+    responses: {
+      native_calendars: [ok([{ id: "cal-2", title: "School", account: "On My Mac" }])],
+    },
+  });
+  await expect(section).toContainText('Due dates are kept in "School (On My Mac)".');
+  await expect(section.getByRole("button", { name: "Open System Settings" })).toHaveCount(0);
+});

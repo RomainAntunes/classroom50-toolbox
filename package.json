@@ -21,7 +21,8 @@
     "test:e2e:debug": "playwright test --headed --debug",
     "e2e:shots": "playwright test --config tests/e2e/shots.config.ts",
     "site:shots": "playwright test --config tests/e2e/showcase.config.ts",
-    "bump": "node scripts/bump-version.mjs"
+    "bump": "node scripts/bump-version.mjs",
+    "profile:power": "scripts/profile-power/capture.sh"
   },
   "dependencies": {
     "@tauri-apps/api": "^2",

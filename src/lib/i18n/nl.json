@@ -127,6 +127,8 @@
   "settings.calendar.openLabel": "Aan je agenda-app toevoegen",
   "settings.calendar.openHint": "Opent het bestand met deadlines in je agenda-app om het te importeren. Open het na een wijziging opnieuw om de nieuwe data te importeren; de meeste agenda-apps werken de afspraken dan bij in plaats van ze dubbel toe te voegen.",
   "settings.calendar.open": "Openen in Agenda",
+  "settings.calendar.denied": "macOS staat de toolbox niet toe je agenda's te gebruiken, dus je deadlines worden niet bijgewerkt.",
+  "settings.calendar.openPrivacy": "Systeeminstellingen openen",
   "calendar.error.calendarAccess": "De toolbox mag je agenda's niet gebruiken. Sta het toe in Systeeminstellingen > Privacy en beveiliging > Agenda's.",
   "calendar.error.calendarUnavailable": "Je agendaservice reageerde niet. Open je agenda-app één keer en probeer het dan opnieuw.",
   "calendar.error.fallback": "Kan de agenda niet bijwerken.",

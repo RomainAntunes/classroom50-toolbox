@@ -90,12 +90,15 @@ pub fn rewatch(app: &AppHandle, targets: Vec<WatchTarget>) {
     tauri::async_runtime::spawn(async move {
         while let Some(path) = rx.recv().await {
             tokio::time::sleep(DEBOUNCE).await;
-            let mut pushed = is_remote_ref(&path);
+            // The ref that made the burst a push, logged rather than the burst's first path.
+            let mut pushed = is_remote_ref(&path).then(|| path.clone());
             while let Ok(path) = rx.try_recv() {
-                pushed |= is_remote_ref(&path);
+                if pushed.is_none() && is_remote_ref(&path) {
+                    pushed = Some(path);
+                }
             }
-            if pushed {
-                log::info!("remote refs changed in {path:?}; checking GitHub");
+            if let Some(remote_ref) = pushed {
+                log::info!("remote refs changed in {remote_ref:?}; checking GitHub");
                 let app = app.clone();
                 tauri::async_runtime::spawn(async move {
                     projects::refresh_after_push(&app).await;

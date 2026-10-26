@@ -127,6 +127,8 @@
   "settings.calendar.openLabel": "Takvim uygulamasına ekle",
   "settings.calendar.openHint": "Teslim tarihleri dosyasını içe aktarmak için takvim uygulamanızda açar. Bir değişiklikten sonra yeni tarihleri içe aktarmak için yeniden açın; çoğu takvim uygulaması etkinlikleri iki kez eklemek yerine günceller.",
   "settings.calendar.open": "Takvim'de aç",
+  "settings.calendar.denied": "macOS, Toolbox'ın takvimlerinizi kullanmasına izin vermiyor; bu yüzden teslim tarihleriniz güncellenmiyor.",
+  "settings.calendar.openPrivacy": "Sistem Ayarları'nı aç",
   "calendar.error.calendarAccess": "Toolbox'ın takvimlerinizi kullanma izni yok. Sistem Ayarları > Gizlilik ve Güvenlik > Takvimler bölümünden izin verin.",
   "calendar.error.calendarUnavailable": "Takvim hizmetiniz yanıt vermedi. Takvim uygulamanızı bir kez açın, sonra yeniden deneyin.",
   "calendar.error.fallback": "Takvim güncellenemedi.",

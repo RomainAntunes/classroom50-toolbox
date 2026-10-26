@@ -127,6 +127,8 @@
   "settings.calendar.openLabel": "Zu deiner Kalender-App hinzufügen",
   "settings.calendar.openHint": "Öffnet die Datei mit den Abgabeterminen in deiner Kalender-App zum Importieren. Öffne sie nach einer Änderung erneut, um die neuen Termine zu importieren; die meisten Kalender-Apps aktualisieren die Termine, statt sie doppelt anzulegen.",
   "settings.calendar.open": "In Kalender öffnen",
+  "settings.calendar.denied": "macOS erlaubt der Toolbox nicht, deine Kalender zu verwenden, deshalb werden deine Abgabetermine nicht aktualisiert.",
+  "settings.calendar.openPrivacy": "Systemeinstellungen öffnen",
   "calendar.error.calendarAccess": "Die Toolbox darf deine Kalender nicht verwenden. Erlaube es unter Systemeinstellungen > Datenschutz & Sicherheit > Kalender.",
   "calendar.error.calendarUnavailable": "Dein Kalenderdienst hat nicht geantwortet. Öffne deine Kalender-App einmal und versuche es dann erneut.",
   "calendar.error.fallback": "Der Kalender konnte nicht aktualisiert werden.",

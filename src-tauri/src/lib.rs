@@ -73,6 +73,7 @@ macro_rules! ipc_commands {
             crate::commands::export_calendar,
             crate::commands::native_calendars,
             crate::commands::open_calendar_file,
+            crate::commands::open_calendar_privacy,
             crate::commands::set_calendar_labels,
             crate::commands::set_tray_labels,
             crate::commands::system_languages,

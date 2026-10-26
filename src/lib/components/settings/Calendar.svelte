@@ -19,7 +19,14 @@
     current,
     info,
     calendars = $bindable(),
-  }: { current: Settings; info: AppInfo | null; calendars: NativeCalendar[] } = $props();
+    denied = $bindable(false),
+  }: {
+    current: Settings;
+    info: AppInfo | null;
+    calendars: NativeCalendar[];
+    /** macOS denies calendar access, turned off since the calendar was chosen. */
+    denied?: boolean;
+  } = $props();
 
   let exported = $state<number | null>(null);
   async function exportCalendar(): Promise<boolean> {
@@ -72,6 +79,14 @@
     calendars.find((c) => c.id === settings.current?.nativeCalendar) ?? null,
   );
 
+  async function openPrivacy() {
+    try {
+      await api.openCalendarPrivacy();
+    } catch (err) {
+      await withDialog(() => message(errorMessage(err), { kind: "error" }));
+    }
+  }
+
   async function setNativeCalendar(id: string | null) {
     writing = true;
     try {
@@ -88,6 +103,7 @@
       // The first call raises macOS's access prompt, which takes focus: pinned, the popover
       // stays on Settings for the menu that follows.
       calendars = await withDialog(() => api.nativeCalendars());
+      denied = false;
     } catch (err) {
       await calendarError(err);
       return;
@@ -140,6 +156,12 @@
         )}</button
       >
     </div>
+    {#if denied && current.nativeCalendar}
+      <div class="row">
+        <span class="text denied">{t("settings.calendar.denied")}</span>
+        <button onclick={openPrivacy}>{t("settings.calendar.openPrivacy")}</button>
+      </div>
+    {/if}
   {/if}
   <div class="row">
     <span class="text">
@@ -178,4 +200,8 @@
   @import "./row.css";
   @import "./label.css";
   @import "./path.css";
+
+  .denied {
+    color: var(--warning);
+  }
 </style>

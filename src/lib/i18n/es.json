@@ -128,6 +128,8 @@
   "settings.calendar.openLabel": "Añadir a tu app de calendario",
   "settings.calendar.openHint": "Abre el archivo de fechas de entrega en tu app de calendario para importarlo. Vuelve a abrirlo después de un cambio para importar las nuevas fechas; la mayoría de las apps de calendario actualizan los eventos en lugar de duplicarlos.",
   "settings.calendar.open": "Abrir en Calendario",
+  "settings.calendar.denied": "macOS no permite que la toolbox use tus calendarios, así que tus fechas de entrega no se actualizan.",
+  "settings.calendar.openPrivacy": "Abrir Ajustes del Sistema",
   "calendar.error.calendarAccess": "La toolbox no tiene permiso para usar tus calendarios. Permítelo en Ajustes del Sistema > Privacidad y seguridad > Calendarios.",
   "calendar.error.calendarUnavailable": "Tu servicio de calendario no respondió. Abre tu app de calendario una vez y vuelve a intentarlo.",
   "calendar.error.fallback": "No se pudo actualizar el calendario.",

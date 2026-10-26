@@ -300,6 +300,9 @@ pub struct CalendarState {
     /// (`again`), so writes behind a slow calendar (Akonadi starting) never pile up.
     busy: AtomicBool,
     again: AtomicBool,
+    /// The last background write's error, so one that repeats (access turned off) is
+    /// logged once rather than after every sync.
+    last_error: Mutex<Option<String>>,
 }
 
 impl CalendarState {
@@ -316,7 +319,30 @@ impl CalendarState {
             labels: Mutex::default(),
             busy: AtomicBool::new(false),
             again: AtomicBool::new(false),
+            last_error: Mutex::default(),
         }
+    }
+
+    /// Logs a background write's failure when it differs from the last one, and the
+    /// recovery once. Returns whether it logged.
+    fn note_write(&self, error: Option<String>) -> bool {
+        let Ok(mut last) = self.last_error.lock() else {
+            return false;
+        };
+        let logged = match (&error, last.as_ref()) {
+            (Some(err), Some(prev)) if err == prev => false,
+            (Some(err), _) => {
+                log::warn!("could not update the calendar: {err}");
+                true
+            }
+            (None, Some(_)) => {
+                log::info!("the calendar is updated again");
+                true
+            }
+            (None, None) => false,
+        };
+        *last = error;
+        logged
     }
 
     /// Returns true when the words changed.
@@ -395,9 +421,11 @@ pub fn sync(app: &AppHandle) {
                         let Some(id) = app.state::<SettingsStore>().get().native_calendar else {
                             break;
                         };
-                        if let Err(err) = write_native(&app, Some(id)).await {
-                            log::warn!("could not update the calendar: {err}");
-                        }
+                        let error = write_native(&app, Some(id))
+                            .await
+                            .err()
+                            .map(|e| e.to_string());
+                        let _ = state.note_write(error);
                     }
                     state.busy.store(false, Ordering::SeqCst);
                     // A sync that came in between the last check and now.
@@ -471,6 +499,22 @@ mod tests {
     use super::*;
     use crate::classroom50::{Assignment, Classroom};
     use crate::projects::Unaccepted;
+
+    #[test]
+    fn a_repeated_write_failure_is_logged_once() {
+        let dir = std::env::temp_dir().join("c50-calendar-note-write");
+        let state = CalendarState::load(&dir, &dir);
+        let denied = || Some("calendar access isn't allowed".to_owned());
+        assert!(state.note_write(denied()));
+        assert!(!state.note_write(denied()));
+        assert!(state.note_write(Some("that calendar no longer exists".into())));
+        assert!(state.note_write(None), "the recovery is logged");
+        assert!(!state.note_write(None));
+        assert!(
+            state.note_write(denied()),
+            "a new failure after a success is logged"
+        );
+    }
 
     fn assignment(name: &str, due: Option<&str>) -> Assignment {
         serde_json::from_value(serde_json::json!({

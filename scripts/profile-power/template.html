@@ -1,0 +1,966 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Classroom 50 Toolbox: power profile</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <style>
+      .viz-root {
+        color-scheme: light;
+        --page: #f9f9f7;
+        --surface-1: #fcfcfb;
+        --text-primary: #0b0b0b;
+        --text-secondary: #52514e;
+        --muted: #898781;
+        --grid: #e1e0d9;
+        --axis: #c3c2b7;
+        --border: rgba(11, 11, 11, 0.1);
+        --series-1: #2a78d6;
+        --series-2: #eb6834;
+        --series-3: #1baf7a;
+        --series-4: #eda100;
+        --good: #006300;
+        --wash: rgba(11, 11, 11, 0.04);
+      }
+      @media (prefers-color-scheme: dark) {
+        :root:where(:not([data-theme="light"])) .viz-root {
+          color-scheme: dark;
+          --page: #0d0d0d;
+          --surface-1: #1a1a19;
+          --text-primary: #ffffff;
+          --text-secondary: #c3c2b7;
+          --muted: #898781;
+          --grid: #2c2c2a;
+          --axis: #383835;
+          --border: rgba(255, 255, 255, 0.1);
+          --series-1: #3987e5;
+          --series-2: #d95926;
+          --series-3: #199e70;
+          --series-4: #c98500;
+          --good: #0ca30c;
+          --wash: rgba(255, 255, 255, 0.05);
+        }
+      }
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+      }
+      .viz-root {
+        background: var(--page);
+        color: var(--text-primary);
+        min-height: 100vh;
+        font:
+          14px/1.45 system-ui,
+          -apple-system,
+          "Segoe UI",
+          sans-serif;
+        padding: 32px 40px 64px;
+      }
+      main {
+        max-width: 1120px;
+        margin: 0 auto;
+      }
+      h1 {
+        font-size: 22px;
+        font-weight: 600;
+        margin: 0 0 4px;
+      }
+      h2 {
+        font-size: 15px;
+        font-weight: 600;
+        margin: 0 0 2px;
+      }
+      .sub {
+        color: var(--text-secondary);
+        margin: 0 0 12px;
+        font-size: 13px;
+      }
+      .lede {
+        color: var(--text-secondary);
+        margin: 0 0 24px;
+      }
+      .tiles {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+        gap: 12px;
+        margin-bottom: 24px;
+      }
+      .tile,
+      .card {
+        background: var(--surface-1);
+        border: 1px solid var(--border);
+        border-radius: 12px;
+      }
+      .tile {
+        padding: 14px 16px;
+      }
+      .tile .label {
+        color: var(--text-secondary);
+        font-size: 12px;
+      }
+      .tile .value {
+        font-size: 26px;
+        font-weight: 600;
+        margin-top: 2px;
+      }
+      .tile .note {
+        color: var(--muted);
+        font-size: 12px;
+      }
+      .tile.hero .value {
+        font-size: 48px;
+        line-height: 1.1;
+      }
+      .card {
+        padding: 18px 20px 14px;
+        margin-bottom: 16px;
+        position: relative;
+      }
+      .grid2 {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 16px;
+      }
+      @media (max-width: 900px) {
+        .grid2 {
+          grid-template-columns: 1fr;
+        }
+      }
+      .legend {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 14px;
+        font-size: 12px;
+        color: var(--text-secondary);
+        margin: 4px 0 8px;
+      }
+      .legend span {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+      }
+      .key-line {
+        width: 14px;
+        height: 2px;
+        border-radius: 1px;
+        display: inline-block;
+      }
+      .key-rect {
+        width: 10px;
+        height: 10px;
+        border-radius: 2px;
+        display: inline-block;
+      }
+      .key-tick {
+        width: 2px;
+        height: 10px;
+        background: var(--muted);
+        display: inline-block;
+      }
+      svg {
+        display: block;
+        width: 100%;
+        overflow: visible;
+      }
+      svg text {
+        fill: var(--muted);
+        font-size: 11px;
+        font-variant-numeric: tabular-nums;
+      }
+      svg .label-strong {
+        fill: var(--text-secondary);
+      }
+      .tooltip {
+        position: absolute;
+        pointer-events: none;
+        background: var(--surface-1);
+        border: 1px solid var(--border);
+        border-radius: 8px;
+        padding: 8px 10px;
+        font-size: 12px;
+        box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12);
+        display: none;
+        z-index: 5;
+        min-width: 150px;
+      }
+      .tooltip .head {
+        color: var(--text-secondary);
+        margin-bottom: 4px;
+      }
+      .tooltip .row {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+      }
+      .tooltip .row b {
+        font-weight: 600;
+        min-width: 48px;
+        font-variant-numeric: tabular-nums;
+      }
+      .tooltip .row .n {
+        color: var(--text-secondary);
+      }
+      .tooltip .ev {
+        color: var(--text-secondary);
+        margin-top: 4px;
+        border-top: 1px solid var(--border);
+        padding-top: 4px;
+        max-width: 320px;
+      }
+      table {
+        border-collapse: collapse;
+        width: 100%;
+        font-size: 12.5px;
+      }
+      th,
+      td {
+        text-align: start;
+        padding: 5px 8px;
+        border-bottom: 1px solid var(--grid);
+      }
+      th {
+        color: var(--text-secondary);
+        font-weight: 600;
+      }
+      td.num,
+      th.num {
+        text-align: end;
+        font-variant-numeric: tabular-nums;
+      }
+      details {
+        margin-top: 8px;
+      }
+      summary {
+        cursor: pointer;
+        color: var(--text-secondary);
+        font-size: 12.5px;
+      }
+      .badge {
+        display: inline-flex;
+        align-items: center;
+        gap: 4px;
+        font-size: 12px;
+        font-weight: 600;
+      }
+      .ok {
+        color: var(--good);
+      }
+      code {
+        font:
+          12px ui-monospace,
+          SFMono-Regular,
+          Menlo,
+          monospace;
+      }
+      .hit {
+        fill: transparent;
+      }
+      .bar:hover,
+      .bar:focus {
+        opacity: 0.8;
+        outline: none;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="viz-root">
+      <main>
+        <h1>Classroom 50 Toolbox: power profile</h1>
+        <p class="lede" id="lede"></p>
+        <div class="tiles" id="tiles"></div>
+
+        <div class="card" id="compare-card" hidden>
+          <h2>Compared with an older capture</h2>
+          <p class="sub">
+            The same measures for both. A window with a full sync, or with the popover or Settings
+            in use, reads busier, so compare captures made the same way.
+          </p>
+          <table id="compare">
+            <thead>
+              <tr>
+                <th>Version</th>
+                <th>Started</th>
+                <th class="num">Window</th>
+                <th class="num">CPU time, 4 processes</th>
+                <th class="num">Avg CPU</th>
+                <th class="num">Avg energy impact</th>
+                <th class="num">Idle wakeups/s</th>
+                <th class="num">Syncs</th>
+              </tr>
+            </thead>
+            <tbody></tbody>
+          </table>
+        </div>
+
+        <div class="card">
+          <h2>CPU over time</h2>
+          <p class="sub">
+            % of one core per process, sampled every 2 s. Ticks along the top are what the app
+            logged (syncs, rescans).
+          </p>
+          <div class="legend" id="leg-cpu"></div>
+          <div id="cpu"></div>
+        </div>
+
+        <div class="grid2">
+          <div class="card">
+            <h2>Energy impact over time</h2>
+            <p class="sub">
+              macOS "energy impact" score, all four processes summed (the number Activity Monitor
+              shows).
+            </p>
+            <div id="power"></div>
+          </div>
+          <div class="card">
+            <h2>Memory over time</h2>
+            <p class="sub">Memory footprint per process, MB.</p>
+            <div class="legend" id="leg-mem"></div>
+            <div id="mem"></div>
+          </div>
+        </div>
+
+        <div class="grid2">
+          <div class="card">
+            <h2>Idle wakeups per second</h2>
+            <p class="sub">
+              Average over the window. Wakeups keep the CPU from its deepest sleep, so they cost
+              battery even at 0% CPU.
+            </p>
+            <div id="wake"></div>
+          </div>
+          <div class="card">
+            <h2>Compared with the rest of the Mac</h2>
+            <p class="sub">
+              Energy impact of the top processes at the end of the window, with the toolbox's four
+              processes added.
+            </p>
+            <div id="context"></div>
+          </div>
+        </div>
+
+        <div class="card">
+          <h2>Syncs per hour, last 24 hours (from the app's log)</h2>
+          <p class="sub">
+            Status checks follow the nearest deadline: every 1 min in its last 3 h, every 2 within a
+            day, 5 within a week, else 15. Gaps are the Mac asleep.
+          </p>
+          <div class="legend" id="leg-hist"></div>
+          <div id="hist"></div>
+        </div>
+
+        <div class="card">
+          <h2>What the app did during the window</h2>
+          <p class="sub">
+            Log lines and the <code>gh</code> / <code>git</code> processes it started (polled every
+            0.5 s, so very short ones may be missed).
+          </p>
+          <table id="activity">
+            <thead>
+              <tr>
+                <th class="num">At</th>
+                <th>Source</th>
+                <th>What</th>
+              </tr>
+            </thead>
+            <tbody></tbody>
+          </table>
+        </div>
+
+        <div class="card">
+          <h2>Data</h2>
+          <table id="totals">
+            <thead>
+              <tr>
+                <th>Process</th>
+                <th class="num">CPU time used</th>
+                <th class="num">Avg CPU</th>
+                <th class="num">Peak CPU</th>
+                <th class="num">Avg energy</th>
+                <th class="num">Wakeups/s</th>
+                <th class="num">RSS start → end (MB)</th>
+              </tr>
+            </thead>
+            <tbody></tbody>
+          </table>
+          <details>
+            <summary>Every sample</summary>
+            <div id="raw" style="max-height: 360px; overflow: auto"></div>
+          </details>
+        </div>
+      </main>
+    </div>
+    <script>
+      const DATA = /*DATA*/ null;
+      const SERIES = DATA.names;
+      const COLOR = {
+        "App (Rust)": "var(--series-1)",
+        WebContent: "var(--series-2)",
+        "WebKit GPU": "var(--series-3)",
+        "WebKit Networking": "var(--series-4)",
+      };
+      const NS = "http://www.w3.org/2000/svg";
+      const rows = DATA.rows;
+      const fmt = (v, d = 1) =>
+        v.toLocaleString("en-US", { maximumFractionDigits: d, minimumFractionDigits: d });
+      const mmss = (s) => `${Math.floor(s / 60)}:${String(Math.round(s % 60)).padStart(2, "0")}`;
+      const avg = (a) => a.reduce((x, y) => x + y, 0) / (a.length || 1);
+      const el = (tag, attrs = {}, parent) => {
+        const e = document.createElementNS(NS, tag);
+        for (const k in attrs) e.setAttribute(k, attrs[k]);
+        if (parent) parent.appendChild(e);
+        return e;
+      };
+      const h = (tag, text, parent, cls) => {
+        const e = document.createElement(tag);
+        if (text != null) e.textContent = text;
+        if (cls) e.className = cls;
+        if (parent) parent.appendChild(e);
+        return e;
+      };
+      function niceMax(v) {
+        if (v <= 0) return 1;
+        const p = 10 ** Math.floor(Math.log10(v));
+        for (const m of [1, 2, 2.5, 5, 10]) if (m * p >= v) return m * p;
+      }
+      function legend(id, names, kind = "line") {
+        const box = document.getElementById(id);
+        for (const n of names) {
+          const s = h("span", null, box);
+          h("i", null, s, kind === "line" ? "key-line" : "key-rect").style.background =
+            COLOR[n] || n;
+          s.append(n);
+        }
+        if (kind === "line" && id === "leg-cpu") {
+          const s = h("span", null, box);
+          h("i", null, s, "key-tick");
+          s.append("Log event");
+        }
+      }
+      function tooltip(card) {
+        const t = h("div", null, card, "tooltip");
+        return t;
+      }
+      function placeTip(tip, card, x, y) {
+        tip.style.display = "block";
+        const w = tip.offsetWidth,
+          cw = card.clientWidth;
+        tip.style.left = Math.min(Math.max(x + 14, 0), cw - w - 4) + "px";
+        tip.style.top = y + 14 + "px";
+      }
+
+      // ---- line chart with crosshair ----
+      function lineChart(
+        id,
+        {
+          series,
+          get,
+          unit,
+          digits = 1,
+          height = 220,
+          events = false,
+          area = false,
+          single = null,
+        },
+      ) {
+        const host = document.getElementById(id),
+          card = host.closest(".card");
+        const W = host.clientWidth,
+          H = height,
+          m = { l: 44, r: 96, t: events ? 18 : 8, b: 24 };
+        const svg = el("svg", { viewBox: `0 0 ${W} ${H}`, height: H, role: "img" }, host);
+        const tmax = DATA.duration;
+        const vals = rows.flatMap((r) => series.map((s) => get(r, s)));
+        const ymax = niceMax(Math.max(...vals) * 1.1);
+        const x = (t) => m.l + (t / tmax) * (W - m.l - m.r),
+          y = (v) => H - m.b - (v / ymax) * (H - m.t - m.b);
+        for (let i = 0; i <= 4; i++) {
+          const v = (ymax * i) / 4;
+          el(
+            "line",
+            {
+              x1: m.l,
+              x2: W - m.r,
+              y1: y(v),
+              y2: y(v),
+              stroke: i ? "var(--grid)" : "var(--axis)",
+              "stroke-width": 1,
+            },
+            svg,
+          );
+          el("text", { x: m.l - 6, y: y(v) + 4, "text-anchor": "end" }, svg).textContent = fmt(
+            v,
+            Number.isInteger(ymax / 4) ? 0 : ((ymax / 4) * 10) % 1 === 0 ? 1 : 2,
+          );
+        }
+        for (let t = 0; t <= tmax; t += 60)
+          el("text", { x: x(t), y: H - 6, "text-anchor": "middle" }, svg).textContent = mmss(t);
+        if (events)
+          for (const e of DATA.events.concat(DATA.children.map((c) => ({ t: c.t, child: true })))) {
+            el(
+              "line",
+              {
+                x1: x(e.t),
+                x2: x(e.t),
+                y1: 2,
+                y2: 12,
+                stroke: "var(--muted)",
+                "stroke-width": e.child ? 1 : 2,
+                "stroke-linecap": "round",
+              },
+              svg,
+            );
+          }
+        const ends = [];
+        for (const s of series) {
+          const pts = rows.map((r) => [x(r.t), y(get(r, s))]);
+          const d = pts
+            .map((p, i) => (i ? "L" : "M") + p[0].toFixed(1) + "," + p[1].toFixed(1))
+            .join("");
+          const color = single || COLOR[s];
+          if (area)
+            el(
+              "path",
+              {
+                d: d + `L${pts.at(-1)[0]},${y(0)}L${pts[0][0]},${y(0)}Z`,
+                fill: color,
+                "fill-opacity": 0.1,
+              },
+              svg,
+            );
+          el(
+            "path",
+            {
+              d,
+              fill: "none",
+              stroke: color,
+              "stroke-width": 2,
+              "stroke-linejoin": "round",
+              "stroke-linecap": "round",
+            },
+            svg,
+          );
+          ends.push({ s, y: pts.at(-1)[1], v: get(rows.at(-1), s), color });
+        }
+        // end labels, only if they don't collide
+        ends.sort((a, b) => a.y - b.y);
+        const ok = ends.every((e, i) => !i || e.y - ends[i - 1].y >= 13);
+        if (ok)
+          for (const e of ends) {
+            el(
+              "circle",
+              {
+                cx: W - m.r,
+                cy: e.y,
+                r: 4,
+                fill: e.color,
+                stroke: "var(--surface-1)",
+                "stroke-width": 2,
+              },
+              svg,
+            );
+            el("text", { x: W - m.r + 8, y: e.y + 4, class: "label-strong" }, svg).textContent =
+              series.length > 1 ? e.s : fmt(e.v, digits) + " " + unit;
+          }
+        const cross = el(
+          "line",
+          { y1: m.t, y2: H - m.b, stroke: "var(--axis)", "stroke-width": 1, visibility: "hidden" },
+          svg,
+        );
+        const dots = series.map((s) =>
+          el(
+            "circle",
+            {
+              r: 4,
+              fill: single || COLOR[s],
+              stroke: "var(--surface-1)",
+              "stroke-width": 2,
+              visibility: "hidden",
+            },
+            svg,
+          ),
+        );
+        const tip = tooltip(card);
+        const hit = el(
+          "rect",
+          { x: m.l, y: 0, width: W - m.l - m.r, height: H - m.b, class: "hit", tabindex: 0 },
+          svg,
+        );
+        let idx = rows.length - 1;
+        function show(i, px, py) {
+          idx = Math.max(0, Math.min(rows.length - 1, i));
+          const r = rows[idx],
+            cx = x(r.t);
+          cross.setAttribute("x1", cx);
+          cross.setAttribute("x2", cx);
+          cross.setAttribute("visibility", "visible");
+          series.forEach((s, k) => {
+            dots[k].setAttribute("cx", cx);
+            dots[k].setAttribute("cy", y(get(r, s)));
+            dots[k].setAttribute("visibility", "visible");
+          });
+          tip.replaceChildren();
+          h("div", `${r.clock}  (+${mmss(r.t)})`, tip, "head");
+          const sorted = series.map((s) => [s, get(r, s)]).sort((a, b) => b[1] - a[1]);
+          for (const [s, v] of sorted) {
+            const row = h("div", null, tip, "row");
+            h("i", null, row, "key-line").style.background = single || COLOR[s];
+            h("b", fmt(v, digits) + " " + unit, row);
+            if (series.length > 1 || single) h("span", series.length > 1 ? s : "", row, "n");
+          }
+          if (events) {
+            const near = DATA.events
+              .filter((e) => Math.abs(e.t - r.t) <= 3)
+              .map((e) => e.msg)
+              .concat(
+                DATA.children
+                  .filter((c) => Math.abs(c.t - r.t) <= 3)
+                  .map((c) => "started " + c.cmd),
+              );
+            for (const n of near.slice(0, 4)) h("div", n, tip, "ev");
+          }
+          const box = host.getBoundingClientRect(),
+            cb = card.getBoundingClientRect();
+          placeTip(
+            tip,
+            card,
+            (px ?? (cx * box.width) / W) + box.left - cb.left,
+            (py ?? 20) + box.top - cb.top,
+          );
+        }
+        const nearest = (t) => {
+          let b = 0;
+          rows.forEach((r, i) => {
+            if (Math.abs(r.t - t) < Math.abs(rows[b].t - t)) b = i;
+          });
+          return b;
+        };
+        hit.addEventListener("pointermove", (ev) => {
+          const b = host.getBoundingClientRect();
+          const sx = ((ev.clientX - b.left) * W) / b.width;
+          show(
+            nearest(((sx - m.l) / (W - m.l - m.r)) * tmax),
+            ev.clientX - b.left,
+            ev.clientY - b.top,
+          );
+        });
+        const hide = () => {
+          tip.style.display = "none";
+          cross.setAttribute("visibility", "hidden");
+          dots.forEach((d) => d.setAttribute("visibility", "hidden"));
+        };
+        hit.addEventListener("pointerleave", hide);
+        hit.addEventListener("blur", hide);
+        hit.addEventListener("focus", () => show(idx));
+        hit.addEventListener("keydown", (e) => {
+          if (e.key === "ArrowRight") show(idx + 1);
+          if (e.key === "ArrowLeft") show(idx - 1);
+        });
+      }
+
+      // ---- horizontal bars ----
+      function hbars(id, items, { unit, digits = 1, highlight }) {
+        const host = document.getElementById(id),
+          card = host.closest(".card");
+        const W = host.clientWidth,
+          rowH = 26,
+          m = { l: 150, r: 60 };
+        const H = items.length * rowH + 4;
+        const svg = el("svg", { viewBox: `0 0 ${W} ${H}`, height: H }, host);
+        const max = niceMax(Math.max(...items.map((i) => i.v)) || 1);
+        const tip = tooltip(card);
+        items.forEach((it, i) => {
+          const yy = i * rowH + 4,
+            w = Math.max(it.v > 0 ? 2 : 0, (it.v / max) * (W - m.l - m.r));
+          el(
+            "text",
+            {
+              x: m.l - 8,
+              y: yy + 13,
+              "text-anchor": "end",
+              class: highlight?.(it) ? "label-strong" : "",
+            },
+            svg,
+          ).textContent = it.name;
+          const g = el("g", { class: "bar", tabindex: 0 }, svg);
+          el("rect", { x: m.l, y: yy - 2, width: W - m.l, height: rowH, class: "hit" }, g);
+          const r = Math.min(4, w / 2);
+          el(
+            "path",
+            {
+              d: `M${m.l},${yy + 2}h${w - r}a${r},${r} 0 0 1 ${r},${r}v${16 - 2 * r}a${r},${r} 0 0 1 -${r},${r}h-${w - r}z`,
+              fill: it.color || "var(--axis)",
+            },
+            g,
+          );
+          el("text", { x: m.l + w + 6, y: yy + 14, class: "label-strong" }, svg).textContent = fmt(
+            it.v,
+            digits,
+          );
+          const show = (px, py) => {
+            tip.replaceChildren();
+            h("div", it.name, tip, "head");
+            const row = h("div", null, tip, "row");
+            h("b", fmt(it.v, digits) + " " + unit, row);
+            if (it.note) h("div", it.note, tip, "ev");
+            const b = host.getBoundingClientRect(),
+              cb = card.getBoundingClientRect();
+            placeTip(tip, card, (px ?? m.l + w) + b.left - cb.left, (py ?? yy) + b.top - cb.top);
+          };
+          g.addEventListener("pointermove", (ev) => {
+            const b = host.getBoundingClientRect();
+            show(ev.clientX - b.left, ev.clientY - b.top);
+          });
+          g.addEventListener("focus", () => show());
+          g.addEventListener("pointerleave", () => (tip.style.display = "none"));
+          g.addEventListener("blur", () => (tip.style.display = "none"));
+        });
+      }
+
+      // ---- stacked columns for history ----
+      function history(id) {
+        const host = document.getElementById(id),
+          card = host.closest(".card");
+        const kinds = ["Status", "Full", "Local"],
+          col = { Status: "var(--series-1)", Full: "var(--series-2)", Local: "var(--series-3)" };
+        const data = DATA.history;
+        const W = host.clientWidth,
+          H = 200,
+          m = { l: 36, r: 8, t: 8, b: 24 };
+        const svg = el("svg", { viewBox: `0 0 ${W} ${H}`, height: H }, host);
+        const max = niceMax(Math.max(...data.map((d) => kinds.reduce((a, k) => a + d[k], 0))));
+        const y = (v) => H - m.b - (v / max) * (H - m.t - m.b);
+        for (let i = 0; i <= 4; i++) {
+          const v = (max * i) / 4;
+          el(
+            "line",
+            { x1: m.l, x2: W - m.r, y1: y(v), y2: y(v), stroke: i ? "var(--grid)" : "var(--axis)" },
+            svg,
+          );
+          el("text", { x: m.l - 6, y: y(v) + 4, "text-anchor": "end" }, svg).textContent = fmt(
+            v,
+            0,
+          );
+        }
+        const band = (W - m.l - m.r) / data.length,
+          bw = Math.min(24, band - 4);
+        const tip = tooltip(card);
+        data.forEach((d, i) => {
+          const cx = m.l + band * i + band / 2;
+          let base = 0;
+          const g = el("g", { class: "bar", tabindex: 0 }, svg);
+          el(
+            "rect",
+            { x: cx - band / 2, y: m.t, width: band, height: H - m.t - m.b, class: "hit" },
+            g,
+          );
+          const stack = kinds.filter((k) => d[k] > 0);
+          stack.forEach((k, j) => {
+            const y0 = y(base),
+              y1 = y(base + d[k]);
+            base += d[k];
+            const top = j === stack.length - 1,
+              hgt = Math.max(0, y0 - y1 - (j ? 2 : 0));
+            const yy = y0 - (j ? 2 : 0) - hgt,
+              r = top ? Math.min(4, hgt / 2, bw / 2) : 0;
+            el(
+              "path",
+              {
+                d: `M${cx - bw / 2},${yy + hgt}v${-(hgt - r)}a${r},${r} 0 0 1 ${r},-${r}h${bw - 2 * r}a${r},${r} 0 0 1 ${r},${r}v${hgt - r}z`,
+                fill: col[k],
+              },
+              g,
+            );
+          });
+          if (i % 2 === 0)
+            el("text", { x: cx, y: H - 6, "text-anchor": "middle" }, svg).textContent =
+              d.hour.slice(11, 13) + "h";
+          const show = (px, py) => {
+            tip.replaceChildren();
+            h("div", d.hour, tip, "head");
+            for (const k of kinds) {
+              const row = h("div", null, tip, "row");
+              h("i", null, row, "key-line").style.background = col[k];
+              h("b", String(d[k]), row);
+              h("span", k + " sync", row, "n");
+            }
+            const b = host.getBoundingClientRect(),
+              cb = card.getBoundingClientRect();
+            placeTip(tip, card, (px ?? cx) + b.left - cb.left, (py ?? 20) + b.top - cb.top);
+          };
+          g.addEventListener("pointermove", (ev) => {
+            const b = host.getBoundingClientRect();
+            show(ev.clientX - b.left, ev.clientY - b.top);
+          });
+          g.addEventListener("focus", () => show());
+          g.addEventListener("pointerleave", () => (tip.style.display = "none"));
+          g.addEventListener("blur", () => (tip.style.display = "none"));
+        });
+        const box = document.getElementById("leg-hist");
+        for (const k of kinds) {
+          const s = h("span", null, box);
+          h("i", null, s, "key-rect").style.background = col[k];
+          s.append(k + " sync");
+        }
+      }
+
+      // ---- numbers ----
+      const stat = {};
+      for (const s of SERIES) {
+        const c = rows.map((r) => r[s].cpu),
+          p = rows.map((r) => r[s].power),
+          w = rows.map((r) => r[s].wake);
+        stat[s] = {
+          cpuAvg: avg(c),
+          cpuPeak: Math.max(...c),
+          powAvg: avg(p),
+          wake: avg(w),
+          ...DATA.totals[s],
+        };
+      }
+      const total = rows.map((r) => SERIES.reduce((a, s) => a + r[s].cpu, 0));
+      const totalPow = rows.map((r) => SERIES.reduce((a, s) => a + r[s].power, 0));
+      const cpuSecs = SERIES.reduce((a, s) => a + (stat[s].cpuSeconds ?? 0), 0);
+      const memEnd = SERIES.reduce((a, s) => a + rows.at(-1)[s].mem, 0);
+      const wakeTotal = SERIES.reduce((a, s) => a + stat[s].wake, 0);
+      const syncs = DATA.events.filter((e) => /sync:/.test(e.msg)).length;
+
+      document.getElementById("lede").textContent =
+        `${DATA.version}, ${DATA.start} to ${DATA.end} (${mmss(DATA.duration)}), ${rows.length} samples. The app (pid ${DATA.pids[0]}) and its WebKit helpers. Power: ${DATA.battStart
+          .replace(/Now drawing from /, "")
+          .split(" -")[0]
+          .replace(/'/g, "")
+          .trim()}.` +
+        (DATA.endedEarly ? " The app quit during the capture (an update?), so it ends there." : "");
+      const tiles = document.getElementById("tiles");
+      function tile(label, value, note, hero) {
+        const t = h("div", null, tiles, "tile" + (hero ? " hero" : ""));
+        h("div", label, t, "label");
+        h("div", value, t, "value");
+        if (note) h("div", note, t, "note");
+      }
+      tile("Average CPU, all 4 processes", fmt(avg(total), 2) + "%", "of one core", true);
+      tile(
+        "CPU time used",
+        fmt(cpuSecs, 2) + " s",
+        fmt((cpuSecs / DATA.duration) * 100, 3) + "% of one core",
+      );
+      tile("Average energy impact", fmt(avg(totalPow), 2), "peak " + fmt(Math.max(...totalPow), 1));
+      tile("Peak CPU, one sample", fmt(Math.max(...total), 1) + "%", "2-second sample");
+      tile("Idle wakeups", fmt(wakeTotal, 1) + "/s", "all 4 processes");
+      tile("Memory footprint", fmt(memEnd, 0) + " MB", "all 4, at the end");
+      tile("Syncs / gh + git runs", `${syncs} / ${DATA.children.length}`, "in the window");
+
+      legend("leg-cpu", SERIES);
+      legend("leg-mem", SERIES);
+      lineChart("cpu", {
+        series: SERIES,
+        get: (r, s) => r[s].cpu,
+        unit: "%",
+        events: true,
+        height: 240,
+      });
+      lineChart("power", {
+        series: ["Energy impact"],
+        get: (r) => SERIES.reduce((a, s) => a + r[s].power, 0),
+        unit: "",
+        single: "var(--series-1)",
+        area: true,
+        events: true,
+      });
+      lineChart("mem", { series: SERIES, get: (r, s) => r[s].mem, unit: "MB", digits: 0 });
+      hbars(
+        "wake",
+        SERIES.map((s) => ({ name: s, v: stat[s].wake, color: COLOR[s] })),
+        { unit: "wakeups/s" },
+      );
+      const ctx = DATA.context
+        .filter((c) => !DATA.pids.includes(c.pid) && c.name !== "top")
+        .slice(0, 10)
+        .map((c) => ({ name: c.name, v: c.power, note: `pid ${c.pid}, ${fmt(c.cpu)}% CPU` }));
+      ctx.push({
+        name: "Classroom 50 Toolbox",
+        v: avg(totalPow),
+        color: "var(--series-1)",
+        note: "4 processes, average over the window",
+      });
+      ctx.sort((a, b) => b.v - a.v);
+      hbars("context", ctx, { unit: "energy impact", highlight: (i) => i.color });
+      history("hist");
+
+      // activity table
+      const act = DATA.events
+        .map((e) => ({ t: e.t, src: "log · " + e.module, what: e.msg }))
+        .concat(DATA.children.map((c) => ({ t: c.t, src: "process", what: c.cmd })))
+        .sort((a, b) => a.t - b.t);
+      const tb = document.querySelector("#activity tbody");
+      if (!act.length) {
+        const tr = h("tr", null, tb);
+        const td = h("td", "Nothing logged and no process started.", tr);
+        td.colSpan = 3;
+      }
+      for (const a of act) {
+        const tr = h("tr", null, tb);
+        h("td", "+" + mmss(a.t), tr, "num");
+        h("td", a.src, tr);
+        h("td", a.what, tr);
+      }
+
+      const tt = document.querySelector("#totals tbody");
+      for (const s of SERIES) {
+        const st = stat[s],
+          tr = h("tr", null, tt);
+        const name = h("td", null, tr);
+        const k = h("i", null, name, "key-rect");
+        k.style.background = COLOR[s];
+        k.style.marginInlineEnd = "6px";
+        name.append(s);
+        h("td", st.cpuSeconds == null ? "n/a" : fmt(st.cpuSeconds, 2) + " s", tr, "num");
+        h("td", fmt(st.cpuAvg, 2) + "%", tr, "num");
+        h("td", fmt(st.cpuPeak, 1) + "%", tr, "num");
+        h("td", fmt(st.powAvg, 2), tr, "num");
+        h("td", fmt(st.wake, 1), tr, "num");
+        h(
+          "td",
+          `${st.rssStart == null ? "n/a" : fmt(st.rssStart, 0)} → ${st.rssEnd == null ? "n/a" : fmt(st.rssEnd, 0)}`,
+          tr,
+          "num",
+        );
+      }
+      const raw = h("table", null, document.getElementById("raw"));
+      const hr = h("tr", null, h("thead", null, raw));
+      h("th", "Time", hr);
+      for (const s of SERIES) {
+        h("th", s + " CPU %", hr, "num");
+        h("th", "energy", hr, "num");
+        h("th", "MB", hr, "num");
+      }
+      const rb = h("tbody", null, raw);
+      for (const r of rows) {
+        const tr = h("tr", null, rb);
+        h("td", r.clock, tr);
+        for (const s of SERIES) {
+          h("td", fmt(r[s].cpu), tr, "num");
+          h("td", fmt(r[s].power), tr, "num");
+          h("td", fmt(r[s].mem, 0), tr, "num");
+        }
+      }
+
+      // before / after
+      const cb = document.querySelector("#compare tbody");
+      document.getElementById("compare-card").hidden = !DATA.compare.length;
+      for (const c of DATA.compare) {
+        const tr = h("tr", null, cb);
+        h("td", c.version, tr);
+        h("td", c.start, tr);
+        h("td", mmss(c.duration), tr, "num");
+        h("td", fmt(c.cpuSeconds, 2) + " s", tr, "num");
+        h("td", fmt(c.cpuAvg, 2) + "%", tr, "num");
+        h("td", fmt(c.power, 2), tr, "num");
+        h("td", fmt(c.wake, 1), tr, "num");
+        h("td", String(c.syncs), tr, "num");
+      }
+    </script>
+  </body>
+</html>

@@ -4,6 +4,7 @@
   import { openUrl } from "@tauri-apps/plugin-opener";
   import {
     api,
+    errorKind,
     onEvent,
     PROJECTS_UPDATED_EVENT,
     type AppInfo,
@@ -34,6 +35,7 @@
   let network = $state<SimulatedNetwork>("normal");
   // Loaded with the page and named by the Calendar section's menu.
   let calendars = $state<NativeCalendar[]>([]);
+  let calendarDenied = $state(false);
 
   let checkingTools = $state(false);
   async function checkTools() {
@@ -58,9 +60,13 @@
       ([appInfo, loaded, details]) => {
         info = appInfo;
         sync = details;
-        // Names the chosen calendar; access was granted when it was chosen.
+        // Names the chosen calendar. Access was granted when it was chosen, but may have
+        // been turned off since in System Settings: the section then says so.
         if (appInfo.nativeCalendar && loaded.nativeCalendar) {
-          void api.nativeCalendars().then((list) => (calendars = list));
+          void api.nativeCalendars().then(
+            (list) => (calendars = list),
+            (err: unknown) => (calendarDenied = errorKind(err) === "calendarAccess"),
+          );
         }
       },
     );
@@ -88,7 +94,7 @@
 
     <RemindersSection {current} />
 
-    <CalendarSection {current} {info} bind:calendars />
+    <CalendarSection {current} {info} bind:calendars bind:denied={calendarDenied} />
 
     <SyncSection bind:sync />
 

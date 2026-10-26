@@ -188,3 +188,42 @@ test("Clear cache spins until the list is rebuilt", async ({ app, page }) => {
   await expect(clear).toHaveAttribute("aria-busy", "false");
   await expect(clear).toBeEnabled();
 });
+
+test("the synced label ticks while the popover is open and stops while it is hidden", async ({
+  app,
+  page,
+}) => {
+  await page.clock.install({ time: new Date() });
+  const at = new Date().toISOString();
+  await app.start(scenario({ snapshot: snapshot({ ...list, syncedAt: at, checkedAt: at }) }));
+  await expect(page.getByText("Synced just now")).toBeVisible();
+  await page.clock.runFor(2 * 60_000);
+  await expect(page.getByText("Synced 2 minutes ago")).toBeVisible();
+
+  // Hidden, nothing re-renders: the label keeps the last minute it showed.
+  await app.emit("popover-hidden", null);
+  await page.clock.runFor(5 * 60_000);
+  await expect(page.getByText("Synced 2 minutes ago")).toBeVisible();
+
+  await app.emit("popover-shown", null);
+  await expect(page.getByText("Synced 7 minutes ago")).toBeVisible();
+  await page.clock.runFor(60_000);
+  await expect(page.getByText("Synced 8 minutes ago")).toBeVisible();
+});
+
+test("a list that mounts hidden doesn't tick until the popover shows", async ({ app, page }) => {
+  await page.clock.install({ time: new Date() });
+  const at = new Date().toISOString();
+  await app.start(
+    scenario({
+      snapshot: snapshot({ ...list, syncedAt: at, checkedAt: at }),
+      responses: { "plugin:window|is_visible": [ok(false)] },
+    }),
+  );
+  await expect(page.getByText("Synced just now")).toBeVisible();
+  await page.clock.runFor(3 * 60_000);
+  await expect(page.getByText("Synced just now")).toBeVisible();
+
+  await app.emit("popover-shown", null);
+  await expect(page.getByText("Synced 3 minutes ago")).toBeVisible();
+});
