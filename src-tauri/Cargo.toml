@@ -1,6 +1,6 @@
 [package]
 name = "classroom50-toolbox"
-version = "0.13.0"
+version = "0.14.0-beta.1"
 description = "Tray toolbox for Classroom 50 students"
 authors = ["Romain Antunes"]
 license = "GPL-3.0-only"

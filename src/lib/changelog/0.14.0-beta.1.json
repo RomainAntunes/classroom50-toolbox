@@ -1,0 +1,155 @@
+{
+  "date": "2026-10-26",
+  "notes": {
+    "en": [
+      {
+        "kind": "improved",
+        "text": "The toolbox now does less work while its window is hidden, so it uses a little less battery."
+      },
+      {
+        "kind": "fixed",
+        "text": "On macOS, Settings now says under Calendar when macOS no longer allows calendar access, with a button that opens the privacy settings so you can allow it again."
+      }
+    ],
+    "fr": [
+      {
+        "kind": "improved",
+        "text": "La toolbox travaille maintenant moins lorsque sa fenêtre est masquée : elle consomme un peu moins de batterie."
+      },
+      {
+        "kind": "fixed",
+        "text": "Sur macOS, Réglages indique maintenant sous Calendrier quand macOS n'autorise plus l'accès au calendrier, avec un bouton qui ouvre les réglages de confidentialité pour l'autoriser à nouveau."
+      }
+    ],
+    "es": [
+      {
+        "kind": "improved",
+        "text": "La toolbox ahora trabaja menos mientras su ventana está oculta, así gasta un poco menos de batería."
+      },
+      {
+        "kind": "fixed",
+        "text": "En macOS, Ajustes ahora avisa en Calendario cuando macOS ya no permite el acceso al calendario, con un botón que abre los ajustes de privacidad para que vuelvas a permitirlo."
+      }
+    ],
+    "de": [
+      {
+        "kind": "improved",
+        "text": "Die Toolbox arbeitet jetzt weniger, solange ihr Fenster ausgeblendet ist, und verbraucht so etwas weniger Akku."
+      },
+      {
+        "kind": "fixed",
+        "text": "Unter macOS zeigen die Einstellungen unter Kalender jetzt an, wenn macOS keinen Zugriff auf den Kalender mehr erlaubt, mit einer Schaltfläche, die die Datenschutzeinstellungen öffnet, damit du ihn wieder erlauben kannst."
+      }
+    ],
+    "it": [
+      {
+        "kind": "improved",
+        "text": "L'app ora lavora meno mentre la sua finestra è nascosta, così consuma un po' meno batteria."
+      },
+      {
+        "kind": "fixed",
+        "text": "Su macOS, Impostazioni ora segnala sotto Calendario quando macOS non consente più l'accesso al calendario, con un pulsante che apre le impostazioni della privacy per consentirlo di nuovo."
+      }
+    ],
+    "pt-BR": [
+      {
+        "kind": "improved",
+        "text": "O app agora trabalha menos enquanto a janela está oculta, então gasta um pouco menos de bateria."
+      },
+      {
+        "kind": "fixed",
+        "text": "No macOS, Configurações agora avisa em Calendário quando o macOS não permite mais o acesso ao calendário, com um botão que abre as configurações de privacidade para você permitir de novo."
+      }
+    ],
+    "pt-PT": [
+      {
+        "kind": "improved",
+        "text": "A app trabalha agora menos enquanto a janela está oculta, para gastar um pouco menos de bateria."
+      },
+      {
+        "kind": "fixed",
+        "text": "No macOS, Definições avisa agora em Calendário quando o macOS já não permite o acesso ao calendário, com um botão que abre as definições de privacidade para o voltares a permitir."
+      }
+    ],
+    "nl": [
+      {
+        "kind": "improved",
+        "text": "De toolbox doet nu minder werk terwijl het venster verborgen is, zodat hij iets minder batterij gebruikt."
+      },
+      {
+        "kind": "fixed",
+        "text": "Op macOS meldt Instellingen nu onder Agenda wanneer macOS geen toegang tot de agenda meer toestaat, met een knop die de privacyinstellingen opent zodat je het weer kunt toestaan."
+      }
+    ],
+    "pl": [
+      {
+        "kind": "improved",
+        "text": "Toolbox wykonuje teraz mniej pracy, gdy jego okno jest ukryte, więc zużywa trochę mniej baterii."
+      },
+      {
+        "kind": "fixed",
+        "text": "Na macOS Ustawienia informują teraz w sekcji Kalendarz, gdy macOS nie pozwala już na dostęp do kalendarza, i pokazują przycisk otwierający ustawienia prywatności, gdzie można go ponownie przyznać."
+      }
+    ],
+    "tr": [
+      {
+        "kind": "improved",
+        "text": "Toolbox artık penceresi gizliyken daha az iş yapıyor; böylece biraz daha az pil tüketiyor."
+      },
+      {
+        "kind": "fixed",
+        "text": "macOS'te Ayarlar artık Takvim altında macOS takvim erişimine izin vermediğinde bunu belirtiyor ve erişime yeniden izin vermeniz için gizlilik ayarlarını açan bir düğme gösteriyor."
+      }
+    ],
+    "ar": [
+      {
+        "kind": "improved",
+        "text": "أصبح التطبيق يقوم بعمل أقل أثناء إخفاء نافذته، فيستهلك قدرًا أقل قليلًا من البطارية."
+      },
+      {
+        "kind": "fixed",
+        "text": "على macOS، توضّح الإعدادات الآن ضمن التقويم متى لم يعد macOS يسمح بالوصول إلى التقويم، مع زر يفتح إعدادات الخصوصية لإعادة السماح به."
+      }
+    ],
+    "he": [
+      {
+        "kind": "improved",
+        "text": "האפליקציה עושה עכשיו פחות עבודה כשהחלון שלה מוסתר, כך שהיא צורכת קצת פחות סוללה."
+      },
+      {
+        "kind": "fixed",
+        "text": "ב-macOS, ההגדרות מציינות עכשיו תחת לוח שנה מתי macOS כבר לא מאפשר גישה ללוח השנה, עם כפתור שפותח את הגדרות הפרטיות כדי לאפשר אותה מחדש."
+      }
+    ],
+    "zh-Hans": [
+      {
+        "kind": "improved",
+        "text": "工具箱窗口隐藏时现在会做更少的工作，因此会更省电一点。"
+      },
+      {
+        "kind": "fixed",
+        "text": "在macOS上，当macOS不再允许访问日历时，设置的日历下现在会给出提示，并提供一个按钮打开隐私设置，让你重新允许访问。"
+      }
+    ],
+    "ja": [
+      {
+        "kind": "improved",
+        "text": "ウィンドウが非表示のあいだの処理を減らしました。バッテリーの消費が少し少なくなります。"
+      },
+      {
+        "kind": "fixed",
+        "text": "macOSでカレンダーへのアクセスが許可されなくなったとき、設定の「カレンダー」でそのことを表示するようになりました。プライバシー設定を開いて再び許可できるボタンもあります。"
+      }
+    ],
+    "ko": [
+      {
+        "kind": "improved",
+        "text": "이제 창이 숨겨져 있는 동안 도구 상자가 하는 일이 줄었어요. 그래서 배터리를 조금 덜 써요."
+      },
+      {
+        "kind": "fixed",
+        "text": "macOS가 더 이상 캘린더 접근을 허용하지 않으면, 이제 설정의 캘린더에서 알려 줘요. 개인정보 보호 설정을 여는 버튼으로 다시 허용할 수 있어요."
+      }
+    ]
+  }
+}
