@@ -218,6 +218,7 @@
   "projects.firstSync.hint": "Lendo suas turmas, tarefas e clones no GitHub e neste computador. Só desta primeira vez demora um pouco.",
   "projects.due": "Vence {when}",
   "projects.wasDue": "Venceu {when}",
+  "time.dayAt": "{day}, {time}",
   "projects.notCloned": "Sem clone",
   "projects.cloning": "Clonando…",
   "projects.clone": "Clonar",

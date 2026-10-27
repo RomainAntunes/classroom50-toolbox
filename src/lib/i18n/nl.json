@@ -217,6 +217,7 @@
   "projects.firstSync.hint": "Je klassen, opdrachten en klonen op GitHub en deze computer worden gelezen. Alleen de eerste keer duurt dit even.",
   "projects.due": "Deadline {when}",
   "projects.wasDue": "Deadline was {when}",
+  "time.dayAt": "{day} om {time}",
   "projects.notCloned": "Niet gekloond",
   "projects.cloning": "Klonen…",
   "projects.clone": "Klonen",

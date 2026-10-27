@@ -216,6 +216,7 @@
   "projects.firstSync.hint": "正在读取你在GitHub和这台电脑上的课程、作业和克隆。只有第一次需要花一点时间。",
   "projects.due": "{when}截止",
   "projects.wasDue": "{when}已截止",
+  "time.dayAt": "{day} {time}",
   "projects.notCloned": "未克隆",
   "projects.cloning": "正在克隆…",
   "projects.clone": "克隆",

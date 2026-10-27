@@ -59,6 +59,38 @@ test("renders classes, rows, the late badge, the grade and an unaccepted assignm
   expect(await app.writes()).toEqual([]);
 });
 
+test.describe("due dates", () => {
+  // Zurich time: 28 October 2026 at 08:00, a deadline 38.5 hours later is still tomorrow.
+  test.use({ timezoneId: "Europe/Zurich" });
+  const dates = snapshot({
+    projects: [
+      project({ slug: "lab1", name: "Lab 1", assignment: { due: "2026-10-29T21:30:00Z" } }),
+    ],
+    unaccepted: [
+      unaccepted({ slug: "lab0", name: "Lab 0", classroom: cs101, due: "2026-10-27T21:30:00Z" }),
+    ],
+  });
+
+  test("say the calendar day and the time of a deadline", async ({ app, page }) => {
+    await page.clock.install({ time: new Date("2026-10-28T07:00:00Z") });
+    await app.start(scenario({ snapshot: dates }));
+
+    const due = app.row("Lab 1").getByText(/^Due /);
+    await expect(due).toHaveText(/^Due tomorrow at 10:30\sPM$/);
+    await expect(due).toHaveAttribute("title", /Oct 29/);
+    const was = app.row("Lab 0").getByText(/^Was due /);
+    await expect(was).toHaveText(/^Was due yesterday at 10:30\sPM$/);
+    await expect(was).toHaveAttribute("title", /Oct 27/);
+  });
+
+  test("in the UI's language", async ({ app, page }) => {
+    await page.clock.install({ time: new Date("2026-10-28T07:00:00Z") });
+    await app.start(scenario({ snapshot: dates, settings: settings({ language: "fr" }) }));
+    await expect(app.row("Lab 1").getByText("À rendre demain à 22:30")).toBeVisible();
+    await expect(app.row("Lab 0").getByText("Était à rendre hier à 22:30")).toBeVisible();
+  });
+});
+
 test("search filters rows across classes", async ({ app, page }) => {
   await app.start(scenario({ snapshot: list }));
   await expect(app.row("Lab 1")).toBeVisible();

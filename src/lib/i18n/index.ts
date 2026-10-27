@@ -196,7 +196,6 @@ export function formatList(items: string[]): string {
   return new Intl.ListFormat(locale.code, { type: "conjunction" }).format(items.map(isolated));
 }
 
-/** "Fri 17 Oct, 23:59" in the catalog's language: for exact dates in details. */
 /** A number in the UI's language, with exactly `digits` decimals: 1.5 -> "1,5" in French. */
 export function formatNumber(value: number, digits = 0): string {
   return new Intl.NumberFormat(locale.code, {
@@ -215,6 +214,7 @@ export function formatMegabytes(bytes: number): string {
   }).format(bytes / 1_000_000);
 }
 
+/** "Fri 17 Oct, 23:59" in the catalog's language: for exact dates in details. */
 export function formatDate(date: Date): string {
   return new Intl.DateTimeFormat(locale.code, {
     weekday: "short",
@@ -242,11 +242,23 @@ function relative(): Intl.RelativeTimeFormat {
   return format;
 }
 
-/** "in 3 hours", "yesterday": for due dates. */
+/** Calendar days from `now`'s date to `date`'s, in local time: 1 is tomorrow at any hour.
+ *  Each date is read as a UTC midnight, so a day of 23 or 25 hours (a DST change) counts
+ *  as one. */
+export function calendarDays(date: Date, now: Date): number {
+  const day = (d: Date) => Date.UTC(d.getFullYear(), d.getMonth(), d.getDate());
+  return Math.round((day(date) - day(now)) / 86_400_000);
+}
+
+/** "in 3 hours", "yesterday", "in 4 days". From a day apart it counts calendar days, so
+ *  "tomorrow" is always the next date, never 38 hours rounded to "the day after
+ *  tomorrow". */
 export function fromNow(date: Date, now = new Date()): string {
   const seconds = Math.round((date.getTime() - now.getTime()) / 1000);
+  const days = calendarDays(date, now);
+  // A 25-hour day (clocks going back) can hold a whole day on one date: hours then.
+  if (Math.abs(seconds) >= 86400 && days !== 0) return relative().format(days, "day");
   const units: [Intl.RelativeTimeFormatUnit, number][] = [
-    ["day", 86400],
     ["hour", 3600],
     ["minute", 60],
   ];
@@ -254,6 +266,25 @@ export function fromNow(date: Date, now = new Date()): string {
     if (Math.abs(seconds) >= size) return relative().format(Math.round(seconds / size), unit);
   }
   return relative().format(seconds, "second");
+}
+
+/** "10:30 PM", "22:30": the hour of a date in the catalog's language. */
+export function formatTime(date: Date): string {
+  return new Intl.DateTimeFormat(locale.code, { hour: "numeric", minute: "2-digit" }).format(date);
+}
+
+/**
+ * When a deadline (or an opening) falls, for a sentence like "Due {when}": "tomorrow at
+ * 10:30 PM" from the day before yesterday to the day after tomorrow, the day counted in
+ * calendar dates; "in 40 minutes" within the hour, where the countdown says more than the
+ * clock; "in 5 days" further out.
+ */
+export function relativeAt(date: Date, now = new Date()): string {
+  const days = calendarDays(date, now);
+  if (Math.abs(date.getTime() - now.getTime()) < 3_600_000 || Math.abs(days) > 2) {
+    return fromNow(date, now);
+  }
+  return t("time.dayAt", { day: relative().format(days, "day"), time: formatTime(date) });
 }
 
 /** 7200 -> "2 hours", 90000 -> "1 day": the largest whole unit, for lateness. */

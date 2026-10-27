@@ -9,7 +9,7 @@
   import { submitProject } from "#lib/submit.js";
   import { addTeammate, joinsGroup } from "#lib/teammate.js";
   import { isHidden, setHidden } from "#lib/hidden.js";
-  import { durationLabel, formatDate, fromNow, isolated, t } from "#lib/i18n/index.js";
+  import { durationLabel, formatDate, fromNow, isolated, relativeAt, t } from "#lib/i18n/index.js";
   import { tildify } from "#lib/paths.svelte.js";
   import { groupDetails } from "#lib/group.js";
   import { session } from "#lib/session.svelte.js";
@@ -36,7 +36,7 @@
   const dueLabel = $derived(
     due === null
       ? null
-      : t(due > now ? "projects.due" : "projects.wasDue", { when: fromNow(due, now) }),
+      : t(due > now ? "projects.due" : "projects.wasDue", { when: relativeAt(due, now) }),
   );
   const behind = $derived(project.local?.behind ?? 0);
   const defaultBranch = $derived(project.remote?.defaultBranch ?? "main");
@@ -452,8 +452,8 @@
           {#if feedback && feedback.comments > 0}
             <span class="feedback">{t("projects.comments", { count: feedback.comments })}</span> ·
           {/if}
-          {#if dueLabel}
-            <span class:soon={dueSoon}>{dueLabel}</span> ·
+          {#if dueLabel && due}
+            <span class:soon={dueSoon} title={formatDate(due)}>{dueLabel}</span> ·
           {/if}
           {#if project.lateSeconds}
             <span class="late" title={t("projects.lateHint")}
