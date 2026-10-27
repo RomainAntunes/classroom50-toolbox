@@ -216,6 +216,7 @@
   "projects.firstSync.hint": "GitHubとこのコンピューターにあるクラス、課題、クローンを読み込んでいます。時間がかかるのは最初の一回だけです。",
   "projects.due": "{when}が期限",
   "projects.wasDue": "{when}に期限切れ",
+  "time.dayAt": "{day}の{time}",
   "projects.notCloned": "未クローン",
   "projects.cloning": "クローン中…",
   "projects.clone": "クローン",

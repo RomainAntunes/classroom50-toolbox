@@ -217,6 +217,7 @@
   "projects.firstSync.hint": "GitHub'daki ve bu bilgisayardaki sınıflarınız, ödevleriniz ve klonlarınız okunuyor. Yalnızca bu ilk sefer biraz zaman alır.",
   "projects.due": "Teslim: {when}",
   "projects.wasDue": "Teslim tarihi geçti: {when}",
+  "time.dayAt": "{day} {time}",
   "projects.notCloned": "Klonlanmadı",
   "projects.cloning": "Klonlanıyor…",
   "projects.clone": "Klonla",

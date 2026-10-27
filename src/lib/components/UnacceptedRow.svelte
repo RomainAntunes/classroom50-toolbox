@@ -9,7 +9,7 @@
   import { session } from "#lib/session.svelte.js";
   import { acceptLink, copyLink } from "#lib/links.js";
   import { groupDetails, groupName } from "#lib/group.js";
-  import { formatDate, fromNow, t } from "#lib/i18n/index.js";
+  import { formatDate, relativeAt, t } from "#lib/i18n/index.js";
   import Details from "./Details.svelte";
 
   let { item, now, unseen }: { item: Unaccepted; now: Date; unseen: boolean } = $props();
@@ -19,7 +19,7 @@
   const dueLabel = $derived(
     due === null
       ? null
-      : t(due > now ? "projects.due" : "projects.wasDue", { when: fromNow(due, now) }),
+      : t(due > now ? "projects.due" : "projects.wasDue", { when: relativeAt(due, now) }),
   );
   const opens = $derived(
     item.assignment.availableFrom ? new Date(item.assignment.availableFrom) : null,
@@ -122,14 +122,14 @@
             >{accepting
               ? t("projects.accepting")
               : upcoming && opens
-                ? t("projects.opens", { when: fromNow(opens, now) })
+                ? t("projects.opens", { when: relativeAt(opens, now) })
                 : t("projects.notAccepted")}</span
           >
           {#if item.group}
             · {t("projects.inGroup", { group: groupName(item.group) })}
           {/if}
-          {#if dueLabel}
-            · {dueLabel}
+          {#if dueLabel && due}
+            · <span title={formatDate(due)}>{dueLabel}</span>
           {/if}
           <!-- The disabled Accept button can't take focus, so its hint is read here. -->
           {#if blocked}<span class="sr-only">. {blocked}</span>{/if}

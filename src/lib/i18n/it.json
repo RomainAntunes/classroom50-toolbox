@@ -218,6 +218,7 @@
   "projects.firstSync.hint": "Lettura di corsi, compiti e clone su GitHub e su questo computer. Solo questa prima volta richiede un po' di tempo.",
   "projects.due": "Scade {when}",
   "projects.wasDue": "Scaduto {when}",
+  "time.dayAt": "{day} ore {time}",
   "projects.notCloned": "Non clonato",
   "projects.cloning": "Clonazione…",
   "projects.clone": "Clona",

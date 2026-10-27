@@ -219,6 +219,7 @@
   "projects.firstSync.hint": "Odczytywanie twoich klas, zadań i klonów na GitHubie i na tym komputerze. Tylko za pierwszym razem trwa to chwilę.",
   "projects.due": "Termin {when}",
   "projects.wasDue": "Termin minął {when}",
+  "time.dayAt": "{day} o {time}",
   "projects.notCloned": "Niesklonowane",
   "projects.cloning": "Klonowanie…",
   "projects.clone": "Sklonuj",

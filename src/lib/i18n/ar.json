@@ -221,6 +221,7 @@
   "projects.firstSync.hint": "تُقرأ صفوفك وواجباتك ونسخك المحلية على GitHub وعلى هذا الحاسوب. يستغرق الأمر بعض الوقت في المرة الأولى فقط.",
   "projects.due": "التسليم {when}",
   "projects.wasDue": "كان التسليم {when}",
+  "time.dayAt": "{day} الساعة {time}",
   "projects.notCloned": "غير مستنسخ",
   "projects.cloning": "جارٍ الاستنساخ…",
   "projects.clone": "استنساخ",

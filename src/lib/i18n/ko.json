@@ -216,6 +216,7 @@
   "projects.firstSync.hint": "GitHub와 이 컴퓨터에서 수업, 과제, 복제본을 읽고 있어요. 처음 한 번만 시간이 조금 걸려요.",
   "projects.due": "{when} 마감",
   "projects.wasDue": "{when} 마감됨",
+  "time.dayAt": "{day} {time}",
   "projects.notCloned": "복제 안 됨",
   "projects.cloning": "복제 중…",
   "projects.clone": "복제",
