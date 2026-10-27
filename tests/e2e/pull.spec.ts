@@ -41,8 +41,13 @@ test("GitHub ahead with commits not fetched yet shows the button too", async ({ 
   await expect(pullButton(app)).toBeVisible();
 });
 
+test("untracked files alone don't hide the button", async ({ app }) => {
+  await start(app, lab({ behind: 1, changedFiles: 1, changedPaths: ["notes.txt"] }));
+  await expect(pullButton(app)).toBeVisible();
+});
+
 for (const [why, local] of [
-  ["uncommitted changes", { behind: 1, changedFiles: 1 }],
+  ["uncommitted changes", { behind: 1, changedFiles: 1, trackedChanges: 1 }],
   ["another branch", { behind: 1, branch: "experiment" }],
   ["local commits", { behind: 1, ahead: 1 }],
 ] as const) {
@@ -65,7 +70,7 @@ test("up to date: no button, and Pull is disabled in the menu", async ({ app }) 
 for (const [kind, local, words] of [
   [
     "localChanges",
-    { behind: 1, changedFiles: 1 },
+    { behind: 1, changedFiles: 1, trackedChanges: 1 },
     "You have changes that aren't committed yet. Commit them first, then pull",
   ],
   ["otherBranch", { behind: 1, branch: "experiment" }, "Switch to main to pull the new commits."],

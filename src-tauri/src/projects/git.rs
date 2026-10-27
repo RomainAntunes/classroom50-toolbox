@@ -243,6 +243,7 @@ fn parse_status(porcelain: &str, is_noise: impl Fn(&str) -> bool) -> LocalState 
         }
     }
     for entry in status_entries(porcelain) {
+        state.tracked_changes += u32::from(!entry.untracked);
         let counts = !entry.untracked || !is_noise(entry.path);
         if counts {
             state.changed_files += 1;
@@ -322,6 +323,7 @@ mod tests {
         // Tracked files count even in a noise folder; untracked noise and the folder holding
         // only noise don't.
         assert_eq!(state.changed_files, 6);
+        assert_eq!(state.tracked_changes, 4);
         assert_eq!(
             state.changed_paths,
             [
@@ -338,6 +340,7 @@ mod tests {
         assert_eq!(state.changed_files, 25);
         assert_eq!(state.changed_paths.len(), MAX_CHANGED_PATHS);
         assert_eq!(state.changed_paths[19], "f19.c");
+        assert_eq!(state.tracked_changes, 0);
 
         let fresh = parse_status("# branch.oid (initial)\0# branch.head (detached)\0", |_| {
             false

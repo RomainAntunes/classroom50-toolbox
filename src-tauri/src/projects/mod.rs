@@ -142,6 +142,10 @@ pub struct LocalState {
     /// new) once, with its trailing `/`.
     #[serde(default)]
     pub changed_paths: Vec<String>,
+    /// Of `changed_files`, the changes to tracked files (staged or not, conflicted), which
+    /// the app's Pull refuses to run over; untracked files don't block it.
+    #[serde(default)]
+    pub tracked_changes: u32,
     /// Local branches with commits missing from the local default branch.
     pub unmerged: Vec<String>,
     /// GitHub's default-branch head isn't in the clone: someone pushed since the last pull.
@@ -154,7 +158,8 @@ pub struct LocalState {
 #[serde(rename_all = "camelCase")]
 pub enum Pending {
     /// Someone pushed commits the clone doesn't have while it holds uncommitted or
-    /// unpushed work: pull now, before the two diverge further.
+    /// unpushed work: pull now, before the two diverge further. The UI words it by what
+    /// stops a fast-forward (local commits, `tracked_changes`).
     Conflict,
     Uncommitted,
     Unpushed,

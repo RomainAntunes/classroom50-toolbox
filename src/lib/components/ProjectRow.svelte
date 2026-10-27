@@ -47,6 +47,13 @@
       ...(project.local?.unmerged ?? []),
     ]),
   ]);
+  // Graded on every push, and GitHub's head is the clone's HEAD with nothing left to push.
+  const handedIn = $derived(
+    gradedOnPush(project) &&
+      Boolean(project.local?.head) &&
+      project.remote?.head?.oid === project.local?.head &&
+      !project.local?.ahead,
+  );
   // One status at most, most important first; `warn` ones need the student's action.
   const grading = $derived(project.remote?.grading ?? null);
   const status = $derived.by(() => {
@@ -66,11 +73,22 @@
         hint: t("projects.unmergedBranches", { branches: unmerged.join(", ") }),
       };
     }
+    // Worded by what stops the app's Pull, which only fast-forwards over untracked files.
     if (project.pending === "conflict") {
+      const [label, hint] = project.local?.ahead
+        ? ["projects.pullAndMerge", "projects.pullAndMergeHint"]
+        : project.local?.trackedChanges
+          ? ["projects.commitThenPull", "projects.commitThenPullHint"]
+          : ["projects.pending.conflict", "projects.conflictHint"];
+      return { label: t(label), warn: true, hint: t(hint) };
+    }
+    // Every push is graded and GitHub has the clone's HEAD: the hand-in is done, and the
+    // edits only exist on this computer.
+    if (project.pending === "uncommitted" && project.local && handedIn) {
       return {
-        label: t("projects.pending.conflict"),
-        warn: true,
-        hint: t("projects.conflictHint"),
+        label: t("projects.localChanges"),
+        warn: false,
+        hint: t("projects.localChangesHint", { files: changedLines(project.local) }),
       };
     }
     if (project.pending === "uncommitted" && project.local) {
@@ -138,13 +156,13 @@
   // Commit & push from the menu, which explains a refusal.
   const pushable = $derived(submittable && offersPush);
 
-  // GitHub has commits the clone lacks. The button only shows when a fast-forward can work;
-  // the menu always offers it and explains a refusal.
+  // GitHub has commits the clone lacks. The button only shows when a fast-forward can work
+  // (untracked files don't stop one); the menu always offers it and explains a refusal.
   const incoming = $derived(Boolean(path) && (behind > 0 || Boolean(project.local?.remoteAhead)));
   const pullable = $derived(
     incoming &&
       project.local?.branch === defaultBranch &&
-      project.local.changedFiles === 0 &&
+      project.local.trackedChanges === 0 &&
       !project.local.ahead,
   );
 
