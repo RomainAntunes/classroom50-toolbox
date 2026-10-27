@@ -72,9 +72,9 @@ pub(super) async fn local_states(
 }
 
 /// `git status` without taking the index lock, so it never races the student's own git.
-/// Untracked editor and OS files (`noise`) don't count. A folder git collapsed into one
-/// untracked entry is listed file by file once more, so a new folder holding only noise (a
-/// `.DS_Store`) doesn't count either.
+/// Untracked editor, OS and build files (`noise`) don't count. A folder git collapsed into
+/// one untracked entry is listed file by file once more, so a new folder holding only noise
+/// (a `.DS_Store`) doesn't count either.
 async fn local_state(path: &Path) -> Option<LocalState> {
     let args = [
         "--no-optional-locks",
@@ -90,10 +90,11 @@ async fn local_state(path: &Path) -> Option<LocalState> {
             return None;
         }
     };
+    let tree = noise::OnDisk::new(path);
     let entries = status_entries(&out);
     let folders: Vec<&str> = entries
         .iter()
-        .filter(|e| e.untracked && e.path.ends_with('/') && !noise::is_noise(e.path))
+        .filter(|e| e.untracked && e.path.ends_with('/') && !noise::is_noise(e.path, &tree))
         .map(|e| e.path)
         .collect();
     let mut real_folders = std::collections::HashSet::new();
@@ -113,7 +114,7 @@ async fn local_state(path: &Path) -> Option<LocalState> {
             Ok(inner) => {
                 for entry in status_entries(&inner.stdout) {
                     if entry.untracked
-                        && !noise::is_noise(entry.path)
+                        && !noise::is_noise(entry.path, &tree)
                         && let Some(folder) = folders.iter().find(|f| entry.path.starts_with(**f))
                     {
                         real_folders.insert(*folder);
@@ -124,7 +125,9 @@ async fn local_state(path: &Path) -> Option<LocalState> {
             Err(_) => real_folders.extend(folders.iter().copied()),
         }
     }
-    Some(parse_status(&out, |folder| real_folders.contains(folder)))
+    Some(parse_status(&out, |entry| {
+        noise::is_noise(entry, &tree) || entry.ends_with('/') && !real_folders.contains(entry)
+    }))
 }
 
 /// Compares each clone with GitHub's data: unmerged local branches, and whether the
@@ -220,9 +223,9 @@ fn status_entries(porcelain: &str) -> Vec<StatusEntry<'_>> {
     entries
 }
 
-/// Reads `git status --porcelain=v2 -z --branch`. Untracked noise files don't count, nor
-/// untracked folders `real_folder` says hold only noise.
-fn parse_status(porcelain: &str, real_folder: impl Fn(&str) -> bool) -> LocalState {
+/// Reads `git status --porcelain=v2 -z --branch`. The untracked entries `is_noise` names
+/// (noise files, folders holding only noise) don't count.
+fn parse_status(porcelain: &str, is_noise: impl Fn(&str) -> bool) -> LocalState {
     let mut state = LocalState::default();
     for header in porcelain.split('\0').filter_map(|e| e.strip_prefix("# ")) {
         let (name, value) = header.split_once(' ').unwrap_or((header, ""));
@@ -240,9 +243,7 @@ fn parse_status(porcelain: &str, real_folder: impl Fn(&str) -> bool) -> LocalSta
         }
     }
     for entry in status_entries(porcelain) {
-        let counts = !entry.untracked
-            || !(noise::is_noise(entry.path)
-                || entry.path.ends_with('/') && !real_folder(entry.path));
+        let counts = !entry.untracked || !is_noise(entry.path);
         if counts {
             state.changed_files += 1;
             if state.changed_paths.len() < MAX_CHANGED_PATHS {
@@ -312,7 +313,9 @@ mod tests {
                 ".vscode/settings.json",
             ]
         );
-        let state = parse_status(&out, |folder| folder == "work/");
+        let state = parse_status(&out, |entry| {
+            noise::root(entry).is_some() || entry.ends_with('/') && entry != "work/"
+        });
         assert_eq!(state.head.as_deref(), Some("5f14f16"));
         assert_eq!(state.branch.as_deref(), Some("main"));
         assert_eq!((state.ahead, state.behind), (Some(2), Some(1)));
@@ -331,13 +334,13 @@ mod tests {
             ]
         );
         let many: String = (0..25).map(|i| format!("? f{i}.c\0")).collect();
-        let state = parse_status(&many, |_| true);
+        let state = parse_status(&many, |_| false);
         assert_eq!(state.changed_files, 25);
         assert_eq!(state.changed_paths.len(), MAX_CHANGED_PATHS);
         assert_eq!(state.changed_paths[19], "f19.c");
 
         let fresh = parse_status("# branch.oid (initial)\0# branch.head (detached)\0", |_| {
-            true
+            false
         });
         assert_eq!(fresh, LocalState::default());
     }
@@ -369,6 +372,56 @@ mod tests {
         std::fs::write(root.join("work").join("b.c"), "x").unwrap();
         std::fs::write(root.join("hello.c~"), "x").unwrap();
         assert_eq!(local_state(&root).await.unwrap().changed_files, 1);
+        let _ = std::fs::remove_dir_all(&root);
+    }
+
+    /// A pushed Maven lab opened in IntelliJ, with no `.gitignore`: `.idea/` and the module's
+    /// `target/` don't count, a tracked file under `target/` does. A bare `out/` (VS Code's
+    /// PlantUML export) is work.
+    #[tokio::test]
+    async fn local_state_skips_build_output() {
+        let root = std::env::temp_dir().join(format!("c50tb-build-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&root);
+        let git = |args: &[&str]| {
+            let out = std::process::Command::new("git")
+                .args(["-c", "user.name=t", "-c", "user.email=t@t"])
+                .args(["-c", "commit.gpgsign=false"])
+                .args(args)
+                .current_dir(&root)
+                .output()
+                .unwrap();
+            assert!(out.status.success(), "{args:?}");
+        };
+        let module = root.join("poo-labo-4");
+        let classes = module.join("target").join("classes");
+        std::fs::create_dir_all(module.join("src")).unwrap();
+        git(&["init", "-q", "-b", "main"]);
+        std::fs::write(module.join("pom.xml"), "<project/>").unwrap();
+        std::fs::write(module.join("src").join("Main.java"), "class Main {}").unwrap();
+        git(&["add", "--all"]);
+        git(&["commit", "-q", "-m", "lab"]);
+        std::fs::create_dir_all(root.join(".idea")).unwrap();
+        std::fs::write(root.join(".idea").join("workspace.xml"), "x").unwrap();
+        std::fs::create_dir_all(&classes).unwrap();
+        std::fs::write(classes.join("Main.class"), "x").unwrap();
+        std::fs::create_dir_all(module.join("target").join("generated-sources")).unwrap();
+        let state = local_state(&root).await.unwrap();
+        assert_eq!(state.changed_files, 0, "{:?}", state.changed_paths);
+
+        // Tracked is never noise, and the untracked files beside it still are.
+        std::fs::write(module.join("target").join("notes.txt"), "a").unwrap();
+        git(&["add", "poo-labo-4/target/notes.txt"]);
+        git(&["commit", "-q", "-m", "notes"]);
+        std::fs::write(module.join("target").join("notes.txt"), "b").unwrap();
+        let state = local_state(&root).await.unwrap();
+        assert_eq!(state.changed_paths, ["poo-labo-4/target/notes.txt"]);
+
+        let png = root.join("out").join("rapport").join("poudlard");
+        std::fs::create_dir_all(&png).unwrap();
+        std::fs::write(png.join("poudlard.png"), "png").unwrap();
+        let _ = std::fs::remove_dir_all(root.join(".idea"));
+        let state = local_state(&root).await.unwrap();
+        assert_eq!(state.changed_paths, ["poo-labo-4/target/notes.txt", "out/"]);
         let _ = std::fs::remove_dir_all(&root);
     }
 }

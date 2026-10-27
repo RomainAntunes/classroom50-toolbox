@@ -160,12 +160,12 @@ describe("commitLocal", () => {
     expect(api.commitPush).not.toHaveBeenCalled();
   });
 
-  it("names the editor and system files it leaves out", async () => {
+  it("names the editor, system and build files it leaves out", async () => {
     api.commitCheck.mockResolvedValue(check({ skipped: [".idea/", ".DS_Store"] }));
     const done = commitLocal(project(), "Lab");
     await vi.waitFor(() => expect(prompt.current).not.toBeNull());
     expect(prompt.current?.message).toContain(
-      "Left out (editor and system files): .idea/, .DS_Store.",
+      "Left out (editor, system and build files): .idea/, .DS_Store.",
     );
     await answer(null);
     expect(await done).toBe(false);

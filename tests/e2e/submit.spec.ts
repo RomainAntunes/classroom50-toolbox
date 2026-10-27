@@ -61,7 +61,7 @@ test("confirming submits, then offers the submission page", async ({ app, page }
     scenario({
       snapshot: snapshot({ projects: [lab] }),
       responses: {
-        submit_check: [ok({ ...clean, editorFiles: [".vscode/settings.json"] })],
+        submit_check: [ok({ ...clean, editorFiles: [".vscode/settings.json", "lab/target/"] })],
         submit_project: [ok({ url: "https://github.com/cs50-school/commit/1" })],
       },
     }),
@@ -70,7 +70,7 @@ test("confirming submits, then offers the submission page", async ({ app, page }
   const confirm = await app.dialog();
   expect(confirm.kind).toBe("info");
   expect(confirm.message).toContain(
-    "Editor and system files in the folder are sent too: .vscode/settings.json",
+    "Editor, system and build files in the folder are sent too: .vscode/settings.json, lab/target/",
   );
   expect(confirm.message).not.toContain("late");
   await app.answer("ok");

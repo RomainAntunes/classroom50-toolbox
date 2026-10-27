@@ -34,8 +34,8 @@ pub struct PushCheck {
     pub files: Vec<String>,
     /// The new ones among them.
     pub untracked: Vec<String>,
-    /// Untracked editor and OS files left out of the commit (`noise`), a folder once with
-    /// its trailing `/`: `.idea/`, `.DS_Store`.
+    /// Untracked editor, OS and build files left out of the commit (`noise`), a folder once
+    /// with its trailing `/`: `.idea/`, `.DS_Store`, a Maven module's `target/`.
     pub skipped: Vec<String>,
     /// Over 50 MB: GitHub warns about them.
     pub large: Vec<String>,
@@ -125,14 +125,14 @@ async fn changes(path: &Path) -> Result<PushCheck> {
     })
 }
 
-/// What a commit of the clone would hold, and the editor and OS files it leaves out.
+/// What a commit of the clone would hold, and the editor, OS and build files it leaves out.
 #[derive(Debug, Default)]
 pub(crate) struct WorkTree {
     /// Every changed path, new, modified, deleted or renamed, noise aside.
     pub files: Vec<String>,
     /// The new ones among them.
     pub untracked: Vec<String>,
-    /// Untracked noise, by root (`noise::root`), file by file in a folder that also holds
+    /// Untracked noise, by root (`noise::root_in`), file by file in a folder that also holds
     /// a file of the commit.
     pub skipped: Vec<String>,
 }
@@ -151,7 +151,7 @@ pub(crate) async fn work_tree(path: &Path) -> Result<WorkTree> {
         ],
     )
     .await?;
-    Ok(parse_status(&status))
+    Ok(parse_status(&status, &noise::OnDisk::new(path)))
 }
 
 /// `git add --all` and `git commit`, refusing files GitHub would reject and a missing
@@ -183,8 +183,8 @@ async fn commit_changes(path: &Path, state: &PushCheck, message: Option<&str>) -
     committed
 }
 
-/// Stages what the commit holds: every change (`git add --all`), or with editor and OS files
-/// to leave out, exactly the listed paths. Those are named in a file rather than on the
+/// Stages what the commit holds: every change (`git add --all`), or with editor, OS or build
+/// files to leave out, exactly the listed paths. Those are named in a file rather than on the
 /// command line (there may be thousands), and never staged at all, so a `node_modules`
 /// isn't hashed into the object store just to be dropped again.
 async fn stage(path: &Path, state: &PushCheck) -> Result<()> {
@@ -445,8 +445,9 @@ async fn ahead(path: &Path, github_head: Option<&str>) -> Result<u32> {
 }
 
 /// `git status --porcelain=v1 -z`: every path, the untracked ones, and the untracked noise
-/// left out of both. A rename's second entry (its old path) is skipped.
-fn parse_status(out: &str) -> WorkTree {
+/// left out of both (build output judged from the files of `clone`). A rename's second entry
+/// (its old path) is skipped.
+fn parse_status(out: &str, clone: &(impl noise::Tree + ?Sized)) -> WorkTree {
     let mut tree = WorkTree::default();
     let mut noise = Vec::new();
     let mut entries = out.split('\0').filter(|e| !e.is_empty());
@@ -458,7 +459,7 @@ fn parse_status(out: &str) -> WorkTree {
             entries.next();
         }
         if code == "??" {
-            if noise::is_noise(file) {
+            if noise::is_noise(file, clone) {
                 noise.push(file);
                 continue;
             }
@@ -470,7 +471,7 @@ fn parse_status(out: &str) -> WorkTree {
     // is named file by file, so "left out" never covers what goes in.
     let mut skipped: Vec<String> = Vec::new();
     for file in noise {
-        let root = noise::root(file).unwrap_or(file);
+        let root = noise::root_in(file, clone).unwrap_or(file);
         let shared = root.ends_with('/') && tree.files.iter().any(|f| f.starts_with(root));
         let shown = if shared { file } else { root };
         if !skipped.iter().any(|s| s == shown) {
@@ -585,8 +586,9 @@ mod tests {
     #[test]
     fn parses_status() {
         let out = " M a.txt\0R  new.txt\0old.txt\0?? dir/b.txt\0 D gone.txt\0\
-            ?? .idea/workspace.xml\0?? .idea/misc.xml\0?? src/.DS_Store\0 M .vscode/settings.json\0";
-        let tree = parse_status(out);
+            ?? .idea/workspace.xml\0?? .idea/misc.xml\0?? src/.DS_Store\0 M .vscode/settings.json\0\
+            ?? target/classes/A.class\0?? target/classes/B.class\0?? build/A.class\0";
+        let tree = parse_status(out, &["pom.xml"][..]);
         assert_eq!(
             tree.files,
             [
@@ -594,11 +596,12 @@ mod tests {
                 "new.txt",
                 "dir/b.txt",
                 "gone.txt",
-                ".vscode/settings.json"
+                ".vscode/settings.json",
+                "build/A.class"
             ]
         );
-        assert_eq!(tree.untracked, ["dir/b.txt"]);
-        assert_eq!(tree.skipped, [".idea/", "src/.DS_Store"]);
+        assert_eq!(tree.untracked, ["dir/b.txt", "build/A.class"]);
+        assert_eq!(tree.skipped, [".idea/", "src/.DS_Store", "target/"]);
     }
 
     #[test]
@@ -811,8 +814,8 @@ mod tests {
         let _ = std::fs::remove_dir_all(&root);
     }
 
-    /// Untracked editor and OS files stay out of the commit and stay untracked; a tracked
-    /// file in an editor folder is real work and goes in. Nothing but noise: nothing to
+    /// Untracked editor, OS and build files stay out of the commit and stay untracked; a
+    /// tracked file in an editor folder is real work and goes in. Nothing but noise: nothing to
     /// commit.
     #[tokio::test]
     async fn commits_leave_editor_files_out() {
@@ -834,6 +837,14 @@ mod tests {
         std::fs::write(clone.join(".idea").join("workspace.xml"), "x").unwrap();
         std::fs::write(clone.join(".DS_Store"), "x").unwrap();
         std::fs::write(clone.join(".vscode").join("launch.json"), "{}").unwrap();
+        // A Maven module's build output, next to its committed `pom.xml`.
+        let classes = clone.join("lab").join("target").join("classes");
+        std::fs::create_dir_all(&classes).unwrap();
+        std::fs::write(clone.join("lab").join("pom.xml"), "<project/>").unwrap();
+        sh(&clone, &["add", "lab/pom.xml"]);
+        sh(&clone, &["commit", "-q", "-m", "pom"]);
+        std::fs::write(classes.join("Main.class"), "x").unwrap();
+        std::fs::write(classes.join("Util.class"), "x").unwrap();
         assert!(matches!(
             commit_check(&clone).await,
             Err(Error::NothingToCommit)
@@ -857,7 +868,7 @@ mod tests {
         );
         assert_eq!(
             state.skipped,
-            [".DS_Store", ".idea/", ".vscode/launch.json"]
+            [".DS_Store", ".idea/", ".vscode/launch.json", "lab/target/"]
         );
 
         commit(&clone, "Work").await.unwrap();
@@ -868,7 +879,8 @@ mod tests {
         );
         assert_eq!(
             sh(&clone, &["status", "--porcelain", "--untracked-files=all"]),
-            "?? .DS_Store\n?? .idea/workspace.xml\n?? .vscode/launch.json"
+            "?? .DS_Store\n?? .idea/workspace.xml\n?? .vscode/launch.json\n\
+             ?? lab/target/classes/Main.class\n?? lab/target/classes/Util.class"
         );
         let _ = std::fs::remove_dir_all(&root);
     }
