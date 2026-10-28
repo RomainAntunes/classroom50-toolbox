@@ -231,7 +231,7 @@ export function install(scenario: Scenario): E2E {
       case "set_popover_pinned":
       case "hide_popover":
       case "set_calendar_labels":
-      case "set_tray_labels":
+      case "set_tray_menu":
       case "cancel_login":
       case "cancel_tool_job":
       case "open_in_editor":

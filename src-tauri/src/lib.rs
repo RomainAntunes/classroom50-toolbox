@@ -75,7 +75,7 @@ macro_rules! ipc_commands {
             crate::commands::open_calendar_file,
             crate::commands::open_calendar_privacy,
             crate::commands::set_calendar_labels,
-            crate::commands::set_tray_labels,
+            crate::commands::set_tray_menu,
             crate::commands::system_languages,
             crate::commands::set_native_calendar,
             crate::commands::simulate_network,

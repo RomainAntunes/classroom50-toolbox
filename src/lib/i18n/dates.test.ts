@@ -82,6 +82,14 @@ describe("relativeAt", () => {
     expect(relativeAt(at(25, 7), at(28, 8))).toBe("3 days ago");
   });
 
+  it("names the hour instead of counting down when asked to", () => {
+    expect(plain(relativeAt(at(28, 8, 40), at(28, 8), false))).toBe("today at 8:40 AM");
+    expect(plain(relativeAt(at(28, 7, 50), at(28, 8), false))).toBe("today at 7:50 AM");
+    expect(plain(relativeAt(at(29, 0, 10), at(28, 23, 50), false))).toBe("tomorrow at 12:10 AM");
+    // Further out the words already change at midnight only.
+    expect(relativeAt(at(31, 22, 30), at(28, 8), false)).toBe("in 3 days");
+  });
+
   it("keeps the dates straight across the change of time", () => {
     // 48.5 hours across the extra hour of 25 October, two dates away.
     expect(plain(relativeAt(at(26, 11, 30), at(24, 12)))).toBe("in 2 days at 11:30 AM");

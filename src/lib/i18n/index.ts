@@ -277,11 +277,13 @@ export function formatTime(date: Date): string {
  * When a deadline (or an opening) falls, for a sentence like "Due {when}": "tomorrow at
  * 10:30 PM" from the day before yesterday to the day after tomorrow, the day counted in
  * calendar dates; "in 40 minutes" within the hour, where the countdown says more than the
- * clock; "in 5 days" further out.
+ * clock; "in 5 days" further out. Without `countdown` the hour keeps "today at 10:30 PM",
+ * so the words only change at midnight (the tray menu, which nothing redraws each minute).
  */
-export function relativeAt(date: Date, now = new Date()): string {
+export function relativeAt(date: Date, now = new Date(), countdown = true): string {
   const days = calendarDays(date, now);
-  if (Math.abs(date.getTime() - now.getTime()) < 3_600_000 || Math.abs(days) > 2) {
+  const soon = countdown && Math.abs(date.getTime() - now.getTime()) < 3_600_000;
+  if (soon || Math.abs(days) > 2) {
     return fromNow(date, now);
   }
   return t("time.dayAt", { day: relative().format(days, "day"), time: formatTime(date) });

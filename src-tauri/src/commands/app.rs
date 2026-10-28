@@ -76,11 +76,11 @@ pub fn system_languages() -> Vec<String> {
     sys_locale::get_locales().collect()
 }
 
-/// The words of the tray menu, from the UI's i18n.
+/// The tray menu, computed and worded by the UI; rebuilt only when it changed.
 #[tauri::command]
 #[cfg_attr(test, specta::specta)]
-pub fn set_tray_labels(app: AppHandle, labels: crate::tray::Labels) {
-    crate::tray::set_labels(&app, &labels);
+pub fn set_tray_menu(app: AppHandle, menu: crate::tray::TrayMenu) {
+    crate::tray::set_menu(&app, menu);
 }
 
 #[cfg(test)]

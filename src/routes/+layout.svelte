@@ -9,7 +9,10 @@
     DEEP_LINK_EVENT,
     NOTIFY_EVENT,
     POPOVER_HIDDEN_EVENT,
+    PROJECTS_UPDATED_EVENT,
     SETTINGS_UPDATED_EVENT,
+    TRAY_ACTION_EVENT,
+    TRAY_EXPIRED_EVENT,
     UNSEEN_EVENT,
     UPDATE_STATE_EVENT,
     type Settings,
@@ -18,14 +21,22 @@
   import { handleDeepLink, linkActive } from "#lib/deeplink.js";
   import { currentDirection, currentLocale, setLocale, t } from "#lib/i18n/index.js";
   import { showNotice } from "#lib/notices.js";
-  import { loadEditors } from "#lib/editor.svelte.js";
+  import { editors, loadEditors } from "#lib/editor.svelte.js";
   import { initTheme } from "#lib/theme/preview.svelte.js";
   import Prompt from "#lib/components/Prompt.svelte";
   import { announce, announcer } from "#lib/announce.svelte.js";
   import { prompt } from "#lib/prompt.svelte.js";
-  import { session } from "#lib/session.svelte.js";
+  import { loadSnapshot, session } from "#lib/session.svelte.js";
   import { loadSettings, settings } from "#lib/settings.svelte.js";
   import { pendingNotes } from "#lib/whatsnew.js";
+  import {
+    handleTrayAction,
+    hiddenFrom,
+    hiddenKey,
+    readyVersion,
+    sendTrayMenu,
+    trayMenu,
+  } from "#lib/tray.js";
 
   let { children } = $props();
 
@@ -66,10 +77,9 @@
     document.documentElement.dir = currentDirection();
   });
 
-  // Rust writes calendar notes and the tray menu with these words (placeholders filled
-  // there; names pass through `t` as themselves, so they are isolated in a right-to-left
-  // language, numbers stay bare as `fill` leaves them); sent again when the language
-  // changes.
+  // Rust writes calendar notes with these words (placeholders filled there; names pass
+  // through `t` as themselves, so they are isolated in a right-to-left language, numbers
+  // stay bare as `fill` leaves them); sent again when the language changes.
   $effect(() => {
     void api.setCalendarLabels({
       class: t("calendar.notes.class", { name: "{name}" }),
@@ -79,7 +89,28 @@
       submitted: t("calendar.notes.submitted"),
       notAccepted: t("calendar.notes.notAccepted"),
     });
-    void api.setTrayLabels({ open: t("tray.open"), quit: t("tray.quit") });
+  });
+
+  // The tray menu, worded here (`t` makes the language an input) and sent when what it
+  // shows changes. Each input is narrowed to a primitive, so a settings save, a download's
+  // progress or an editor lookup that changes nothing here recomputes nothing. No timer:
+  // Rust's background tick says when `validUntil` passed (`tray-expired`). It waits for the
+  // first loads, so startup sends one menu, in the right language.
+  let trayReady = $state(false);
+  let trayExpired = $state(0);
+  const trayUpdate = $derived(readyVersion(session.update));
+  const trayHidden = $derived(hiddenKey(settings.current));
+  const trayEditor = $derived(editors.installed.length > 0);
+  $effect(() => {
+    void trayExpired;
+    if (!trayReady) return;
+    const input = {
+      snapshot: session.snapshot,
+      update: trayUpdate,
+      hidden: hiddenFrom(trayHidden),
+      editor: trayEditor,
+    };
+    sendTrayMenu(trayMenu(input, new Date()));
   });
 
   // Self-update, for the main page's banner and Settings > About. A screen reader hears
@@ -112,11 +143,17 @@
 
   // Lives in the layout so notices arrive whichever page is shown, and while hidden.
   onMount(() => {
-    void loadSettings();
-    void api.systemLanguages().then((languages) => {
-      if (languages.length) systemLanguages = languages;
+    const loads = [
+      loadSettings(),
+      api.systemLanguages().then((languages) => {
+        if (languages.length) systemLanguages = languages;
+      }),
+      loadEditors(),
+      loadSnapshot(),
+    ];
+    void Promise.allSettled(loads).then(() => {
+      trayReady = true;
     });
-    void loadEditors();
     void api.appInfo().then((info) => initTheme(info.os));
     void api.unseen().then((ids) => {
       session.unseen = ids;
@@ -133,6 +170,20 @@
       }),
       onEvent(UPDATE_STATE_EVENT, (status) => setUpdate(status)),
       onEvent(DEEP_LINK_EVENT, () => void handleDeepLink()),
+      // The only listener: Tauri parses the payload once per listener.
+      onEvent(PROJECTS_UPDATED_EVENT, (snapshot) => {
+        // `gh auth switch`: the footer follows the account the data now belongs to.
+        if (snapshot.login && snapshot.login !== session.auth?.login) {
+          void api.authStatus().then((auth) => {
+            session.auth = auth;
+          });
+        }
+        session.snapshot = snapshot;
+      }),
+      onEvent(TRAY_ACTION_EVENT, (action) => void handleTrayAction(action)),
+      onEvent(TRAY_EXPIRED_EVENT, () => {
+        trayExpired++;
+      }),
       onEvent(POPOVER_HIDDEN_EVENT, () => {
         session.focus = null;
         void reopenOn();

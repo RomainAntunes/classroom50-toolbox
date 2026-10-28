@@ -56,8 +56,11 @@ export type Added = B.Added_Serialize;
 export type Member = B.Member;
 /** The words of calendar event notes; `{name}`, `{n}`, `{score}`, `{max}` stay as is. */
 export type CalendarLabels = B.CalendarLabels;
-/** The words of the tray icon's menu. */
-export type TrayLabels = B.TrayLabels;
+/** The tray icon's menu, computed and worded by the UI (`src/lib/tray.ts`). */
+export type TrayMenu = B.TrayMenu;
+export type TrayItem = B.TrayItem;
+/** A tray menu item the UI carries out (`tray-action`). */
+export type TrayAction = B.Action;
 /** A published assignment the user hasn't accepted yet. */
 export type Unaccepted = B.Unaccepted_Serialize;
 /** A `classroom50-toolbox://` link, validated by Rust. */
@@ -151,6 +154,10 @@ export const POPOVER_HIDDEN_EVENT = "popover-hidden" satisfies EventName;
 export const POPOVER_SHOWN_EVENT = "popover-shown" satisfies EventName;
 /** The global shortcut showed the popover: the list takes the keyboard focus. */
 export const POPOVER_SHORTCUT_EVENT = "popover-shortcut" satisfies EventName;
+/** Payload: `TrayAction`, a tray menu item for the UI to carry out. */
+export const TRAY_ACTION_EVENT = "tray-action" satisfies EventName;
+/** The tray menu's `validUntil` passed: it is worded again. */
+export const TRAY_EXPIRED_EVENT = "tray-expired" satisfies EventName;
 
 /** Listens to a Rust event, its payload typed by `Events`. */
 export function onEvent<K extends EventName>(

@@ -98,8 +98,8 @@ export const commands = {
 	openCalendarPrivacy: () => __TAURI_INVOKE<null>("open_calendar_privacy"),
 	/**  The words of calendar event notes, from the UI's i18n. */
 	setCalendarLabels: (labels: CalendarLabels) => __TAURI_INVOKE<void>("set_calendar_labels", { labels }),
-	/**  The words of the tray menu, from the UI's i18n. */
-	setTrayLabels: (labels: TrayLabels) => __TAURI_INVOKE<void>("set_tray_labels", { labels }),
+	/**  The tray menu, computed and worded by the UI; rebuilt only when it changed. */
+	setTrayMenu: (menu: TrayMenu) => __TAURI_INVOKE<void>("set_tray_menu", { menu }),
 	/**
 	 *  The OS's preferred languages, most wanted first, as BCP 47 tags (`fr-CH`). The UI's
 	 *  `navigator.languages` can't stand in: WKWebView reports the bundle's localizations
@@ -264,6 +264,17 @@ export type Account = {
 	login: string,
 	active: boolean,
 };
+
+/**  What a click on the menu asks the UI to do (`tray-action`); the rest stays in Rust. */
+export type Action = 
+/**  Settings, in the popover Rust just showed. */
+{ kind: "settings" } | 
+/**  A deadline's row, pinned in the list as a link's is. */
+{ kind: "focus"; id: string } | 
+/**  A recent clone, opened in its editor with no popover. */
+{ kind: "open"; id: string } | 
+/**  Restart now, as the update banner's button. */
+{ kind: "installUpdate" };
 
 /**  What adding one classmate gave. */
 export type Added = Added_Serialize | Added_Deserialize;
@@ -568,6 +579,13 @@ export type Events_Deserialize = {
 	"popover-shown": null,
 	/**  The global shortcut showed the popover: the list takes the keyboard focus. */
 	"popover-shortcut": null,
+	/**
+	 *  A tray menu item that the UI carries out (Settings, a deadline, a recent clone,
+	 *  Restart to Update).
+	 */
+	"tray-action": Action,
+	/**  The tray menu's `validUntil` passed (midnight, a deadline): the UI words it again. */
+	"tray-expired": null,
 };
 
 /**  The payload of each event, by name: `Events` in `src/lib/bindings.ts`. */
@@ -598,6 +616,13 @@ export type Events_Serialize = {
 	"popover-shown": null,
 	/**  The global shortcut showed the popover: the list takes the keyboard focus. */
 	"popover-shortcut": null,
+	/**
+	 *  A tray menu item that the UI carries out (Settings, a deadline, a recent clone,
+	 *  Restart to Update).
+	 */
+	"tray-action": Action,
+	/**  The tray menu's `validUntil` passed (midnight, a deadline): the UI words it again. */
+	"tray-expired": null,
 };
 
 /**  An error as the UI shows it (`errorMessage`): `error.<kind>`, else the message. */
@@ -1291,13 +1316,36 @@ export type ToolStatus = {
 	outdated: boolean,
 };
 
+/**  A row that leads to a project or an unaccepted assignment, by its list id. */
+export type TrayItem = {
+	id: string,
+	label: string,
+};
+
 /**
- *  The menu's words, from the UI's i18n (`set_tray_labels`), sent at startup and when the
- *  language changes.
+ *  The menu, computed and worded by the UI (`set_tray_menu`, `src/lib/tray.ts`): sent at
+ *  startup and whenever what it shows changes (a sync, the language, `tray-expired`). Rust
+ *  has no catalogs, so dates come worded.
  */
-export type TrayLabels = {
+export type TrayMenu = {
 	open: string,
 	quit: string,
+	refresh: string,
+	settings: string,
+	/**  "Synced today at 2:32 PM", a disabled line; None before the first sync. */
+	synced: string | null,
+	/**  Rows with the nearest deadlines of unfinished work, nearest first. */
+	deadlines: TrayItem[],
+	/**  The submenu's title and the clones it opens, most recently active first. */
+	recentTitle: string,
+	recent: TrayItem[],
+	/**  "Restart to Update to X", while a downloaded update waits. */
+	update: string | null,
+	/**
+	 *  When a label or the selection would change (midnight, a deadline): the background
+	 *  tick then sends `tray-expired` (`check_expiry`). None when nothing depends on time.
+	 */
+	validUntil: string | null,
 };
 
 /**  What the UI knows and Rust doesn't. */
