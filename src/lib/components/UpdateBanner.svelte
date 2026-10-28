@@ -1,8 +1,8 @@
 <script lang="ts">
-  import { message } from "@tauri-apps/plugin-dialog";
   import { openUrl } from "@tauri-apps/plugin-opener";
-  import { api, errorMessage, withDialog, type UpdateStatus } from "#lib/api.js";
+  import { api, type UpdateStatus } from "#lib/api.js";
   import { formatMegabytes, t } from "#lib/i18n/index.js";
+  import { installUpdate } from "#lib/update.js";
   import Spinner from "./Spinner.svelte";
 
   const RELEASES_URL = "https://github.com/RomainAntunes/classroom50-toolbox/releases/tag/v";
@@ -42,14 +42,6 @@
           ? t(status.deferred || compact ? "update.deferredHint" : "update.readyHint")
           : t("update.restartHint"),
   );
-
-  async function restart() {
-    try {
-      await api.installUpdate();
-    } catch (err) {
-      await withDialog(() => message(errorMessage(err), { kind: "error" }));
-    }
-  }
 </script>
 
 {#if update.phase === "downloading"}
@@ -89,7 +81,7 @@
         class="primary"
         disabled={status.installing}
         aria-busy={status.installing}
-        onclick={restart}
+        onclick={installUpdate}
         >{#if status.installing}<Spinner />{/if}{t(
           status.installing ? "update.installing" : "update.restart",
         )}</button
