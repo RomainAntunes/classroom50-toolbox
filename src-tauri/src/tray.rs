@@ -1,20 +1,21 @@
 use std::sync::Mutex;
 
+use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use tauri::image::Image;
 use tauri::menu::{IsMenuItem, Menu, MenuItem, PredefinedMenuItem, Submenu};
 use tauri::tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent};
 use tauri::{AppHandle, Wry};
 
-use crate::events::{IpcEvent, TrayAction};
+use crate::events::{IpcEvent, TrayAction, TrayExpired};
 use crate::popover;
 use crate::updater;
 
 pub const ID: &str = "main";
 
 /// The menu, computed and worded by the UI (`set_tray_menu`, `src/lib/tray.ts`): sent at
-/// startup, after a sync and whenever a label or the language changes. Rust has no
-/// catalogs, so dates come worded.
+/// startup and whenever what it shows changes (a sync, the language, `tray-expired`). Rust
+/// has no catalogs, so dates come worded.
 #[derive(Debug, Clone, PartialEq, Deserialize)]
 #[cfg_attr(test, derive(specta::Type))]
 #[serde(rename_all = "camelCase")]
@@ -32,6 +33,9 @@ pub struct TrayMenu {
     pub recent: Vec<TrayItem>,
     /// "Restart to Update to X", while a downloaded update waits.
     pub update: Option<String>,
+    /// When a label or the selection would change (midnight, a deadline): the background
+    /// tick then sends `tray-expired` (`check_expiry`). None when nothing depends on time.
+    pub valid_until: Option<DateTime<Utc>>,
 }
 
 /// A row that leads to a project or an unaccepted assignment, by its list id.
@@ -55,6 +59,7 @@ impl Default for TrayMenu {
             recent_title: "Open Recent".into(),
             recent: Vec::new(),
             update: None,
+            valid_until: None,
         }
     }
 }
@@ -74,8 +79,36 @@ pub enum Action {
     InstallUpdate,
 }
 
-/// The menu last built, so an unchanged one isn't rebuilt (that closes it on some trays).
-static BUILT: Mutex<Option<TrayMenu>> = Mutex::new(None);
+/// The menu there now and the handles of its items, so a new one with the same structure
+/// only gets new text (rebuilding closes an open menu on some trays, and costs more).
+struct Built {
+    menu: TrayMenu,
+    /// What `labels` lists, in its order.
+    natives: Vec<Native>,
+}
+
+static BUILT: Mutex<Option<Built>> = Mutex::new(None);
+
+/// A built item whose text can change.
+enum Native {
+    Item(MenuItem<Wry>),
+    Submenu(Submenu<Wry>),
+}
+
+impl Native {
+    fn set_text(&self, text: &str) -> tauri::Result<()> {
+        match self {
+            Native::Item(item) => item.set_text(text),
+            Native::Submenu(submenu) => submenu.set_text(text),
+        }
+    }
+}
+
+/// muda reads `&` as a mnemonic marker on every OS: macOS drops it, GTK and Windows
+/// underline the next letter. `&&` shows one `&` ("R&D" stays "R&D").
+fn escape(label: &str) -> String {
+    label.replace('&', "&&")
+}
 
 /// One line of the menu, before it becomes a native item.
 #[derive(Debug, PartialEq)]
@@ -147,6 +180,74 @@ fn layout(menu: &TrayMenu) -> Vec<Entry<'_>> {
     entries
 }
 
+/// What decides the native items, labels aside: each line's kind, id and enabled flag, a
+/// submenu's rows included.
+#[derive(Debug, PartialEq)]
+enum Shape<'e> {
+    Item { id: &'e str, enabled: bool },
+    Submenu(Vec<Shape<'e>>),
+    Separator,
+}
+
+fn shape<'e>(entries: &'e [Entry<'_>]) -> Vec<Shape<'e>> {
+    entries
+        .iter()
+        .map(|entry| match entry {
+            Entry::Item { id, enabled, .. } => Shape::Item {
+                id,
+                enabled: *enabled,
+            },
+            Entry::Submenu { items, .. } => Shape::Submenu(shape(items)),
+            Entry::Separator => Shape::Separator,
+        })
+        .collect()
+}
+
+/// Every label in build order: the items, and a submenu's title after its rows.
+fn labels<'a>(entries: &[Entry<'a>]) -> Vec<&'a str> {
+    let mut out = Vec::new();
+    for entry in entries {
+        match entry {
+            Entry::Item { label, .. } => out.push(*label),
+            Entry::Submenu { title, items } => {
+                out.extend(labels(items));
+                out.push(*title);
+            }
+            Entry::Separator => {}
+        }
+    }
+    out
+}
+
+/// What the menu there needs to become the next one.
+#[derive(Debug, PartialEq)]
+enum Change<'a> {
+    /// Nothing native: the same lines (only `valid_until` may have moved).
+    None,
+    /// The same structure: these labels, by their place in `labels`, get new text.
+    Relabel(Vec<(usize, &'a str)>),
+    /// Lines came, went, moved or changed state.
+    Rebuild,
+}
+
+fn change<'a>(built: &[Entry<'_>], next: &[Entry<'a>]) -> Change<'a> {
+    if shape(built) != shape(next) {
+        return Change::Rebuild;
+    }
+    let relabel: Vec<_> = labels(built)
+        .into_iter()
+        .zip(labels(next))
+        .enumerate()
+        .filter(|(_, (before, after))| before != after)
+        .map(|(at, (_, after))| (at, after))
+        .collect();
+    if relabel.is_empty() {
+        Change::None
+    } else {
+        Change::Relabel(relabel)
+    }
+}
+
 /// A menu item's id, read back.
 #[derive(Debug, PartialEq)]
 enum Click<'a> {
@@ -207,21 +308,26 @@ fn on_click(app: &AppHandle, id: &str) {
     }
 }
 
-fn build(app: &AppHandle, entries: &[Entry]) -> tauri::Result<Vec<Box<dyn IsMenuItem<Wry>>>> {
+/// The native items, and in `natives` the ones `labels` lists, in its order.
+fn build(
+    app: &AppHandle,
+    entries: &[Entry],
+    natives: &mut Vec<Native>,
+) -> tauri::Result<Vec<Box<dyn IsMenuItem<Wry>>>> {
     let mut items: Vec<Box<dyn IsMenuItem<Wry>>> = Vec::new();
     for entry in entries {
         match entry {
-            Entry::Item { id, label, enabled } => items.push(Box::new(MenuItem::with_id(
-                app,
-                id,
-                label,
-                *enabled,
-                None::<&str>,
-            )?)),
+            Entry::Item { id, label, enabled } => {
+                let item = MenuItem::with_id(app, id, escape(label), *enabled, None::<&str>)?;
+                natives.push(Native::Item(item.clone()));
+                items.push(Box::new(item));
+            }
             Entry::Submenu { title, items: rows } => {
-                let rows = build(app, rows)?;
+                let rows = build(app, rows, natives)?;
                 let refs: Vec<&dyn IsMenuItem<Wry>> = rows.iter().map(|row| row.as_ref()).collect();
-                items.push(Box::new(Submenu::with_items(app, title, true, &refs)?));
+                let submenu = Submenu::with_items(app, escape(title), true, &refs)?;
+                natives.push(Native::Submenu(submenu.clone()));
+                items.push(Box::new(submenu));
             }
             Entry::Separator => items.push(Box::new(PredefinedMenuItem::separator(app)?)),
         }
@@ -229,13 +335,15 @@ fn build(app: &AppHandle, entries: &[Entry]) -> tauri::Result<Vec<Box<dyn IsMenu
     Ok(items)
 }
 
-fn menu(app: &AppHandle, tray: &TrayMenu) -> tauri::Result<Menu<Wry>> {
-    let items = build(app, &layout(tray))?;
+fn menu(app: &AppHandle, tray: &TrayMenu) -> tauri::Result<(Menu<Wry>, Vec<Native>)> {
+    let mut natives = Vec::new();
+    let items = build(app, &layout(tray), &mut natives)?;
     let refs: Vec<&dyn IsMenuItem<Wry>> = items.iter().map(|item| item.as_ref()).collect();
-    Menu::with_items(app, &refs)
+    Ok((Menu::with_items(app, &refs)?, natives))
 }
 
-/// Rebuilds the menu the UI sent, unless it is the one already there.
+/// Takes the menu the UI sent: nothing native when only `valid_until` moved, new text when
+/// only labels changed (a sync moves "Synced ..."), a rebuild when lines came or went.
 pub fn set_menu(app: &AppHandle, next: TrayMenu) {
     let Some(tray) = app.tray_by_id(ID) else {
         return;
@@ -243,18 +351,62 @@ pub fn set_menu(app: &AppHandle, next: TrayMenu) {
     let mut built = BUILT
         .lock()
         .unwrap_or_else(|poisoned| poisoned.into_inner());
-    if built.as_ref() == Some(&next) {
-        return;
+    if let Some(current) = built.as_mut() {
+        let kept = match change(&layout(&current.menu), &layout(&next)) {
+            Change::None => true,
+            Change::Relabel(labels) => labels.into_iter().all(|(at, label)| {
+                current.natives[at]
+                    .set_text(&escape(label))
+                    .inspect_err(|err| log::warn!("tray menu text: {err}"))
+                    .is_ok()
+            }),
+            Change::Rebuild => false,
+        };
+        if kept {
+            current.menu = next;
+            return;
+        }
     }
-    match menu(app, &next).and_then(|menu| tray.set_menu(Some(menu))) {
-        Ok(()) => *built = Some(next),
+    match menu(app, &next).and_then(|(menu, natives)| {
+        tray.set_menu(Some(menu))?;
+        Ok(natives)
+    }) {
+        Ok(natives) => {
+            *built = Some(Built {
+                menu: next,
+                natives,
+            })
+        }
         Err(err) => log::warn!("tray menu: {err}"),
     }
 }
 
+/// From the background tick (`projects::schedule`, every 30 s, waking from sleep included):
+/// once the menu's `valid_until` has passed, asks the UI for a new one (`tray-expired`),
+/// once per menu. No timer of its own, so the hidden app wakes no more often than before.
+pub fn check_expiry(app: &AppHandle) {
+    let expired = BUILT
+        .lock()
+        .unwrap_or_else(|poisoned| poisoned.into_inner())
+        .as_mut()
+        .is_some_and(|built| take_expiry(&mut built.menu, Utc::now()));
+    if expired && let Err(err) = TrayExpired::emit(app, &()) {
+        log::warn!("tray expired: {err}");
+    }
+}
+
+/// Whether the menu's `valid_until` has passed; true once only, until the UI sends another.
+fn take_expiry(menu: &mut TrayMenu, now: DateTime<Utc>) -> bool {
+    let expired = menu.valid_until.is_some_and(|at| now >= at);
+    if expired {
+        menu.valid_until = None;
+    }
+    expired
+}
+
 pub fn setup(app: &AppHandle) -> tauri::Result<()> {
     let first = TrayMenu::default();
-    let menu = menu(app, &first)?;
+    let (menu, natives) = menu(app, &first)?;
 
     let builder = TrayIconBuilder::with_id(ID)
         .icon(icon()?)
@@ -279,7 +431,10 @@ pub fn setup(app: &AppHandle) -> tauri::Result<()> {
     builder.build(app)?;
     *BUILT
         .lock()
-        .unwrap_or_else(|poisoned| poisoned.into_inner()) = Some(first);
+        .unwrap_or_else(|poisoned| poisoned.into_inner()) = Some(Built {
+        menu: first,
+        natives,
+    });
     Ok(())
 }
 
@@ -514,9 +669,147 @@ mod tests {
             "open": "Open", "quit": "Quit", "refresh": "Refresh", "settings": "Settings…",
             "synced": null, "deadlines": [{ "id": "a/b", "label": "Lab" }],
             "recentTitle": "Open Recent", "recent": [], "update": null,
+            "validUntil": "2026-10-28T23:00:00.000Z",
         }))
         .unwrap();
         assert_eq!(menu.deadlines, [row("a/b", "Lab")]);
         assert_eq!(menu.recent_title, "Open Recent");
+        assert_eq!(
+            menu.valid_until,
+            Some("2026-10-28T23:00:00Z".parse().unwrap())
+        );
+    }
+
+    #[test]
+    fn a_label_keeps_its_ampersand() {
+        assert_eq!(escape("R&D"), "R&&D");
+        assert_eq!(escape("Lab 3 && more"), "Lab 3 &&&& more");
+        assert_eq!(escape("Lab 3"), "Lab 3");
+    }
+
+    fn synced(label: &str) -> TrayMenu {
+        TrayMenu {
+            synced: Some(label.into()),
+            deadlines: vec![row("a/lab3", "Lab 3 · Due tomorrow")],
+            recent: vec![row("a/lab1", "Lab 1")],
+            ..TrayMenu::default()
+        }
+    }
+
+    #[test]
+    fn the_same_menu_changes_nothing() {
+        let (before, after) = (
+            synced("Synced today at 2:32 PM"),
+            synced("Synced today at 2:32 PM"),
+        );
+        assert_eq!(change(&layout(&before), &layout(&after)), Change::None);
+        // Only when it expires moved: nothing native either.
+        let later = TrayMenu {
+            valid_until: Some("2026-10-28T23:00:00Z".parse().unwrap()),
+            ..after
+        };
+        assert_eq!(change(&layout(&before), &layout(&later)), Change::None);
+    }
+
+    #[test]
+    fn new_words_are_set_in_place() {
+        let before = synced("Synced today at 2:32 PM");
+        let after = synced("Synced today at 2:58 PM");
+        // Labels in build order: open, the deadline, Lab 1 then its submenu's title,
+        // refresh, synced, settings, quit.
+        assert_eq!(
+            labels(&layout(&after)),
+            [
+                "Open Classroom 50 Toolbox",
+                "Lab 3 · Due tomorrow",
+                "Lab 1",
+                "Open Recent",
+                "Refresh",
+                "Synced today at 2:58 PM",
+                "Settings…",
+                "Quit",
+            ]
+        );
+        assert_eq!(
+            change(&layout(&before), &layout(&after)),
+            Change::Relabel(vec![(5, "Synced today at 2:58 PM")])
+        );
+        let french = TrayMenu {
+            recent_title: "Ouvrir un élément récent".into(),
+            deadlines: vec![row("a/lab3", "Lab 3 · À rendre demain")],
+            ..before.clone()
+        };
+        assert_eq!(
+            change(&layout(&before), &layout(&french)),
+            Change::Relabel(vec![
+                (1, "Lab 3 · À rendre demain"),
+                (3, "Ouvrir un élément récent")
+            ])
+        );
+    }
+
+    #[test]
+    fn other_lines_rebuild() {
+        let before = synced("Synced today at 2:32 PM");
+        let rebuilt =
+            |after: TrayMenu| change(&layout(&before), &layout(&after)) == Change::Rebuild;
+        // A line comes or goes.
+        assert!(rebuilt(TrayMenu {
+            update: Some("Restart to Update to 0.14.0".into()),
+            ..before.clone()
+        }));
+        assert!(rebuilt(TrayMenu {
+            synced: None,
+            ..before.clone()
+        }));
+        // Another row, or the same rows in another order.
+        assert!(rebuilt(TrayMenu {
+            deadlines: vec![row("a/p2", "Lab 3 · Due tomorrow")],
+            ..before.clone()
+        }));
+        assert!(rebuilt(TrayMenu {
+            recent: vec![row("a/lab1", "Lab 1"), row("a/lab2", "Lab 2")],
+            ..before.clone()
+        }));
+        let two = TrayMenu {
+            recent: vec![row("a/lab1", "Lab 1"), row("a/lab2", "Lab 2")],
+            ..before.clone()
+        };
+        let swapped = TrayMenu {
+            recent: vec![row("a/lab2", "Lab 2"), row("a/lab1", "Lab 1")],
+            ..before.clone()
+        };
+        assert_eq!(change(&layout(&two), &layout(&swapped)), Change::Rebuild);
+        // A disabled line is another item than an enabled one.
+        let items = [item("a", "A")];
+        let disabled = [Entry::Item {
+            id: "a".into(),
+            label: "A",
+            enabled: false,
+        }];
+        assert_eq!(change(&items, &disabled), Change::Rebuild);
+    }
+
+    #[test]
+    fn expires_once_per_menu() {
+        let at = |text: &str| text.parse::<DateTime<Utc>>().unwrap();
+        let mut menu = TrayMenu {
+            valid_until: Some(at("2026-10-28T23:00:00Z")),
+            ..TrayMenu::default()
+        };
+        assert!(!take_expiry(&mut menu, at("2026-10-28T22:59:59Z")));
+        assert!(take_expiry(&mut menu, at("2026-10-28T23:00:00Z")));
+        // Asked once: the next tick waits for the menu the UI sends then.
+        assert!(!take_expiry(&mut menu, at("2026-10-28T23:00:30Z")));
+        // Woken the next morning: one ask, not one per deadline missed.
+        let mut menu = TrayMenu {
+            valid_until: Some(at("2026-10-28T23:00:00Z")),
+            ..TrayMenu::default()
+        };
+        assert!(take_expiry(&mut menu, at("2026-10-29T07:00:00Z")));
+        assert!(!take_expiry(
+            &mut TrayMenu::default(),
+            at("2026-10-29T07:00:00Z")
+        ));
     }
 }

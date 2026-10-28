@@ -80,4 +80,6 @@ events! {
     /// A tray menu item that the UI carries out (Settings, a deadline, a recent clone,
     /// Restart to Update).
     TrayAction = "tray-action" => Action;
+    /// The tray menu's `validUntil` passed (midnight, a deadline): the UI words it again.
+    TrayExpired = "tray-expired" => ();
 }

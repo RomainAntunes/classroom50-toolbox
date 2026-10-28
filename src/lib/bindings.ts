@@ -584,6 +584,8 @@ export type Events_Deserialize = {
 	 *  Restart to Update).
 	 */
 	"tray-action": Action,
+	/**  The tray menu's `validUntil` passed (midnight, a deadline): the UI words it again. */
+	"tray-expired": null,
 };
 
 /**  The payload of each event, by name: `Events` in `src/lib/bindings.ts`. */
@@ -619,6 +621,8 @@ export type Events_Serialize = {
 	 *  Restart to Update).
 	 */
 	"tray-action": Action,
+	/**  The tray menu's `validUntil` passed (midnight, a deadline): the UI words it again. */
+	"tray-expired": null,
 };
 
 /**  An error as the UI shows it (`errorMessage`): `error.<kind>`, else the message. */
@@ -1320,8 +1324,8 @@ export type TrayItem = {
 
 /**
  *  The menu, computed and worded by the UI (`set_tray_menu`, `src/lib/tray.ts`): sent at
- *  startup, after a sync and whenever a label or the language changes. Rust has no
- *  catalogs, so dates come worded.
+ *  startup and whenever what it shows changes (a sync, the language, `tray-expired`). Rust
+ *  has no catalogs, so dates come worded.
  */
 export type TrayMenu = {
 	open: string,
@@ -1337,6 +1341,11 @@ export type TrayMenu = {
 	recent: TrayItem[],
 	/**  "Restart to Update to X", while a downloaded update waits. */
 	update: string | null,
+	/**
+	 *  When a label or the selection would change (midnight, a deadline): the background
+	 *  tick then sends `tray-expired` (`check_expiry`). None when nothing depends on time.
+	 */
+	validUntil: string | null,
 };
 
 /**  What the UI knows and Rust doesn't. */

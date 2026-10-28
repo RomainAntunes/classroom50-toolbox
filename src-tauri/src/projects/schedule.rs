@@ -122,6 +122,8 @@ pub fn start_background_sync(app: AppHandle) {
                 .saturating_sub(monotonic_now - monotonic)
                 > Duration::from_secs(60);
             (wall, monotonic) = (wall_now, monotonic_now);
+            // Riding this tick, the tray menu's dated labels need no timer of their own.
+            crate::tray::check_expiry(&app);
 
             let state = app.state::<ProjectsState>();
             if state.is_offline() {
