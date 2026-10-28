@@ -20,6 +20,7 @@ import { editorFor, openInEditor } from "#lib/editor.svelte.js";
 import { classKey } from "#lib/filter.js";
 import { relativeAt, t } from "#lib/i18n/index.js";
 import { session } from "#lib/session.svelte.js";
+import { installUpdate } from "#lib/update.js";
 
 /** What the menu is made of. The layout passes each one narrowed to what the menu reads,
  *  so a settings save or a download's progress that changes nothing here costs nothing. */
@@ -177,9 +178,9 @@ function activeAt(project: Project): number {
   return at ? new Date(at).getTime() : 0;
 }
 
-/** "Restart to Update to X" while a downloaded update waits. Not yet. */
-function update(_input: TrayInput): string | null {
-  return null;
+/** "Restart to Update to X" while a downloaded update waits, gone once it installs. */
+function update({ update }: TrayInput): string | null {
+  return update ? t("tray.update", { version: update }) : null;
 }
 
 /** The next local midnight: "today" becomes "yesterday". */
@@ -242,6 +243,8 @@ export async function handleTrayAction(action: TrayAction): Promise<void> {
       return;
     }
     case "installUpdate":
+      // What the banner's Restart now runs; no popover.
+      await installUpdate();
       return;
   }
 }
