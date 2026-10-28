@@ -2,12 +2,12 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { EditorInfo, Project, Settings, Snapshot } from "#lib/api.js";
 import { editors } from "#lib/editor.svelte.js";
 import { setLocale } from "#lib/i18n/index.js";
+import { session } from "#lib/session.svelte.js";
 import { settings } from "#lib/settings.svelte.js";
-import { handleTrayAction, trayMenu, type TrayInput } from "#lib/tray.js";
+import { handleTrayAction, sendTrayMenu, trayMenu, type TrayInput } from "#lib/tray.js";
 
 const api = vi.hoisted(() => ({
   setTrayMenu: vi.fn(),
-  listProjects: vi.fn(),
   openInEditor: vi.fn(),
 }));
 vi.mock("$app/navigation", () => ({ goto: vi.fn() }));
@@ -52,13 +52,13 @@ function input(projects: Project[], over: Partial<TrayInput> = {}): TrayInput {
   return {
     snapshot: { projects, unaccepted: [] } as unknown as Snapshot,
     update: null,
-    settings: { hidden: [], hiddenClasses: [] } as unknown as Settings,
-    editors: [idea],
+    hidden: { ids: [], classes: [] },
+    editor: true,
     ...over,
   };
 }
 
-const hour = (h: number) => new Date(Date.UTC(2026, 9, 28, h)).toISOString();
+const hour = (h: number, m = 0) => new Date(Date.UTC(2026, 9, 28, h, m)).toISOString();
 const labels = (i: TrayInput) => trayMenu(i, now).recent.map((item) => item.label);
 
 describe("recent", () => {
@@ -101,8 +101,8 @@ describe("recent", () => {
       clone("lab-1", { classroom: "algo" }),
       clone("lab-2", { classroom: "Algo" }),
     ];
-    const hiding = { hidden: ["acme/cs50-hello-alex"], hiddenClasses: ["acme/algo"] };
-    expect(labels(input(projects, { settings: hiding as unknown as Settings }))).toEqual(["mario"]);
+    const hidden = { ids: ["acme/cs50-hello-alex"], classes: ["acme/algo"] };
+    expect(labels(input(projects, { hidden }))).toEqual(["mario"]);
   });
 
   it("adds the class when two picks share a name", () => {
@@ -117,37 +117,56 @@ describe("recent", () => {
   });
 
   it("offers nothing without an editor to open them in", () => {
-    expect(trayMenu(input([clone("hello")], { editors: [] }), now).recent).toEqual([]);
+    expect(trayMenu(input([clone("hello")], { editor: false }), now).recent).toEqual([]);
   });
 
   it("offers nothing before the first snapshot", () => {
     expect(trayMenu(input([], { snapshot: null }), now).recent).toEqual([]);
   });
+
+  it("sends nothing when a clone was worked in but the order holds", () => {
+    api.setTrayMenu.mockReset().mockResolvedValue(null);
+    const before = [clone("hello", { activeAt: hour(12) }), clone("mario", { activeAt: hour(9) })];
+    sendTrayMenu(trayMenu(input(before), now));
+    // A sync later: hello's index moved again, still the newest.
+    const after = [clone("hello", { activeAt: hour(13) }), clone("mario", { activeAt: hour(9) })];
+    sendTrayMenu(trayMenu(input(after), now));
+    expect(api.setTrayMenu).toHaveBeenCalledOnce();
+    // Mario worked in since: the order changes, so the menu does.
+    const swapped = [
+      clone("hello", { activeAt: hour(13) }),
+      clone("mario", { activeAt: hour(13, 30) }),
+    ];
+    sendTrayMenu(trayMenu(input(swapped), now));
+    expect(api.setTrayMenu).toHaveBeenCalledTimes(2);
+  });
 });
+
+const snap = (projects: Project[]) => ({ projects, unaccepted: [] }) as unknown as Snapshot;
 
 describe("handleTrayAction open", () => {
   beforeEach(() => {
-    api.listProjects.mockReset();
+    session.snapshot = null;
     api.openInEditor.mockReset().mockResolvedValue(null);
     editors.installed = [idea, vscode];
     settings.current = { defaultEditor: null } as Settings;
   });
 
   it("opens the clone in the editor that last opened it", async () => {
-    api.listProjects.mockResolvedValue({ projects: [clone("hello", { editor: "vscode" })] });
+    session.snapshot = snap([clone("hello", { editor: "vscode" })]);
     await handleTrayAction({ kind: "open", id: "acme/cs50-hello-alex" });
     expect(api.openInEditor).toHaveBeenCalledWith("/code/cs50-hello", "vscode");
   });
 
   it("uses the default editor otherwise", async () => {
     settings.current = { defaultEditor: "vscode" } as Settings;
-    api.listProjects.mockResolvedValue({ projects: [clone("hello")] });
+    session.snapshot = snap([clone("hello")]);
     await handleTrayAction({ kind: "open", id: "acme/cs50-hello-alex" });
     expect(api.openInEditor).toHaveBeenCalledWith("/code/cs50-hello", "vscode");
   });
 
   it("does nothing for a project gone or without a clone", async () => {
-    api.listProjects.mockResolvedValue({ projects: [clone("hello", { path: null })] });
+    session.snapshot = snap([clone("hello", { path: null })]);
     await handleTrayAction({ kind: "open", id: "acme/cs50-hello-alex" });
     await handleTrayAction({ kind: "open", id: "acme/cs50-mario-alex" });
     expect(api.openInEditor).not.toHaveBeenCalled();
@@ -155,7 +174,7 @@ describe("handleTrayAction open", () => {
 
   it("does nothing once no editor is installed", async () => {
     editors.installed = [];
-    api.listProjects.mockResolvedValue({ projects: [clone("hello")] });
+    session.snapshot = snap([clone("hello")]);
     await handleTrayAction({ kind: "open", id: "acme/cs50-hello-alex" });
     expect(api.openInEditor).not.toHaveBeenCalled();
   });

@@ -19,6 +19,7 @@ import { focus } from "#lib/deeplink.js";
 import { editorFor, openInEditor } from "#lib/editor.svelte.js";
 import { classKey } from "#lib/filter.js";
 import { relativeAt, t } from "#lib/i18n/index.js";
+import { session } from "#lib/session.svelte.js";
 
 /** What the menu is made of. The layout passes each one narrowed to what the menu reads,
  *  so a settings save or a download's progress that changes nothing here costs nothing. */
@@ -144,16 +145,14 @@ const RECENT = 5;
 /** The clones worked on last, for Open Recent: shown ones only, the latest `.git/index`
  *  change first, and only when an editor can open them. Two picks of the same name are
  *  told apart by their class. */
-function recent({ snapshot, settings, editors }: TrayInput): TrayItem[] {
-  if (!editors.length) return [];
-  const hidden = settings?.hidden ?? [];
-  const hiddenClasses = settings?.hiddenClasses ?? [];
+function recent({ snapshot, hidden, editor }: TrayInput): TrayItem[] {
+  if (!editor) return [];
   const picked = (snapshot?.projects ?? [])
     .filter(
       (project) =>
         project.path &&
-        !hidden.includes(project.id) &&
-        !hiddenClasses.includes(classKey(project.owner, project.config.classroom)),
+        !hidden.ids.includes(project.id) &&
+        !hidden.classes.includes(classKey(project.owner, project.config.classroom)),
     )
     .map((project) => ({ project, at: activeAt(project) }))
     .sort((a, b) => b.at - a.at)
@@ -235,9 +234,9 @@ export async function handleTrayAction(action: TrayAction): Promise<void> {
       await focus(action.id);
       return;
     case "open": {
-      // Rust's snapshot now: the clone may have moved since the menu was sent.
-      const { projects } = await api.listProjects();
-      const project = projects.find((other) => other.id === action.id);
+      // The list as it is now (the layout keeps it current): the clone may have moved
+      // since the menu was sent.
+      const project = session.snapshot?.projects.find((other) => other.id === action.id);
       const editor = project && editorFor(project);
       if (project?.path && editor) await openInEditor(project.path, editor);
       return;
