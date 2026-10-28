@@ -42,8 +42,9 @@ async function ready(target: DeepLinkTarget): Promise<boolean> {
 
 let seq = 0;
 
-/** Shows row `id` on the main page: unfolded, scrolled to and opened. */
-async function focus(id: string): Promise<void> {
+/** Shows row `id` on the main page: unfolded, scrolled to and opened (a link's row, or a
+ *  deadline picked from the tray menu). */
+export async function focus(id: string): Promise<void> {
   await goto("/");
   await loadSnapshot();
   session.focus = { id, seq: ++seq };

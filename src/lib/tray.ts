@@ -7,6 +7,7 @@ import { goto } from "$app/navigation";
 import { page } from "$app/state";
 import {
   api,
+  type Project,
   type Settings,
   type Snapshot,
   type TrayAction,
@@ -14,6 +15,8 @@ import {
   type TrayMenu,
   type UpdateStatus,
 } from "#lib/api.js";
+import { focus } from "#lib/deeplink.js";
+import { classKey } from "#lib/filter.js";
 import { relativeAt, t } from "#lib/i18n/index.js";
 
 /** What the menu is made of. The layout passes each one narrowed to what the menu reads,
@@ -74,9 +77,75 @@ function synced({ snapshot }: TrayInput, now: Date): string | null {
   return at ? t("projects.synced", { when: relativeAt(new Date(at), now, false) }) : null;
 }
 
-/** The nearest deadlines of unfinished work, nearest first. None yet. */
-function deadlines(_input: TrayInput, _now: Date): TrayItem[] {
-  return [];
+const DAY = 24 * 60 * 60 * 1000;
+/** Deadlines the menu lists at most. */
+const DEADLINES = 3;
+
+interface Deadline {
+  id: string;
+  name: string;
+  /** Epoch milliseconds. */
+  due: number;
+}
+
+/** The project's deadline while it is open, as Rust's `alerts::open_due` reads it. */
+function openDue(project: Project): string | null {
+  const assignment = project.assignment;
+  if (!assignment || assignment.closed || project.remote?.archived) return null;
+  return assignment.due;
+}
+
+/** Whether the assignment may still need the student, as Rust's `alerts::needs_work` says:
+ *  anything pending, or no clone to tell, unless a tag-mode submission covers GitHub's head. */
+function needsWork(project: Project): boolean {
+  if (project.pending) return true;
+  if (project.path) return false;
+  const tagMode = project.assignment?.submissionMode === "tag";
+  const head = project.remote?.head?.oid;
+  const submitted = head !== undefined && project.remote?.lastSubmission?.commit === head;
+  return !(tagMode && submitted);
+}
+
+/** Every deadline of open work that isn't hidden, past ones included, in no order: what the
+ *  menu picks from, and what `nextChange` watches. */
+function candidates({ snapshot, hidden }: TrayInput): Deadline[] {
+  const shown = (id: string, owner: string | null, classroom: string) =>
+    !hidden.ids.includes(id) && !hidden.classes.includes(classKey(owner, classroom));
+  const out: Deadline[] = [];
+  for (const project of snapshot?.projects ?? []) {
+    const due = openDue(project);
+    if (due && needsWork(project) && shown(project.id, project.owner, project.config.classroom)) {
+      const name = project.assignment?.name ?? project.config.assignment;
+      out.push({ id: project.id, name, due: Date.parse(due) });
+    }
+  }
+  for (const item of snapshot?.unaccepted ?? []) {
+    const { due, closed, name } = item.assignment;
+    if (due && !closed && shown(item.id, item.classroom.org, item.classroom.slug)) {
+      out.push({ id: item.id, name, due: Date.parse(due) });
+    }
+  }
+  return out;
+}
+
+/** The nearest deadlines of unfinished work, nearest first: "Lab 3 · Due tomorrow at 10:30
+ *  PM". One just past shows as "Was due ..." for a day, then drops. */
+function deadlines(input: TrayInput, now: Date): TrayItem[] {
+  return candidates(input)
+    .filter(({ due }) => due > now.getTime() - DAY)
+    .sort((a, b) => a.due - b.due)
+    .slice(0, DEADLINES)
+    .map(({ id, name, due }) => {
+      const at = new Date(due);
+      const when = relativeAt(at, now, false);
+      return {
+        id,
+        label: t("tray.deadline", {
+          name,
+          due: t(at > now ? "projects.due" : "projects.wasDue", { when }),
+        }),
+      };
+    });
 }
 
 /** The clones worked on last, for Open Recent. None yet. */
@@ -94,11 +163,20 @@ function nextMidnight(now: Date): number {
   return new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1).getTime();
 }
 
-/** Milliseconds from `now` until a label or what the menu picks would change; null when
- *  nothing it shows depends on the time. */
+/** Milliseconds from `now` until a label or what the menu picks would change: midnight, a
+ *  deadline ("Due" becomes "Was due") or a day after one (it drops, and another may show).
+ *  Null when nothing it shows or could pick depends on the time. */
 export function nextChange(input: TrayInput, now: Date): number | null {
-  if (!synced(input, now)) return null;
-  return nextMidnight(now) - now.getTime();
+  const all = candidates(input);
+  if (!synced(input, now) && !all.length) return null;
+  const from = now.getTime();
+  let next = nextMidnight(now);
+  for (const { due } of all) {
+    for (const moment of [due, due + DAY]) {
+      if (moment > from && moment < next) next = moment;
+    }
+  }
+  return next - from;
 }
 
 /** `nextChange` as the moment Rust asks for a new menu (`tray-expired`). */
@@ -128,6 +206,8 @@ export async function handleTrayAction(action: TrayAction): Promise<void> {
       if (page.url.pathname !== "/welcome") await goto("/settings");
       return;
     case "focus":
+      // Pinned whatever the filters, scrolled to and opened, as a link's row is.
+      await focus(action.id);
       return;
     case "open":
       return;
