@@ -65,17 +65,20 @@ test("the menu lists the nearest deadlines of unfinished work", async ({ app }) 
     ]);
 });
 
-test("a passing deadline changes its line, with no tick before", async ({ app }) => {
+test("a passing deadline changes its line once Rust says the menu expired", async ({ app }) => {
   await app.start(world);
   await expect
     .poll(async () => (await deadlines(app))?.[1].label)
     .toBe("Lab 3 · Due today at 6:00 PM");
+  // Valid until Lab 3's deadline, 6 PM in Zurich.
+  expect((await menus(app)).at(-1)?.validUntil).toBe("2026-10-28T17:00:00.000Z");
   const sent = (await menus(app)).length;
 
+  // Past the deadline the UI sends nothing by itself; Rust's tick asks.
   await app.emit("popover-hidden", null);
-  await app.page.clock.runFor(2.9 * 3_600_000);
+  await app.page.clock.runFor(3.1 * 3_600_000);
   expect(await menus(app)).toHaveLength(sent);
-  await app.page.clock.runFor(0.2 * 3_600_000);
+  await app.emit("tray-expired", null);
   await expect
     .poll(async () => (await deadlines(app))?.[1].label)
     .toBe("Lab 3 · Was due today at 6:00 PM");

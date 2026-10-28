@@ -902,6 +902,11 @@ export type Project_Deserialize = {
 	classroom: Classroom | null,
 	assignment: Assignment_Deserialize | null,
 	pending: Pending | null,
+	/**
+	 *  Whether the assignment may still need the student (`alerts::needs_work`): what
+	 *  reminders and the tray menu's deadlines go by. Set with `pending`.
+	 */
+	needsWork: boolean,
 	/**  The assignment's page in the Classroom 50 web app. */
 	webUrl: string | null,
 	/**
@@ -928,6 +933,11 @@ export type Project_Serialize = {
 	classroom: Classroom | null,
 	assignment: Assignment_Serialize | null,
 	pending: Pending | null,
+	/**
+	 *  Whether the assignment may still need the student (`alerts::needs_work`): what
+	 *  reminders and the tray menu's deadlines go by. Set with `pending`.
+	 */
+	needsWork: boolean,
 	/**  The assignment's page in the Classroom 50 web app. */
 	webUrl: string | null,
 	/**

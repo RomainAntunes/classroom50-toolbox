@@ -186,6 +186,10 @@ pub struct Project {
     pub classroom: Option<Classroom>,
     pub assignment: Option<Assignment>,
     pub pending: Option<Pending>,
+    /// Whether the assignment may still need the student (`alerts::needs_work`): what
+    /// reminders and the tray menu's deadlines go by. Set with `pending`.
+    #[serde(default)]
+    pub needs_work: bool,
     /// The assignment's page in the Classroom 50 web app.
     pub web_url: Option<String>,
     /// How late the graded work is: the submit tag's time (tag mode) or the head commit's

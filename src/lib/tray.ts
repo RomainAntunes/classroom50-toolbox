@@ -95,17 +95,6 @@ function openDue(project: Project): string | null {
   return assignment.due;
 }
 
-/** Whether the assignment may still need the student, as Rust's `alerts::needs_work` says:
- *  anything pending, or no clone to tell, unless a tag-mode submission covers GitHub's head. */
-function needsWork(project: Project): boolean {
-  if (project.pending) return true;
-  if (project.path) return false;
-  const tagMode = project.assignment?.submissionMode === "tag";
-  const head = project.remote?.head?.oid;
-  const submitted = head !== undefined && project.remote?.lastSubmission?.commit === head;
-  return !(tagMode && submitted);
-}
-
 /** Every deadline of open work that isn't hidden, past ones included, in no order: what the
  *  menu picks from, and what `nextChange` watches. */
 function candidates({ snapshot, hidden }: TrayInput): Deadline[] {
@@ -114,7 +103,7 @@ function candidates({ snapshot, hidden }: TrayInput): Deadline[] {
   const out: Deadline[] = [];
   for (const project of snapshot?.projects ?? []) {
     const due = openDue(project);
-    if (due && needsWork(project) && shown(project.id, project.owner, project.config.classroom)) {
+    if (due && project.needsWork && shown(project.id, project.owner, project.config.classroom)) {
       const name = project.assignment?.name ?? project.config.assignment;
       out.push({ id: project.id, name, due: Date.parse(due) });
     }

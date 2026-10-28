@@ -27,7 +27,7 @@ const plain = (text: string) => text.replace(/\s/g, " ");
 const HOUR = 3_600_000;
 const NOW = at(28, 15);
 
-/** Lab `slug` of class cs101, accepted but not cloned: it needs work. */
+/** Lab `slug` of class cs101, accepted but not cloned: Rust says it needs work. */
 function project(
   slug: string,
   due: string | null,
@@ -45,6 +45,7 @@ function project(
     classroom: null,
     assignment: { name: `Lab ${slug}`, due, closed: false, submissionMode: null, ...assignment },
     pending: null,
+    needsWork: true,
     ...over,
   } as unknown as Project;
 }
@@ -129,34 +130,12 @@ describe("deadlines", () => {
     expect(trayMenu(input(projects, items), NOW).deadlines).toEqual([]);
   });
 
-  it("leaves out work that is done, as reminders do", () => {
+  it("leaves out work that is done, as Rust's needsWork says (reminders go by it too)", () => {
     const due = iso(29, 12);
-    const clean = project("clean", due, { path: "~/c/clean" });
-    const changed = project("changed", due, {
-      path: "~/c/changed",
-      pending: { kind: "uncommitted" },
-    } as unknown as Partial<Project>);
-    // Submitted with a tag on GitHub's head, no clone to tell otherwise.
-    const remote = { archived: false, head: { oid: "abc" }, lastSubmission: { commit: "abc" } };
-    const submitted = project("submitted", due, { remote } as Partial<Project>, {
-      submissionMode: "tag",
-    });
-    // Every push counts, so the head being tagged says nothing.
-    const pushMode = project("push", due, { remote } as Partial<Project>, {
-      submissionMode: "every-push",
-    });
-    const older = project(
-      "older",
-      due,
-      { remote: { ...remote, head: { oid: "def" } } } as Partial<Project>,
-      { submissionMode: "tag" },
-    );
-    const menu = trayMenu(input([clean, changed, submitted, pushMode, older]), NOW);
-    expect(labels(menu).map((l) => l.split(" · ")[0])).toEqual([
-      "Lab changed",
-      "Lab push",
-      "Lab older",
-    ]);
+    const done = project("done", due, { path: "~/c/done", needsWork: false });
+    const changed = project("changed", due, { path: "~/c/changed" });
+    const menu = trayMenu(input([done, changed]), NOW);
+    expect(labels(menu).map((l) => l.split(" · ")[0])).toEqual(["Lab changed"]);
   });
 
   it("leaves out hidden assignments and classes", () => {

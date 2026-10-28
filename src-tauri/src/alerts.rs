@@ -659,6 +659,7 @@ mod tests {
             classroom: None,
             assignment: Some(assignment(slug, due)),
             pending: None,
+            needs_work: false,
             web_url: None,
             late_seconds: None,
             editor: None,
