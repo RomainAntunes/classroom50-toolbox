@@ -1,5 +1,14 @@
 import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
-import { calendarDays, durationLabel, fromNow, relativeAt, setLocale } from "./index";
+import {
+  calendarDays,
+  durationLabel,
+  formatDate,
+  formatTime,
+  fromNow,
+  relativeAt,
+  setHourCycle,
+  setLocale,
+} from "./index";
 
 // Local dates below are in Zurich time, which leaves summer time on 25 October 2026.
 const zone = process.env.TZ;
@@ -9,7 +18,10 @@ beforeAll(() => {
 afterAll(() => {
   process.env.TZ = zone;
 });
-afterEach(() => setLocale("en"));
+afterEach(() => {
+  setLocale("en");
+  setHourCycle(null);
+});
 
 /** 29 October 2026 at 22:30 is `at(29, 22, 30)`, local time. */
 const at = (day: number, hour: number, minute = 0) => new Date(2026, 9, day, hour, minute);
@@ -105,6 +117,34 @@ describe("relativeAt", () => {
     setLocale("de");
     expect(relativeAt(at(29, 22, 30), at(28, 8))).toBe("morgen um 22:30");
     expect(relativeAt(at(28, 13), at(28, 8))).toBe("heute um 13:00");
+  });
+});
+
+describe("the OS's clock", () => {
+  it("puts an English UI on 24 hours", () => {
+    setHourCycle("h23");
+    expect(formatTime(at(29, 22, 30))).toBe("22:30");
+    expect(relativeAt(at(29, 22, 30), at(28, 8))).toBe("tomorrow at 22:30");
+    expect(formatDate(at(29, 22, 30))).toBe("Thu, Oct 29, 22:30");
+  });
+
+  it("counts midnight as 00, never 24", () => {
+    setHourCycle("h23");
+    expect(formatTime(at(29, 0, 5))).toBe("00:05");
+    expect(formatDate(at(29, 0, 5))).toBe("Thu, Oct 29, 00:05");
+  });
+
+  it("puts a French UI on 12 hours", () => {
+    setLocale("fr");
+    setHourCycle("h12");
+    expect(plain(formatTime(at(29, 22, 30)))).toBe("10:30 PM");
+    expect(plain(relativeAt(at(29, 22, 30), at(28, 8)))).toBe("demain à 10:30 PM");
+  });
+
+  it("keeps the language's clock when the OS doesn't say", () => {
+    expect(plain(formatTime(at(29, 22, 30)))).toBe("10:30 PM");
+    setLocale("fr");
+    expect(formatTime(at(29, 22, 30))).toBe("22:30");
   });
 });
 

@@ -76,6 +76,15 @@ pub fn system_languages() -> Vec<String> {
     sys_locale::get_locales().collect()
 }
 
+/// The OS's 12- or 24-hour clock (System Settings' "24-hour time", Windows' region format,
+/// GNOME's clock), `None` when it can't say, so the UI's language keeps its own. Cached;
+/// `hour-cycle` tells a change.
+#[tauri::command]
+#[cfg_attr(test, specta::specta)]
+pub async fn system_hour_cycle(app: AppHandle) -> Option<platform::HourCycle> {
+    crate::clock::hour_cycle(&app).await
+}
+
 /// The tray menu, computed and worded by the UI; rebuilt only when it changed.
 #[tauri::command]
 #[cfg_attr(test, specta::specta)]

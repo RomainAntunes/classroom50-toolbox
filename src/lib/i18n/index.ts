@@ -19,6 +19,7 @@ import ja from "./ja.json";
 import ko from "./ko.json";
 import { isolate, textDirection, type Direction } from "./direction";
 import { locale } from "./locale.svelte";
+import type { HourCycle } from "#lib/api.js";
 
 export { isolate, textDirection, type Direction } from "./direction";
 
@@ -111,6 +112,11 @@ function pluralRules(code: string): Intl.PluralRules {
 /** Switches the catalog (`language` as in `resolveLocale`); the UI follows at once. */
 export function setLocale(language: string, preferred: readonly string[] = []): void {
   locale.code = resolveLocale(language, preferred);
+}
+
+/** The OS's 12- or 24-hour clock (`system_hour_cycle`); `null` keeps the language's. */
+export function setHourCycle(cycle: HourCycle | null): void {
+  locale.hourCycle = cycle;
 }
 
 /** The active catalog's code, e.g. for `<html lang>`. */
@@ -214,6 +220,13 @@ export function formatMegabytes(bytes: number): string {
   }).format(bytes / 1_000_000);
 }
 
+// Times of day follow the OS's 12- or 24-hour clock, as native apps do, whatever the
+// language: WebKit's `Intl` only knows the language's default. `h23` counts 0 to 23, so
+// midnight is "00:05", never "24:05".
+function clock(): Pick<Intl.DateTimeFormatOptions, "hourCycle"> {
+  return locale.hourCycle ? { hourCycle: locale.hourCycle } : {};
+}
+
 /** "Fri 17 Oct, 23:59" in the catalog's language: for exact dates in details. */
 export function formatDate(date: Date): string {
   return new Intl.DateTimeFormat(locale.code, {
@@ -222,6 +235,7 @@ export function formatDate(date: Date): string {
     month: "short",
     hour: "2-digit",
     minute: "2-digit",
+    ...clock(),
   }).format(date);
 }
 
@@ -268,9 +282,13 @@ export function fromNow(date: Date, now = new Date()): string {
   return relative().format(seconds, "second");
 }
 
-/** "10:30 PM", "22:30": the hour of a date in the catalog's language. */
+/** "10:30 PM", "22:30": the hour of a date in the catalog's language, on the OS's clock. */
 export function formatTime(date: Date): string {
-  return new Intl.DateTimeFormat(locale.code, { hour: "numeric", minute: "2-digit" }).format(date);
+  return new Intl.DateTimeFormat(locale.code, {
+    hour: "numeric",
+    minute: "2-digit",
+    ...clock(),
+  }).format(date);
 }
 
 /**

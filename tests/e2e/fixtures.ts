@@ -13,6 +13,7 @@ import type {
   ErrorKind,
   Grade,
   GradeTest,
+  HourCycle,
   LocalState,
   Project,
   RemoteRepo,
@@ -40,6 +41,8 @@ export interface Scenario {
   editors: EditorInfo[];
   accounts: Account[];
   systemLanguages: string[];
+  /** The OS's 12- or 24-hour clock (`system_hour_cycle`); null keeps the language's. */
+  hourCycle: HourCycle | null;
   unseen: string[];
   syncDetails: SyncDetails;
   /** Self-update (`update_status`); `defer_update` and `install_update` change it and send
@@ -314,6 +317,7 @@ export function scenario(over: Partial<Scenario> = {}): Scenario {
     editors: [{ id: "vscode", name: "Visual Studio Code" }],
     accounts: [{ login: LOGIN, active: true }],
     systemLanguages: ["en-US"],
+    hourCycle: null,
     unseen: [],
     syncDetails: {
       login: LOGIN,

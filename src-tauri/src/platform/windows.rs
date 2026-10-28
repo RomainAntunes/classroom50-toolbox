@@ -20,6 +20,16 @@ pub fn os_version() -> Option<String> {
     ))
 }
 
+pub const HOUR_CYCLE_IN_PROCESS: bool = true;
+
+/// The short time format of the user's region settings (`HH:mm`, `h:mm tt`).
+pub async fn hour_cycle() -> Option<super::HourCycle> {
+    use windows_registry::CURRENT_USER;
+    let key = CURRENT_USER.open(r"Control Panel\International").ok()?;
+    let pattern = key.get_string("sShortTime").ok()?;
+    super::hour_cycle::from_windows_pattern(&pattern)
+}
+
 /// Where gh and git may be when the PATH the app started with doesn't list them. An
 /// installer writes the new folder to PATH in the registry, which an already-running
 /// process (or one started by an Explorer that missed the change) never sees, so PATH is

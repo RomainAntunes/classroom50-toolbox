@@ -14,6 +14,27 @@ pub fn os_version() -> Option<String> {
         .and_then(|text| super::os_version::linux(&text))
 }
 
+pub const HOUR_CYCLE_IN_PROCESS: bool = false;
+
+/// GNOME's clock setting, on GNOME only; other desktops keep the language's clock.
+pub async fn hour_cycle() -> Option<super::HourCycle> {
+    let desktop = std::env::var("XDG_CURRENT_DESKTOP").ok();
+    if !super::hour_cycle::is_gnome(desktop.as_deref())
+        || process::find_in_path("gsettings").is_none()
+    {
+        return None;
+    }
+    let out = process::run_with_timeout(
+        "gsettings",
+        ["get", "org.gnome.desktop.interface", "clock-format"],
+        None,
+        std::time::Duration::from_secs(5),
+    )
+    .await
+    .ok()?;
+    super::hour_cycle::from_gnome_clock_format(&out.stdout)
+}
+
 pub fn extra_path_dirs() -> Vec<PathBuf> {
     let mut dirs = vec![
         PathBuf::from("/usr/local/bin"),

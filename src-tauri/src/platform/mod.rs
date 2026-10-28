@@ -10,6 +10,7 @@ use serde::{Deserialize, Serialize};
 use crate::error::Result;
 use crate::tools::Tool;
 
+mod hour_cycle;
 mod install;
 #[cfg(target_os = "linux")]
 mod linux;
@@ -28,6 +29,8 @@ use linux as imp;
 use macos as imp;
 #[cfg(target_os = "windows")]
 use windows as imp;
+
+pub use hour_cycle::HourCycle;
 
 #[derive(Debug, Clone, Copy, Serialize, PartialEq, Eq)]
 #[cfg_attr(test, derive(specta::Type))]
@@ -64,6 +67,17 @@ pub fn os() -> Os {
 pub fn os_version() -> Option<String> {
     imp::os_version()
 }
+
+/// The OS's 12- or 24-hour clock setting, whatever the UI's language; `None` when it can't
+/// say, so the language's own clock stays. macOS and Windows read it in-process; Linux asks
+/// GNOME's `gsettings`, a program.
+pub async fn hour_cycle() -> Option<HourCycle> {
+    imp::hour_cycle().await
+}
+
+/// Whether `hour_cycle` runs no program, so it is cheap enough to read again whenever the
+/// popover shows (Linux reads it at startup only).
+pub const HOUR_CYCLE_IN_PROCESS: bool = imp::HOUR_CYCLE_IN_PROCESS;
 
 /// Directories appended to PATH for child processes (see `process::search_path`).
 pub fn extra_path_dirs() -> Vec<PathBuf> {
