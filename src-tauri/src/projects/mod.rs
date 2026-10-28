@@ -150,6 +150,10 @@ pub struct LocalState {
     pub unmerged: Vec<String>,
     /// GitHub's default-branch head isn't in the clone: someone pushed since the last pull.
     pub remote_ahead: bool,
+    /// When the clone's `.git/index` last changed: any stage, commit, checkout or pull, or
+    /// git refreshing it after files changed. Open Recent's order.
+    #[serde(default)]
+    pub active_at: Option<DateTime<Utc>>,
 }
 
 /// The most pressing reason the graded state lags behind the student's work.

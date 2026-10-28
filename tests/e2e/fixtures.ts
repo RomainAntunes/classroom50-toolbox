@@ -217,6 +217,7 @@ export function project(options: ProjectOptions): Project {
           trackedChanges: 0,
           unmerged: [],
           remoteAhead: false,
+          activeAt: null,
           ...options.local,
         };
   const remote: RemoteRepo | null =
