@@ -9,16 +9,19 @@
     DEEP_LINK_EVENT,
     NOTIFY_EVENT,
     POPOVER_HIDDEN_EVENT,
+    PROJECTS_UPDATED_EVENT,
     SETTINGS_UPDATED_EVENT,
+    TRAY_ACTION_EVENT,
     UNSEEN_EVENT,
     UPDATE_STATE_EVENT,
     type Settings,
+    type Snapshot,
     type UpdateStatus,
   } from "#lib/api.js";
   import { handleDeepLink, linkActive } from "#lib/deeplink.js";
   import { currentDirection, currentLocale, setLocale, t } from "#lib/i18n/index.js";
   import { showNotice } from "#lib/notices.js";
-  import { loadEditors } from "#lib/editor.svelte.js";
+  import { editors, loadEditors } from "#lib/editor.svelte.js";
   import { initTheme } from "#lib/theme/preview.svelte.js";
   import Prompt from "#lib/components/Prompt.svelte";
   import { announce, announcer } from "#lib/announce.svelte.js";
@@ -26,6 +29,7 @@
   import { session } from "#lib/session.svelte.js";
   import { loadSettings, settings } from "#lib/settings.svelte.js";
   import { pendingNotes } from "#lib/whatsnew.js";
+  import { handleTrayAction, nextChange, sendTrayMenu, trayMenu } from "#lib/tray.js";
 
   let { children } = $props();
 
@@ -66,10 +70,9 @@
     document.documentElement.dir = currentDirection();
   });
 
-  // Rust writes calendar notes and the tray menu with these words (placeholders filled
-  // there; names pass through `t` as themselves, so they are isolated in a right-to-left
-  // language, numbers stay bare as `fill` leaves them); sent again when the language
-  // changes.
+  // Rust writes calendar notes with these words (placeholders filled there; names pass
+  // through `t` as themselves, so they are isolated in a right-to-left language, numbers
+  // stay bare as `fill` leaves them); sent again when the language changes.
   $effect(() => {
     void api.setCalendarLabels({
       class: t("calendar.notes.class", { name: "{name}" }),
@@ -79,7 +82,26 @@
       submitted: t("calendar.notes.submitted"),
       notAccepted: t("calendar.notes.notAccepted"),
     });
-    void api.setTrayLabels({ open: t("tray.open"), quit: t("tray.quit") });
+  });
+
+  // The tray menu, worded here (`t` makes the language an input) and sent whenever an input
+  // changes. The list's snapshot is only kept while the main page is mounted, so the layout
+  // keeps its own. No tick: one timer wakes it when a label would change (midnight, a
+  // deadline), so the hidden app stays idle.
+  let traySnapshot = $state<Snapshot | null>(null);
+  let trayWake = $state(0);
+  $effect(() => {
+    void trayWake;
+    const input = {
+      snapshot: traySnapshot,
+      update: session.update,
+      settings: settings.current,
+      editors: editors.installed,
+    };
+    const now = new Date();
+    sendTrayMenu(trayMenu(input, now));
+    const timer = setTimeout(() => trayWake++, nextChange(input, now) + 1000);
+    return () => clearTimeout(timer);
   });
 
   // Self-update, for the main page's banner and Settings > About. A screen reader hears
@@ -123,6 +145,9 @@
     });
     // A popover opened mid-download shows where it stands.
     void api.updateStatus().then(setUpdate);
+    void api.listProjects().then((snapshot) => {
+      traySnapshot ??= snapshot;
+    });
     const unlisteners = [
       onEvent(NOTIFY_EVENT, (notice) => void showNotice(notice)),
       onEvent(UNSEEN_EVENT, (ids) => {
@@ -133,6 +158,10 @@
       }),
       onEvent(UPDATE_STATE_EVENT, (status) => setUpdate(status)),
       onEvent(DEEP_LINK_EVENT, () => void handleDeepLink()),
+      onEvent(PROJECTS_UPDATED_EVENT, (snapshot) => {
+        traySnapshot = snapshot;
+      }),
+      onEvent(TRAY_ACTION_EVENT, (action) => void handleTrayAction(action)),
       onEvent(POPOVER_HIDDEN_EVENT, () => {
         session.focus = null;
         void reopenOn();

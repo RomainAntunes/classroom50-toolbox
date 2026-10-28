@@ -10,6 +10,7 @@ use crate::login::DeviceCode;
 use crate::projects::{Snapshot, SyncProgress};
 use crate::settings::Settings;
 use crate::tools::ToolJob;
+use crate::tray::Action;
 use crate::updater::UpdateStatus;
 
 /// An event the UI listens to: its name and what it carries.
@@ -76,4 +77,7 @@ events! {
     PopoverShown = "popover-shown" => ();
     /// The global shortcut showed the popover: the list takes the keyboard focus.
     PopoverShortcut = "popover-shortcut" => ();
+    /// A tray menu item that the UI carries out (Settings, a deadline, a recent clone,
+    /// Restart to Update).
+    TrayAction = "tray-action" => Action;
 }
