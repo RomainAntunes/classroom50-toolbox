@@ -11,8 +11,11 @@ vi.mock("#lib/deeplink.js", () => link);
 
 // Local dates below are in Zurich time.
 const zone = process.env.TZ;
+// Made once the zone is set: a date built at load would be in the machine's own zone.
+let NOW: Date;
 beforeAll(() => {
   process.env.TZ = "Europe/Zurich";
+  NOW = at(28, 15);
 });
 afterAll(() => {
   process.env.TZ = zone;
@@ -25,7 +28,6 @@ const iso = (day: number, hour: number, minute = 0) => at(day, hour, minute).toI
 // ICU puts a narrow no-break space before "PM".
 const plain = (text: string) => text.replace(/\s/g, " ");
 const HOUR = 3_600_000;
-const NOW = at(28, 15);
 
 /** Lab `slug` of class cs101, accepted but not cloned: Rust says it needs work. */
 function project(
