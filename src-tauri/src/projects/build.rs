@@ -168,6 +168,7 @@ pub(super) async fn build(
     progress.finish_phase(Phase::Clones);
     for project in &mut projects {
         project.pending = pending(project);
+        project.needs_work = crate::alerts::needs_work(project);
         project.late_seconds = late_seconds(project);
     }
     projects.sort_by_cached_key(|p| sort_key(p, now));

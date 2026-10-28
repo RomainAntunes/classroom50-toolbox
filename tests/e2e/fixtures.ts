@@ -187,6 +187,8 @@ export interface ProjectOptions {
   /** null: GitHub doesn't know it. */
   remote?: Partial<RemoteRepo> | null;
   pending?: Project["pending"];
+  /** Rust's `alerts::needs_work`; by default something pending, or no clone. */
+  needsWork?: boolean;
   lateSeconds?: number | null;
   group?: Project["group"];
   editor?: string | null;
@@ -249,6 +251,7 @@ export function project(options: ProjectOptions): Project {
     classroom: cls,
     assignment: a,
     pending: options.pending ?? null,
+    needsWork: options.needsWork ?? (options.pending != null || local === null),
     webUrl: `https://classroom50.org/${cls.org}/${cls.slug}/assignments/${options.slug}/submission`,
     lateSeconds: options.lateSeconds ?? null,
     editor: options.editor ?? null,
