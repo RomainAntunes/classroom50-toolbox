@@ -197,11 +197,11 @@ pub struct SubmitCheck {
     /// assignments, or a deleted marker) gh-student finds the assignment from the repo's name
     /// (`MIN_GH_STUDENT`), which the check has already made sure it can.
     pub has_marker: bool,
-    /// Changes not committed yet (new, modified, deleted, staged or not), editor and OS
-    /// files aside: submit refuses while there are any.
+    /// Changes not committed yet (new, modified, deleted, staged or not), editor, OS and
+    /// build files aside: submit refuses while there are any.
     pub uncommitted: Vec<String>,
-    /// Untracked editor and OS files (`noise`, by root): they don't block a submit, but
-    /// `gh student submit` sends them too unless a `.gitignore` lists them.
+    /// Untracked editor, OS and build files (`noise`, by root): they don't block a submit,
+    /// but `gh student submit` sends them too unless a `.gitignore` lists them.
     pub editor_files: Vec<String>,
 }
 
@@ -541,7 +541,7 @@ mod tests {
         assert!(process::writes_to_github("gh", &args));
     }
 
-    /// Uncommitted work blocks a submit before gh runs; editor files don't. A dev build
+    /// Uncommitted work blocks a submit before gh runs; editor and build files don't. A dev build
     /// then refuses the submit itself, so this never reaches GitHub.
     #[tokio::test]
     async fn submits_only_a_clean_clone() {
@@ -561,13 +561,16 @@ mod tests {
         git(&["init", "-q", "-b", "main"]);
         std::fs::write(root.join(REPO_CONFIG_FILE), "classroom: c\nassignment: a\n").unwrap();
         std::fs::write(root.join("a.c"), "x").unwrap();
+        std::fs::write(root.join("Cargo.toml"), "[package]").unwrap();
         git(&["add", "--all"]);
         git(&["commit", "-q", "-m", "one"]);
         std::fs::write(root.join(".DS_Store"), "x").unwrap();
+        std::fs::create_dir_all(root.join("target").join("debug")).unwrap();
+        std::fs::write(root.join("target").join("debug").join("a"), "x").unwrap();
         let clean = check(&root, SubmitTarget::default()).await.unwrap();
         assert!(clean.has_marker);
         assert!(clean.uncommitted.is_empty());
-        assert_eq!(clean.editor_files, [".DS_Store"]);
+        assert_eq!(clean.editor_files, [".DS_Store", "target/"]);
 
         std::fs::remove_file(root.join("a.c")).unwrap();
         std::fs::write(root.join("b.c"), "x").unwrap();

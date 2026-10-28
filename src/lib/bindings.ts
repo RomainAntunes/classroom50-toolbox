@@ -917,8 +917,8 @@ export type PushCheck = {
 	/**  The new ones among them. */
 	untracked: string[],
 	/**
-	 *  Untracked editor and OS files left out of the commit (`noise`), a folder once with
-	 *  its trailing `/`: `.idea/`, `.DS_Store`.
+	 *  Untracked editor, OS and build files left out of the commit (`noise`), a folder once
+	 *  with its trailing `/`: `.idea/`, `.DS_Store`, a Maven module's `target/`.
 	 */
 	skipped: string[],
 	/**  Over 50 MB: GitHub warns about them. */
@@ -1115,13 +1115,13 @@ export type SubmitCheck = {
 	 */
 	hasMarker: boolean,
 	/**
-	 *  Changes not committed yet (new, modified, deleted, staged or not), editor and OS
-	 *  files aside: submit refuses while there are any.
+	 *  Changes not committed yet (new, modified, deleted, staged or not), editor, OS and
+	 *  build files aside: submit refuses while there are any.
 	 */
 	uncommitted: string[],
 	/**
-	 *  Untracked editor and OS files (`noise`, by root): they don't block a submit, but
-	 *  `gh student submit` sends them too unless a `.gitignore` lists them.
+	 *  Untracked editor, OS and build files (`noise`, by root): they don't block a submit,
+	 *  but `gh student submit` sends them too unless a `.gitignore` lists them.
 	 */
 	editorFiles: string[],
 };

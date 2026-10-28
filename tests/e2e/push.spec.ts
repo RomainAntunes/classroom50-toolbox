@@ -46,14 +46,16 @@ async function open(
 
 test("Commit & push: the prompt lists the files and pushes with the message", async ({ app }) => {
   await open(app, {
-    commit_check: [ok(check({ skipped: [".DS_Store"], ahead: 1 }))],
+    commit_check: [ok(check({ skipped: [".DS_Store", "target/"], ahead: 1 }))],
     commit_push: [ok({ commit: "abc" })],
   });
   await expect(app.prompt).toBeVisible();
   await expect(app.prompt.getByRole("heading")).toHaveText("Commit & push");
   await expect(app.prompt).toContainText("2 changed files: hello.c, notes.md.");
   await expect(app.prompt).toContainText("New files included: notes.md.");
-  await expect(app.prompt).toContainText("Left out (editor and system files): .DS_Store.");
+  await expect(app.prompt).toContainText(
+    "Left out (editor, system and build files): .DS_Store, target/.",
+  );
   await expect(app.prompt).toContainText("Your 1 commit not on GitHub yet is pushed too.");
   // Nothing to say, nothing to send.
   await expect(app.prompt.getByRole("button", { name: "Commit & push" })).toBeDisabled();
