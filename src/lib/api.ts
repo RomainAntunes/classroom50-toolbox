@@ -156,6 +156,8 @@ export const POPOVER_SHOWN_EVENT = "popover-shown" satisfies EventName;
 export const POPOVER_SHORTCUT_EVENT = "popover-shortcut" satisfies EventName;
 /** Payload: `TrayAction`, a tray menu item for the UI to carry out. */
 export const TRAY_ACTION_EVENT = "tray-action" satisfies EventName;
+/** The tray menu's `validUntil` passed: it is worded again. */
+export const TRAY_EXPIRED_EVENT = "tray-expired" satisfies EventName;
 
 /** Listens to a Rust event, its payload typed by `Events`. */
 export function onEvent<K extends EventName>(

@@ -49,6 +49,7 @@ test("the menu holds Refresh, when GitHub was read and Settings", async ({ app }
       recentTitle: "Open Recent",
       recent: [],
       update: null,
+      validUntil: "2026-10-28T23:00:00.000Z",
     } satisfies TrayMenu);
 });
 
@@ -85,17 +86,32 @@ test("the menu follows the UI's language", async ({ app }) => {
     });
 });
 
-test("at midnight today becomes yesterday, with no tick before", async ({ app }) => {
+test("past midnight Rust asks again and today becomes yesterday; the UI has no timer", async ({
+  app,
+}) => {
   await start(app);
   await expect.poll(async () => (await lastMenu(app))?.synced).toBe("Synced today at 2:32 PM");
   const sent = (await menus(app)).length;
 
-  // Hidden all evening: nothing is sent until the date changes.
+  // Hidden all evening and past midnight: the UI sends nothing by itself.
   await app.emit("popover-hidden", null);
-  await app.page.clock.runFor(8 * 3_600_000);
+  await app.page.clock.runFor(10 * 3_600_000);
   expect(await menus(app)).toHaveLength(sent);
-  await app.page.clock.runFor(2 * 3_600_000);
+  // Rust's tick saw `validUntil` pass.
+  await app.emit("tray-expired", null);
   await expect.poll(async () => (await lastMenu(app))?.synced).toBe("Synced yesterday at 2:32 PM");
+  expect((await lastMenu(app))?.validUntil).toBe("2026-10-29T23:00:00.000Z");
+});
+
+test("startup sends one menu, in the saved language", async ({ app }) => {
+  await app.start(scenario({ snapshot: synced, settings: settings({ language: "fr" }) }));
+  await expect(app.page.getByRole("searchbox")).toBeVisible();
+  await expect.poll(async () => (await menus(app)).length).toBe(1);
+  expect((await lastMenu(app))?.refresh).toBe("Actualiser");
+  // A settings save that leaves the hidden lists alone sends nothing.
+  await app.emit("settings-updated", settings({ language: "fr", listFilter: "week" }));
+  await app.page.clock.runFor(1000);
+  expect(await menus(app)).toHaveLength(1);
 });
 
 test("Settings from the menu opens Settings", async ({ app, page }) => {

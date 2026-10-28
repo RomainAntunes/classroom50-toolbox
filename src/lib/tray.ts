@@ -1,12 +1,12 @@
 // The tray icon's menu. The UI computes and words it (Rust has no catalogs) and Rust builds
 // it (`tray.rs`), leaving out empty sections. The layout sends it again whenever an input
-// or the language changes, and once more at `nextChange`: nothing ticks while the popover
-// is hidden, so a label may only change at midnight or at a moment known in advance.
+// or the language changes, and when Rust says its `validUntil` passed (`tray-expired`, on
+// the background tick it runs anyway): the UI has no timer, so a label may only change at
+// midnight or at a moment known in advance.
 import { goto } from "$app/navigation";
 import { page } from "$app/state";
 import {
   api,
-  type EditorInfo,
   type Settings,
   type Snapshot,
   type TrayAction,
@@ -16,13 +16,39 @@ import {
 } from "#lib/api.js";
 import { relativeAt, t } from "#lib/i18n/index.js";
 
-/** What the menu is made of; the layout keeps each one current. */
+/** What the menu is made of. The layout passes each one narrowed to what the menu reads,
+ *  so a settings save or a download's progress that changes nothing here costs nothing. */
 export interface TrayInput {
   snapshot: Snapshot | null;
-  update: UpdateStatus | null;
-  settings: Settings | null;
-  /** The installed editors: Open Recent needs one. */
-  editors: readonly EditorInfo[];
+  /** The version a downloaded update waits to install as (`readyVersion`). */
+  update: string | null;
+  /** Hidden ids and classes (`hiddenFrom(hiddenKey(settings))`). */
+  hidden: Hidden;
+  /** Whether an editor is installed: Open Recent needs one. */
+  editor: boolean;
+}
+
+export interface Hidden {
+  /** Project and unaccepted-assignment ids. */
+  ids: readonly string[];
+  /** `classKey`s. */
+  classes: readonly string[];
+}
+
+/** The hidden lists as one string, for a `$derived` that only moves when they do. */
+export function hiddenKey(settings: Settings | null): string {
+  return JSON.stringify([settings?.hidden ?? [], settings?.hiddenClasses ?? []]);
+}
+
+export function hiddenFrom(key: string): Hidden {
+  const [ids, classes] = JSON.parse(key) as [string[], string[]];
+  return { ids, classes };
+}
+
+/** The version of a downloaded update waiting, null otherwise and once it installs. Its
+ *  progress changes nothing, so the menu isn't recomputed during a download. */
+export function readyVersion(status: UpdateStatus | null): string | null {
+  return status?.state.phase === "ready" && !status.installing ? status.state.version : null;
 }
 
 /** The menu for `now`, worded in the UI's language. Pure but for the catalog. */
@@ -37,6 +63,7 @@ export function trayMenu(input: TrayInput, now: Date): TrayMenu {
     recentTitle: t("tray.recent"),
     recent: recent(input),
     update: update(input),
+    validUntil: validUntil(input, now),
   };
 }
 
@@ -67,9 +94,17 @@ function nextMidnight(now: Date): number {
   return new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1).getTime();
 }
 
-/** Milliseconds from `now` until a label or what the menu picks would change. */
-export function nextChange(_input: TrayInput, now: Date): number {
+/** Milliseconds from `now` until a label or what the menu picks would change; null when
+ *  nothing it shows depends on the time. */
+export function nextChange(input: TrayInput, now: Date): number | null {
+  if (!synced(input, now)) return null;
   return nextMidnight(now) - now.getTime();
+}
+
+/** `nextChange` as the moment Rust asks for a new menu (`tray-expired`). */
+function validUntil(input: TrayInput, now: Date): string | null {
+  const next = nextChange(input, now);
+  return next === null ? null : new Date(now.getTime() + next).toISOString();
 }
 
 let sent: string | null = null;

@@ -1,10 +1,19 @@
 // Main-page state kept outside the page component, so going to Settings and back shows
 // the last known values at once instead of an empty list and footer while they reload.
-import type { AuthStatus, Snapshot, SyncProgress, ToolStatus, UpdateStatus } from "#lib/api.js";
+import {
+  api,
+  type AuthStatus,
+  type Snapshot,
+  type SyncProgress,
+  type ToolStatus,
+  type UpdateStatus,
+} from "#lib/api.js";
 
 export const session = $state<{
   tools: ToolStatus[];
   auth: AuthStatus | null;
+  /** The project list: read once (`loadSnapshot`), then kept current by the layout's one
+   *  `projects-updated` listener, whichever page shows. */
   snapshot: Snapshot | null;
   /** Self-update, kept current by the layout (`update-state`). */
   update: UpdateStatus | null;
@@ -39,6 +48,26 @@ export const session = $state<{
   accepting: [],
   cloning: [],
 });
+
+let snapshotLoad: Promise<void> | null = null;
+
+/** Reads Rust's project list once per run, for whoever needs it first (the layout at
+ *  startup, the list, a link); `projects-updated` keeps it current after that. */
+export function loadSnapshot(): Promise<void> {
+  // An event got there first: nothing to read.
+  if (session.snapshot && !snapshotLoad) return Promise.resolve();
+  snapshotLoad ??= api.listProjects().then(
+    (snapshot) => {
+      // The startup sync may still be running; its event fills the list.
+      if (snapshot.syncedAt || !session.snapshot) session.snapshot = snapshot;
+    },
+    (err: unknown) => {
+      snapshotLoad = null;
+      throw err;
+    },
+  );
+  return snapshotLoad;
+}
 
 /** Runs `task` with `id` listed in `session[list]` meanwhile. */
 export async function busy<T>(

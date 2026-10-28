@@ -8,7 +8,7 @@ import { api, errorMessage, withDialog, type DeepLink, type DeepLinkTarget } fro
 import { acceptAssignment, acceptBlocked } from "#lib/accept.js";
 import { cloneProject } from "#lib/clone.js";
 import { t } from "#lib/i18n/index.js";
-import { session } from "#lib/session.svelte.js";
+import { loadSnapshot, session } from "#lib/session.svelte.js";
 import { loadSettings } from "#lib/settings.svelte.js";
 
 async function tell(text: string, kind: "info" | "warning" | "error" = "info"): Promise<void> {
@@ -45,7 +45,7 @@ let seq = 0;
 /** Shows row `id` on the main page: unfolded, scrolled to and opened. */
 async function focus(id: string): Promise<void> {
   await goto("/");
-  if (!session.snapshot) session.snapshot = await api.listProjects();
+  await loadSnapshot();
   session.focus = { id, seq: ++seq };
   await tick();
 }

@@ -12,7 +12,6 @@
     POPOVER_HIDDEN_EVENT,
     POPOVER_SHORTCUT_EVENT,
     POPOVER_SHOWN_EVENT,
-    PROJECTS_UPDATED_EVENT,
     SYNC_PROGRESS_EVENT,
     type AuthStatus,
     type Project,
@@ -25,7 +24,7 @@
   import { menuKey, onContextMenu, popupMenu, rovingList } from "#lib/keyboard.js";
   import { moveIndex } from "#lib/keys.js";
   import { currentDirection, fromNow, t } from "#lib/i18n/index.js";
-  import { session } from "#lib/session.svelte.js";
+  import { loadSnapshot, session } from "#lib/session.svelte.js";
   import { loadSettings, saveSettings, settings } from "#lib/settings.svelte.js";
   import Section from "#lib/components/Section.svelte";
   import ToolRow from "#lib/components/ToolRow.svelte";
@@ -144,19 +143,23 @@
       await goto("/whats-new", { replace: true });
       return;
     }
-    const [tools, auth, snapshot, progress] = await Promise.all([
+    // The project list is read once per run (`loadSnapshot`) and kept current by the layout.
+    const [tools, auth, progress] = await Promise.all([
       api.toolStatuses(),
       api.authStatus(),
-      api.listProjects(),
       api.syncProgress(),
+      loadSnapshot(),
     ]);
     session.tools = tools;
     session.progress = progress;
     session.auth = auth;
-    // The startup sync may still be running; its event fills the list.
-    if (snapshot.syncedAt || !session.snapshot) session.snapshot = snapshot;
-    now = new Date();
   }
+
+  // A new list (a sync, a rescan, an event): its labels start from now.
+  $effect(() => {
+    void session.snapshot;
+    now = new Date();
+  });
 
   /** The refresh button: everything, including a GitHub sync. */
   async function refresh() {
@@ -167,7 +170,6 @@
         Promise.all([api.toolStatuses(), api.authStatus(), api.refreshProjects()]),
       );
       Object.assign(session, { tools, auth, snapshot });
-      now = new Date();
       announce(snapshot.issue ? t("a11y.syncFailed") : t("a11y.synced"));
     } catch (err) {
       announce(t("a11y.syncFailed"));
@@ -182,7 +184,6 @@
     loading = true;
     try {
       session.snapshot = await atLeast(api.rescanLocal());
-      now = new Date();
       announce(t("a11y.rescanned"));
     } finally {
       loading = false;
@@ -311,16 +312,6 @@
       onEvent(POPOVER_SHORTCUT_EVENT, focusList),
       onEvent(SYNC_PROGRESS_EVENT, (progress) => {
         session.progress = progress;
-      }),
-      onEvent(PROJECTS_UPDATED_EVENT, (snapshot) => {
-        // `gh auth switch`: the footer follows the account the data now belongs to.
-        if (snapshot.login && snapshot.login !== session.auth?.login) {
-          void api.authStatus().then((auth) => {
-            session.auth = auth;
-          });
-        }
-        session.snapshot = snapshot;
-        now = new Date();
       }),
     ];
     return () => {

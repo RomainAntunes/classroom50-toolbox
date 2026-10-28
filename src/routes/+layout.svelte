@@ -12,10 +12,10 @@
     PROJECTS_UPDATED_EVENT,
     SETTINGS_UPDATED_EVENT,
     TRAY_ACTION_EVENT,
+    TRAY_EXPIRED_EVENT,
     UNSEEN_EVENT,
     UPDATE_STATE_EVENT,
     type Settings,
-    type Snapshot,
     type UpdateStatus,
   } from "#lib/api.js";
   import { handleDeepLink, linkActive } from "#lib/deeplink.js";
@@ -26,10 +26,17 @@
   import Prompt from "#lib/components/Prompt.svelte";
   import { announce, announcer } from "#lib/announce.svelte.js";
   import { prompt } from "#lib/prompt.svelte.js";
-  import { session } from "#lib/session.svelte.js";
+  import { loadSnapshot, session } from "#lib/session.svelte.js";
   import { loadSettings, settings } from "#lib/settings.svelte.js";
   import { pendingNotes } from "#lib/whatsnew.js";
-  import { handleTrayAction, nextChange, sendTrayMenu, trayMenu } from "#lib/tray.js";
+  import {
+    handleTrayAction,
+    hiddenFrom,
+    hiddenKey,
+    readyVersion,
+    sendTrayMenu,
+    trayMenu,
+  } from "#lib/tray.js";
 
   let { children } = $props();
 
@@ -84,24 +91,26 @@
     });
   });
 
-  // The tray menu, worded here (`t` makes the language an input) and sent whenever an input
-  // changes. The list's snapshot is only kept while the main page is mounted, so the layout
-  // keeps its own. No tick: one timer wakes it when a label would change (midnight, a
-  // deadline), so the hidden app stays idle.
-  let traySnapshot = $state<Snapshot | null>(null);
-  let trayWake = $state(0);
+  // The tray menu, worded here (`t` makes the language an input) and sent when what it
+  // shows changes. Each input is narrowed to a primitive, so a settings save, a download's
+  // progress or an editor lookup that changes nothing here recomputes nothing. No timer:
+  // Rust's background tick says when `validUntil` passed (`tray-expired`). It waits for the
+  // first loads, so startup sends one menu, in the right language.
+  let trayReady = $state(false);
+  let trayExpired = $state(0);
+  const trayUpdate = $derived(readyVersion(session.update));
+  const trayHidden = $derived(hiddenKey(settings.current));
+  const trayEditor = $derived(editors.installed.length > 0);
   $effect(() => {
-    void trayWake;
+    void trayExpired;
+    if (!trayReady) return;
     const input = {
-      snapshot: traySnapshot,
-      update: session.update,
-      settings: settings.current,
-      editors: editors.installed,
+      snapshot: session.snapshot,
+      update: trayUpdate,
+      hidden: hiddenFrom(trayHidden),
+      editor: trayEditor,
     };
-    const now = new Date();
-    sendTrayMenu(trayMenu(input, now));
-    const timer = setTimeout(() => trayWake++, nextChange(input, now) + 1000);
-    return () => clearTimeout(timer);
+    sendTrayMenu(trayMenu(input, new Date()));
   });
 
   // Self-update, for the main page's banner and Settings > About. A screen reader hears
@@ -134,20 +143,23 @@
 
   // Lives in the layout so notices arrive whichever page is shown, and while hidden.
   onMount(() => {
-    void loadSettings();
-    void api.systemLanguages().then((languages) => {
-      if (languages.length) systemLanguages = languages;
+    const loads = [
+      loadSettings(),
+      api.systemLanguages().then((languages) => {
+        if (languages.length) systemLanguages = languages;
+      }),
+      loadEditors(),
+      loadSnapshot(),
+    ];
+    void Promise.allSettled(loads).then(() => {
+      trayReady = true;
     });
-    void loadEditors();
     void api.appInfo().then((info) => initTheme(info.os));
     void api.unseen().then((ids) => {
       session.unseen = ids;
     });
     // A popover opened mid-download shows where it stands.
     void api.updateStatus().then(setUpdate);
-    void api.listProjects().then((snapshot) => {
-      traySnapshot ??= snapshot;
-    });
     const unlisteners = [
       onEvent(NOTIFY_EVENT, (notice) => void showNotice(notice)),
       onEvent(UNSEEN_EVENT, (ids) => {
@@ -158,10 +170,20 @@
       }),
       onEvent(UPDATE_STATE_EVENT, (status) => setUpdate(status)),
       onEvent(DEEP_LINK_EVENT, () => void handleDeepLink()),
+      // The only listener: Tauri parses the payload once per listener.
       onEvent(PROJECTS_UPDATED_EVENT, (snapshot) => {
-        traySnapshot = snapshot;
+        // `gh auth switch`: the footer follows the account the data now belongs to.
+        if (snapshot.login && snapshot.login !== session.auth?.login) {
+          void api.authStatus().then((auth) => {
+            session.auth = auth;
+          });
+        }
+        session.snapshot = snapshot;
       }),
       onEvent(TRAY_ACTION_EVENT, (action) => void handleTrayAction(action)),
+      onEvent(TRAY_EXPIRED_EVENT, () => {
+        trayExpired++;
+      }),
       onEvent(POPOVER_HIDDEN_EVENT, () => {
         session.focus = null;
         void reopenOn();

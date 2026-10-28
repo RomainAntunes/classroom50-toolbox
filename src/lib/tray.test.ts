@@ -1,7 +1,15 @@
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import type { Snapshot, TrayMenu } from "#lib/api.js";
 import { setLocale } from "#lib/i18n/index.js";
-import { handleTrayAction, nextChange, sendTrayMenu, trayMenu } from "#lib/tray.js";
+import {
+  handleTrayAction,
+  hiddenFrom,
+  hiddenKey,
+  nextChange,
+  readyVersion,
+  sendTrayMenu,
+  trayMenu,
+} from "#lib/tray.js";
 
 const nav = vi.hoisted(() => ({ goto: vi.fn() }));
 const state = vi.hoisted(() => ({ page: { url: new URL("http://localhost/") } }));
@@ -40,8 +48,8 @@ function snapshot(over: Partial<Snapshot> = {}): Snapshot {
 const input = (snap: Snapshot | null = snapshot()) => ({
   snapshot: snap,
   update: null,
-  settings: null,
-  editors: [],
+  hidden: { ids: [], classes: [] },
+  editor: false,
 });
 
 describe("trayMenu", () => {
@@ -57,6 +65,8 @@ describe("trayMenu", () => {
       recentTitle: "Open Recent",
       recent: [],
       update: null,
+      // Midnight, Zurich time.
+      validUntil: "2026-10-28T23:00:00.000Z",
     } satisfies TrayMenu);
   });
 
@@ -99,6 +109,36 @@ describe("nextChange", () => {
   it("counts the 25-hour day when summer time ends", () => {
     // 25 October 2026 holds an extra hour.
     expect(nextChange(input(), at(25, 0))).toBe(25 * 3_600_000);
+  });
+
+  it("never wakes for a menu with no date in it", () => {
+    expect(nextChange(input(null), at(28, 15))).toBeNull();
+    expect(trayMenu(input(null), at(28, 15)).validUntil).toBeNull();
+  });
+
+  it("names the same moment however late it is computed", () => {
+    expect(trayMenu(input(), at(28, 15)).validUntil).toBe(trayMenu(input(), at(28, 22)).validUntil);
+  });
+});
+
+describe("narrowed inputs", () => {
+  it("keys the hidden lists, so another setting changes nothing", () => {
+    const base = { hidden: ["a/b"], hiddenClasses: ["acme/cs50"] };
+    const key = hiddenKey(base as never);
+    expect(hiddenKey({ ...base, language: "fr" } as never)).toBe(key);
+    expect(hiddenFrom(key)).toEqual({ ids: ["a/b"], classes: ["acme/cs50"] });
+    expect(hiddenFrom(hiddenKey(null))).toEqual({ ids: [], classes: [] });
+  });
+
+  it("reads the update's version only once it is ready and not installing", () => {
+    const status = (state: object, installing = false) =>
+      ({ state, installing, deferred: false }) as never;
+    expect(readyVersion(null)).toBeNull();
+    expect(readyVersion(status({ phase: "downloading", downloaded: 10, total: 100 }))).toBeNull();
+    expect(readyVersion(status({ phase: "ready", version: "9.9.0", notes: null }))).toBe("9.9.0");
+    expect(
+      readyVersion(status({ phase: "ready", version: "9.9.0", notes: null }, true)),
+    ).toBeNull();
   });
 });
 
