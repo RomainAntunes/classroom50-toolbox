@@ -8,6 +8,7 @@
   "tray.settings": "الإعدادات…",
   "tray.deadline": "{name} · {due}",
   "tray.recent": "فتح العناصر الأخيرة",
+  "tray.recentItem": "{name} ({classroom})",
   "tray.update": "إعادة التشغيل للتحديث إلى الإصدار {version}",
   "setup.title": "الإعداد",
   "setup.install": "تثبيت",

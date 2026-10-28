@@ -8,6 +8,7 @@
   "tray.settings": "Instellingen…",
   "tray.deadline": "{name} · {due}",
   "tray.recent": "Recent geopend",
+  "tray.recentItem": "{name} ({classroom})",
   "tray.update": "Herstarten en bijwerken naar versie {version}",
   "setup.title": "Installatie",
   "setup.install": "Installeren",

@@ -8,6 +8,7 @@
   "tray.settings": "הגדרות…",
   "tray.deadline": "{name} · {due}",
   "tray.recent": "פתיחת פריטים אחרונים",
+  "tray.recentItem": "{name} ({classroom})",
   "tray.update": "הפעלה מחדש לעדכון לגרסה {version}",
   "setup.title": "הגדרה",
   "setup.install": "התקנה",

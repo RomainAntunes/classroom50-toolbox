@@ -8,6 +8,7 @@
   "tray.settings": "설정…",
   "tray.deadline": "{name} · {due}",
   "tray.recent": "최근 항목 열기",
+  "tray.recentItem": "{name} ({classroom})",
   "tray.update": "다시 시작하여 버전 {version} 설치",
   "setup.title": "준비",
   "setup.install": "설치",
