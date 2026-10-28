@@ -4,7 +4,7 @@ import {
   sendNotification,
 } from "@tauri-apps/plugin-notification";
 import type { Notice } from "#lib/api.js";
-import { formatDate, formatList, fromNow, t } from "#lib/i18n/index.js";
+import { formatDate, formatList, relativeAt, t } from "#lib/i18n/index.js";
 
 /** Words a notice from Rust (`alerts.rs`) and shows it as a system notification. */
 export async function showNotice(notice: Notice) {
@@ -17,7 +17,7 @@ export async function showNotice(notice: Notice) {
     values.members = formatList(notice.members);
     values.count = notice.members.length;
   }
-  if (notice.kind === "due") values.when = fromNow(new Date(notice.due));
+  if (notice.kind === "due") values.when = relativeAt(new Date(notice.due));
   if (notice.kind === "deadlineChanged") {
     values.when = notice.due ? formatDate(new Date(notice.due)) : t("alerts.noDeadline");
   }

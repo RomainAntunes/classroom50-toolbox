@@ -217,6 +217,7 @@
   "projects.firstSync.hint": "Reading your classes, assignments and clones on GitHub and this computer. Only this first time takes a moment.",
   "projects.due": "Due {when}",
   "projects.wasDue": "Was due {when}",
+  "time.dayAt": "{day} at {time}",
   "projects.notCloned": "Not cloned",
   "projects.cloning": "Cloning…",
   "projects.clone": "Clone",

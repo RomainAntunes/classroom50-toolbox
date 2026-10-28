@@ -217,6 +217,7 @@
   "projects.firstSync.hint": "Deine Kurse, Aufgaben und Klone auf GitHub und diesem Computer werden gelesen. Nur beim ersten Mal dauert das einen Moment.",
   "projects.due": "Fällig {when}",
   "projects.wasDue": "War fällig {when}",
+  "time.dayAt": "{day} um {time}",
   "projects.notCloned": "Nicht geklont",
   "projects.cloning": "Wird geklont…",
   "projects.clone": "Klonen",
