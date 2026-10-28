@@ -1,5 +1,6 @@
 // A list with every kind of row, for layout checks and screenshots: late, graded, grading,
-// uncommitted, behind, feedback, closed, a group, not cloned, unaccepted and upcoming.
+// uncommitted, local changes, commit then pull, behind, feedback, closed, a group, not
+// cloned, unaccepted and upcoming.
 import {
   classroom,
   daysFromNow,
@@ -55,6 +56,27 @@ export function richScenario(over: Partial<Settings> = {}): Scenario {
           assignment: { due: hoursFromNow(5) },
           pending: "uncommitted",
           local: { changedFiles: 3, changedPaths: ["mario.c", "cash.c", "README.md"] },
+        }),
+        // Every push is graded and GitHub has the clone's HEAD: the edits are only local.
+        project({
+          slug: "lab6",
+          name: "Lab 6: Recursion",
+          assignment: { submissionMode: "every-push", due: daysFromNow(2) },
+          pending: "uncommitted",
+          local: { changedFiles: 1, changedPaths: ["notes.md"] },
+        }),
+        // A teammate pushed over changes to tracked files, which the app's Pull refuses.
+        project({
+          slug: "lab7",
+          name: "Lab 7: Pointers",
+          assignment: { submissionMode: "every-push", due: daysFromNow(3) },
+          pending: "conflict",
+          local: {
+            remoteAhead: true,
+            changedFiles: 1,
+            trackedChanges: 1,
+            changedPaths: ["swap.c"],
+          },
         }),
         project({
           slug: "lab3",

@@ -766,6 +766,11 @@ export type LocalState = {
 	 *  new) once, with its trailing `/`.
 	 */
 	changedPaths: string[],
+	/**
+	 *  Of `changed_files`, the changes to tracked files (staged or not, conflicted), which
+	 *  the app's Pull refuses to run over; untracked files don't block it.
+	 */
+	trackedChanges: number,
 	/**  Local branches with commits missing from the local default branch. */
 	unmerged: string[],
 	/**  GitHub's default-branch head isn't in the clone: someone pushed since the last pull. */
@@ -825,7 +830,8 @@ export type Os = "macos" | "windows" | "linux";
 export type Pending = 
 /**
  *  Someone pushed commits the clone doesn't have while it holds uncommitted or
- *  unpushed work: pull now, before the two diverge further.
+ *  unpushed work: pull now, before the two diverge further. The UI words it by what
+ *  stops a fast-forward (local commits, `tracked_changes`).
  */
 "conflict" | "uncommitted" | "unpushed" | 
 /**

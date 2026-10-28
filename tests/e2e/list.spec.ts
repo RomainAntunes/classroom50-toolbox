@@ -12,6 +12,7 @@ import {
   settings,
   snapshot,
   unaccepted,
+  type ProjectOptions,
 } from "./fixtures";
 
 const cs101 = classroom();
@@ -97,6 +98,93 @@ test("the date filter is saved through Rust", async ({ app, page }) => {
   await expect(app.row("Lab 2")).toHaveCount(0);
   expect((await app.settings()).listFilter).toBe("past");
 });
+
+// A row's status names what stands between the work and its grade, and only warns when the
+// student has something to do.
+const single = (options: Omit<ProjectOptions, "slug" | "name">) =>
+  snapshot({ projects: [project({ slug: "lab", name: "Lab", ...options })] });
+const EVERY_PUSH = { submissionMode: "every-push" } as const;
+const EDITED = { changedFiles: 2, changedPaths: ["notes.md", "out/"] };
+
+test("an every-push lab whose last push is the clone's HEAD only has local changes", async ({
+  app,
+}) => {
+  await app.start(
+    scenario({
+      snapshot: single({ assignment: EVERY_PUSH, pending: "uncommitted", local: EDITED }),
+    }),
+  );
+  const status = app.row("Lab").locator(".status");
+  await expect(status).toHaveText("Local changes");
+  await expect(status).not.toHaveClass(/warn/);
+  await expect(status).toHaveAttribute(
+    "title",
+    "Your last push is on GitHub and counts. These changes are only on this computer and not committed yet:\nnotes.md\nout/",
+  );
+  // The row's button describes itself with the same words.
+  await expect(app.row("Lab").locator("[data-row]")).toHaveAccessibleDescription(/Local changes/);
+  expect(await app.writes()).toEqual([]);
+});
+
+for (const [why, options] of [
+  ["tag mode", { pending: "uncommitted", local: EDITED }],
+  [
+    "GitHub at another commit",
+    {
+      assignment: EVERY_PUSH,
+      pending: "uncommitted",
+      local: EDITED,
+      remote: { head: { oid: "ffff0000", at: hoursFromNow(-1), author: "student" } },
+    },
+  ],
+  [
+    "commits not pushed",
+    { assignment: EVERY_PUSH, pending: "uncommitted", local: { ...EDITED, ahead: 1 } },
+  ],
+] as const) {
+  test(`changes still warn Uncommitted with ${why}`, async ({ app }) => {
+    await app.start(scenario({ snapshot: single(options) }));
+    const status = app.row("Lab").locator(".status");
+    await expect(status).toHaveText("Uncommitted");
+    await expect(status).toHaveClass(/warn/);
+  });
+}
+
+const conflicts: [string, ProjectOptions["local"], string, boolean][] = [
+  [
+    "Commit, then pull",
+    { remoteAhead: true, changedFiles: 2, trackedChanges: 1, changedPaths: ["rapport.md", "img/"] },
+    "A teammate pushed while you have changes that aren't committed yet. Commit them first",
+    false,
+  ],
+  [
+    "Pull and merge",
+    { behind: 1, ahead: 2 },
+    "A teammate pushed while you have commits that aren't on GitHub yet",
+    false,
+  ],
+  [
+    "Pull first",
+    { remoteAhead: true, changedFiles: 1, changedPaths: ["img/"] },
+    "A teammate pushed while you have uncommitted or unpushed work. Pull now",
+    true,
+  ],
+];
+for (const [label, local, hint, button] of conflicts) {
+  test(`a teammate's push over local work says ${label}`, async ({ app }) => {
+    await app.start(
+      scenario({ snapshot: single({ assignment: EVERY_PUSH, pending: "conflict", local }) }),
+    );
+    const status = app.row("Lab").locator(".status");
+    await expect(status).toHaveText(label);
+    await expect(status).toHaveClass(/warn/);
+    await expect(status).toHaveAttribute("title", new RegExp(`^${hint}`));
+    // The Pull button only shows when the app's Pull can fast-forward: untracked files
+    // don't stop it, tracked changes and local commits do.
+    await expect(app.row("Lab").getByRole("button", { name: "Pull" })).toHaveCount(button ? 1 : 0);
+    expect(await app.writes()).toEqual([]);
+  });
+}
 
 // What the runner (cli 1.58.0 on) keeps of a test it stopped at its time limit: the input it
 // was fed, then what it flushed before the kill.

@@ -212,6 +212,7 @@ export function project(options: ProjectOptions): Project {
           behind: 0,
           changedFiles: 0,
           changedPaths: [],
+          trackedChanges: 0,
           unmerged: [],
           remoteAhead: false,
           ...options.local,
