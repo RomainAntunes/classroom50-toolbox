@@ -8,6 +8,7 @@
   "tray.settings": "Ayarlar…",
   "tray.deadline": "{name} · {due}",
   "tray.recent": "Son kullanılanları aç",
+  "tray.recentItem": "{name} ({classroom})",
   "tray.update": "{version} sürümüne güncellemek için yeniden başlat",
   "setup.title": "Kurulum",
   "setup.install": "Yükle",

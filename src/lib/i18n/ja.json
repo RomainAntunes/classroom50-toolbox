@@ -8,6 +8,7 @@
   "tray.settings": "設定…",
   "tray.deadline": "{name} · {due}",
   "tray.recent": "最近使用した項目を開く",
+  "tray.recentItem": "{name}（{classroom}）",
   "tray.update": "再起動してバージョン{version}にアップデート",
   "setup.title": "セットアップ",
   "setup.install": "インストール",

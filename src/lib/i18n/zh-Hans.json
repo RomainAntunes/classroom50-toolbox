@@ -8,6 +8,7 @@
   "tray.settings": "设置…",
   "tray.deadline": "{name} · {due}",
   "tray.recent": "打开最近使用",
+  "tray.recentItem": "{name}（{classroom}）",
   "tray.update": "重启以更新到版本{version}",
   "setup.title": "准备工作",
   "setup.install": "安装",

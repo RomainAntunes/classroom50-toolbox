@@ -2,10 +2,10 @@
 //! which order.
 
 use std::collections::BTreeMap;
-use std::path::Path;
 
 use chrono::{DateTime, Utc};
 
+use super::git::last_activity;
 use super::{LocalState, Pending, Project, RemoteRepo, key};
 use crate::classroom50::{RepoConfig, SubmissionMode};
 use crate::discovery::LocalProject;
@@ -95,13 +95,6 @@ pub(super) fn late_seconds(project: &Project) -> Option<i64> {
     (late > 0).then_some(late)
 }
 
-/// When the clone's index last changed (any stage, commit, checkout or pull).
-fn last_activity(path: &Path) -> Option<std::time::SystemTime> {
-    std::fs::metadata(path.join(".git").join("index"))
-        .and_then(|meta| meta.modified())
-        .ok()
-}
-
 pub(super) fn pending(project: &Project) -> Option<Pending> {
     if let Some(local) = &project.local {
         let incoming = local.remote_ahead || local.behind.is_some_and(|n| n > 0);
@@ -166,6 +159,7 @@ pub(super) fn sort_key(project: &Project, now: DateTime<Utc>) -> (u8, i64, Strin
 mod tests {
     use super::*;
     use serde_json::json;
+    use std::path::Path;
 
     use crate::classroom50::Assignment;
     use crate::projects::fixtures::{config, remote};

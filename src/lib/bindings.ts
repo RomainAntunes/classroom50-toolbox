@@ -800,6 +800,11 @@ export type LocalState = {
 	unmerged: string[],
 	/**  GitHub's default-branch head isn't in the clone: someone pushed since the last pull. */
 	remoteAhead: boolean,
+	/**
+	 *  When the clone's `.git/index` last changed: any stage, commit, checkout or pull, or
+	 *  git refreshing it after files changed. Open Recent's order.
+	 */
+	activeAt: string | null,
 };
 
 export type Member = {

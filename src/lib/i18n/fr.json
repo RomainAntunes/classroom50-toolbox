@@ -8,6 +8,7 @@
   "tray.settings": "Réglages…",
   "tray.deadline": "{name} · {due}",
   "tray.recent": "Ouvrir un élément récent",
+  "tray.recentItem": "{name} ({classroom})",
   "tray.update": "Redémarrer pour installer la version {version}",
   "setup.title": "Installation",
   "setup.install": "Installer",

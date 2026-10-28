@@ -3,6 +3,7 @@
 
 use std::path::{Path, PathBuf};
 
+use chrono::{DateTime, Utc};
 use tokio::task::JoinSet;
 
 use super::{LocalState, MAX_CHANGED_PATHS, Progress, Project};
@@ -125,9 +126,18 @@ async fn local_state(path: &Path) -> Option<LocalState> {
             Err(_) => real_folders.extend(folders.iter().copied()),
         }
     }
-    Some(parse_status(&out, |entry| {
+    let mut state = parse_status(&out, |entry| {
         noise::is_noise(entry, &tree) || entry.ends_with('/') && !real_folders.contains(entry)
-    }))
+    });
+    state.active_at = last_activity(path).map(DateTime::<Utc>::from);
+    Some(state)
+}
+
+/// When the clone's index last changed (any stage, commit, checkout or pull).
+pub(super) fn last_activity(path: &Path) -> Option<std::time::SystemTime> {
+    std::fs::metadata(path.join(".git").join("index"))
+        .and_then(|meta| meta.modified())
+        .ok()
 }
 
 /// Compares each clone with GitHub's data: unmerged local branches, and whether the
@@ -348,6 +358,18 @@ mod tests {
         assert_eq!(fresh, LocalState::default());
     }
 
+    /// A `snapshot.json` saved before `activeAt` existed still loads.
+    #[test]
+    fn reads_local_state_without_active_at() {
+        let state: LocalState = serde_json::from_value(serde_json::json!({
+            "branch": "main", "head": "5f14f16", "ahead": 0, "behind": 0, "changedFiles": 0,
+            "changedPaths": [], "trackedChanges": 0, "unmerged": [], "remoteAhead": false
+        }))
+        .unwrap();
+        assert_eq!(state.active_at, None);
+        assert_eq!(state.branch.as_deref(), Some("main"));
+    }
+
     /// A real clone: untracked editor files and a new folder holding only a `.DS_Store`
     /// don't count; a new folder with real work does, once.
     #[tokio::test]
@@ -368,7 +390,10 @@ mod tests {
         std::fs::create_dir_all(root.join("empty").join("__pycache__")).unwrap();
         std::fs::write(root.join("empty").join(".DS_Store"), "x").unwrap();
         std::fs::write(root.join("empty").join("__pycache__").join("m.pyc"), "x").unwrap();
-        assert_eq!(local_state(&root).await.unwrap().changed_files, 0);
+        let state = local_state(&root).await.unwrap();
+        assert_eq!(state.changed_files, 0);
+        // Nothing staged yet: git hasn't written an index.
+        assert_eq!(state.active_at, None);
 
         std::fs::create_dir_all(root.join("work")).unwrap();
         std::fs::write(root.join("work").join("a.c"), "x").unwrap();
@@ -418,6 +443,10 @@ mod tests {
         std::fs::write(module.join("target").join("notes.txt"), "b").unwrap();
         let state = local_state(&root).await.unwrap();
         assert_eq!(state.changed_paths, ["poo-labo-4/target/notes.txt"]);
+        // Open Recent's order: the index's mtime, written by the last commit.
+        let index = std::fs::metadata(root.join(".git").join("index")).unwrap();
+        let written = DateTime::<Utc>::from(index.modified().unwrap());
+        assert_eq!(state.active_at, Some(written));
 
         let png = root.join("out").join("rapport").join("poudlard");
         std::fs::create_dir_all(&png).unwrap();
