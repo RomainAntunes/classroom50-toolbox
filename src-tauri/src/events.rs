@@ -7,6 +7,7 @@ use tauri::{Emitter, Runtime};
 
 use crate::alerts::Notice;
 use crate::login::DeviceCode;
+use crate::platform::HourCycle;
 use crate::projects::{Snapshot, SyncProgress};
 use crate::settings::Settings;
 use crate::tools::ToolJob;
@@ -82,4 +83,6 @@ events! {
     TrayAction = "tray-action" => Action;
     /// The tray menu's `validUntil` passed (midnight, a deadline): the UI words it again.
     TrayExpired = "tray-expired" => ();
+    /// The OS's 12- or 24-hour clock changed (`system_hour_cycle` gives the first reading).
+    HourCycleChanged = "hour-cycle" => Option<HourCycle>;
 }

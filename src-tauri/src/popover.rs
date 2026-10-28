@@ -126,6 +126,7 @@ fn show_at(app: &AppHandle, icon: Option<Area>) {
     let _ = window.set_focus();
     let _ = PopoverShown::emit(app, &());
     crate::projects::refresh_if_stale(app);
+    crate::clock::refresh(app);
 }
 
 fn move_to(app: &AppHandle, window: &WebviewWindow, icon: Option<Area>) {

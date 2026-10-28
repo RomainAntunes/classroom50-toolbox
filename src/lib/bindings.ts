@@ -107,6 +107,12 @@ export const commands = {
 	 */
 	systemLanguages: () => __TAURI_INVOKE<string[]>("system_languages"),
 	/**
+	 *  The OS's 12- or 24-hour clock (System Settings' "24-hour time", Windows' region format,
+	 *  GNOME's clock), `None` when it can't say, so the UI's language keeps its own. Cached;
+	 *  `hour-cycle` tells a change.
+	 */
+	systemHourCycle: () => __TAURI_INVOKE<"h12" | "h23" | null>("system_hour_cycle"),
+	/**
 	 *  Picks the OS calendar to keep the due dates in (writing them now), or with `None` stops
 	 *  and removes the events the app wrote.
 	 */
@@ -586,6 +592,8 @@ export type Events_Deserialize = {
 	"tray-action": Action,
 	/**  The tray menu's `validUntil` passed (midnight, a deadline): the UI words it again. */
 	"tray-expired": null,
+	/**  The OS's 12- or 24-hour clock changed (`system_hour_cycle` gives the first reading). */
+	"hour-cycle": HourCycle | null,
 };
 
 /**  The payload of each event, by name: `Events` in `src/lib/bindings.ts`. */
@@ -623,6 +631,8 @@ export type Events_Serialize = {
 	"tray-action": Action,
 	/**  The tray menu's `validUntil` passed (midnight, a deadline): the UI words it again. */
 	"tray-expired": null,
+	/**  The OS's 12- or 24-hour clock changed (`system_hour_cycle` gives the first reading). */
+	"hour-cycle": HourCycle | null,
 };
 
 /**  An error as the UI shows it (`errorMessage`): `error.<kind>`, else the message. */
@@ -737,6 +747,9 @@ export type Group = {
 	classroom: string | null,
 	assignment: string | null,
 };
+
+/**  The clock times are shown on: `Intl.DateTimeFormat`'s `hourCycle` ("10:30 PM" or "22:30"). */
+export type HourCycle = "h12" | "h23";
 
 /**
  *  Who to commit as when git doesn't know: the signed-in GitHub account, with its private

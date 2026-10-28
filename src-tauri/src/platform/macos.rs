@@ -12,6 +12,25 @@ pub fn os_version() -> Option<String> {
     super::os_version::macos(&plist)
 }
 
+pub const HOUR_CYCLE_IN_PROCESS: bool = true;
+
+pub async fn hour_cycle() -> Option<super::HourCycle> {
+    icu_hour_cycle()
+}
+
+/// The pattern the user's locale gives the `j` template (its preferred hour), which honors
+/// System Settings' "24-hour time" switch as well as the region's default.
+fn icu_hour_cycle() -> Option<super::HourCycle> {
+    use objc2_foundation::{NSDateFormatter, NSLocale, NSString};
+    let locale = NSLocale::autoupdatingCurrentLocale();
+    let pattern = NSDateFormatter::dateFormatFromTemplate_options_locale(
+        &NSString::from_str("j"),
+        0,
+        Some(&locale),
+    )?;
+    super::hour_cycle::from_icu_pattern(&pattern.to_string())
+}
+
 pub fn extra_path_dirs() -> Vec<PathBuf> {
     let mut dirs = vec![
         PathBuf::from("/opt/homebrew/bin"),

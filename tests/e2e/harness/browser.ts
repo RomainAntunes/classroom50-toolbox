@@ -209,6 +209,8 @@ export function install(scenario: Scenario): E2E {
         return state.unseen;
       case "system_languages":
         return state.systemLanguages;
+      case "system_hour_cycle":
+        return state.hourCycle;
       case "installed_editors":
         return state.editors;
       case "list_accounts":

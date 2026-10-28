@@ -75,7 +75,7 @@ windows-registry = "0.6"
 block2 = "0.6"
 objc2 = "0.6"
 objc2-event-kit = { version = "0.3", default-features = false, features = ["std", "block2", "objc2-core-graphics", "EKCalendar", "EKCalendarItem", "EKEvent", "EKEventStore", "EKAlarm", "EKObject", "EKSource", "EKTypes"] }
-objc2-foundation = { version = "0.3", default-features = false, features = ["std", "block2", "NSArray", "NSDate", "NSError", "NSString", "NSURL", "NSObject"] }
+objc2-foundation = { version = "0.3", default-features = false, features = ["std", "block2", "NSArray", "NSDate", "NSDateFormatter", "NSError", "NSFormatter", "NSLocale", "NSString", "NSURL", "NSObject"] }
 objc2-service-management = { version = "0.3", default-features = false, features = ["std", "SMAppService"] }
 
 # tauri-plugin-deep-link 2.6.2 builds rust-ini's ParseOption with the two fields it had

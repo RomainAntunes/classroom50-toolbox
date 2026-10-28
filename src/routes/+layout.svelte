@@ -7,6 +7,7 @@
     api,
     onEvent,
     DEEP_LINK_EVENT,
+    HOUR_CYCLE_EVENT,
     NOTIFY_EVENT,
     POPOVER_HIDDEN_EVENT,
     PROJECTS_UPDATED_EVENT,
@@ -19,7 +20,7 @@
     type UpdateStatus,
   } from "#lib/api.js";
   import { handleDeepLink, linkActive } from "#lib/deeplink.js";
-  import { currentDirection, currentLocale, setLocale, t } from "#lib/i18n/index.js";
+  import { currentDirection, currentLocale, setHourCycle, setLocale, t } from "#lib/i18n/index.js";
   import { showNotice } from "#lib/notices.js";
   import { editors, loadEditors } from "#lib/editor.svelte.js";
   import { initTheme } from "#lib/theme/preview.svelte.js";
@@ -148,6 +149,10 @@
       api.systemLanguages().then((languages) => {
         if (languages.length) systemLanguages = languages;
       }),
+      // The OS's 12- or 24-hour clock, for every time shown (the tray menu's first one
+      // included); Rust reads it again as the popover shows (where that runs no program)
+      // and sends `hour-cycle` only on a change.
+      api.systemHourCycle().then(setHourCycle),
       loadEditors(),
       loadSnapshot(),
     ];
@@ -184,6 +189,7 @@
       onEvent(TRAY_EXPIRED_EVENT, () => {
         trayExpired++;
       }),
+      onEvent(HOUR_CYCLE_EVENT, setHourCycle),
       onEvent(POPOVER_HIDDEN_EVENT, () => {
         session.focus = null;
         void reopenOn();

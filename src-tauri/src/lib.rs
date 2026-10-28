@@ -2,6 +2,7 @@ pub mod accounts;
 pub mod alerts;
 mod calendar;
 pub mod classroom50;
+mod clock;
 pub mod clones;
 mod commands;
 mod cooldown;
@@ -77,6 +78,7 @@ macro_rules! ipc_commands {
             crate::commands::set_calendar_labels,
             crate::commands::set_tray_menu,
             crate::commands::system_languages,
+            crate::commands::system_hour_cycle,
             crate::commands::set_native_calendar,
             crate::commands::simulate_network,
             crate::commands::simulated_network,
@@ -153,6 +155,7 @@ pub fn run() {
         .plugin(tauri_plugin_clipboard_manager::init())
         .plugin(tauri_plugin_opener::init())
         .manage(popover::PopoverState::default())
+        .manage(clock::ClockState::default())
         .manage(shortcut::ShortcutRegistration::default())
         .manage(deeplink::DeepLinkState::default())
         .manage(student::FoundedGroups::default())

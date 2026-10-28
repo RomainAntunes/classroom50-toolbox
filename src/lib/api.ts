@@ -67,6 +67,8 @@ export type Unaccepted = B.Unaccepted_Serialize;
 export type DeepLink = B.Link;
 /** Where a link leads (`take_deep_link`). */
 export type DeepLinkTarget = B.Target_Serialize;
+/** The OS's 12- or 24-hour clock, as `Intl.DateTimeFormat`'s `hourCycle`. */
+export type HourCycle = B.HourCycle;
 /** How gh clones github.com repos. */
 export type GitProtocol = B.GitProtocol;
 export type GitCredentials = B.GitCredentials;
@@ -158,6 +160,8 @@ export const POPOVER_SHORTCUT_EVENT = "popover-shortcut" satisfies EventName;
 export const TRAY_ACTION_EVENT = "tray-action" satisfies EventName;
 /** The tray menu's `validUntil` passed: it is worded again. */
 export const TRAY_EXPIRED_EVENT = "tray-expired" satisfies EventName;
+/** Payload: the OS's `HourCycle` (or `null`), when it changed since `systemHourCycle`. */
+export const HOUR_CYCLE_EVENT = "hour-cycle" satisfies EventName;
 
 /** Listens to a Rust event, its payload typed by `Events`. */
 export function onEvent<K extends EventName>(

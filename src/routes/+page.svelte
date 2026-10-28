@@ -23,7 +23,7 @@
   import { atLeast } from "#lib/busy.js";
   import { menuKey, onContextMenu, popupMenu, rovingList } from "#lib/keyboard.js";
   import { moveIndex } from "#lib/keys.js";
-  import { currentDirection, fromNow, t } from "#lib/i18n/index.js";
+  import { currentDirection, formatDate, fromNow, t } from "#lib/i18n/index.js";
   import { loadSnapshot, session } from "#lib/session.svelte.js";
   import { loadSettings, saveSettings, settings } from "#lib/settings.svelte.js";
   import Section from "#lib/components/Section.svelte";
@@ -470,7 +470,7 @@
 <footer>
   <LoginStatus auth={session.auth} {ghInstalled} onchange={signedIn} />
   {#if syncedLabel && syncedAt && !session.signingIn}
-    <span class="synced" title={syncedAt.toLocaleString()}>{syncedLabel}</span>
+    <span class="synced" title={formatDate(syncedAt)}>{syncedLabel}</span>
   {/if}
 </footer>
 
