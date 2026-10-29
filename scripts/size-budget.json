@@ -1,5 +1,5 @@
 {
-  "$comment": "Bytes, summed over build/ (pnpm build). Set at about 15% over the bundle of 2026-10-18 before SvelteKit 3 and the module split (JS 906.8 kB raw, 282.0 kB gzip; CSS 29.4 kB raw, 9.1 kB gzip); after both, JS 920.2 kB raw, 286.8 kB gzip and CSS 30.0 kB raw, 9.1 kB gzip, about 12% under. JS raw raised to 1080 kB on 2026-10-28 (tray menu, 1043 kB before it, at 100%): each feature now also adds its strings to 15 catalogs, and the bundled changelogs grow every release. Raise a limit only on purpose, saying why in the PR.",
-  "js": { "raw": 1080000, "gzip": 325000 },
+  "$comment": "Bytes, summed over build/ (pnpm build). Set at about 15% over the bundle of 2026-10-18 before SvelteKit 3 and the module split (JS 906.8 kB raw, 282.0 kB gzip; CSS 29.4 kB raw, 9.1 kB gzip); after both, JS 920.2 kB raw, 286.8 kB gzip and CSS 30.0 kB raw, 9.1 kB gzip, about 12% under. JS raw raised to 1080 kB on 2026-10-28 (tray menu, 1043 kB before it, at 100%): each feature now also adds its strings to 15 catalogs, and the bundled changelogs grow every release. JS raw raised to 1200 kB and gzip to 360 kB on 2026-10-29 (1109.9 kB and 329.8 kB, over both): the 0.14.1-beta.1 and 0.14.1 changelogs added about 60 kB raw and 12 kB gzip, and bump commits skipped this check until ci.yml ran it in release-inputs too. Each release adds about 30 kB raw and 6 kB gzip of notes. Raise a limit only on purpose, saying why in the PR.",
+  "js": { "raw": 1200000, "gzip": 360000 },
   "css": { "raw": 34000, "gzip": 10500 }
 }
