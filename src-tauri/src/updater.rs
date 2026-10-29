@@ -30,6 +30,9 @@ const BETA_URL: &str = "https://github.com/RomainAntunes/classroom50-toolbox/rel
 const MEMORY_FILE: &str = "update-check.json";
 /// Startup stays quick: the first check waits for the sync and the UI to settle.
 const STARTUP_DELAY: Duration = Duration::from_secs(20);
+/// Windows: an installer an update left in the temp dir is deleted once its folder is this
+/// old, so the one that just installed and relaunched the app is never touched while it runs.
+const INSTALLER_KEEP: Duration = Duration::from_secs(10 * 60);
 /// The background tick only compares clocks; a check runs when one is due.
 const TICK: Duration = Duration::from_secs(60);
 /// Checks while the app runs. A check made just before a release is published (or one that
@@ -493,13 +496,21 @@ pub fn start(app: AppHandle) {
         return;
     }
     tauri::async_runtime::spawn(async move {
+        let started = Instant::now();
+        let mut swept = false;
         tokio::time::sleep(STARTUP_DELAY).await;
+        remove_old_installers(&app).await;
         if let Err(err) = check(&app, true).await {
             log::info!("update check at startup failed: {err}");
         }
         let mut last = (Utc::now(), Instant::now());
         loop {
             tokio::time::sleep(TICK).await;
+            // Once more when the installer that relaunched the app is old enough to go.
+            if !swept && started.elapsed() >= INSTALLER_KEEP {
+                swept = true;
+                remove_old_installers(&app).await;
+            }
             let now = (Utc::now(), Instant::now());
             let slept = woke(now.0 - last.0, now.1 - last.1);
             last = now;
@@ -510,6 +521,63 @@ pub fn start(app: AppHandle) {
             check_if_due(&app).await;
         }
     });
+}
+
+/// Whether `name` is a folder the updater plugin made in the temp dir for a Windows installer,
+/// `<app>-<version>-updater-<random>` (its `make_temp_dir`). The plugin keeps that folder and
+/// exits right after starting the installer, so nothing else ever deletes it.
+#[cfg_attr(not(windows), allow(dead_code))]
+fn is_installer_dir(name: &str, app_name: &str) -> bool {
+    let Some((version, random)) = name
+        .strip_prefix(app_name)
+        .and_then(|rest| rest.strip_prefix('-'))
+        .and_then(|rest| rest.rsplit_once("-updater-"))
+    else {
+        return false;
+    };
+    version.starts_with(|c: char| c.is_ascii_digit())
+        && version
+            .chars()
+            .all(|c| c.is_ascii_alphanumeric() || matches!(c, '.' | '-' | '+'))
+        && !random.is_empty()
+        && random.chars().all(|c| c.is_ascii_alphanumeric())
+}
+
+/// Deletes the installers earlier updates left in the temp dir (3 to 6 MB each), once their
+/// folder is `INSTALLER_KEEP` old; best effort. Windows only: elsewhere the plugin's temp
+/// files go when the install returns.
+async fn remove_old_installers(app: &AppHandle) {
+    #[cfg(windows)]
+    {
+        let app_name = app.package_info().name.clone();
+        let _ = tauri::async_runtime::spawn_blocking(move || {
+            let Ok(entries) = std::fs::read_dir(std::env::temp_dir()) else {
+                return;
+            };
+            for entry in entries.flatten() {
+                let name = entry.file_name();
+                let Some(name) = name.to_str() else { continue };
+                // `DirEntry::metadata` doesn't follow a link, so only a real folder goes.
+                let old = entry
+                    .metadata()
+                    .ok()
+                    .filter(|meta| meta.is_dir())
+                    .and_then(|meta| meta.modified().ok())
+                    .and_then(|modified| modified.elapsed().ok())
+                    .is_some_and(|age| age >= INSTALLER_KEEP);
+                if !old || !is_installer_dir(name, &app_name) {
+                    continue;
+                }
+                match std::fs::remove_dir_all(entry.path()) {
+                    Ok(()) => log::info!("removed {name}, an installer an update left"),
+                    Err(err) => log::info!("could not remove {name}: {err}"),
+                }
+            }
+        })
+        .await;
+    }
+    #[cfg(not(windows))]
+    let _ = app;
 }
 
 async fn check_if_due(app: &AppHandle) {
@@ -1060,6 +1128,29 @@ mod tests {
         assert!(!Bundle::Rpm.installs_on_quit() && Bundle::Rpm.asks_password());
         assert!(!Bundle::Unbundled.can_update() && !Bundle::Unbundled.installs_on_quit());
         assert!(!Bundle::Msi.has_beta() && Bundle::Nsis.has_beta());
+    }
+
+    #[test]
+    fn knows_the_installer_folders_updates_leave() {
+        let app = "Classroom 50 Toolbox";
+        for name in [
+            "Classroom 50 Toolbox-0.14.1-updater-a1B2c3",
+            "Classroom 50 Toolbox-0.15.0-beta.2-updater-Xy9zQ0",
+        ] {
+            assert!(is_installer_dir(name, app), "{name}");
+        }
+        for name in [
+            "Classroom 50 Toolbox",
+            "Classroom 50 Toolbox-0.14.1-updater-",
+            "Classroom 50 Toolbox-0.14.1-updater-a1/b2",
+            "Classroom 50 Toolbox-beta-updater-a1B2c3",
+            "Classroom 50 Toolbox-0.14.1-installer.exe",
+            "Classroom 50 Toolbox Helper-0.14.1-updater-a1B2c3",
+            "Other App-0.14.1-updater-a1B2c3",
+            "tauri_current_app1234",
+        ] {
+            assert!(!is_installer_dir(name, app), "{name}");
+        }
     }
 
     #[test]
