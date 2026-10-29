@@ -1,0 +1,155 @@
+{
+  "date": "2026-10-29",
+  "notes": {
+    "en": [
+      {
+        "kind": "improved",
+        "text": "When you accept a team assignment and don't have a group yet, the summary now asks for your new group's name right away, so accepting takes one step. If a teammate already added you to a group, you simply join it."
+      },
+      {
+        "kind": "fixed",
+        "text": "On Windows, updates no longer leave their installers behind in the temporary folder, where they took up disk space."
+      }
+    ],
+    "fr": [
+      {
+        "kind": "improved",
+        "text": "Quand vous acceptez un devoir en équipe sans avoir encore de groupe, le résumé demande maintenant directement le nom de votre nouveau groupe : tout se fait en une étape. Si un coéquipier vous a déjà ajouté à un groupe, vous le rejoignez simplement."
+      },
+      {
+        "kind": "fixed",
+        "text": "Sur Windows, les mises à jour ne laissent plus leurs installateurs dans le dossier temporaire, où ils occupaient de l'espace disque."
+      }
+    ],
+    "es": [
+      {
+        "kind": "improved",
+        "text": "Al aceptar una tarea en equipo sin tener grupo todavía, el resumen ahora te pide directamente el nombre de tu nuevo grupo, así todo se hace en un solo paso. Si un compañero ya te añadió a un grupo, simplemente te unes a él."
+      },
+      {
+        "kind": "fixed",
+        "text": "En Windows, las actualizaciones ya no dejan sus instaladores en la carpeta temporal ocupando espacio en el disco."
+      }
+    ],
+    "de": [
+      {
+        "kind": "improved",
+        "text": "Nimmst du eine Teamaufgabe an und hast noch keine Gruppe, fragt die Zusammenfassung jetzt direkt nach dem Namen deiner neuen Gruppe: So geht das Annehmen in einem Schritt. Hat dich jemand aus deinem Team schon zu einer Gruppe hinzugefügt, trittst du ihr einfach bei."
+      },
+      {
+        "kind": "fixed",
+        "text": "Unter Windows lassen Updates ihre Installationsprogramme nicht mehr im temporären Ordner liegen, wo sie Speicherplatz belegt haben."
+      }
+    ],
+    "it": [
+      {
+        "kind": "improved",
+        "text": "Quando accetti un compito di gruppo e non hai ancora un gruppo, il riepilogo ora ti chiede subito il nome del nuovo gruppo, così basta un solo passaggio. Se un compagno ti ha già aggiunto a un gruppo, ti unisci semplicemente a quello."
+      },
+      {
+        "kind": "fixed",
+        "text": "Su Windows, gli aggiornamenti non lasciano più i loro programmi di installazione nella cartella temporanea, dove occupavano spazio su disco."
+      }
+    ],
+    "pt-BR": [
+      {
+        "kind": "improved",
+        "text": "Ao aceitar uma tarefa em equipe sem ter grupo ainda, o resumo agora já pede o nome do seu novo grupo, então tudo é feito em um passo só. Se um colega já adicionou você a um grupo, você simplesmente entra nele."
+      },
+      {
+        "kind": "fixed",
+        "text": "No Windows, as atualizações não deixam mais seus instaladores na pasta temporária ocupando espaço em disco."
+      }
+    ],
+    "pt-PT": [
+      {
+        "kind": "improved",
+        "text": "Ao aceitares uma tarefa em equipa sem teres ainda um grupo, o resumo pede agora logo o nome do teu novo grupo, para fazeres tudo num só passo. Se um colega já te adicionou a um grupo, entras simplesmente nesse grupo."
+      },
+      {
+        "kind": "fixed",
+        "text": "No Windows, as atualizações já não deixam os instaladores na pasta temporária a ocupar espaço em disco."
+      }
+    ],
+    "nl": [
+      {
+        "kind": "improved",
+        "text": "Als je een teamopdracht accepteert en nog geen groep hebt, vraagt het overzicht nu meteen naar de naam van je nieuwe groep, zodat accepteren in één stap gaat. Heeft een teamgenoot je al aan een groep toegevoegd, dan sluit je je daar gewoon bij aan."
+      },
+      {
+        "kind": "fixed",
+        "text": "Op Windows laten updates hun installatieprogramma's niet meer achter in de tijdelijke map, waar ze schijfruimte innamen."
+      }
+    ],
+    "pl": [
+      {
+        "kind": "improved",
+        "text": "Gdy akceptujesz zadanie zespołowe, a nie masz jeszcze grupy, podsumowanie od razu pyta teraz o nazwę nowej grupy, więc wszystko odbywa się w jednym kroku. Jeśli ktoś z zespołu już dodał cię do grupy, po prostu do niej dołączasz."
+      },
+      {
+        "kind": "fixed",
+        "text": "W systemie Windows aktualizacje nie zostawiają już instalatorów w folderze tymczasowym, gdzie zajmowały miejsce na dysku."
+      }
+    ],
+    "tr": [
+      {
+        "kind": "improved",
+        "text": "Henüz grubunuz yokken bir takım ödevini kabul ettiğinizde özet artık yeni grubunuzun adını doğrudan soruyor; böylece kabul etmek tek adımda bitiyor. Bir takım arkadaşınız sizi zaten bir gruba eklediyse o gruba katılırsınız."
+      },
+      {
+        "kind": "fixed",
+        "text": "Windows'ta güncellemeler artık yükleyicilerini geçici klasörde bırakıp disk alanı kaplamıyor."
+      }
+    ],
+    "ar": [
+      {
+        "kind": "improved",
+        "text": "عند قبول واجب جماعي دون وجود مجموعة بعد، يطلب الملخص الآن اسم المجموعة الجديدة مباشرة، فيتم القبول في خطوة واحدة. وإذا كان أحد أعضاء الفريق قد أضاف الحساب إلى مجموعة، يتم الانضمام إليها مباشرة."
+      },
+      {
+        "kind": "fixed",
+        "text": "على Windows، لم تعد التحديثات تترك ملفات التثبيت في المجلد المؤقت حيث كانت تشغل مساحة من القرص."
+      }
+    ],
+    "he": [
+      {
+        "kind": "improved",
+        "text": "בקבלת מטלת צוות כשעדיין אין קבוצה, הסיכום מבקש עכשיו ישר את שם הקבוצה החדשה, כך שהקבלה נעשית בצעד אחד. ואם חבר צוות כבר הוסיף את החשבון לקבוצה, ההצטרפות אליה מתבצעת מיד."
+      },
+      {
+        "kind": "fixed",
+        "text": "ב-Windows, עדכונים כבר לא משאירים את קובצי ההתקנה בתיקייה הזמנית, שם הם תפסו מקום בדיסק."
+      }
+    ],
+    "zh-Hans": [
+      {
+        "kind": "improved",
+        "text": "接受团队作业但还没有小组时，摘要现在会直接询问你新小组的名称，一步即可完成接受。如果队友已经把你加入了某个小组，你会直接加入该小组。"
+      },
+      {
+        "kind": "fixed",
+        "text": "在Windows上，更新不再把安装程序留在临时文件夹里占用磁盘空间。"
+      }
+    ],
+    "ja": [
+      {
+        "kind": "improved",
+        "text": "まだグループがないままチーム課題を受け入れるとき、概要で新しいグループの名前をその場で入力できるようになりました。受け入れが1回の操作で済みます。チームメイトがすでにあなたをグループに追加している場合は、そのグループにそのまま参加します。"
+      },
+      {
+        "kind": "fixed",
+        "text": "Windowsで、アップデートのインストーラーが一時フォルダーに残り、ディスク容量を使い続けることがなくなりました。"
+      }
+    ],
+    "ko": [
+      {
+        "kind": "improved",
+        "text": "아직 그룹이 없는 상태로 팀 과제를 수락하면, 이제 요약 화면에서 바로 새 그룹 이름을 물어봐요. 그래서 한 번에 수락할 수 있어요. 팀원이 이미 그룹에 추가해 줬다면 그 그룹에 바로 들어가요."
+      },
+      {
+        "kind": "fixed",
+        "text": "Windows에서 업데이트 설치 파일이 더 이상 임시 폴더에 남아 디스크 공간을 차지하지 않아요."
+      }
+    ]
+  }
+}
