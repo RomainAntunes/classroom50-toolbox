@@ -88,7 +88,7 @@
           <input
             bind:this={input}
             bind:value
-            aria-label={current.title}
+            aria-label={current.label ?? current.title}
             placeholder={current.placeholder}
             maxlength={current.maxLength}
             autocomplete="off"
@@ -127,6 +127,9 @@
     /* Three buttons (Cancel, Commit only, Commit & push) fit on one line at 14px; the
        380px popover minus the scrim's padding leaves 348px. */
     max-width: 340px;
+    /* A long message (accept's summary) scrolls inside the popover. */
+    max-height: calc(100vh - 32px);
+    overflow-y: auto;
     padding: 14px;
     border: 1px solid var(--border);
     border-radius: var(--radius-card);

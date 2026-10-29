@@ -142,19 +142,36 @@ pub struct AcceptRequest<'a> {
     pub new_team: Option<&'a str>,
 }
 
-/// Runs `gh student accept` and returns the repo's `owner/name`. Accepting again is safe:
-/// an existing repo is reported as accepted (and repaired if its setup was cut short).
-pub async fn accept(request: &AcceptRequest<'_>) -> Result<String> {
+/// What an accept gave.
+pub struct AcceptOutcome {
+    /// The repo's `owner/name`.
+    pub repo: String,
+    /// The student was already in a group (a teammate added them), so gh-student ignored
+    /// `--new-team` and no group was founded.
+    pub joined_group: bool,
+}
+
+/// Runs `gh student accept`. Accepting again is safe: an existing repo is reported as
+/// accepted (and repaired if its setup was cut short).
+pub async fn accept(request: &AcceptRequest<'_>) -> Result<AcceptOutcome> {
     let args = accept_args(request)?;
     // Accept prints extra advice when run inside a git repo.
     let cwd = std::env::temp_dir();
     let output = run(args, &cwd, ACCEPT_TIMEOUT).await?;
-    accepted_repo(&output.stdout).ok_or_else(|| {
+    let repo = accepted_repo(&output.stdout).ok_or_else(|| {
         Error::Student(format!(
             "gh student accept succeeded but printed no repository: {}",
             output.stdout
         ))
-    })
+    })?;
+    let joined_group = request.new_team.is_some()
+        && (ignored_new_team(&output.stdout) || ignored_new_team(&output.stderr));
+    Ok(AcceptOutcome { repo, joined_group })
+}
+
+/// gh-student's `you are already in group N for this assignment; ignoring --new-team`.
+fn ignored_new_team(output: &str) -> bool {
+    output.contains("ignoring --new-team")
 }
 
 /// The `gh` arguments for an accept, after checking the group name. `--new-team` always
@@ -392,6 +409,14 @@ mod tests {
             Some("o/r")
         );
         assert_eq!(accepted_repo("Something else"), None);
+    }
+
+    #[test]
+    fn sees_a_group_already_joined() {
+        assert!(ignored_new_team(
+            "you are already in group 3 for this assignment; ignoring --new-team"
+        ));
+        assert!(!ignored_new_team("Created group 3 (The Sharks)"));
     }
 
     #[test]

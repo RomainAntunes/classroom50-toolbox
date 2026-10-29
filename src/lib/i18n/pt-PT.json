@@ -379,7 +379,7 @@
   "accept.thenClone": "Depois, a app propõe cloná-lo.",
   "accept.group": "Trabalho de grupo: só um membro o aceita e depois convida os outros para o repositório.",
   "accept.teamTeacher": "Trabalho em equipa: o teu professor forma os grupos. Se ainda não estás num, pede-lhe primeiro que te adicione.",
-  "accept.teamStudent": "Trabalho em equipa: o teu grupo partilha um único repositório. Se um colega já criou o teu grupo, pede-lhe que te adicione antes de aceitares; caso contrário, dás nome a um novo grupo.",
+  "accept.teamStudent": "Trabalho em equipa: o teu grupo partilha um único repositório. Dá um nome ao teu novo grupo aqui em baixo: serás o fundador e depois poderás adicionar os teus colegas. Se um colega já criou o teu grupo, cancela e pede-lhe primeiro que te adicione.",
   "accept.needsTeam": "Ainda não estás num grupo para este trabalho. Dá nome a um novo grupo para o criares: ficas como fundador e podes adicionar os teus colegas. Se um colega já tem um grupo, cancela e pede-lhe antes que te adicione.",
   "accept.newTeam": "Criar grupo",
   "accept.groupNameTitle": "Dá um nome ao teu grupo",

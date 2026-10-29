@@ -87,20 +87,25 @@ export function canFoundGroup(item: Unaccepted): boolean {
   return a.mode === "team" && a.teamFormation !== "teacher" && !item.group;
 }
 
-/** Runs the accept, founding `group` when named ("Create a group…"), else asking for a new
- *  group's name only on `needsTeam`. Null when cancelled. */
+/** Runs the accept, founding `group` when named, else asking for a new group's name on
+ *  `needsTeam` (a group the last sync listed is gone). `group` comes back null when the
+ *  student turned out to be in a group already, which gh-student then accepts for. Null
+ *  when cancelled. */
 async function run(
   item: Unaccepted,
   group: string | null,
 ): Promise<{ accepted: Accepted; group: string | null } | null> {
-  if (group) return { accepted: await api.acceptAssignment(item.id, group), group };
+  if (group) {
+    const accepted = await api.acceptAssignment(item.id, group);
+    return { accepted, group: accepted.joinedGroup ? null : group };
+  }
   try {
     return { accepted: await api.acceptAssignment(item.id, null), group: null };
   } catch (err) {
     if (errorKind(err) !== "needsTeam") throw err;
   }
   const named = await askGroupName(t("accept.needsTeam"));
-  return named ? { accepted: await api.acceptAssignment(item.id, named), group: named } : null;
+  return named ? run(item, named) : null;
 }
 
 /** Asks, accepts, then offers to clone the new repo. The row shows it meanwhile. With
@@ -129,6 +134,18 @@ async function accept(item: Unaccepted, newGroup: boolean): Promise<void> {
   let group: string | null = null;
   if (newGroup) {
     group = await askGroupName(`${t("accept.createGroupHint")}\n${repoPoint(item, login)}`);
+    if (!group) return;
+  } else if (canFoundGroup(item)) {
+    // The summary asks the new group's name at once: gh-student needs it to found the
+    // group, and ignores it for a student a teammate added since the last sync.
+    group = await askText({
+      title: name,
+      message: notes(item, login),
+      label: t("accept.groupNameTitle"),
+      placeholder: t("accept.groupNamePlaceholder"),
+      okLabel: t("accept.ok"),
+      maxLength: MAX_GROUP_NAME,
+    });
     if (!group) return;
   } else if (!(await confirm(notes(item, login), name, t("accept.ok")))) return;
   let result: Awaited<ReturnType<typeof run>>;

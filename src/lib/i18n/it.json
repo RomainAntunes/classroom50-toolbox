@@ -379,7 +379,7 @@
   "accept.thenClone": "Poi l'app propone di clonarlo.",
   "accept.group": "Compito di gruppo: un solo membro lo accetta, poi invita gli altri nel repository.",
   "accept.teamTeacher": "Compito a squadre: i gruppi li forma l'insegnante. Se non sei ancora in un gruppo, chiedi prima all'insegnante di aggiungerti.",
-  "accept.teamStudent": "Compito a squadre: il tuo gruppo condivide un unico repository. Se qualcuno della squadra ha già creato il gruppo, fatti aggiungere prima di accettare; altrimenti dai un nome a un nuovo gruppo.",
+  "accept.teamStudent": "Compito a squadre: il tuo gruppo condivide un unico repository. Dai un nome al nuovo gruppo qui sotto: ne sarai il fondatore e poi potrai aggiungere la tua squadra. Se qualcuno della squadra ha già creato il gruppo, annulla e fatti aggiungere prima.",
   "accept.needsTeam": "Non sei ancora in un gruppo per questo compito. Dai un nome a un nuovo gruppo per crearlo: ne diventi il fondatore e puoi aggiungere i tuoi compagni. Se qualcuno della squadra ha già un gruppo, annulla e fatti aggiungere.",
   "accept.newTeam": "Crea il gruppo",
   "accept.groupNameTitle": "Dai un nome al tuo gruppo",

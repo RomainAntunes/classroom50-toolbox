@@ -386,7 +386,7 @@
   "accept.thenClone": "Potem aplikacja zaproponuje jego sklonowanie.",
   "accept.group": "Zadanie grupowe: akceptuje je tylko jedna osoba z grupy, a potem zaprasza pozostałych do repozytorium.",
   "accept.teamTeacher": "Zadanie zespołowe: grupy przydziela nauczyciel. Jeśli nie należysz jeszcze do żadnej, najpierw poproś o dodanie.",
-  "accept.teamStudent": "Zadanie zespołowe: twoja grupa współdzieli jedno repozytorium. Jeśli ktoś z zespołu już utworzył twoją grupę, poproś o dodanie przed akceptacją; w przeciwnym razie nazwiesz nową grupę.",
+  "accept.teamStudent": "Zadanie zespołowe: twoja grupa współdzieli jedno repozytorium. Nazwij poniżej nową grupę: zostaniesz jej założycielem i potem dodasz osoby z zespołu. Jeśli ktoś z zespołu już utworzył twoją grupę, anuluj i najpierw poproś o dodanie.",
   "accept.needsTeam": "Nie należysz jeszcze do żadnej grupy w tym zadaniu. Nazwij nową grupę, aby ją utworzyć: to ty ją zakładasz i możesz dodać do niej osoby z zespołu. Jeśli ktoś z zespołu ma już grupę, anuluj i poproś o dodanie.",
   "accept.newTeam": "Utwórz grupę",
   "accept.groupNameTitle": "Nazwij swoją grupę",

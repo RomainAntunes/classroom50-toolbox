@@ -372,7 +372,7 @@
   "accept.thenClone": "Then the app offers to clone it.",
   "accept.group": "Group assignment: only one member accepts it, then invites the others to the repository.",
   "accept.teamTeacher": "Team assignment: your teacher assigns the groups. If you aren't in one yet, ask them to add you first.",
-  "accept.teamStudent": "Team assignment: your group shares one repository. If a teammate already created your group, ask them to add you before accepting; otherwise you name a new group.",
+  "accept.teamStudent": "Team assignment: your group shares one repository. Name your new group below: you become its founder and can add your teammates next. If a teammate already created your group, cancel and ask them to add you first.",
   "accept.needsTeam": "You aren't in a group for this assignment yet. Name a new group to create it: you become its founder and can add your teammates. If a teammate already has a group, cancel and ask them to add you instead.",
   "accept.newTeam": "Create group",
   "accept.groupNameTitle": "Name your group",

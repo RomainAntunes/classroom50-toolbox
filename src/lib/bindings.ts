@@ -205,7 +205,8 @@ export const commands = {
 	/**
 	 *  Accepts an unaccepted assignment with `gh student accept`, then syncs so the new repo
 	 *  shows up. `team_name` founds a group with that name for a team assignment formed by
-	 *  students; without it such an assignment fails with `needsTeam`.
+	 *  students, unless the student is in a group already; without it such an assignment fails
+	 *  with `needsTeam` while they aren't.
 	 */
 	acceptAssignment: (id: string, teamName: string | null) => __TAURI_INVOKE<Accepted>("accept_assignment", { id, teamName }),
 	/**  What submitting project `id` would send, for the confirmation dialog. */
@@ -264,6 +265,11 @@ export type Accepted = {
 	repo: string,
 	/**  The new project's id, once the sync that follows the accept has found it. */
 	projectId: string | null,
+	/**
+	 *  A group name was given but the student was already in a group (a teammate added
+	 *  them), so that group's repo was accepted and no group was founded.
+	 */
+	joinedGroup: boolean,
 };
 
 export type Account = {

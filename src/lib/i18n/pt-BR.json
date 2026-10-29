@@ -379,7 +379,7 @@
   "accept.thenClone": "Depois, o app oferece cloná-lo.",
   "accept.group": "Tarefa em grupo: só um membro a aceita e depois convida os outros para o repositório.",
   "accept.teamTeacher": "Tarefa em equipe: seu professor define os grupos. Se você ainda não está em um, peça que ele adicione você primeiro.",
-  "accept.teamStudent": "Tarefa em equipe: seu grupo compartilha um único repositório. Se um colega já criou seu grupo, peça para adicionarem você antes de aceitar; caso contrário, você dá nome a um novo grupo.",
+  "accept.teamStudent": "Tarefa em equipe: seu grupo compartilha um único repositório. Dê um nome ao seu novo grupo abaixo: você será o fundador e depois poderá adicionar seus colegas. Se um colega já criou seu grupo, cancele e peça primeiro para adicionarem você.",
   "accept.needsTeam": "Você ainda não está em um grupo para esta tarefa. Dê um nome a um novo grupo para criá-lo: você será o fundador e poderá adicionar seus colegas. Se um colega já tem um grupo, cancele e peça para adicionarem você.",
   "accept.newTeam": "Criar grupo",
   "accept.groupNameTitle": "Dê um nome ao seu grupo",

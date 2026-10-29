@@ -372,7 +372,7 @@
   "accept.thenClone": "Ardından uygulama depoyu klonlamayı önerir.",
   "accept.group": "Grup ödevi: yalnızca bir üye kabul eder, ardından diğerlerini depoya davet eder.",
   "accept.teamTeacher": "Takım ödevi: grupları öğretmeniniz belirler. Henüz bir grupta değilseniz önce öğretmeninizden sizi eklemesini isteyin.",
-  "accept.teamStudent": "Takım ödevi: grubunuz tek bir depoyu paylaşır. Bir takım arkadaşınız grubunuzu zaten oluşturduysa kabul etmeden önce sizi eklemesini isteyin; aksi halde yeni bir gruba ad verirsiniz.",
+  "accept.teamStudent": "Takım ödevi: grubunuz tek bir depoyu paylaşır. Yeni grubunuza aşağıda bir ad verin: grubun kurucusu siz olursunuz ve ardından takım arkadaşlarınızı ekleyebilirsiniz. Bir takım arkadaşınız grubunuzu zaten oluşturduysa iptal edin ve önce sizi eklemesini isteyin.",
   "accept.needsTeam": "Bu ödev için henüz bir grupta değilsiniz. Oluşturmak için yeni bir gruba ad verin: grubun kurucusu siz olursunuz ve takım arkadaşlarınızı ekleyebilirsiniz. Bir takım arkadaşınızın zaten grubu varsa iptal edin ve sizi eklemesini isteyin.",
   "accept.newTeam": "Grup oluştur",
   "accept.groupNameTitle": "Grubunuzu adlandırın",
