@@ -55,7 +55,8 @@ jobs:
           echo "scope=$scope" >> "$GITHUB_OUTPUT"
 
   # Scope `bump`: what the release reads. The versions agree (Cargo.lock refreshed), the
-  # changelogs are formatted and complete in every catalog (changelog.test.ts).
+  # changelogs are formatted and complete in every catalog (changelog.test.ts), and the
+  # bundle, which holds every changelog, still fits its size budget.
   release-inputs:
     needs: gate
     if: needs.gate.outputs.scope == 'bump'
@@ -75,6 +76,9 @@ jobs:
       - run: node scripts/ci-scope.mjs --versions
       - run: pnpm exec prettier --check package.json src/lib/changelog
       - run: pnpm exec vitest run src/lib/changelog scripts
+      - run: pnpm build
+      - name: Bundle size budget
+        run: node scripts/size-budget.mjs build
 
   check:
     needs: gate

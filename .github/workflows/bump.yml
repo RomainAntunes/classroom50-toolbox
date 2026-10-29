@@ -87,6 +87,9 @@ jobs:
       - run: node scripts/ci-scope.mjs --versions
       - run: pnpm exec prettier --check package.json src/lib/changelog
       - run: pnpm exec vitest run src/lib/changelog scripts
+      - run: pnpm build
+      - name: Bundle size budget
+        run: node scripts/size-budget.mjs build
       - name: Commit to main and start the release
         if: ${{ !inputs.dry-run }}
         env:
