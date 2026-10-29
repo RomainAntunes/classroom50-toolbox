@@ -2,6 +2,7 @@
 // one is needed, then offers to clone.
 import { expect, test } from "./app";
 import { fail, ok, scenario, snapshot, unaccepted } from "./fixtures";
+import type { Unaccepted } from "../../src/lib/api";
 
 const lab3 = unaccepted({ slug: "lab3", name: "Lab 3", feedbackPr: true });
 const team = unaccepted({ slug: "proj", name: "Project", mode: "team", teamFormation: "student" });
@@ -30,7 +31,9 @@ test("accepting runs gh student accept, then offers to clone; Later clones nothi
     scenario({
       snapshot: snapshot({ unaccepted: [lab3] }),
       responses: {
-        accept_assignment: [ok({ repo: "cs50-school/cs101-lab3-student", projectId: "p-lab3" })],
+        accept_assignment: [
+          ok({ repo: "cs50-school/cs101-lab3-student", projectId: "p-lab3", joinedGroup: false }),
+        ],
       },
     }),
   );
@@ -50,37 +53,37 @@ test("accepting runs gh student accept, then offers to clone; Later clones nothi
   expect(await app.writes()).toEqual(["accept_assignment"]);
 });
 
-test("needsTeam asks for a group name, founds it, then clones", async ({ app }) => {
+test("a team assignment asks the group's name with the summary, founds it, then clones", async ({
+  app,
+}) => {
   await app.start(
     scenario({
       snapshot: snapshot({ unaccepted: [team] }),
       responses: {
         accept_assignment: [
-          fail("needsTeam"),
-          ok({ repo: "cs50-school/cs101-proj-group-4", projectId: "p-proj" }),
+          ok({ repo: "cs50-school/cs101-proj-group-4", projectId: "p-proj", joinedGroup: false }),
         ],
         clone_project: [ok("/Users/student/Classroom/cs101-proj-group-4")],
       },
     }),
   );
   await app.row("Project").getByRole("button", { name: "Accept" }).click();
-  await app.expectDialog([/Team assignment: your group shares one repository/], "ok");
 
-  // Not in a group: the in-popover prompt asks for its name, required.
-  await expect(app.prompt.getByRole("heading")).toHaveText("Name your group");
-  await expect(app.prompt).toContainText("You aren't in a group for this assignment yet.");
-  const create = app.prompt.getByRole("button", { name: "Create group" });
-  await expect(create).toBeDisabled();
-  await app.prompt.getByRole("textbox").fill("   ");
-  await expect(create).toBeDisabled();
-  await app.prompt.getByRole("textbox").fill("  The Sharks ");
-  await create.click();
+  // One step: the summary is the prompt asking the new group's name, required.
+  await expect(app.prompt.getByRole("heading")).toHaveText("Project");
+  await expect(app.prompt).toContainText("Team assignment: your group shares one repository.");
+  await expect(app.prompt).toContainText("Name your new group below");
+  expect(await app.pendingDialogs()).toEqual([]);
+  const field = app.prompt.getByRole("textbox", { name: "Name your group" });
+  const accept = app.prompt.getByRole("button", { name: "Accept" });
+  await expect(accept).toBeDisabled();
+  await field.fill("   ");
+  await expect(accept).toBeDisabled();
+  await field.fill("  The Sharks ");
+  await accept.click();
 
-  const accepts = await app.waitForCall("accept_assignment", 2);
-  expect(accepts.map((call) => call.args)).toEqual([
-    { id: team.id, teamName: null },
-    { id: team.id, teamName: "The Sharks" },
-  ]);
+  const accepts = await app.waitForCall("accept_assignment");
+  expect(accepts.map((call) => call.args)).toEqual([{ id: team.id, teamName: "The Sharks" }]);
 
   // Founded: adding teammates is offered first; Later keeps it for the menu.
   const founded = await app.expectDialog(
@@ -98,22 +101,78 @@ test("needsTeam asks for a group name, founds it, then clones", async ({ app }) 
     path: "/Users/student/Classroom/cs101-proj-group-4",
     editor: "vscode",
   });
-  expect(await app.writes()).toEqual(["accept_assignment", "accept_assignment", "clone_project"]);
+  expect(await app.writes()).toEqual(["accept_assignment", "clone_project"]);
 });
 
-test("cancelling the group name accepts nothing more", async ({ app }) => {
+test("cancelling the group name accepts nothing", async ({ app }) => {
+  await app.start(scenario({ snapshot: snapshot({ unaccepted: [team] }) }));
+  await app.row("Project").getByRole("button", { name: "Accept" }).click();
+  await app.prompt.getByRole("button", { name: "Cancel" }).click();
+  await expect(app.prompt).toHaveCount(0);
+  expect(await app.calls("accept_assignment")).toEqual([]);
+  expect(await app.pendingDialogs()).toEqual([]);
+});
+
+test("a teammate's group joined since the last sync founds nothing", async ({ app }) => {
   await app.start(
     scenario({
       snapshot: snapshot({ unaccepted: [team] }),
-      responses: { accept_assignment: [fail("needsTeam")] },
+      responses: {
+        accept_assignment: [
+          ok({ repo: "cs50-school/cs101-proj-group-2", projectId: "p-proj", joinedGroup: true }),
+        ],
+      },
     }),
   );
   await app.row("Project").getByRole("button", { name: "Accept" }).click();
-  await app.answer("ok");
-  await app.prompt.getByRole("button", { name: "Cancel" }).click();
-  await expect(app.prompt).toHaveCount(0);
-  expect((await app.calls("accept_assignment")).length).toBe(1);
-  expect(await app.pendingDialogs()).toEqual([]);
+  await app.prompt.getByRole("textbox").fill("The Sharks");
+  await app.prompt.getByRole("button", { name: "Accept" }).click();
+
+  // gh-student accepted the existing group's repo: no "created" note, straight to the clone.
+  await app.expectDialog([/Clone it now into ~\/Classroom\/cs101-proj-group-2\?/], "cancel");
+  expect(await app.writes()).toEqual(["accept_assignment"]);
+});
+
+test("a group the last sync listed but gone asks for a new name on needsTeam", async ({ app }) => {
+  const listed: Unaccepted = {
+    ...team,
+    group: {
+      org: "cs50-school",
+      slug: "classroom50-group-abc123-2",
+      number: 2,
+      name: "Old group",
+      members: [],
+      founders: null,
+      url: "https://github.com/orgs/cs50-school/teams/classroom50-group-abc123-2",
+      classroom: null,
+      assignment: null,
+    },
+  };
+  await app.start(
+    scenario({
+      snapshot: snapshot({ unaccepted: [listed] }),
+      responses: {
+        accept_assignment: [
+          fail("needsTeam"),
+          ok({ repo: "cs50-school/cs101-proj-group-4", projectId: null, joinedGroup: false }),
+        ],
+      },
+    }),
+  );
+  await app.row("Project").getByRole("button", { name: "Accept" }).click();
+  await app.expectDialog([/This creates your repository/], "ok");
+
+  await expect(app.prompt.getByRole("heading")).toHaveText("Name your group");
+  await expect(app.prompt).toContainText("You aren't in a group for this assignment yet.");
+  await app.prompt.getByRole("textbox").fill("The Sharks");
+  await app.prompt.getByRole("button", { name: "Create group" }).click();
+
+  const accepts = await app.waitForCall("accept_assignment", 2);
+  expect(accepts.map((call) => call.args)).toEqual([
+    { id: listed.id, teamName: null },
+    { id: listed.id, teamName: "The Sharks" },
+  ]);
+  await app.expectDialog([/^The Sharks is created and you're its founder\./], "cancel");
 });
 
 test("a failed accept shows gh-student's own words", async ({ app }) => {

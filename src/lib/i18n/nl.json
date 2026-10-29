@@ -372,7 +372,7 @@
   "accept.thenClone": "Daarna biedt de app aan om hem te klonen.",
   "accept.group": "Groepsopdracht: maar één lid accepteert hem en nodigt daarna de anderen uit voor de repository.",
   "accept.teamTeacher": "Teamopdracht: je docent deelt de groepen in. Zit je nog niet in een groep, vraag je docent dan eerst om je toe te voegen.",
-  "accept.teamStudent": "Teamopdracht: je groep deelt één repository. Als een teamgenoot je groep al heeft gemaakt, vraag dan om je toe te voegen voordat je accepteert; anders geef je een nieuwe groep een naam.",
+  "accept.teamStudent": "Teamopdracht: je groep deelt één repository. Geef je nieuwe groep hieronder een naam: jij richt hem op en kunt daarna je teamgenoten toevoegen. Als een teamgenoot je groep al heeft gemaakt, annuleer dan en vraag eerst om je toe te voegen.",
   "accept.needsTeam": "Je zit nog niet in een groep voor deze opdracht. Geef een nieuwe groep een naam om hem te maken: je wordt de oprichter en kunt je teamgenoten toevoegen. Heeft een teamgenoot al een groep, annuleer dan en vraag of die je toevoegt.",
   "accept.newTeam": "Groep maken",
   "accept.groupNameTitle": "Geef je groep een naam",

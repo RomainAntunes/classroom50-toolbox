@@ -60,7 +60,7 @@ describe("notes", () => {
     expect(text).toContain("Feedback pull request");
     expect(text).toContain("Only what you submit counts");
     expect(text).toContain("marked late, never refused");
-    expect(text).toContain("you name a new group");
+    expect(text).toContain("Name your new group below");
     expect(text).not.toMatch(/[{}]/);
   });
 });

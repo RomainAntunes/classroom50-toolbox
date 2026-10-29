@@ -372,7 +372,7 @@
   "accept.thenClone": "Danach bietet die App an, es zu klonen.",
   "accept.group": "Gruppenaufgabe: Nur ein Mitglied nimmt sie an und lädt dann die anderen in das Repository ein.",
   "accept.teamTeacher": "Teamaufgabe: Deine Lehrperson teilt die Gruppen ein. Wenn du noch in keiner bist, bitte sie zuerst, dich hinzuzufügen.",
-  "accept.teamStudent": "Teamaufgabe: Deine Gruppe teilt sich ein Repository. Wenn jemand aus deinem Team die Gruppe schon erstellt hat, lass dich hinzufügen, bevor du annimmst; sonst gibst du einer neuen Gruppe einen Namen.",
+  "accept.teamStudent": "Teamaufgabe: Deine Gruppe teilt sich ein Repository. Gib deiner neuen Gruppe unten einen Namen: Du gründest sie und kannst danach dein Team hinzufügen. Wenn jemand aus deinem Team die Gruppe schon erstellt hat, brich ab und lass dich zuerst hinzufügen.",
   "accept.needsTeam": "Du bist für diese Aufgabe noch in keiner Gruppe. Gib einer neuen Gruppe einen Namen, um sie zu erstellen: Du gründest sie und kannst deine Teammitglieder hinzufügen. Wenn jemand aus deinem Team schon eine Gruppe hat, brich ab und lass dich stattdessen hinzufügen.",
   "accept.newTeam": "Gruppe erstellen",
   "accept.groupNameTitle": "Benenne deine Gruppe",

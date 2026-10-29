@@ -18,11 +18,15 @@ pub struct Accepted {
     repo: String,
     /// The new project's id, once the sync that follows the accept has found it.
     project_id: Option<String>,
+    /// A group name was given but the student was already in a group (a teammate added
+    /// them), so that group's repo was accepted and no group was founded.
+    joined_group: bool,
 }
 
 /// Accepts an unaccepted assignment with `gh student accept`, then syncs so the new repo
 /// shows up. `team_name` founds a group with that name for a team assignment formed by
-/// students; without it such an assignment fails with `needsTeam`.
+/// students, unless the student is in a group already; without it such an assignment fails
+/// with `needsTeam` while they aren't.
 #[tauri::command]
 #[cfg_attr(test, specta::specta)]
 pub async fn accept_assignment(
@@ -66,8 +70,8 @@ pub async fn accept_assignment(
             },
         );
     }
-    let repo = match accepted {
-        Ok(repo) => repo,
+    let student::AcceptOutcome { repo, joined_group } = match accepted {
+        Ok(outcome) => outcome,
         // A failure or a timeout may come after the repo was made: look again.
         Err(err @ Error::Student(_)) => {
             let app = app.clone();
@@ -93,7 +97,11 @@ pub async fn accept_assignment(
             projects::refresh_after_write(&app).await;
         });
     }
-    Ok(Accepted { repo, project_id })
+    Ok(Accepted {
+        repo,
+        project_id,
+        joined_group,
+    })
 }
 
 /// The project of the assignment behind unaccepted id `org/classroom/assignment`.
@@ -104,6 +112,7 @@ fn accepted_project(snapshot: &Snapshot, id: &str) -> Option<Accepted> {
     Some(Accepted {
         repo: format!("{}/{}", project.owner.as_deref()?, project.repo.as_deref()?),
         project_id: Some(project.id.clone()),
+        joined_group: false,
     })
 }
 

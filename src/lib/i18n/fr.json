@@ -379,7 +379,7 @@
   "accept.thenClone": "L'app propose ensuite de le cloner.",
   "accept.group": "Devoir de groupe : un seul membre l'accepte, puis invite les autres dans le dépôt.",
   "accept.teamTeacher": "Devoir en équipe : votre enseignant forme les groupes. Si vous n'êtes encore dans aucun, demandez-lui d'abord de vous ajouter.",
-  "accept.teamStudent": "Devoir en équipe : votre groupe partage un seul dépôt. Si un coéquipier a déjà créé votre groupe, demandez-lui de vous ajouter avant d'accepter ; sinon, vous nommez un nouveau groupe.",
+  "accept.teamStudent": "Devoir en équipe : votre groupe partage un seul dépôt. Nommez votre nouveau groupe ci-dessous : vous en serez le fondateur et pourrez ensuite ajouter vos coéquipiers. Si un coéquipier a déjà créé votre groupe, annulez et demandez-lui d'abord de vous ajouter.",
   "accept.needsTeam": "Vous n'êtes pas encore dans un groupe pour ce devoir. Nommez un nouveau groupe pour le créer : vous en serez le fondateur et pourrez ajouter vos coéquipiers. Si un coéquipier a déjà un groupe, annulez et demandez-lui plutôt de vous ajouter.",
   "accept.newTeam": "Créer le groupe",
   "accept.groupNameTitle": "Nommez votre groupe",
