@@ -1,0 +1,695 @@
+{
+  "date": "2026-10-29",
+  "notes": {
+    "en": [
+      {
+        "kind": "new",
+        "text": "The menu of the toolbox's tray icon now has Refresh, the time of the last sync and Settings, so you can reach them without opening the window."
+      },
+      {
+        "kind": "new",
+        "text": "The tray icon's menu now lists your three nearest deadlines, such as \"Lab 3 · Due tomorrow at 10:30 PM\". Click one to open its row in the list."
+      },
+      {
+        "kind": "new",
+        "text": "Open Recent, in the tray icon's menu, lists the five assignments you worked on last. Pick one to open it straight in its editor."
+      },
+      {
+        "kind": "new",
+        "text": "When an update has downloaded, the tray icon's menu offers Restart to Update, so you can install it from there."
+      },
+      {
+        "kind": "improved",
+        "text": "Times now follow your computer's 12- or 24-hour clock, whatever language the toolbox speaks."
+      },
+      {
+        "kind": "improved",
+        "text": "The toolbox now does less work while its window is hidden, so it uses a little less battery."
+      },
+      {
+        "kind": "fixed",
+        "text": "Due dates now count calendar days and name the hour: a deadline tomorrow evening reads \"Due tomorrow at 10:30 PM\", no longer \"the day after tomorrow\". Hover over it to see the full date."
+      },
+      {
+        "kind": "fixed",
+        "text": "Build folders made by Maven, Gradle, Cargo or your IDE no longer mark an assignment as Uncommitted, and Commit leaves them out."
+      },
+      {
+        "kind": "fixed",
+        "text": "Once your last push is handed in, editing files no longer shows a worrying Uncommitted: the row now says Local changes and explains that your push on GitHub still counts."
+      },
+      {
+        "kind": "fixed",
+        "text": "When a teammate pushed while you have work of your own, the row no longer says Pull first if Pull can't work: it now says Commit, then pull or Pull and merge, and explains what to do."
+      },
+      {
+        "kind": "fixed",
+        "text": "On macOS, Settings now says under Calendar when macOS no longer allows calendar access, with a button that opens the privacy settings so you can allow it again."
+      }
+    ],
+    "fr": [
+      {
+        "kind": "new",
+        "text": "Le menu de l'icône de la toolbox propose maintenant Actualiser, l'heure de la dernière synchronisation et Réglages : vous y accédez sans ouvrir la fenêtre."
+      },
+      {
+        "kind": "new",
+        "text": "Le menu de l'icône de la toolbox affiche maintenant vos trois échéances les plus proches, avec le jour et l'heure. Cliquez sur l'une d'elles pour ouvrir sa ligne dans la liste."
+      },
+      {
+        "kind": "new",
+        "text": "Ouvrir récent, dans le menu de l'icône de la toolbox, liste les cinq devoirs sur lesquels vous avez travaillé en dernier. Choisissez-en un pour l'ouvrir directement dans son éditeur."
+      },
+      {
+        "kind": "new",
+        "text": "Quand une mise à jour est téléchargée, le menu de l'icône de la toolbox propose Redémarrer pour mettre à jour : vous pouvez l'installer de là."
+      },
+      {
+        "kind": "improved",
+        "text": "Les heures suivent maintenant l'horloge 12 ou 24 heures de votre ordinateur, quelle que soit la langue de la toolbox."
+      },
+      {
+        "kind": "improved",
+        "text": "La toolbox travaille maintenant moins lorsque sa fenêtre est masquée : elle consomme un peu moins de batterie."
+      },
+      {
+        "kind": "fixed",
+        "text": "Les échéances comptent maintenant en jours du calendrier et indiquent l'heure : un devoir à rendre demain soir affiche « demain à 22:30 » et non plus « après-demain ». Survolez l'échéance pour voir la date complète."
+      },
+      {
+        "kind": "fixed",
+        "text": "Les dossiers de build créés par Maven, Gradle, Cargo ou votre IDE ne signalent plus un devoir comme non commité, et Commit les laisse de côté."
+      },
+      {
+        "kind": "fixed",
+        "text": "Une fois votre dernier push rendu, modifier des fichiers n'affiche plus un inquiétant « non commité » : la ligne indique maintenant Modifications locales et explique que votre push sur GitHub compte toujours."
+      },
+      {
+        "kind": "fixed",
+        "text": "Quand un coéquipier a fait un push alors que vous avez votre propre travail, la ligne n'indique plus Pull d'abord si Pull ne peut pas fonctionner : elle indique maintenant Commit, puis pull ou Pull et merge, et explique quoi faire."
+      },
+      {
+        "kind": "fixed",
+        "text": "Sur macOS, Réglages indique maintenant sous Calendrier quand macOS n'autorise plus l'accès au calendrier, avec un bouton qui ouvre les réglages de confidentialité pour l'autoriser à nouveau."
+      }
+    ],
+    "es": [
+      {
+        "kind": "new",
+        "text": "El menú del icono de la toolbox ahora tiene Actualizar, la hora de la última sincronización y Ajustes, así puedes usarlos sin abrir la ventana."
+      },
+      {
+        "kind": "new",
+        "text": "El menú del icono de la toolbox ahora muestra tus tres entregas más próximas, con el día y la hora. Haz clic en una para abrir su fila en la lista."
+      },
+      {
+        "kind": "new",
+        "text": "Abrir reciente, en el menú del icono de la toolbox, muestra las cinco tareas en las que trabajaste por última vez. Elige una para abrirla directamente en su editor."
+      },
+      {
+        "kind": "new",
+        "text": "Cuando se descarga una actualización, el menú del icono de la toolbox ofrece Reiniciar para actualizar, así puedes instalarla desde ahí."
+      },
+      {
+        "kind": "improved",
+        "text": "Las horas ahora siguen el reloj de 12 o 24 horas de tu equipo, sea cual sea el idioma de la toolbox."
+      },
+      {
+        "kind": "improved",
+        "text": "La toolbox ahora trabaja menos mientras su ventana está oculta, así gasta un poco menos de batería."
+      },
+      {
+        "kind": "fixed",
+        "text": "Las fechas de entrega ahora cuentan días del calendario e indican la hora: una entrega mañana por la noche dice «mañana a las 22:30» y ya no «pasado mañana». Pasa el cursor por encima para ver la fecha completa."
+      },
+      {
+        "kind": "fixed",
+        "text": "Las carpetas de compilación que crean Maven, Gradle, Cargo o tu IDE ya no marcan una tarea como sin commit, y Commit las deja fuera."
+      },
+      {
+        "kind": "fixed",
+        "text": "Cuando tu último push ya está entregado, editar archivos ya no muestra un alarmante «sin commit»: la fila ahora dice Cambios locales y explica que tu push en GitHub sigue contando."
+      },
+      {
+        "kind": "fixed",
+        "text": "Cuando un compañero hizo push mientras tú tienes trabajo propio, la fila ya no dice Pull primero si Pull no puede funcionar: ahora dice Commit y luego pull o Pull y merge, y explica qué hacer."
+      },
+      {
+        "kind": "fixed",
+        "text": "En macOS, Ajustes ahora avisa en Calendario cuando macOS ya no permite el acceso al calendario, con un botón que abre los ajustes de privacidad para que vuelvas a permitirlo."
+      }
+    ],
+    "de": [
+      {
+        "kind": "new",
+        "text": "Das Menü des Toolbox-Symbols bietet jetzt Aktualisieren, die Uhrzeit der letzten Synchronisierung und Einstellungen, sodass du sie ohne das Fenster erreichst."
+      },
+      {
+        "kind": "new",
+        "text": "Das Menü des Toolbox-Symbols zeigt jetzt deine drei nächsten Abgabetermine mit Tag und Uhrzeit. Ein Klick darauf öffnet die passende Zeile in der Liste."
+      },
+      {
+        "kind": "new",
+        "text": "Zuletzt geöffnet im Menü des Toolbox-Symbols listet die fünf Aufgaben, an denen du zuletzt gearbeitet hast. Wähl eine aus, um sie direkt in ihrem Editor zu öffnen."
+      },
+      {
+        "kind": "new",
+        "text": "Ist ein Update heruntergeladen, bietet das Menü des Toolbox-Symbols Neu starten zum Aktualisieren, sodass du es von dort installieren kannst."
+      },
+      {
+        "kind": "improved",
+        "text": "Uhrzeiten folgen jetzt der 12- oder 24-Stunden-Uhr deines Computers, egal in welcher Sprache die Toolbox läuft."
+      },
+      {
+        "kind": "improved",
+        "text": "Die Toolbox arbeitet jetzt weniger, solange ihr Fenster ausgeblendet ist, und verbraucht so etwas weniger Akku."
+      },
+      {
+        "kind": "fixed",
+        "text": "Abgabetermine zählen jetzt Kalendertage und nennen die Uhrzeit: Eine Abgabe morgen Abend heißt „morgen um 22:30“ und nicht mehr „übermorgen“. Fahr mit der Maus darüber, um das vollständige Datum zu sehen."
+      },
+      {
+        "kind": "fixed",
+        "text": "Build-Ordner von Maven, Gradle, Cargo oder deiner IDE markieren eine Aufgabe nicht mehr als nicht committet, und Commit lässt sie weg."
+      },
+      {
+        "kind": "fixed",
+        "text": "Ist dein letzter Push abgegeben, zeigt das Bearbeiten von Dateien kein beunruhigendes „nicht committet“ mehr: Die Zeile zeigt jetzt Lokale Änderungen und erklärt, dass dein Push auf GitHub weiterhin zählt."
+      },
+      {
+        "kind": "fixed",
+        "text": "Hat jemand aus deinem Team gepusht, während du eigene Arbeit hast, zeigt die Zeile nicht mehr Zuerst pullen, wenn Pull nicht funktionieren kann: Sie zeigt jetzt Committen, dann pullen oder Pullen und mergen und erklärt, was zu tun ist."
+      },
+      {
+        "kind": "fixed",
+        "text": "Unter macOS zeigen die Einstellungen unter Kalender jetzt an, wenn macOS keinen Zugriff auf den Kalender mehr erlaubt, mit einer Schaltfläche, die die Datenschutzeinstellungen öffnet, damit du ihn wieder erlauben kannst."
+      }
+    ],
+    "it": [
+      {
+        "kind": "new",
+        "text": "Il menu dell'icona dell'app ora ha Aggiorna, l'ora dell'ultima sincronizzazione e Impostazioni, così puoi usarli senza aprire la finestra."
+      },
+      {
+        "kind": "new",
+        "text": "Il menu dell'icona dell'app ora mostra le tue tre scadenze più vicine, con giorno e ora. Fai clic su una per aprire la sua riga nell'elenco."
+      },
+      {
+        "kind": "new",
+        "text": "Apri recenti, nel menu dell'icona dell'app, elenca i cinque compiti su cui hai lavorato per ultimi. Scegline uno per aprirlo direttamente nel suo editor."
+      },
+      {
+        "kind": "new",
+        "text": "Quando un aggiornamento è stato scaricato, il menu dell'icona dell'app offre Riavvia per aggiornare, così puoi installarlo da lì."
+      },
+      {
+        "kind": "improved",
+        "text": "Gli orari ora seguono l'orologio a 12 o 24 ore del tuo computer, qualunque sia la lingua dell'app."
+      },
+      {
+        "kind": "improved",
+        "text": "L'app ora lavora meno mentre la sua finestra è nascosta, così consuma un po' meno batteria."
+      },
+      {
+        "kind": "fixed",
+        "text": "Le scadenze ora contano i giorni di calendario e indicano l'ora: una consegna domani sera mostra «domani alle 22:30» e non più «dopodomani». Passa il mouse sopra per vedere la data completa."
+      },
+      {
+        "kind": "fixed",
+        "text": "Le cartelle di build create da Maven, Gradle, Cargo o dal tuo IDE non segnano più un compito come non committato, e Commit le lascia fuori."
+      },
+      {
+        "kind": "fixed",
+        "text": "Quando il tuo ultimo push è già consegnato, modificare dei file non mostra più un allarmante «non committato»: la riga ora dice Modifiche locali e spiega che il tuo push su GitHub conta ancora."
+      },
+      {
+        "kind": "fixed",
+        "text": "Quando un compagno ha fatto push mentre hai del lavoro tuo, la riga non dice più Prima pull se Pull non può funzionare: ora dice Commit, poi pull oppure Pull e merge, e spiega cosa fare."
+      },
+      {
+        "kind": "fixed",
+        "text": "Su macOS, Impostazioni ora segnala sotto Calendario quando macOS non consente più l'accesso al calendario, con un pulsante che apre le impostazioni della privacy per consentirlo di nuovo."
+      }
+    ],
+    "pt-BR": [
+      {
+        "kind": "new",
+        "text": "O menu do ícone do app agora tem Atualizar, o horário da última sincronização e Configurações, então você pode usá-los sem abrir a janela."
+      },
+      {
+        "kind": "new",
+        "text": "O menu do ícone do app agora mostra seus três prazos mais próximos, com dia e horário. Clique em um para abrir a linha dele na lista."
+      },
+      {
+        "kind": "new",
+        "text": "Abrir recente, no menu do ícone do app, lista as cinco tarefas em que você trabalhou por último. Escolha uma para abri-la direto no editor dela."
+      },
+      {
+        "kind": "new",
+        "text": "Quando uma atualização é baixada, o menu do ícone do app oferece Reiniciar para atualizar, então você pode instalá-la por ali."
+      },
+      {
+        "kind": "improved",
+        "text": "Os horários agora seguem o relógio de 12 ou 24 horas do seu computador, seja qual for o idioma do app."
+      },
+      {
+        "kind": "improved",
+        "text": "O app agora trabalha menos enquanto a janela está oculta, então gasta um pouco menos de bateria."
+      },
+      {
+        "kind": "fixed",
+        "text": "Os prazos agora contam dias do calendário e dizem o horário: uma entrega amanhã à noite mostra \"amanhã às 22:30\" e não mais \"depois de amanhã\". Passe o mouse por cima para ver a data completa."
+      },
+      {
+        "kind": "fixed",
+        "text": "Pastas de build criadas pelo Maven, Gradle, Cargo ou pela sua IDE não marcam mais uma tarefa como sem commit, e o Commit as deixa de fora."
+      },
+      {
+        "kind": "fixed",
+        "text": "Quando seu último push já foi entregue, editar arquivos não mostra mais um preocupante \"sem commit\": a linha agora diz Alterações locais e explica que seu push no GitHub continua valendo."
+      },
+      {
+        "kind": "fixed",
+        "text": "Quando um colega fez push enquanto você tem trabalho seu, a linha não diz mais Pull primeiro se o Pull não puder funcionar: agora diz Commit, depois pull ou Pull e merge, e explica o que fazer."
+      },
+      {
+        "kind": "fixed",
+        "text": "No macOS, Configurações agora avisa em Calendário quando o macOS não permite mais o acesso ao calendário, com um botão que abre as configurações de privacidade para você permitir de novo."
+      }
+    ],
+    "pt-PT": [
+      {
+        "kind": "new",
+        "text": "O menu do ícone da app tem agora Atualizar, a hora da última sincronização e Definições, para os usares sem abrir a janela."
+      },
+      {
+        "kind": "new",
+        "text": "O menu do ícone da app mostra agora os teus três prazos mais próximos, com o dia e a hora. Clica num para abrir a respetiva linha na lista."
+      },
+      {
+        "kind": "new",
+        "text": "Abrir recente, no menu do ícone da app, lista as cinco tarefas em que trabalhaste por último. Escolhe uma para a abrires diretamente no respetivo editor."
+      },
+      {
+        "kind": "new",
+        "text": "Quando uma atualização é transferida, o menu do ícone da app oferece Reiniciar para atualizar, para a instalares a partir daí."
+      },
+      {
+        "kind": "improved",
+        "text": "As horas seguem agora o relógio de 12 ou 24 horas do teu computador, seja qual for o idioma da app."
+      },
+      {
+        "kind": "improved",
+        "text": "A app trabalha agora menos enquanto a janela está oculta, para gastar um pouco menos de bateria."
+      },
+      {
+        "kind": "fixed",
+        "text": "Os prazos contam agora dias de calendário e indicam a hora: uma entrega amanhã à noite mostra \"amanhã às 22:30\" e já não \"depois de amanhã\". Passa o rato por cima para ver a data completa."
+      },
+      {
+        "kind": "fixed",
+        "text": "As pastas de build criadas pelo Maven, Gradle, Cargo ou pelo teu IDE já não marcam uma tarefa como sem commit, e o Commit deixa-as de fora."
+      },
+      {
+        "kind": "fixed",
+        "text": "Quando o teu último push já foi entregue, editar ficheiros já não mostra um preocupante \"sem commit\": a linha indica agora Alterações locais e explica que o teu push no GitHub continua a contar."
+      },
+      {
+        "kind": "fixed",
+        "text": "Quando um colega fez push enquanto tens trabalho teu, a linha já não diz Pull primeiro se o Pull não puder funcionar: diz agora Commit e depois pull ou Pull e merge, e explica o que fazer."
+      },
+      {
+        "kind": "fixed",
+        "text": "No macOS, Definições avisa agora em Calendário quando o macOS já não permite o acesso ao calendário, com um botão que abre as definições de privacidade para o voltares a permitir."
+      }
+    ],
+    "nl": [
+      {
+        "kind": "new",
+        "text": "Het menu van het toolbox-pictogram heeft nu Vernieuwen, de tijd van de laatste synchronisatie en Instellingen, zodat je ze zonder het venster kunt gebruiken."
+      },
+      {
+        "kind": "new",
+        "text": "Het menu van het toolbox-pictogram toont nu je drie eerstvolgende deadlines, met dag en tijd. Klik erop om de rij in de lijst te openen."
+      },
+      {
+        "kind": "new",
+        "text": "Recent openen, in het menu van het toolbox-pictogram, toont de vijf opdrachten waaraan je het laatst hebt gewerkt. Kies er een om die meteen in de bijbehorende editor te openen."
+      },
+      {
+        "kind": "new",
+        "text": "Als er een update is gedownload, biedt het menu van het toolbox-pictogram Opnieuw starten om bij te werken, zodat je die van daaruit kunt installeren."
+      },
+      {
+        "kind": "improved",
+        "text": "Tijden volgen nu de 12- of 24-uursklok van je computer, in welke taal de toolbox ook werkt."
+      },
+      {
+        "kind": "improved",
+        "text": "De toolbox doet nu minder werk terwijl het venster verborgen is, zodat hij iets minder batterij gebruikt."
+      },
+      {
+        "kind": "fixed",
+        "text": "Deadlines tellen nu kalenderdagen en noemen het tijdstip: een deadline morgenavond toont „morgen om 22:30” en niet meer „overmorgen”. Beweeg erover om de volledige datum te zien."
+      },
+      {
+        "kind": "fixed",
+        "text": "Buildmappen van Maven, Gradle, Cargo of je IDE markeren een opdracht niet meer als niet gecommit, en Commit laat ze weg."
+      },
+      {
+        "kind": "fixed",
+        "text": "Als je laatste push al is ingeleverd, toont het bewerken van bestanden geen verontrustend „niet gecommit” meer: de rij zegt nu Lokale wijzigingen en legt uit dat je push op GitHub nog steeds telt."
+      },
+      {
+        "kind": "fixed",
+        "text": "Als een teamgenoot heeft gepusht terwijl je zelf werk hebt, zegt de rij niet meer Eerst pullen als Pull niet kan werken: hij zegt nu Eerst committen, dan pullen of Pullen en mergen, en legt uit wat je moet doen."
+      },
+      {
+        "kind": "fixed",
+        "text": "Op macOS meldt Instellingen nu onder Agenda wanneer macOS geen toegang tot de agenda meer toestaat, met een knop die de privacyinstellingen opent zodat je het weer kunt toestaan."
+      }
+    ],
+    "pl": [
+      {
+        "kind": "new",
+        "text": "Menu ikony Toolbox ma teraz Odśwież, godzinę ostatniej synchronizacji i Ustawienia, więc możesz z nich korzystać bez otwierania okna."
+      },
+      {
+        "kind": "new",
+        "text": "Menu ikony Toolbox pokazuje teraz trzy najbliższe terminy, z dniem i godziną. Kliknij jeden, aby otworzyć jego wiersz na liście."
+      },
+      {
+        "kind": "new",
+        "text": "Otwórz ostatnie w menu ikony Toolbox pokazuje pięć zadań, nad którymi ostatnio trwała praca. Wybierz jedno, aby otworzyć je od razu w jego edytorze."
+      },
+      {
+        "kind": "new",
+        "text": "Gdy aktualizacja zostanie pobrana, menu ikony Toolbox oferuje Uruchom ponownie, aby zaktualizować, więc możesz ją stamtąd zainstalować."
+      },
+      {
+        "kind": "improved",
+        "text": "Godziny są teraz wyświetlane w 12- lub 24-godzinnym formacie ustawionym na twoim komputerze, niezależnie od języka Toolbox."
+      },
+      {
+        "kind": "improved",
+        "text": "Toolbox wykonuje teraz mniej pracy, gdy jego okno jest ukryte, więc zużywa trochę mniej baterii."
+      },
+      {
+        "kind": "fixed",
+        "text": "Terminy liczą teraz dni kalendarzowe i podają godzinę: termin jutro wieczorem pokazuje „jutro o 22:30”, a nie „pojutrze”. Najedź na niego kursorem, aby zobaczyć pełną datę."
+      },
+      {
+        "kind": "fixed",
+        "text": "Foldery kompilacji tworzone przez Maven, Gradle, Cargo lub twoje IDE nie oznaczają już zadania jako niezacommitowanego, a Commit je pomija."
+      },
+      {
+        "kind": "fixed",
+        "text": "Gdy twój ostatni push jest już oddany, edytowanie plików nie pokazuje już niepokojącego „niezacommitowane”: wiersz mówi teraz Zmiany lokalne i wyjaśnia, że twój push na GitHubie nadal się liczy."
+      },
+      {
+        "kind": "fixed",
+        "text": "Gdy ktoś z zespołu zrobił push, a ty masz własną pracę, wiersz nie mówi już Najpierw pull, jeśli Pull nie może zadziałać: mówi teraz Commit, potem pull albo Pull i merge oraz wyjaśnia, co zrobić."
+      },
+      {
+        "kind": "fixed",
+        "text": "Na macOS Ustawienia informują teraz w sekcji Kalendarz, gdy macOS nie pozwala już na dostęp do kalendarza, i pokazują przycisk otwierający ustawienia prywatności, gdzie można go ponownie przyznać."
+      }
+    ],
+    "tr": [
+      {
+        "kind": "new",
+        "text": "Toolbox simgesinin menüsünde artık Yenile, son eşitleme zamanı ve Ayarlar var; böylece pencereyi açmadan bunlara ulaşabilirsiniz."
+      },
+      {
+        "kind": "new",
+        "text": "Toolbox simgesinin menüsü artık en yakın üç teslim tarihinizi gün ve saatiyle gösteriyor. Birine tıkladığınızda listede o satır açılır."
+      },
+      {
+        "kind": "new",
+        "text": "Toolbox simgesinin menüsündeki Son açılanlar, en son üzerinde çalıştığınız beş ödevi listeliyor. Birini seçerek doğrudan kendi düzenleyicisinde açabilirsiniz."
+      },
+      {
+        "kind": "new",
+        "text": "Bir güncelleme indirildiğinde Toolbox simgesinin menüsü Güncellemek için yeniden başlat seçeneğini sunuyor; böylece güncellemeyi oradan yükleyebilirsiniz."
+      },
+      {
+        "kind": "improved",
+        "text": "Saatler artık Toolbox hangi dilde olursa olsun bilgisayarınızın 12 veya 24 saat biçimini izliyor."
+      },
+      {
+        "kind": "improved",
+        "text": "Toolbox artık penceresi gizliyken daha az iş yapıyor; böylece biraz daha az pil tüketiyor."
+      },
+      {
+        "kind": "fixed",
+        "text": "Teslim tarihleri artık takvim günlerini sayıyor ve saati belirtiyor: yarın akşam teslim edilecek bir ödev artık \"öbür gün\" yerine \"yarın 22:30'da\" gösteriyor. Tam tarihi görmek için üzerine gelin."
+      },
+      {
+        "kind": "fixed",
+        "text": "Maven, Gradle, Cargo veya IDE'nizin oluşturduğu derleme klasörleri artık bir ödevi commit edilmemiş olarak işaretlemiyor ve Commit bunları dışarıda bırakıyor."
+      },
+      {
+        "kind": "fixed",
+        "text": "Son push'unuz teslim edildiyse dosyaları düzenlemek artık endişe verici bir \"commit edilmemiş\" uyarısı göstermiyor: satır artık Yerel değişiklikler diyor ve GitHub'daki push'unuzun hâlâ geçerli olduğunu açıklıyor."
+      },
+      {
+        "kind": "fixed",
+        "text": "Kendi çalışmanız varken bir takım arkadaşınız push yaptıysa ve Pull çalışamıyorsa, satır artık Önce pull demiyor: Önce commit, sonra pull ya da Pull ve merge diyor ve ne yapmanız gerektiğini açıklıyor."
+      },
+      {
+        "kind": "fixed",
+        "text": "macOS'te Ayarlar artık Takvim altında macOS takvim erişimine izin vermediğinde bunu belirtiyor ve erişime yeniden izin vermeniz için gizlilik ayarlarını açan bir düğme gösteriyor."
+      }
+    ],
+    "ar": [
+      {
+        "kind": "new",
+        "text": "أصبحت قائمة أيقونة التطبيق تضم التحديث ووقت آخر مزامنة والإعدادات، للوصول إليها دون فتح النافذة."
+      },
+      {
+        "kind": "new",
+        "text": "تعرض قائمة أيقونة التطبيق الآن أقرب ثلاثة مواعيد تسليم، مع اليوم والساعة. النقر على أحدها يفتح سطره في قائمة الواجبات."
+      },
+      {
+        "kind": "new",
+        "text": "يعرض خيار فتح الأخيرة، في قائمة أيقونة التطبيق، آخر خمسة واجبات جرى العمل عليها. اختيار أحدها يفتحه مباشرة في محرره."
+      },
+      {
+        "kind": "new",
+        "text": "عند تنزيل تحديث، تعرض قائمة أيقونة التطبيق خيار إعادة التشغيل للتحديث، لتثبيته من هناك."
+      },
+      {
+        "kind": "improved",
+        "text": "أصبحت الأوقات تتبع نظام الساعة 12 أو 24 المضبوط على الحاسوب، أيًّا كانت لغة التطبيق."
+      },
+      {
+        "kind": "improved",
+        "text": "أصبح التطبيق يقوم بعمل أقل أثناء إخفاء نافذته، فيستهلك قدرًا أقل قليلًا من البطارية."
+      },
+      {
+        "kind": "fixed",
+        "text": "أصبحت مواعيد التسليم تُحسب بأيام التقويم وتذكر الساعة: موعد تسليم مساء الغد يظهر «غدًا الساعة 22:30» لا «بعد غد». يكفي تمرير المؤشر فوقه لرؤية التاريخ كاملًا."
+      },
+      {
+        "kind": "fixed",
+        "text": "لم تعد مجلدات البناء التي ينشئها Maven أو Gradle أو Cargo أو بيئة التطوير تجعل الواجب يظهر بحالة «بدون commit»، ولم يعد Commit يضمّها."
+      },
+      {
+        "kind": "fixed",
+        "text": "بعد تسليم آخر push، لم يعد تعديل الملفات يُظهر تحذير «بدون commit» المقلق: يعرض السطر الآن تغييرات محلية ويوضّح أن الـ push الموجود على GitHub ما زال محتسبًا."
+      },
+      {
+        "kind": "fixed",
+        "text": "عندما يُجري أحد أعضاء الفريق push مع وجود عمل محلي، لم يعد السطر يقول Pull أولًا إذا تعذّر Pull: يقول الآن Commit ثم pull أو Pull ثم merge، ويوضّح ما يجب فعله."
+      },
+      {
+        "kind": "fixed",
+        "text": "على macOS، توضّح الإعدادات الآن ضمن التقويم متى لم يعد macOS يسمح بالوصول إلى التقويم، مع زر يفتح إعدادات الخصوصية لإعادة السماح به."
+      }
+    ],
+    "he": [
+      {
+        "kind": "new",
+        "text": "בתפריט של סמל האפליקציה יש עכשיו רענון, את שעת הסנכרון האחרון ואת ההגדרות, כך שאפשר להגיע אליהם בלי לפתוח את החלון."
+      },
+      {
+        "kind": "new",
+        "text": "התפריט של סמל האפליקציה מציג עכשיו את שלושת מועדי ההגשה הקרובים, עם היום והשעה. לחיצה על אחד מהם פותחת את השורה שלו ברשימה."
+      },
+      {
+        "kind": "new",
+        "text": "פתיחת אחרונים, בתפריט של סמל האפליקציה, מציגה את חמש המטלות שעבדו עליהן לאחרונה. בחירה באחת מהן פותחת אותה ישירות בעורך שלה."
+      },
+      {
+        "kind": "new",
+        "text": "כשעדכון ירד, התפריט של סמל האפליקציה מציע הפעלה מחדש לעדכון, כדי להתקין אותו משם."
+      },
+      {
+        "kind": "improved",
+        "text": "השעות מוצגות עכשיו לפי שעון 12 או 24 השעות של המחשב, בכל שפה של האפליקציה."
+      },
+      {
+        "kind": "improved",
+        "text": "האפליקציה עושה עכשיו פחות עבודה כשהחלון שלה מוסתר, כך שהיא צורכת קצת פחות סוללה."
+      },
+      {
+        "kind": "fixed",
+        "text": "מועדי ההגשה נספרים עכשיו לפי ימים בלוח השנה ומציינים את השעה: הגשה מחר בערב מוצגת כ„מחר ב-22:30” ולא עוד כ„מחרתיים”. ריחוף מעליה מציג את התאריך המלא."
+      },
+      {
+        "kind": "fixed",
+        "text": "תיקיות build ש-Maven, ‏Gradle, ‏Cargo או סביבת הפיתוח יוצרים כבר לא גורמות למטלה להופיע כ„ללא commit”, ו-Commit משאיר אותן בחוץ."
+      },
+      {
+        "kind": "fixed",
+        "text": "אחרי שה-push האחרון הוגש, עריכת קבצים כבר לא מציגה „ללא commit” מדאיג: השורה מציגה עכשיו שינויים מקומיים ומסבירה שה-push ב-GitHub עדיין נחשב."
+      },
+      {
+        "kind": "fixed",
+        "text": "כשחבר צוות ביצע push בזמן שיש עבודה מקומית, השורה כבר לא אומרת Pull קודם אם Pull לא יכול לעבוד: היא אומרת עכשיו Commit ואז pull או Pull ו-merge, ומסבירה מה לעשות."
+      },
+      {
+        "kind": "fixed",
+        "text": "ב-macOS, ההגדרות מציינות עכשיו תחת לוח שנה מתי macOS כבר לא מאפשר גישה ללוח השנה, עם כפתור שפותח את הגדרות הפרטיות כדי לאפשר אותה מחדש."
+      }
+    ],
+    "zh-Hans": [
+      {
+        "kind": "new",
+        "text": "工具箱图标的菜单现在有刷新、上次同步时间和设置，不用打开窗口也能使用。"
+      },
+      {
+        "kind": "new",
+        "text": "工具箱图标的菜单现在会列出你最近的三个截止日期，并显示日期和时间。点击其中一个即可在列表中打开对应的行。"
+      },
+      {
+        "kind": "new",
+        "text": "工具箱图标菜单中的打开最近项目会列出你最近处理过的五个作业。选择一个即可直接在它的编辑器中打开。"
+      },
+      {
+        "kind": "new",
+        "text": "更新下载完成后，工具箱图标的菜单会提供重启以更新，你可以直接从那里安装。"
+      },
+      {
+        "kind": "improved",
+        "text": "无论工具箱使用哪种语言，时间现在都会按照你电脑的12小时制或24小时制显示。"
+      },
+      {
+        "kind": "improved",
+        "text": "工具箱窗口隐藏时现在会做更少的工作，因此会更省电一点。"
+      },
+      {
+        "kind": "fixed",
+        "text": "截止日期现在按日历天数计算并显示具体时间：明天晚上截止的作业会显示“明天22:30”，而不再是“后天”。将鼠标悬停在上面即可查看完整日期。"
+      },
+      {
+        "kind": "fixed",
+        "text": "Maven、Gradle、Cargo或IDE生成的构建文件夹不再让作业显示为未提交，提交时也会将它们排除在外。"
+      },
+      {
+        "kind": "fixed",
+        "text": "当你最后一次推送已经上交后，再编辑文件不会再显示令人担心的未提交：这一行现在显示本地更改，并说明你在GitHub上的推送仍然有效。"
+      },
+      {
+        "kind": "fixed",
+        "text": "当队友推送了内容而你也有自己的工作时，如果无法拉取，这一行不会再显示先拉取：现在会显示先提交再拉取或拉取并合并，并说明该怎么做。"
+      },
+      {
+        "kind": "fixed",
+        "text": "在macOS上，当macOS不再允许访问日历时，设置的日历下现在会给出提示，并提供一个按钮打开隐私设置，让你重新允许访问。"
+      }
+    ],
+    "ja": [
+      {
+        "kind": "new",
+        "text": "ツールボックスのアイコンのメニューに、再読み込み、最後の同期時刻、設定が加わりました。ウィンドウを開かずに使えます。"
+      },
+      {
+        "kind": "new",
+        "text": "アイコンのメニューに、締め切りが近い課題を3つまで日時付きで表示するようになりました。クリックすると、リストのその行が開きます。"
+      },
+      {
+        "kind": "new",
+        "text": "アイコンのメニューの「最近使った項目を開く」に、最近作業した課題が5つまで表示されます。選ぶと、そのエディターで直接開きます。"
+      },
+      {
+        "kind": "new",
+        "text": "アップデートのダウンロードが終わると、アイコンのメニューに「再起動してアップデート」が表示されます。そこからインストールできます。"
+      },
+      {
+        "kind": "improved",
+        "text": "時刻は、ツールボックスの言語にかかわらず、コンピューターの12時間制・24時間制の設定に従うようになりました。"
+      },
+      {
+        "kind": "improved",
+        "text": "ウィンドウが非表示のあいだの処理を減らしました。バッテリーの消費が少し少なくなります。"
+      },
+      {
+        "kind": "fixed",
+        "text": "締め切りをカレンダーの日付で数え、時刻も表示するようになりました。明日の夜が締め切りなら「明後日」ではなく「明日 22:30」と表示されます。ポインターを合わせると完全な日付が表示されます。"
+      },
+      {
+        "kind": "fixed",
+        "text": "Maven、Gradle、CargoやIDEが作るビルドフォルダーがあっても、課題が「未コミット」と表示されなくなりました。コミットでもこれらは除外されます。"
+      },
+      {
+        "kind": "fixed",
+        "text": "最後のpushを提出したあとにファイルを編集しても、不安になる「未コミット」は表示されなくなりました。行には「ローカルの変更」と表示され、GitHub上のpushが引き続き有効であることを説明します。"
+      },
+      {
+        "kind": "fixed",
+        "text": "自分の作業があるときにチームメイトがpushし、プルできない場合、行に「先にプル」と表示されなくなりました。代わりに「コミットしてからプル」または「プルしてマージ」と表示され、どうすればよいかを説明します。"
+      },
+      {
+        "kind": "fixed",
+        "text": "macOSでカレンダーへのアクセスが許可されなくなったとき、設定の「カレンダー」でそのことを表示するようになりました。プライバシー設定を開いて再び許可できるボタンもあります。"
+      }
+    ],
+    "ko": [
+      {
+        "kind": "new",
+        "text": "이제 도구 상자 아이콘 메뉴에 새로 고침, 마지막 동기화 시간, 설정이 있어요. 창을 열지 않고도 쓸 수 있어요."
+      },
+      {
+        "kind": "new",
+        "text": "이제 도구 상자 아이콘 메뉴에 가장 가까운 마감 세 개가 날짜, 시간과 함께 보여요. 하나를 클릭하면 목록에서 그 행이 열려요."
+      },
+      {
+        "kind": "new",
+        "text": "도구 상자 아이콘 메뉴의 최근 항목 열기에 최근에 작업한 과제 다섯 개가 나와요. 하나를 고르면 해당 편집기에서 바로 열려요."
+      },
+      {
+        "kind": "new",
+        "text": "업데이트가 다운로드되면 도구 상자 아이콘 메뉴에 다시 시작하여 업데이트가 나타나요. 거기서 바로 설치할 수 있어요."
+      },
+      {
+        "kind": "improved",
+        "text": "이제 시간이 도구 상자 언어와 상관없이 컴퓨터의 12시간제 또는 24시간제 설정을 따라요."
+      },
+      {
+        "kind": "improved",
+        "text": "이제 창이 숨겨져 있는 동안 도구 상자가 하는 일이 줄었어요. 그래서 배터리를 조금 덜 써요."
+      },
+      {
+        "kind": "fixed",
+        "text": "이제 마감일을 달력 날짜로 세고 시간도 알려 줘요. 내일 저녁 마감이면 '모레'가 아니라 '내일 오후 10:30'으로 보여요. 마우스를 올리면 전체 날짜를 볼 수 있어요."
+      },
+      {
+        "kind": "fixed",
+        "text": "Maven, Gradle, Cargo나 IDE가 만든 빌드 폴더 때문에 과제가 커밋 안 됨으로 표시되지 않아요. 커밋할 때도 이 폴더는 빠져요."
+      },
+      {
+        "kind": "fixed",
+        "text": "마지막 push를 이미 제출한 뒤에 파일을 고쳐도 걱정스러운 커밋 안 됨이 더 이상 나오지 않아요. 이제 행에 로컬 변경 사항이 표시되고, GitHub에 있는 push가 그대로 인정된다고 알려 줘요."
+      },
+      {
+        "kind": "fixed",
+        "text": "내 작업이 있는 동안 팀원이 push했는데 끌어오기를 할 수 없으면, 행에 더 이상 먼저 끌어오기가 표시되지 않아요. 대신 커밋 후 끌어오기나 끌어오기 후 병합이 표시되고 어떻게 하면 되는지 알려 줘요."
+      },
+      {
+        "kind": "fixed",
+        "text": "macOS가 더 이상 캘린더 접근을 허용하지 않으면, 이제 설정의 캘린더에서 알려 줘요. 개인정보 보호 설정을 여는 버튼으로 다시 허용할 수 있어요."
+      }
+    ]
+  }
+}
