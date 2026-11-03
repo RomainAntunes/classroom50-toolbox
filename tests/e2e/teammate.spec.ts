@@ -1,13 +1,16 @@
 // Adding classmates from a row's menu: the in-popover prompt takes several usernames at once
-// (commas or spaces, `@` dropped), `add_teammates` runs once with all of them, and the
-// results dialog offers "Add another" until Done. On a team assignment only the group's
-// founder can add members, which the menu says up front instead of letting gh fail.
+// (commas or spaces, `@` dropped) and `add_teammates` queues them all and returns at once.
+// Rust adds them in the background and sends `teammate-jobs`: the row shows each username
+// waiting, being added, added or why not, with "Add another" at any time and Done once the
+// queue is empty. On a team assignment only the group's founder can add members, which the
+// menu says up front instead of letting gh fail.
 import { expect, test, type App } from "./app";
-import { LOGIN, hold, ok, fail, project, scenario, snapshot } from "./fixtures";
-import type { Group, Project } from "../../src/lib/api";
+import { LOGIN, fail, project, scenario, snapshot } from "./fixtures";
+import type { Group, Project, TeammateEntry, TeammateJob } from "../../src/lib/api";
 import type { Reply } from "./fixtures";
 
 const solo = project({ slug: "lab1", name: "Lab 1" });
+const REPO = `${solo.owner}/${solo.repo}`;
 
 function group(founders: string[] | null): Group {
   return {
@@ -37,22 +40,45 @@ async function open(app: App, row: Project, item: string, responses: Record<stri
   await app.pickMenu(item);
 }
 
-test("several usernames go in at once; add_teammates runs once with all of them", async ({
-  app,
-}) => {
-  await open(app, solo, "Invite a classmate…", {
-    add_teammates: [
-      ok([
-        { username: "alice", error: null },
-        { username: "bob", error: { kind: "student", message: "bob isn't a GitHub user" } },
-        { username: "carol", error: null },
-      ]),
-    ],
-  });
+/** One username's line, as Rust sends it. */
+function entry(username: string, state: TeammateEntry["state"], error?: string): TeammateEntry {
+  return { username, state, error: error ? { kind: "student", message: error } : null };
+}
+
+/** The queue of `row` as Rust sends it in `teammate-jobs`. */
+function job(
+  row: Project,
+  entries: TeammateEntry[],
+  extra: Partial<TeammateJob> = {},
+): TeammateJob {
+  return {
+    id: row.id,
+    project: row.id,
+    repo: `${row.owner}/${row.repo}`,
+    assignment: row.assignment!.name,
+    team: false,
+    running: entries.some((e) => e.state === "waiting" || e.state === "adding"),
+    entries,
+    ...extra,
+  };
+}
+
+/** Boots on `row` and waits for the first read of the queues, which an event sent earlier
+ *  would race. */
+async function startOn(app: App, row: Project) {
+  await app.start(scenario({ snapshot: snapshot({ projects: [row] }) }));
+  await app.waitForCall("teammate_jobs");
+  await expect(app.page.getByRole("button", { name: row.assignment!.name })).toBeVisible();
+}
+
+/** The row's progress list. */
+const progress = (app: App, label = "Invite a classmate") =>
+  app.page.getByRole("region", { name: label });
+
+test("the usernames are queued at once and the row shows how each one goes", async ({ app }) => {
+  await open(app, solo, "Invite a classmate…");
   await expect(app.prompt.getByRole("heading")).toHaveText("Invite a classmate");
-  await expect(app.prompt).toContainText(
-    "They get a GitHub invitation to push to cs50-school/cs101-lab1-student.",
-  );
+  await expect(app.prompt).toContainText(`They get a GitHub invitation to push to ${REPO}.`);
   await expect(app.prompt.getByRole("textbox")).toHaveAttribute("placeholder", "GitHub usernames");
   await app.prompt.getByRole("textbox").fill("@alice, bob  carol;@Alice");
   await app.prompt.getByRole("button", { name: "Invite" }).click();
@@ -60,59 +86,110 @@ test("several usernames go in at once; add_teammates runs once with all of them"
   const calls = await app.waitForCall("add_teammates");
   expect(calls).toHaveLength(1);
   expect(calls[0].args).toEqual({ id: solo.id, usernames: ["alice", "bob", "carol"] });
+  // Nothing waits on gh: the prompt is gone and no dialog is up.
+  await expect(app.prompt).toHaveCount(0);
+  expect(await app.pendingDialogs()).toEqual([]);
 
-  const results = await app.dialog();
-  expect(results.title).toBe("Invite a classmate");
-  // Some went through: not an error.
-  expect(results.kind).toBe("info");
-  expect(results.message).toBe(
+  await app.emit("teammate-jobs", [
+    job(solo, [entry("alice", "adding"), entry("bob", "waiting"), entry("carol", "waiting")]),
+  ]);
+  const list = progress(app);
+  await expect(list.getByRole("listitem")).toHaveText([
+    "Inviting alice…",
+    "bob: waiting",
+    "carol: waiting",
+  ]);
+  await expect(list).toHaveAttribute("aria-busy", "true");
+  await expect(list.getByRole("button", { name: "Add another" })).toBeVisible();
+  await expect(list.getByRole("button", { name: "Done" })).toHaveCount(0);
+
+  await app.emit("teammate-jobs", [
+    job(solo, [
+      entry("alice", "added"),
+      entry("bob", "failed", "bob isn't a GitHub user"),
+      entry("carol", "added"),
+    ]),
+  ]);
+  await expect(list.getByRole("listitem")).toHaveText([
+    "alice got an invitation",
+    "Couldn't add bob: bob isn't a GitHub user",
+    "carol got an invitation",
+  ]);
+  // No dialog says how it went: screen readers hear it.
+  await expect(app.page.getByRole("status")).toHaveText(
     [
-      "alice got an invitation to push to cs50-school/cs101-lab1-student.",
+      `alice got an invitation to push to ${REPO}.`,
       "Couldn't add bob: bob isn't a GitHub user",
-      "carol got an invitation to push to cs50-school/cs101-lab1-student.",
+      `carol got an invitation to push to ${REPO}.`,
     ].join("\n"),
   );
-  expect(results.labels).toEqual({ ok: "Add another", cancel: "Done" });
-  await app.answer("cancel");
-  await expect(app.prompt).toHaveCount(0);
+  expect(await app.pendingDialogs()).toEqual([]);
+
+  await list.getByRole("button", { name: "Done" }).click();
+  expect((await app.waitForCall("dismiss_teammate_job"))[0].args).toEqual({ id: solo.id });
+  await app.emit("teammate-jobs", []);
+  await expect(list).toHaveCount(0);
   expect(await app.writes()).toEqual(["add_teammates"]);
 });
 
-test("Add another asks again, until Done", async ({ app }) => {
-  await open(app, solo, "Invite a classmate…", {
-    add_teammates: [
-      ok([{ username: "alice", error: null }]),
-      ok([{ username: "dave", error: null }]),
-    ],
-  });
-  await app.prompt.getByRole("textbox").fill("alice");
-  await app.prompt.getByRole("button", { name: "Invite" }).click();
-  await app.answer("ok");
+test("Add another queues more while the first ones are still being added", async ({ app }) => {
+  await startOn(app, solo);
+  await app.emit("teammate-jobs", [job(solo, [entry("alice", "adding")])]);
+  await progress(app).getByRole("button", { name: "Add another" }).click();
 
-  // A fresh prompt for the next ones.
-  await expect(app.prompt).toBeVisible();
+  // A fresh prompt, without waiting for alice.
+  await expect(app.prompt.getByRole("heading")).toHaveText("Invite a classmate");
   await expect(app.prompt.getByRole("textbox")).toHaveValue("");
   await app.prompt.getByRole("textbox").fill("dave");
   await app.prompt.getByRole("button", { name: "Invite" }).click();
-  await app.expectDialog(["dave got an invitation"], "cancel");
-
-  const calls = await app.calls("add_teammates");
-  expect(calls.map((c) => c.args.usernames)).toEqual([["alice"], ["dave"]]);
+  const calls = await app.waitForCall("add_teammates");
+  expect(calls.map((c) => c.args)).toEqual([{ id: solo.id, usernames: ["dave"] }]);
   await expect(app.prompt).toHaveCount(0);
 });
 
-test("a failure for everyone is an error, worded per username", async ({ app }) => {
+test("a call Rust refuses (nothing queued) is an error for everyone", async ({ app }) => {
   await open(app, solo, "Invite a classmate…", {
     add_teammates: [fail("student", "the classroom is closed")],
   });
   await app.prompt.getByRole("textbox").fill("alice bob");
   await app.prompt.getByRole("button", { name: "Invite" }).click();
-  const results = await app.dialog();
-  expect(results.kind).toBe("error");
-  expect(results.message).toBe(
-    "Couldn't add alice: the classroom is closed\nCouldn't add bob: the classroom is closed",
-  );
-  await app.answer("cancel");
+  const dialog = await app.dialog();
+  expect(dialog.title).toBe("Invite a classmate");
+  expect(dialog.kind).toBe("error");
+  expect(dialog.message).toBe("Couldn't add alice and bob: the classroom is closed");
+  await app.answer("ok");
+});
+
+test("added while the popover was hidden: the notification says who made it", async ({
+  app,
+  page,
+}) => {
+  await app.start(scenario({ snapshot: snapshot({ projects: [solo] }) }));
+  // The layout listens once mounted; an event before that is lost.
+  await expect(page.getByRole("searchbox")).toBeVisible();
+  await app.emit("notify", {
+    kind: "teammatesAdded",
+    assignment: "Project",
+    team: true,
+    added: ["alice", "carol"],
+    failed: ["bob"],
+  });
+  await app.emit("notify", {
+    kind: "teammatesAdded",
+    assignment: "Lab 1",
+    team: false,
+    added: [],
+    failed: ["dave"],
+  });
+  await expect
+    .poll(() => app.notifications())
+    .toEqual([
+      {
+        title: "Classmates added: Project",
+        body: "In your group now: alice and carol\nCouldn't add: bob",
+      },
+      { title: "Couldn't add classmates: Lab 1", body: "Couldn't add: dave" },
+    ]);
 });
 
 test("cancelling the prompt adds nobody", async ({ app }) => {
@@ -133,19 +210,37 @@ test("only separators and @ add nobody", async ({ app }) => {
 });
 
 test("the group's founder adds members to the group", async ({ app }) => {
-  await open(app, teamProject([LOGIN]), "Add to my group…", {
-    add_teammates: [hold()],
-  });
+  const row = teamProject([LOGIN]);
+  await open(app, row, "Add to my group…");
   await expect(app.prompt.getByRole("heading")).toHaveText("Add to my group");
   await expect(app.prompt).toContainText("They get push access to Project through your group.");
   await app.prompt.getByRole("textbox").fill("bob");
   await app.prompt.getByRole("button", { name: "Add" }).click();
   expect((await app.waitForCall("add_teammates"))[0].args).toEqual({
-    id: teamProject([LOGIN]).id,
+    id: row.id,
     usernames: ["bob"],
   });
-  await app.release("add_teammates", ok([{ username: "bob", error: null }]));
-  await app.expectDialog(["bob is in your group now. They should accept Project next."], "cancel");
+  await app.emit("teammate-jobs", [job(row, [entry("bob", "adding")], { team: true })]);
+  const list = progress(app, "Add to my group");
+  await expect(list.getByRole("listitem")).toHaveText(["Adding bob…"]);
+  await app.emit("teammate-jobs", [job(row, [entry("bob", "added")], { team: true })]);
+  await expect(list.getByRole("listitem")).toHaveText(["bob is in your group"]);
+  await expect(list).toContainText("Once added, each teammate accepts Project too.");
+  await expect(app.page.getByRole("status")).toHaveText(
+    "bob is in your group now. They should accept Project next.",
+  );
+});
+
+test("a group just founded: its queue moves to the repo's row once a sync lists it", async ({
+  app,
+}) => {
+  const row = teamProject([LOGIN]);
+  await startOn(app, row);
+  // Queued from the accepted assignment's id, before the repo was listed.
+  await app.emit("teammate-jobs", [
+    job(row, [entry("bob", "waiting")], { id: "cs50-school/cs101/proj", team: true }),
+  ]);
+  await expect(progress(app, "Add to my group").getByRole("listitem")).toHaveText(["bob: waiting"]);
 });
 
 for (const [why, row, words] of [

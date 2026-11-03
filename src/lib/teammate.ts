@@ -1,8 +1,16 @@
 // Giving classmates push access: `gh student team add` on a team assignment (they join the
-// group), `gh student invite` otherwise. Asks for the usernames in the popover first, adds
-// them one by one and offers to add more.
-import { ask, message } from "@tauri-apps/plugin-dialog";
-import { api, errorMessage, withDialog, type Added, type Group, type Project } from "#lib/api.js";
+// group), `gh student invite` otherwise. Asks for the usernames in the popover, then Rust
+// adds them one by one in the background while the row shows each one's progress
+// (`teammateJobs.svelte.ts`, `TeammateProgress.svelte`), with "Add another" at hand.
+import { message } from "@tauri-apps/plugin-dialog";
+import {
+  api,
+  errorMessage,
+  withDialog,
+  type Group,
+  type Project,
+  type TeammateEntry,
+} from "#lib/api.js";
 import { formatList, t } from "#lib/i18n/index.js";
 import { askText } from "#lib/prompt.svelte.js";
 import { session } from "#lib/session.svelte.js";
@@ -42,7 +50,7 @@ export function notFounderReason(
 }
 
 /** Where classmates are added, and how the prompt words it. */
-interface Target {
+export interface Target {
   /** A project id, or the assignment of a group just founded. */
   id: string;
   /** `owner/repo`. */
@@ -80,41 +88,32 @@ export function addToNewGroup(id: string, repo: string, assignment: string): Pro
   return addTeammates({ id, repo, assignment, team: true });
 }
 
-/** Asks for usernames, adds them, shows each result, and offers to add more until the
- *  student is done or cancels. */
-async function addTeammates(target: Target): Promise<void> {
+/** Asks for usernames and queues them; Rust adds them in the background, the row shows
+ *  how each one goes. Also the row's "Add another", which joins a queue still running. */
+export async function addTeammates(target: Target): Promise<void> {
   const { team, repo, assignment } = target;
   const title = t(team ? "teammate.teamTitle" : "teammate.inviteTitle");
-  for (;;) {
-    const text = await askText({
-      title,
-      message: t(team ? "teammate.teamHint" : "teammate.inviteHint", { assignment, repo }),
-      placeholder: t("teammate.placeholder"),
-      okLabel: t(team ? "teammate.teamOk" : "teammate.inviteOk"),
-    });
-    const usernames = text ? parseUsernames(text) : [];
-    if (usernames.length === 0) return;
-    let results: Outcome[];
-    try {
-      results = await api.addTeammates(target.id, usernames);
-    } catch (err) {
-      const error = { kind: "", message: errorMessage(err) };
-      results = usernames.map((username) => ({ username, error }));
-    }
-    const again = await withDialog(() =>
-      ask(resultsText(results, target), {
-        title,
-        kind: results.every((r) => r.error) ? "error" : "info",
-        okLabel: t("teammate.again"),
-        cancelLabel: t("teammate.done"),
-      }),
+  const text = await askText({
+    title,
+    message: t(team ? "teammate.teamHint" : "teammate.inviteHint", { assignment, repo }),
+    placeholder: t("teammate.placeholder"),
+    okLabel: t(team ? "teammate.teamOk" : "teammate.inviteOk"),
+  });
+  const usernames = text ? parseUsernames(text) : [];
+  if (usernames.length === 0) return;
+  try {
+    await api.addTeammates(target.id, usernames);
+  } catch (err) {
+    // Nothing was queued (the row is gone, say): one line for all of them.
+    const user = formatList(usernames);
+    await withDialog(() =>
+      message(t("teammate.failed", { user, error: errorMessage(err) }), { title, kind: "error" }),
     );
-    if (!again) return;
   }
 }
 
-/** What adding one classmate gave: `Added`, or a failure of the whole call, worded. */
-type Outcome = Pick<Added, "username"> & { error: unknown };
+/** What adding one classmate gave. */
+type Outcome = Pick<TeammateEntry, "username" | "error">;
 
 /** One line per username: added, or why not. */
 export function resultsText(results: Outcome[], target: Omit<Target, "id">): string {

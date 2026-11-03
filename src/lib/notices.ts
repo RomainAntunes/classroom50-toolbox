@@ -8,6 +8,7 @@ import { formatDate, formatList, relativeAt, t } from "#lib/i18n/index.js";
 
 /** Words a notice from Rust (`alerts.rs`) and shows it as a system notification. */
 export async function showNotice(notice: Notice) {
+  if (notice.kind === "teammatesAdded") return showTeammates(notice);
   const { kind, ...params } = notice;
   const values: Record<string, string | number> = {};
   for (const [key, value] of Object.entries(params)) {
@@ -21,13 +22,27 @@ export async function showNotice(notice: Notice) {
   if (notice.kind === "deadlineChanged") {
     values.when = notice.due ? formatDate(new Date(notice.due)) : t("alerts.noDeadline");
   }
+  await send(t(`alerts.${kind}.title`, values), t(`alerts.${kind}.body`, values));
+}
+
+async function send(title: string, body: string) {
   const granted = (await isPermissionGranted()) || (await requestPermission()) === "granted";
-  if (granted) {
-    sendNotification({
-      title: t(`alerts.${kind}.title`, values),
-      body: t(`alerts.${kind}.body`, values),
-    });
+  if (granted) sendNotification({ title, body });
+}
+
+/** Classmates added while the popover was hidden: who made it, then who didn't. */
+function showTeammates(notice: Extract<Notice, { kind: "teammatesAdded" }>) {
+  const { assignment, team, added, failed } = notice;
+  const title = added.length
+    ? t(team ? "alerts.teammatesAdded.title" : "alerts.teammatesAdded.inviteTitle", { assignment })
+    : t("alerts.teammatesAdded.failedTitle", { assignment });
+  const lines = [];
+  if (added.length) {
+    const key = team ? "alerts.teammatesAdded.body" : "alerts.teammatesAdded.invited";
+    lines.push(t(key, { users: formatList(added) }));
   }
+  if (failed.length) lines.push(t("alerts.teammatesAdded.failed", { users: formatList(failed) }));
+  return send(title, lines.join("\n"));
 }
 
 const HOUR = 60 * 60 * 1000;
@@ -45,6 +60,7 @@ export function sampleNotices(now = Date.now()): Notice[] {
     { kind: "groupJoined", assignment, members: ["Alice Martin"] },
     { kind: "deadlineChanged", assignment, due: new Date(now + 48 * HOUR).toISOString() },
     { kind: "closed", assignment },
+    { kind: "teammatesAdded", assignment, team: true, added: ["alice"], failed: ["bob"] },
     { kind: "updateReady", version: "0.11.0" },
   ];
 }

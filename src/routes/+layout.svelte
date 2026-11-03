@@ -22,6 +22,7 @@
   import { handleDeepLink, linkActive } from "#lib/deeplink.js";
   import { currentDirection, currentLocale, setHourCycle, setLocale, t } from "#lib/i18n/index.js";
   import { showNotice } from "#lib/notices.js";
+  import { watchTeammateJobs } from "#lib/teammateJobs.svelte.js";
   import { editors, loadEditors } from "#lib/editor.svelte.js";
   import { initTheme } from "#lib/theme/preview.svelte.js";
   import Prompt from "#lib/components/Prompt.svelte";
@@ -165,6 +166,8 @@
     });
     // A popover opened mid-download shows where it stands.
     void api.updateStatus().then(setUpdate);
+    // Here so a queue that ends on another page is still announced.
+    watchTeammateJobs();
     const unlisteners = [
       onEvent(NOTIFY_EVENT, (notice) => void showNotice(notice)),
       onEvent(UNSEEN_EVENT, (ids) => {

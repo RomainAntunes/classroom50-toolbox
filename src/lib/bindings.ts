@@ -182,12 +182,18 @@ export const commands = {
 	installedEditors: () => __TAURI_INVOKE<EditorInfo[]>("installed_editors"),
 	openInEditor: (path: string, editor: string) => __TAURI_INVOKE<null>("open_in_editor", { path, editor }),
 	/**
-	 *  Gives classmates push access to project `id`, one by one: joins them to the group on a
-	 *  team assignment, invites them as a collaborator otherwise. `id` may also be the
-	 *  assignment of a group just founded from the app whose repo no sync has listed yet. One
-	 *  full sync follows, so the group's members are read again.
+	 *  Queues classmates to get push access to project `id` and returns at once: they join
+	 *  the group on a team assignment, get an invitation otherwise, one by one in the
+	 *  background (`teammates.rs`, sent as `teammate-jobs`), then a full sync reads the group's
+	 *  members again. `id` may also be the assignment of a group just founded from the app
+	 *  whose repo no sync has listed yet. Usernames queued while that row's are still being
+	 *  added join its queue.
 	 */
-	addTeammates: (id: string, usernames: string[]) => __TAURI_INVOKE<Added_Serialize[]>("add_teammates", { id, usernames }),
+	addTeammates: (id: string, usernames: string[]) => __TAURI_INVOKE<null>("add_teammates", { id, usernames }),
+	/**  Every row's queue of classmates, for a view that opens while one runs. */
+	teammateJobs: () => __TAURI_INVOKE<TeammateJob_Serialize[]>("teammate_jobs"),
+	/**  Done: drops the results the row of `id` shows (usernames still queued stay). */
+	dismissTeammateJob: (id: string) => __TAURI_INVOKE<void>("dismiss_teammate_job", { id }),
 	/**
 	 *  Clones a project that has no local copy into `parent/<repo>`, registers the clone and
 	 *  rescans the disk. Returns the new folder; `projects-updated` follows.
@@ -288,22 +294,8 @@ export type Action =
 /**  Restart now, as the update banner's button. */
 { kind: "installUpdate" };
 
-/**  What adding one classmate gave. */
-export type Added = Added_Serialize | Added_Deserialize;
-
-/**  What adding one classmate gave. */
-export type Added_Deserialize = {
-	username: string,
-	/**  Why it failed, None when they were added. */
-	error: CommandError_Deserialize | null,
-};
-
-/**  What adding one classmate gave. */
-export type Added_Serialize = {
-	username: string,
-	/**  Why it failed, None when they were added. */
-	error: CommandError_Serialize | null,
-};
+/**  Where one username stands. */
+export type AddState = "waiting" | "adding" | "added" | "failed";
 
 export type AppInfo = {
 	os: Os,
@@ -571,6 +563,8 @@ export type Events_Deserialize = {
 	"sync-progress": SyncProgress,
 	/**  Every install or update running, sent when one starts, prints a line or ends. */
 	"tool-jobs": ToolJob[],
+	/**  Every row's queue of classmates being added, sent when one is queued, starts or ends. */
+	"teammate-jobs": TeammateJob_Deserialize[],
 	/**  Self-update changed state. */
 	"update-state": UpdateStatus,
 	/**  Something worth a notification; the UI words it and sends it. */
@@ -610,6 +604,8 @@ export type Events_Serialize = {
 	"sync-progress": SyncProgress,
 	/**  Every install or update running, sent when one starts, prints a line or ends. */
 	"tool-jobs": ToolJob[],
+	/**  Every row's queue of classmates being added, sent when one is queued, starts or ends. */
+	"teammate-jobs": TeammateJob_Serialize[],
 	/**  Self-update changed state. */
 	"update-state": UpdateStatus,
 	/**  Something worth a notification; the UI words it and sends it. */
@@ -870,6 +866,11 @@ export type Notice = { kind: "due"; assignment: string; due: string } | { kind: 
 { kind: "groupJoined"; assignment: string; members: string[] } | 
 /**  `due` is `None` when the deadline was removed. */
 { kind: "deadlineChanged"; assignment: string; due: string | null } | { kind: "closed"; assignment: string } | 
+/**
+ *  Classmates queued with the popover open were added while it was hidden (`teammates.rs`):
+ *  the logins added and those that failed. `team`: they joined the group, else invited.
+ */
+{ kind: "teammatesAdded"; assignment: string; team: boolean; added: string[]; failed: string[] } | 
 /**  A new version of the app is downloaded and installs on restart (`updater.rs`). */
 { kind: "updateReady"; version: string };
 
@@ -1315,6 +1316,71 @@ export type Target_Serialize =
 
 /**  Who forms the groups of a `team` assignment. */
 export type TeamFormation = "teacher" | "student";
+
+export type TeammateEntry = TeammateEntry_Serialize | TeammateEntry_Deserialize;
+
+export type TeammateEntry_Deserialize = {
+	username: string,
+	state: AddState,
+	/**  Why it failed, None unless `failed`. */
+	error: CommandError_Deserialize | null,
+};
+
+export type TeammateEntry_Serialize = {
+	username: string,
+	state: AddState,
+	/**  Why it failed, None unless `failed`. */
+	error: CommandError_Serialize | null,
+};
+
+/**  The classmates queued for one row, as the UI shows them. */
+export type TeammateJob = TeammateJob_Serialize | TeammateJob_Deserialize;
+
+/**  The classmates queued for one row, as the UI shows them. */
+export type TeammateJob_Deserialize = {
+	/**
+	 *  What `add_teammates` was given: a project id, or the assignment of a group just
+	 *  founded whose repo no sync has listed yet.
+	 */
+	id: string,
+	/**
+	 *  The project id of the repo (`owner/repo`, lowercase), so the row that replaces a
+	 *  just-accepted assignment's shows the same job.
+	 */
+	project: string,
+	/**  `owner/repo` as GitHub spells it. */
+	repo: string,
+	/**  The assignment's name, for the notification. */
+	assignment: string,
+	/**  Joins the group (`team add`) rather than inviting. */
+	team: boolean,
+	/**  Whether usernames are still waiting or being added. */
+	running: boolean,
+	entries: TeammateEntry_Deserialize[],
+};
+
+/**  The classmates queued for one row, as the UI shows them. */
+export type TeammateJob_Serialize = {
+	/**
+	 *  What `add_teammates` was given: a project id, or the assignment of a group just
+	 *  founded whose repo no sync has listed yet.
+	 */
+	id: string,
+	/**
+	 *  The project id of the repo (`owner/repo`, lowercase), so the row that replaces a
+	 *  just-accepted assignment's shows the same job.
+	 */
+	project: string,
+	/**  `owner/repo` as GitHub spells it. */
+	repo: string,
+	/**  The assignment's name, for the notification. */
+	assignment: string,
+	/**  Joins the group (`team add`) rather than inviting. */
+	team: boolean,
+	/**  Whether usernames are still waiting or being added. */
+	running: boolean,
+	entries: TeammateEntry_Serialize[],
+};
 
 /**  An assignment's starter repo (`assignments-v1` `template`). */
 export type Template = {

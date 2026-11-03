@@ -72,6 +72,14 @@ pub enum Notice {
     Closed {
         assignment: String,
     },
+    /// Classmates queued with the popover open were added while it was hidden (`teammates.rs`):
+    /// the logins added and those that failed. `team`: they joined the group, else invited.
+    TeammatesAdded {
+        assignment: String,
+        team: bool,
+        added: Vec<String>,
+        failed: Vec<String>,
+    },
     /// A new version of the app is downloaded and installs on restart (`updater.rs`).
     UpdateReady {
         version: String,

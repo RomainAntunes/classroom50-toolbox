@@ -177,11 +177,18 @@ fn move_to(app: &AppHandle, window: &WebviewWindow, icon: Option<Area>) {
     };
 }
 
+/// Whether the popover is on screen.
+pub fn is_visible(app: &AppHandle) -> bool {
+    app.get_webview_window(LABEL)
+        .is_some_and(|window| window.is_visible().unwrap_or(false))
+}
+
 pub fn hide(app: &AppHandle) {
     if let Some(window) = app.get_webview_window(LABEL) {
         let _ = window.hide();
         let _ = PopoverHidden::emit(app, &());
         crate::alerts::mark_seen(app);
+        crate::teammates::popover_hidden(app);
         if let Ok(mut at) = app.state::<PopoverState>().hidden_at.lock() {
             *at = Some(Instant::now());
         }

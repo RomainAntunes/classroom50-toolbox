@@ -19,7 +19,9 @@
   import { scrollBehavior } from "#lib/motion.js";
   import { changedLines } from "#lib/files.js";
   import { atLeast } from "#lib/busy.js";
+  import { jobFor } from "#lib/teammateJobs.svelte.js";
   import Details from "./Details.svelte";
+  import TeammateProgress from "./TeammateProgress.svelte";
   import Spinner from "./Spinner.svelte";
 
   let { project, now, unseen }: { project: Project; now: Date; unseen: boolean } = $props();
@@ -39,6 +41,8 @@
       : t(due > now ? "projects.due" : "projects.wasDue", { when: relativeAt(due, now) }),
   );
   const behind = $derived(project.local?.behind ?? 0);
+  // Classmates Rust is adding in the background.
+  const teammates = $derived(jobFor(project.id));
   const defaultBranch = $derived(project.remote?.defaultBranch ?? "main");
   // Pushed and local branches holding work that isn't graded yet.
   const unmerged = $derived([
@@ -508,6 +512,9 @@
       >
     {/if}
   </div>
+  {#if teammates}
+    <TeammateProgress job={teammates} />
+  {/if}
   {#if open}
     <Details
       description={project.assignment?.description ?? null}

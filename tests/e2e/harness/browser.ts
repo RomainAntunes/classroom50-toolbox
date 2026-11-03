@@ -165,6 +165,7 @@ export function install(scenario: Scenario): E2E {
       case "tool_statuses":
         return state.tools;
       case "tool_jobs":
+      case "teammate_jobs":
         return [];
       case "tool_update":
         return null;
@@ -234,6 +235,8 @@ export function install(scenario: Scenario): E2E {
       case "hide_popover":
       case "set_calendar_labels":
       case "set_tray_menu":
+      case "add_teammates":
+      case "dismiss_teammate_job":
       case "cancel_login":
       case "cancel_tool_job":
       case "open_in_editor":

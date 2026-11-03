@@ -30,6 +30,7 @@ mod simulate;
 pub mod status;
 pub mod student;
 mod sync_progress;
+mod teammates;
 mod testenv;
 pub mod tools;
 mod tray;
@@ -96,6 +97,8 @@ macro_rules! ipc_commands {
             crate::commands::installed_editors,
             crate::commands::open_in_editor,
             crate::commands::add_teammates,
+            crate::commands::teammate_jobs,
+            crate::commands::dismiss_teammate_job,
             crate::commands::clone_project,
             crate::commands::git_protocol,
             crate::commands::git_credentials,
@@ -159,6 +162,7 @@ pub fn run() {
         .manage(shortcut::ShortcutRegistration::default())
         .manage(deeplink::DeepLinkState::default())
         .manage(student::FoundedGroups::default())
+        .manage(teammates::TeammateJobs::default())
         .manage(login::LoginState::default())
         .manage(tools::ToolJobs::default())
         .manage(tools::ToolChecks::default())
