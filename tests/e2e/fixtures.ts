@@ -195,6 +195,8 @@ export interface ProjectOptions {
   lateSeconds?: number | null;
   group?: Project["group"];
   editor?: string | null;
+  /** The editor last picked for the clone in the app. */
+  lastEditor?: string | null;
 }
 
 /** A clone of an accepted assignment, on GitHub and on disk, nothing pending. */
@@ -259,6 +261,7 @@ export function project(options: ProjectOptions): Project {
     webUrl: `https://classroom50.org/${cls.org}/${cls.slug}/assignments/${options.slug}/submission`,
     lateSeconds: options.lateSeconds ?? null,
     editor: options.editor ?? null,
+    lastEditor: options.lastEditor ?? null,
     group: options.group ?? null,
   };
 }

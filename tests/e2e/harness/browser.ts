@@ -236,7 +236,20 @@ export function install(scenario: Scenario): E2E {
       case "set_tray_menu":
       case "cancel_login":
       case "cancel_tool_job":
-      case "open_in_editor":
+      case "open_in_editor": {
+        // Rust remembers the editor for the clone and sends the list again with it.
+        const { projects } = state.snapshot;
+        if (projects.some((p) => p.path === args.path)) {
+          state.snapshot = {
+            ...state.snapshot,
+            projects: projects.map((p) =>
+              p.path === args.path ? { ...p, lastEditor: args.editor as string } : p,
+            ),
+          };
+          void emit("projects-updated", state.snapshot);
+        }
+        return null;
+      }
       case "open_terminal":
       case "set_git_identity":
       case "pause_global_shortcut":
