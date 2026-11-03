@@ -35,7 +35,8 @@ ignore = [
     { id = "RUSTSEC-2026-0370", reason = "zbus 5 dependency of Tauri plugins; merged into zbus 6, not a vulnerability" },
     { id = "RUSTSEC-2026-0372", reason = "zbus 5 dependency of Tauri plugins; merged into zbus 6, not a vulnerability" },
     # zip < 9 extraction flaws (SUID/SGID bits kept, symlinks escaping the destination,
-    # permissions applied through symlinks). zip 4 is only built on Windows, by
+    # permissions applied through symlinks, an abort on a symlink entry declaring a huge
+    # size). zip 4 is only built on Windows, by
     # tauri-plugin-updater, which extracts an update only when the payload is a zip, and only
     # after checking its signature against the app's updater key. The app's updater artifacts
     # are plain .exe and .msi files, so no zip is ever extracted, and the flaws are about Unix
@@ -44,6 +45,7 @@ ignore = [
     { id = "RUSTSEC-2026-0367", reason = "Windows-only zip 4 in tauri-plugin-updater; signed .exe/.msi payloads, never a zip; fixed upstream, not released" },
     { id = "RUSTSEC-2026-0368", reason = "Windows-only zip 4 in tauri-plugin-updater; signed .exe/.msi payloads, never a zip; fixed upstream, not released" },
     { id = "RUSTSEC-2026-0369", reason = "Windows-only zip 4 in tauri-plugin-updater; signed .exe/.msi payloads, never a zip; fixed upstream, not released" },
+    { id = "RUSTSEC-2026-0429", reason = "Windows-only zip 4 in tauri-plugin-updater; signed .exe/.msi payloads, never a zip; fixed upstream, not released" },
 ]
 
 [licenses]
