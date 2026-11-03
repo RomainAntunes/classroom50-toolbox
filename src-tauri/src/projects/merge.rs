@@ -33,6 +33,7 @@ pub(super) fn merge(
                 web_url: None,
                 late_seconds: None,
                 editor: None,
+                last_editor: None,
                 group: None,
             };
             (id, project)
@@ -73,6 +74,7 @@ pub(super) fn merge(
                         web_url: None,
                         late_seconds: None,
                         editor: None,
+                        last_editor: None,
                         group: None,
                     },
                 );
@@ -220,6 +222,7 @@ mod tests {
             web_url: None,
             late_seconds: None,
             editor: None,
+            last_editor: None,
             group: None,
         };
 

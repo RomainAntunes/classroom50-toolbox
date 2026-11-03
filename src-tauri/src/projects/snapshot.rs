@@ -8,17 +8,19 @@ use super::{
     status_auth,
 };
 use crate::discovery::LocalProject;
+use crate::editor_choices;
 use crate::editors;
 use crate::error::{Error, Result};
 use crate::groups;
 use crate::sync_progress::Phase;
 
-/// Adds what isn't decided by the build: groups, the editor that opened each clone, the
-/// account.
+/// Adds what isn't decided by the build: groups, the editor that opened each clone (from
+/// the editors' lists and from the app), the account.
 pub(super) fn annotate(
     state: &ProjectsState,
     snapshot: &mut Snapshot,
     recents: &[editors::Recent],
+    choices: &editor_choices::Choices,
 ) {
     let groups = state.remote().groups;
     // A rename leaves the group teams as they were, named after the old slug.
@@ -49,6 +51,12 @@ pub(super) fn annotate(
             .as_deref()
             .and_then(|path| editors::editor_for(path, recents))
             .map(|editor| editor.id.to_owned());
+        project.last_editor = project
+            .path
+            .as_deref()
+            .and_then(|path| editor_choices::lookup(choices, path))
+            .and_then(|choice| choice.standing(project.editor.as_deref()))
+            .map(str::to_owned);
     }
     snapshot.login = state.remote().login;
 }

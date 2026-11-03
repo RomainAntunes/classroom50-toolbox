@@ -200,9 +200,14 @@ pub struct Project {
     /// date, as upstream grades it, past the due date. Advisory: nothing is blocked.
     #[serde(default)]
     pub late_seconds: Option<i64>,
-    /// The editor that last opened the clone (`editors::Editor::id`), when one did.
+    /// The editor that last opened the clone (`editors::Editor::id`), judged from the
+    /// editors' own recent lists, when one did.
     #[serde(default)]
     pub editor: Option<String>,
+    /// The editor the student last opened the clone with from the app, while it stands
+    /// (`editor_choices::Choice::standing`): offered before `editor`.
+    #[serde(default)]
+    pub last_editor: Option<String>,
     /// The user's group, on a team assignment.
     #[serde(default)]
     pub group: Option<Group>,
@@ -402,6 +407,28 @@ impl ProjectsState {
 
     pub fn snapshot(&self) -> Snapshot {
         self.snapshot.lock().map(|s| s.clone()).unwrap_or_default()
+    }
+
+    /// After the student opened the clone at `path` in `editor` from the app: sets it as the
+    /// project's `last_editor` in the current snapshot, saved, so the row offers it at once
+    /// without a rescan. Returns the editor the editors' lists named for the clone (to
+    /// record with the choice) and the updated snapshot, when a project has that clone.
+    pub fn set_last_editor(&self, path: &Path, editor: &str) -> Option<(Option<String>, Snapshot)> {
+        let canonical = std::fs::canonicalize(path).ok();
+        let updated = {
+            let mut snapshot = self.snapshot.lock().ok()?;
+            let project = snapshot.projects.iter_mut().find(|p| {
+                p.path.as_deref().is_some_and(|own| {
+                    own == path
+                        || canonical.is_some() && std::fs::canonicalize(own).ok() == canonical
+                })
+            })?;
+            project.last_editor = Some(editor.to_owned());
+            let detected = project.editor.clone();
+            (detected, snapshot.clone())
+        };
+        self.save_state();
+        Some(updated)
     }
 
     pub fn stats(&self) -> SyncStats {

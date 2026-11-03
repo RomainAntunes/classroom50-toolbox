@@ -31,6 +31,7 @@ pub(super) fn project(
         web_url: None,
         late_seconds: None,
         editor: None,
+        last_editor: None,
         group: None,
     }
 }

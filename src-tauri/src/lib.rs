@@ -10,6 +10,7 @@ pub mod credentials;
 mod deeplink;
 mod diagnostics;
 pub mod discovery;
+pub mod editor_choices;
 pub mod editors;
 pub mod error;
 mod events;
@@ -196,6 +197,9 @@ pub fn run() {
             }
             app.manage(settings);
             app.manage(clones::CloneStore::load(&app.path().app_config_dir()?));
+            app.manage(editor_choices::EditorChoices::load(
+                &app.path().app_config_dir()?,
+            ));
             app.manage(calendar::CalendarState::load(
                 &app.path().app_config_dir()?,
                 &app.path().app_data_dir()?,

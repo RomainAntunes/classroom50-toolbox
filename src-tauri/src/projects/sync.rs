@@ -12,6 +12,7 @@ use super::{
     local_snapshot, may_call_github, scan_local, sync_remote, watch_targets,
 };
 use crate::clones::CloneStore;
+use crate::editor_choices::EditorChoices;
 use crate::events::{IpcEvent, ProjectsUpdated};
 use crate::github::{self, Http};
 use crate::settings::{Settings, SettingsStore};
@@ -222,7 +223,8 @@ async fn sync(
             let quiet = Progress::quiet(&progress.app);
             let mut snapshot =
                 local_snapshot(state, http, locals.clone(), now, false, false, &quiet).await;
-            annotate(state, &mut snapshot, recents);
+            let choices = progress.app.state::<EditorChoices>().all();
+            annotate(state, &mut snapshot, recents, &choices);
             if let Err(err) = ProjectsUpdated::emit(&progress.app, &snapshot) {
                 log::warn!("could not emit {}: {err}", ProjectsUpdated::NAME);
             }
@@ -249,7 +251,8 @@ async fn sync(
         )
     };
     let mut snapshot = snapshot;
-    annotate(state, &mut snapshot, &recents);
+    let choices = progress.app.state::<EditorChoices>().all();
+    annotate(state, &mut snapshot, &recents, &choices);
     commit_emails(&mut snapshot.projects).await;
     let targets = watch_targets(&settings.watched_folders, scan_targets, &snapshot.projects);
     (snapshot, targets)
