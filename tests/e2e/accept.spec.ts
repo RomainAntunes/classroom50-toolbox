@@ -104,6 +104,36 @@ test("a team assignment asks the group's name with the summary, founds it, then 
   expect(await app.writes()).toEqual(["accept_assignment", "clone_project"]);
 });
 
+test("adding teammates right after founding queues them, and the accept flow goes on at once", async ({
+  app,
+}) => {
+  await app.start(
+    scenario({
+      snapshot: snapshot({ unaccepted: [team] }),
+      responses: {
+        accept_assignment: [
+          ok({ repo: "cs50-school/cs101-proj-group-4", projectId: null, joinedGroup: false }),
+        ],
+      },
+    }),
+  );
+  await app.row("Project").getByRole("button", { name: "Accept" }).click();
+  await app.prompt.getByRole("textbox", { name: "Name your group" }).fill("The Sharks");
+  await app.prompt.getByRole("button", { name: "Accept" }).click();
+  await app.expectDialog([/^The Sharks is created/], "ok");
+
+  await expect(app.prompt.getByRole("heading")).toHaveText("Add to my group");
+  await app.prompt.getByRole("textbox").fill("bob carol");
+  await app.prompt.getByRole("button", { name: "Add" }).click();
+  const added = await app.waitForCall("add_teammates");
+  // Queued on the accepted assignment: no sync has listed the group's repo yet.
+  expect(added[0].args).toEqual({ id: team.id, usernames: ["bob", "carol"] });
+  // No wait for gh, no results dialog: what comes after the accept is next (the repo isn't
+  // listed yet, so no clone offer).
+  await app.expectDialog([/cs50-school\/cs101-proj-group-4/], "ok");
+  expect(await app.writes()).toEqual(["accept_assignment", "add_teammates"]);
+});
+
 test("cancelling the group name accepts nothing", async ({ app }) => {
   await app.start(scenario({ snapshot: snapshot({ unaccepted: [team] }) }));
   await app.row("Project").getByRole("button", { name: "Accept" }).click();
