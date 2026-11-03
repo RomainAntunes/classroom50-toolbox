@@ -48,6 +48,8 @@ pub struct FoundedGroups(Mutex<HashMap<String, FoundedGroup>>);
 
 #[derive(Clone)]
 pub struct FoundedGroup {
+    /// The group's repo, `owner/name` as GitHub spells it.
+    pub repo: String,
     pub org: String,
     pub classroom: String,
     pub assignment: String,

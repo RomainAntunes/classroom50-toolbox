@@ -51,8 +51,9 @@ export type Assignment = B.Assignment_Serialize;
 export type Project = B.Project_Serialize;
 /** A group team (`classroom50-group-<hash>-<n>`) the user is on. */
 export type Group = B.Group;
-/** What adding one classmate gave (`add_teammates`). */
-export type Added = B.Added_Serialize;
+/** The classmates queued for one row (`teammate_jobs`, the `teammate-jobs` event). */
+export type TeammateJob = B.TeammateJob_Serialize;
+export type TeammateEntry = B.TeammateEntry_Serialize;
 export type Member = B.Member;
 /** The words of calendar event notes; `{name}`, `{n}`, `{score}`, `{max}` stay as is. */
 export type CalendarLabels = B.CalendarLabels;
@@ -140,6 +141,8 @@ export const LOGIN_ENDED_EVENT = "login-ended" satisfies EventName;
 export const UPDATE_STATE_EVENT = "update-state" satisfies EventName;
 /** Payload: `ToolJob[]`, every install or update running. */
 export const TOOL_JOBS_EVENT = "tool-jobs" satisfies EventName;
+/** Payload: `TeammateJob[]`, every row's queue of classmates being added. */
+export const TEAMMATE_JOBS_EVENT = "teammate-jobs" satisfies EventName;
 export const PROJECTS_UPDATED_EVENT = "projects-updated" satisfies EventName;
 export const SYNC_PROGRESS_EVENT = "sync-progress" satisfies EventName;
 /** Payload: `Notice`. The UI words it and sends the system notification. */

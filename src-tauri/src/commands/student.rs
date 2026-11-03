@@ -9,6 +9,7 @@ use crate::deeplink::DeepLinkState;
 use crate::error::{Error, Result};
 use crate::projects::{self, Project, ProjectsState, Snapshot};
 use crate::student;
+use crate::teammates;
 
 #[derive(Serialize)]
 #[cfg_attr(test, derive(specta::Type))]
@@ -58,18 +59,6 @@ pub async fn accept_assignment(
         new_team: team_name.as_deref(),
     })
     .await;
-    if accepted.is_ok() && item.assignment.mode == crate::classroom50::AssignmentMode::Team {
-        // Teammates can be added before a sync lists the group's repo.
-        app.state::<student::FoundedGroups>().insert(
-            &id,
-            student::FoundedGroup {
-                org: item.classroom.org.clone(),
-                classroom: item.classroom.slug.clone(),
-                assignment: item.assignment.slug.clone(),
-                key: key.map(str::to_owned),
-            },
-        );
-    }
     let student::AcceptOutcome { repo, joined_group } = match accepted {
         Ok(outcome) => outcome,
         // A failure or a timeout may come after the repo was made: look again.
@@ -82,6 +71,19 @@ pub async fn accept_assignment(
         }
         Err(err) => return Err(err),
     };
+    if item.assignment.mode == crate::classroom50::AssignmentMode::Team {
+        // Teammates can be added before a sync lists the group's repo.
+        app.state::<student::FoundedGroups>().insert(
+            &id,
+            student::FoundedGroup {
+                repo: repo.clone(),
+                org: item.classroom.org.clone(),
+                classroom: item.classroom.slug.clone(),
+                assignment: item.assignment.slug.clone(),
+                key: key.map(str::to_owned),
+            },
+        );
+    }
     let snapshot = projects::refresh_after_write(&app).await;
     let key = repo.to_ascii_lowercase();
     let project_id = snapshot
@@ -116,20 +118,12 @@ fn accepted_project(snapshot: &Snapshot, id: &str) -> Option<Accepted> {
     })
 }
 
-/// What adding one classmate gave.
-#[derive(Serialize)]
-#[cfg_attr(test, derive(specta::Type))]
-#[serde(rename_all = "camelCase")]
-pub struct Added {
-    username: String,
-    /// Why it failed, None when they were added.
-    error: Option<Error>,
-}
-
-/// Gives classmates push access to project `id`, one by one: joins them to the group on a
-/// team assignment, invites them as a collaborator otherwise. `id` may also be the
-/// assignment of a group just founded from the app whose repo no sync has listed yet. One
-/// full sync follows, so the group's members are read again.
+/// Queues classmates to get push access to project `id` and returns at once: they join
+/// the group on a team assignment, get an invitation otherwise, one by one in the
+/// background (`teammates.rs`, sent as `teammate-jobs`), then a full sync reads the group's
+/// members again. `id` may also be the assignment of a group just founded from the app
+/// whose repo no sync has listed yet. Usernames queued while that row's are still being
+/// added join its queue.
 #[tauri::command]
 #[cfg_attr(test, specta::specta)]
 pub async fn add_teammates(
@@ -138,21 +132,34 @@ pub async fn add_teammates(
     founded: State<'_, student::FoundedGroups>,
     id: String,
     usernames: Vec<String>,
-) -> Result<Vec<Added>> {
+) -> Result<()> {
+    // Async only to stay off the main thread, where Tauri runs sync commands.
     let project = state.snapshot().projects.into_iter().find(|p| p.id == id);
-    let group;
-    let full_name;
-    let addition = match &project {
+    let (meta, target) = match project {
         None => {
-            group = founded
+            let group = founded
                 .get(&id)
                 .ok_or_else(|| Error::Unsupported(format!("unknown project {id}")))?;
-            student::Addition::Team {
-                org: &group.org,
-                classroom: &group.classroom,
-                assignment: &group.assignment,
-                key: group.key.as_deref(),
-            }
+            let assignment = state
+                .snapshot()
+                .unaccepted
+                .iter()
+                .find(|u| u.id == id)
+                .map_or_else(|| group.assignment.clone(), |u| u.assignment.name.clone());
+            let meta = job(
+                &id,
+                group.repo.to_ascii_lowercase(),
+                &group.repo,
+                assignment,
+                true,
+            );
+            let target = teammates::Target::Team {
+                org: group.org,
+                classroom: group.classroom,
+                assignment: group.assignment,
+                key: group.key,
+            };
+            (meta, target)
         }
         Some(project) => {
             let (Some(owner), Some(repo)) = (project.owner.as_deref(), project.repo.as_deref())
@@ -164,35 +171,69 @@ pub async fn add_teammates(
                     .assignment
                     .as_ref()
                     .is_some_and(|a| a.mode == crate::classroom50::AssignmentMode::Team);
-            full_name = format!("{owner}/{repo}");
-            if team {
-                student::Addition::Team {
-                    org: owner,
-                    classroom: &project.config.classroom,
-                    assignment: &project.config.assignment,
+            let full_name = format!("{owner}/{repo}");
+            let assignment = project
+                .assignment
+                .as_ref()
+                .map_or_else(|| project.config.assignment.clone(), |a| a.name.clone());
+            let target = if team {
+                teammates::Target::Team {
+                    org: owner.to_owned(),
+                    classroom: project.config.classroom.clone(),
+                    assignment: project.config.assignment.clone(),
                     key: project
                         .classroom
                         .as_ref()
-                        .and_then(|c| c.secret.as_deref())
-                        .or(project.config.secret.as_deref()),
+                        .and_then(|c| c.secret.clone())
+                        .or_else(|| project.config.secret.clone()),
                 }
             } else {
-                student::Addition::Invite {
-                    repo: &full_name,
-                    clone: project.path.as_deref(),
+                teammates::Target::Invite {
+                    repo: full_name.clone(),
+                    clone: project.path.clone(),
                 }
-            }
+            };
+            (job(&id, id.clone(), &full_name, assignment, team), target)
         }
     };
-    let mut results = Vec::new();
-    for username in usernames {
-        let error = student::add(&addition, &username).await.err();
-        results.push(Added { username, error });
+    teammates::enqueue(&app, meta, target, usernames);
+    Ok(())
+}
+
+/// A new queue of classmates for the row of `id`, on repo `repo` (`owner/name`), whose
+/// project id is `project`.
+fn job(
+    id: &str,
+    project: String,
+    repo: &str,
+    assignment: String,
+    team: bool,
+) -> teammates::TeammateJob {
+    teammates::TeammateJob {
+        id: id.to_owned(),
+        project,
+        repo: repo.to_owned(),
+        assignment,
+        team,
+        running: false,
+        entries: Vec::new(),
     }
-    if results.iter().any(|r| r.error.is_none()) {
-        projects::refresh_after_write(&app).await;
+}
+
+/// Every row's queue of classmates, for a view that opens while one runs.
+#[tauri::command]
+#[cfg_attr(test, specta::specta)]
+pub fn teammate_jobs(jobs: State<'_, teammates::TeammateJobs>) -> Vec<teammates::TeammateJob> {
+    jobs.list()
+}
+
+/// Done: drops the results the row of `id` shows (usernames still queued stay).
+#[tauri::command]
+#[cfg_attr(test, specta::specta)]
+pub fn dismiss_teammate_job(app: AppHandle, jobs: State<'_, teammates::TeammateJobs>, id: String) {
+    if jobs.dismiss(&id) {
+        teammates::emit(&app);
     }
-    Ok(results)
 }
 
 /// The clone of project `id`, which must exist and still take submissions.

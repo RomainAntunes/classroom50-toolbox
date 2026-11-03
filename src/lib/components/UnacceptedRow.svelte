@@ -10,7 +10,9 @@
   import { acceptLink, copyLink } from "#lib/links.js";
   import { groupDetails, groupName } from "#lib/group.js";
   import { formatDate, relativeAt, t } from "#lib/i18n/index.js";
+  import { jobFor } from "#lib/teammateJobs.svelte.js";
   import Details from "./Details.svelte";
+  import TeammateProgress from "./TeammateProgress.svelte";
 
   let { item, now, unseen }: { item: Unaccepted; now: Date; unseen: boolean } = $props();
   const uid = $props.id();
@@ -27,6 +29,8 @@
   const upcoming = $derived(opens !== null && opens > now);
 
   const blocked = $derived(acceptBlocked(item, now));
+  // Classmates being added to a group just founded, before a sync lists its repo.
+  const teammates = $derived(jobFor(item.id));
 
   const accepting = $derived(session.accepting.includes(item.id));
   function accept(newGroup = false) {
@@ -149,6 +153,9 @@
       ><span class="mirror-rtl" aria-hidden="true">↗</span></button
     >
   </div>
+  {#if teammates}
+    <TeammateProgress job={teammates} />
+  {/if}
   {#if open}
     <Details description={item.assignment.description} items={details} />
   {/if}

@@ -10,6 +10,7 @@ use crate::login::DeviceCode;
 use crate::platform::HourCycle;
 use crate::projects::{Snapshot, SyncProgress};
 use crate::settings::Settings;
+use crate::teammates::TeammateJob;
 use crate::tools::ToolJob;
 use crate::tray::Action;
 use crate::updater::UpdateStatus;
@@ -58,6 +59,8 @@ events! {
     SyncProgressed = "sync-progress" => SyncProgress;
     /// Every install or update running, sent when one starts, prints a line or ends.
     ToolJobsChanged = "tool-jobs" => Vec<ToolJob>;
+    /// Every row's queue of classmates being added, sent when one is queued, starts or ends.
+    TeammateJobsChanged = "teammate-jobs" => Vec<TeammateJob>;
     /// Self-update changed state.
     UpdateStateChanged = "update-state" => UpdateStatus;
     /// Something worth a notification; the UI words it and sends it.
