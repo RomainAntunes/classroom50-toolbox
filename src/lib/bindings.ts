@@ -180,6 +180,10 @@ export const commands = {
 	openTerminal: (path: string) => __TAURI_INVOKE<null>("open_terminal", { path }),
 	/**  The editors installed here that can open a folder, in a stable order. */
 	installedEditors: () => __TAURI_INVOKE<EditorInfo[]>("installed_editors"),
+	/**
+	 *  Opens the clone at `path` in `editor` and remembers the choice (`editor_choices`): the
+	 *  row's "Open in" offers it from then on, sent at once as `projects-updated`.
+	 */
 	openInEditor: (path: string, editor: string) => __TAURI_INVOKE<null>("open_in_editor", { path, editor }),
 	/**
 	 *  Gives classmates push access to project `id`, one by one: joins them to the group on a
@@ -938,8 +942,16 @@ export type Project_Deserialize = {
 	 *  date, as upstream grades it, past the due date. Advisory: nothing is blocked.
 	 */
 	lateSeconds: number | null,
-	/**  The editor that last opened the clone (`editors::Editor::id`), when one did. */
+	/**
+	 *  The editor that last opened the clone (`editors::Editor::id`), judged from the
+	 *  editors' own recent lists, when one did.
+	 */
 	editor: string | null,
+	/**
+	 *  The editor the student last opened the clone with from the app, while it stands
+	 *  (`editor_choices::Choice::standing`): offered before `editor`.
+	 */
+	lastEditor: string | null,
 	/**  The user's group, on a team assignment. */
 	group: Group | null,
 };
@@ -969,8 +981,16 @@ export type Project_Serialize = {
 	 *  date, as upstream grades it, past the due date. Advisory: nothing is blocked.
 	 */
 	lateSeconds: number | null,
-	/**  The editor that last opened the clone (`editors::Editor::id`), when one did. */
+	/**
+	 *  The editor that last opened the clone (`editors::Editor::id`), judged from the
+	 *  editors' own recent lists, when one did.
+	 */
 	editor: string | null,
+	/**
+	 *  The editor the student last opened the clone with from the app, while it stands
+	 *  (`editor_choices::Choice::standing`): offered before `editor`.
+	 */
+	lastEditor: string | null,
 	/**  The user's group, on a team assignment. */
 	group: Group | null,
 };

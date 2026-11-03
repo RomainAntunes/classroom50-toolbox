@@ -30,6 +30,7 @@ interface Options {
   path?: string | null;
   activeAt?: string | null;
   editor?: string | null;
+  lastEditor?: string | null;
 }
 
 /** A clone of `slug` in class `classroom` (org `acme`), last worked in at `activeAt`. */
@@ -45,6 +46,7 @@ function clone(slug: string, options: Options = {}): Project {
     assignment: { name: options.name ?? slug },
     classroom: { name: classroom.toUpperCase() },
     editor: options.editor ?? null,
+    lastEditor: options.lastEditor ?? null,
   } as Project;
 }
 
@@ -156,6 +158,12 @@ describe("handleTrayAction open", () => {
     session.snapshot = snap([clone("hello", { editor: "vscode" })]);
     await handleTrayAction({ kind: "open", id: "acme/cs50-hello-alex" });
     expect(api.openInEditor).toHaveBeenCalledWith("/code/cs50-hello", "vscode");
+  });
+
+  it("opens the clone in the editor last picked for it in the app", async () => {
+    session.snapshot = snap([clone("hello", { editor: "vscode", lastEditor: "idea" })]);
+    await handleTrayAction({ kind: "open", id: "acme/cs50-hello-alex" });
+    expect(api.openInEditor).toHaveBeenCalledWith("/code/cs50-hello", "idea");
   });
 
   it("uses the default editor otherwise", async () => {

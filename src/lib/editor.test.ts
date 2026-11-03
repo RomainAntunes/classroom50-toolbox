@@ -6,8 +6,8 @@ import { settings } from "#lib/settings.svelte.js";
 const idea = { id: "idea", name: "IntelliJ IDEA" };
 const vscode = { id: "vscode", name: "Visual Studio Code" };
 
-function project(editor: string | null): Project {
-  return { editor } as Project;
+function project(editor: string | null, lastEditor: string | null = null): Project {
+  return { editor, lastEditor } as Project;
 }
 
 describe("editor choice", () => {
@@ -29,6 +29,17 @@ describe("editor choice", () => {
 
   it("opens a clone in the editor that last opened it", () => {
     expect(editorFor(project("vscode"))).toEqual(vscode);
+  });
+
+  it("prefers the editor last picked in the app", () => {
+    expect(editorFor(project("idea", "vscode"))).toEqual(vscode);
+    expect(editorFor(project(null, "vscode"))).toEqual(vscode);
+  });
+
+  it("skips a picked editor that is gone", () => {
+    settings.current = { defaultEditor: "vscode" } as Settings;
+    expect(editorFor(project("idea", "datagrip"))).toEqual(idea);
+    expect(editorFor(project(null, "datagrip"))).toEqual(vscode);
   });
 
   it("falls back to the default when that editor is gone", () => {

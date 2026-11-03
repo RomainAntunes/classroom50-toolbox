@@ -1,5 +1,6 @@
 // Opening clones in an editor: the installed editors (looked up once per run), which one a
-// clone opens in, and the launch with failures reported in a dialog.
+// clone opens in, and the launch with failures reported in a dialog. Rust remembers the
+// editor each clone was opened in from here and sends it back as the project's `lastEditor`.
 import { CheckMenuItem, Menu } from "@tauri-apps/api/menu";
 import { message } from "@tauri-apps/plugin-dialog";
 import { api, errorMessage, withDialog, type EditorInfo, type Project } from "#lib/api.js";
@@ -34,9 +35,10 @@ export function defaultEditor(): EditorInfo | null {
   return installed(settings.current?.defaultEditor) ?? editors.installed[0] ?? null;
 }
 
-/** The editor that last opened the clone when it's still installed, else the default. */
+/** The editor the clone opens in: the one last picked for it in the app, else the one the
+ *  editors' recent lists say opened it, each while installed, else the default. */
 export function editorFor(project: Project): EditorInfo | null {
-  return installed(project.editor) ?? defaultEditor();
+  return installed(project.lastEditor) ?? installed(project.editor) ?? defaultEditor();
 }
 
 export async function openInEditor(path: string, editor: EditorInfo): Promise<void> {
