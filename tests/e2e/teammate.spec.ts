@@ -160,8 +160,13 @@ test("a call Rust refuses (nothing queued) is an error for everyone", async ({ a
   await app.answer("ok");
 });
 
-test("added while the popover was hidden: the notification says who made it", async ({ app }) => {
+test("added while the popover was hidden: the notification says who made it", async ({
+  app,
+  page,
+}) => {
   await app.start(scenario({ snapshot: snapshot({ projects: [solo] }) }));
+  // The layout listens once mounted; an event before that is lost.
+  await expect(page.getByRole("searchbox")).toBeVisible();
   await app.emit("notify", {
     kind: "teammatesAdded",
     assignment: "Project",
