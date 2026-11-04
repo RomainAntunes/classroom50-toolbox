@@ -47,6 +47,9 @@ export type Classroom = B.Classroom;
 export type LocalState = B.LocalState;
 export type Pending = B.Pending;
 export type Assignment = B.Assignment_Serialize;
+/** An assignment's description as Rust parsed it (`markdown.rs`), rendered by `Markdown.svelte`. */
+export type MarkdownBlock = B.Block;
+export type MarkdownInline = B.Inline;
 /** One assignment repo, merged from GitHub, the watched folders and the Pages manifest. */
 export type Project = B.Project_Serialize;
 /** A group team (`classroom50-group-<hash>-<n>`) the user is on. */
