@@ -43,6 +43,8 @@ export type GradeTest = B.GradeTest;
 export type ReleaseNotes = B.ReleaseNotes;
 /** Teacher comments and reviews on the Feedback PR. */
 export type Feedback = B.Feedback;
+/** A milestone tag pattern of the assignment with the newest tag matching it. */
+export type Milestone = B.Milestone;
 export type Classroom = B.Classroom;
 export type LocalState = B.LocalState;
 export type Pending = B.Pending;

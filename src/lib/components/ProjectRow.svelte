@@ -1,7 +1,7 @@
 <script lang="ts">
   import { Menu, MenuItem, PredefinedMenuItem, Submenu } from "@tauri-apps/api/menu";
   import { openUrl, revealItemInDir } from "@tauri-apps/plugin-opener";
-  import { api, type Project } from "#lib/api.js";
+  import { api, type Milestone, type Project } from "#lib/api.js";
   import { cloneProject, type CloneMode } from "#lib/clone.js";
   import { editorFor, editors, openInEditor } from "#lib/editor.svelte.js";
   import { pullProject } from "#lib/pull.js";
@@ -126,6 +126,24 @@
     grading?.state === "running" ? [] : (grade?.tests.filter((test) => !test.passed) ?? []),
   );
   const feedback = $derived(project.remote?.feedback ?? null);
+  // Each milestone tag pattern: the newest tag pushed for it, or not yet.
+  const milestones = $derived(
+    (project.remote?.milestones ?? []).map((m) => ({
+      pattern: m.pattern,
+      done: m.tag !== null,
+      text: milestoneText(m),
+      title: m.tag?.at ? formatDate(new Date(m.tag.at)) : null,
+    })),
+  );
+  function milestoneText({ pattern, tag }: Milestone): string {
+    if (!tag) return t("details.milestoneNotYet");
+    if (!tag.at) return t("details.milestonePushedUndated", { tag: tag.name });
+    const when = fromNow(new Date(tag.at), now);
+    // A glob names the tag that matched it.
+    return tag.name === pattern
+      ? t("details.milestonePushed", { when })
+      : t("details.milestonePushedAs", { tag: tag.name, when });
+  }
   // Grades before the current one, newest first.
   const earlier = $derived((project.remote?.history ?? []).filter((g) => g.tag !== grade?.tag));
   const gradeLine = (g: { score: number; maxScore: number; publishedAt: string | null }) =>
@@ -553,6 +571,7 @@
       description={project.assignment?.description ?? null}
       doc={project.assignment?.descriptionDoc ?? null}
       items={details}
+      {milestones}
       failed={failedTests}
       notes={grading?.state === "running" ? null : (grade?.releaseNotes ?? null)}
       gradeUrl={grade?.url ?? null}
