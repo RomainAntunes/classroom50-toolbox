@@ -106,3 +106,79 @@ test("a saved language reaches Rust's calendar words once, in that language", as
     fr["calendar.notes.class"],
   ]);
 });
+
+test("a notice arriving before the saved language loads is worded in it, in order", async ({
+  app,
+  page,
+}) => {
+  const catalog = await holdCatalog(page, "Français");
+  await app.start(scenario({ settings: settings({ language: "fr" }) }));
+  // The layout listens once mounted; the page shows in English while French loads.
+  await expect(page.getByRole("searchbox")).toBeVisible();
+  await expect.poll(() => catalog.requested()).toBe(true);
+  await app.emit("notify", { kind: "grade", assignment: "Lab 1", score: 8, maxScore: 10 });
+  await app.emit("notify", { kind: "closed", assignment: "Lab 2" });
+  // Nothing goes out in English meanwhile.
+  await page.waitForTimeout(200);
+  expect(await app.notifications()).toEqual([]);
+
+  catalog.settle(true);
+  await expect
+    .poll(() => app.notifications())
+    .toEqual([
+      { title: fr["alerts.grade.title"].replace("{assignment}", "Lab 1"), body: "8/10" },
+      {
+        title: fr["alerts.closed.title"].replace("{assignment}", "Lab 2"),
+        body: fr["alerts.closed.body"],
+      },
+    ]);
+  await expect(page.locator("html")).toHaveAttribute("lang", "fr");
+});
+
+test("a notice still goes out, in English, when the saved language won't load", async ({
+  app,
+  page,
+}) => {
+  const catalog = await holdCatalog(page, "Français");
+  await app.start(scenario({ settings: settings({ language: "fr" }) }));
+  await expect(page.getByRole("searchbox")).toBeVisible();
+  await expect.poll(() => catalog.requested()).toBe(true);
+  await app.emit("notify", { kind: "grade", assignment: "Lab 1", score: 8, maxScore: 10 });
+  catalog.settle(false);
+  await expect
+    .poll(() => app.notifications())
+    .toEqual([{ title: "New grade: Lab 1", body: "8/10" }]);
+  await expect(page.locator("html")).toHaveAttribute("lang", "en");
+});
+
+test("the link that started the app is taken at once and asks in the saved language", async ({
+  app,
+  page,
+}) => {
+  const catalog = await holdCatalog(page, "Français");
+  const link = {
+    kind: "accept",
+    org: "acme-school",
+    classroom: "cs101",
+    assignment: "lab9",
+    key: null,
+  } as const;
+  await app.start(
+    scenario({ settings: settings({ language: "fr" }), deepLink: { kind: "unlisted", link } }),
+  );
+  await app.waitForCall("take_deep_link");
+  await expect.poll(() => catalog.requested()).toBe(true);
+  await page.waitForTimeout(200);
+  expect(await app.pendingDialogs()).toEqual([]);
+
+  catalog.settle(true);
+  const ask = await app.dialog();
+  expect(ask.message).toBe(
+    fr["link.openAssignment"]
+      .replace("{assignment}", "lab9")
+      .replace("{classroom}", "acme-school/cs101"),
+  );
+  await app.answer("cancel");
+  await app.waitForCall("deep_link_done");
+  expect(await app.writes()).toEqual([]);
+});

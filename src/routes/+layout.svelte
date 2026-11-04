@@ -157,11 +157,24 @@
 
   // Lives in the layout so notices arrive whichever page is shown, and while hidden.
   onMount(() => {
-    const loads = [
+    const languageLoads = [
       loadSettings(),
       api.systemLanguages().then((languages) => {
         if (languages.length) systemLanguages = languages;
       }),
+    ];
+    // The catalog the effect above started loading, once settings and the OS's languages
+    // are in (the same load, not a second one). The notices and the link Rust sends in the
+    // first moments (a grade that came while the app was closed, the link that started it)
+    // wait for it too, each in the order it came; one that won't load lets them through in
+    // English.
+    const localeLoaded = Promise.allSettled(languageLoads)
+      .then(() => setLocale(language, systemLanguages).catch(() => {}))
+      .then(() => {
+        localeReady = true;
+      });
+    const loads = [
+      ...languageLoads,
       // The OS's 12- or 24-hour clock, for every time shown (the tray menu's first one
       // included); Rust reads it again as the popover shows (where that runs no program)
       // and sends `hour-cycle` only on a change.
@@ -169,14 +182,9 @@
       loadEditors(),
       loadSnapshot(),
     ];
-    void Promise.allSettled(loads)
-      // The catalog the effect above started loading, once settings and the OS's languages
-      // are in (the same load, not a second one).
-      .then(() => setLocale(language, systemLanguages).catch(() => {}))
-      .then(() => {
-        localeReady = true;
-        trayReady = true;
-      });
+    void Promise.allSettled([...loads, localeLoaded]).then(() => {
+      trayReady = true;
+    });
     void api.appInfo().then((info) => initTheme(info.os));
     void api.unseen().then((ids) => {
       session.unseen = ids;
@@ -186,7 +194,7 @@
     // Here so a queue that ends on another page is still announced.
     watchTeammateJobs();
     const unlisteners = [
-      onEvent(NOTIFY_EVENT, (notice) => void showNotice(notice)),
+      onEvent(NOTIFY_EVENT, (notice) => void localeLoaded.then(() => showNotice(notice))),
       onEvent(UNSEEN_EVENT, (ids) => {
         session.unseen = ids;
       }),
@@ -194,7 +202,7 @@
         settings.current = saved;
       }),
       onEvent(UPDATE_STATE_EVENT, (status) => setUpdate(status)),
-      onEvent(DEEP_LINK_EVENT, () => void handleDeepLink()),
+      onEvent(DEEP_LINK_EVENT, () => void handleDeepLink(localeLoaded)),
       // The only listener: Tauri parses the payload once per listener.
       onEvent(PROJECTS_UPDATED_EVENT, (snapshot) => {
         // `gh auth switch`: the footer follows the account the data now belongs to.
@@ -216,7 +224,7 @@
       }),
     ];
     // A link that started the app came before this page could hear about it.
-    void handleDeepLink();
+    void handleDeepLink(localeLoaded);
     return () => {
       for (const unlisten of unlisteners) void unlisten.then((stop) => stop());
     };

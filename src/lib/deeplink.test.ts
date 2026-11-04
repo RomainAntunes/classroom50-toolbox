@@ -95,6 +95,26 @@ describe("handleDeepLink", () => {
     expect(dialog.message).not.toHaveBeenCalled();
   });
 
+  it("takes the link at once but asks nothing before the words are in", async () => {
+    loadSettings.mockResolvedValue({ onboarded: false });
+    api.takeDeepLink.mockResolvedValueOnce({ kind: "accept", item: item(), listed: true });
+    api.takeDeepLink.mockResolvedValue(null);
+    let wordsIn!: () => void;
+    const words = new Promise<void>((resolve) => (wordsIn = resolve));
+    const handled = handleDeepLink(words);
+    await vi.waitFor(() => expect(api.takeDeepLink).toHaveBeenCalledOnce());
+    // Taken: What's new leaves the main page to it meanwhile.
+    await vi.waitFor(() => expect(linkActive()).toBe(true));
+    await new Promise((resolve) => setTimeout(resolve, 10));
+    expect(loadSettings).not.toHaveBeenCalled();
+    expect(dialog.message).not.toHaveBeenCalled();
+
+    wordsIn();
+    await handled;
+    expect(dialog.message).toHaveBeenCalledOnce();
+    expect(api.deepLinkDone).toHaveBeenCalledOnce();
+  });
+
   it("before the guide is done, only says so", async () => {
     loadSettings.mockResolvedValue({ onboarded: false });
     await handle({ kind: "accept", item: item(), listed: true });
