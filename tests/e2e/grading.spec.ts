@@ -197,7 +197,7 @@ test("Rust's refusal past the limit is worded on the row", async ({ app }) => {
           state: "failed",
           error: {
             kind: "groupFull",
-            message: "your group is full (at most 2 members)",
+            message: "your group is full (maximum: 2)",
             params: { max: "2" },
           },
         },
@@ -205,6 +205,6 @@ test("Rust's refusal past the limit is worded on the row", async ({ app }) => {
     },
   ]);
   await expect(app.row("Project")).toContainText(
-    "Couldn't add bob: your group is full (at most 2 members)",
+    "Couldn't add bob: your group is full (maximum: 2)",
   );
 });

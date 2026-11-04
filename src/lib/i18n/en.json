@@ -654,7 +654,7 @@
   "error.ghStudentOutdated": "submitting a repository without .classroom50.yaml needs gh-student {min} or newer (installed: {version})",
   "error.staleMarker": "this assignment was renamed: pull the clone before you submit",
   "error.invalidUsername": "\"{username}\" isn't a GitHub username",
-  "error.groupFull": "your group is full (at most {max} members)",
+  "error.groupFull": "your group is full (maximum: {max})",
   "error.invalidTeamName": "a group name needs 1 to 80 characters, on one line",
   "error.noTerminal": "no terminal emulator found",
   "error.localChanges": "the clone has uncommitted changes",

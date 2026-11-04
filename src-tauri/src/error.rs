@@ -84,7 +84,7 @@ pub enum Error {
 
     /// Adding a classmate refused: the group already has the most members the assignment
     /// allows (`max_group_size`), counting those added earlier in the same queue.
-    #[error("your group is full (at most {max} members)")]
+    #[error("your group is full (maximum: {max})")]
     GroupFull { max: u32 },
 
     /// Not a GitHub login, checked before it reaches `gh student`.

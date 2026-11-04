@@ -624,7 +624,7 @@ mod tests {
         let error = kind(&jobs, 1);
         assert_eq!(error["kind"], "groupFull");
         assert_eq!(error["params"]["max"], "3");
-        assert_eq!(error["message"], "your group is full (at most 3 members)");
+        assert_eq!(error["message"], "your group is full (maximum: 3)");
     }
 
     #[test]
