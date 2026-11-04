@@ -46,6 +46,9 @@ export interface Scenario {
   /** The OS's 12- or 24-hour clock (`system_hour_cycle`); null keeps the language's. */
   hourCycle: HourCycle | null;
   unseen: string[];
+  /** Rows whose grading lines show while `showGradingInfo` hides them (`grading_revealed`);
+   *  a change of that setting clears them and sends `grading-revealed`, as Rust does. */
+  gradingRevealed: string[];
   syncDetails: SyncDetails;
   /** Self-update (`update_status`); `defer_update` and `install_update` change it and send
    *  `update-state`, as Rust does. */
@@ -103,6 +106,7 @@ export function settings(over: Partial<Settings> = {}): Settings {
     onboarded: true,
     commitActions: "none",
     updateChannel: "stable",
+    showGradingInfo: true,
     // This version's notes were read: What's new doesn't take the main page's place.
     lastSeenVersion: VERSION,
     globalShortcut: null,
@@ -338,6 +342,7 @@ export function scenario(over: Partial<Scenario> = {}): Scenario {
     systemLanguages: ["en-US"],
     hourCycle: null,
     unseen: [],
+    gradingRevealed: [],
     syncDetails: {
       login: LOGIN,
       syncedAt: hoursFromNow(0),
