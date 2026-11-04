@@ -556,7 +556,7 @@ mod tests {
               {"nodes": [
                 {"name": "phase10", "target": {"oid": "c10", "committedDate": "2026-10-20T10:00:00Z"}},
                 {"name": "phase1", "target": {"oid": "tagobj",
-                  "tagger": {"date": "2026-10-12T09:00:00Z"},
+                  "tagger": {"date": "2026-10-12T11:00:00+02:00"},
                   "target": {"oid": "c1", "committedDate": "2026-10-11T09:00:00Z"}}}
               ]},
               {"nodes": [
@@ -576,7 +576,8 @@ mod tests {
                     tag: Some(MilestoneTag {
                         name: "phase1".into(),
                         commit: "c1".into(),
-                        // An annotated tag: its own date.
+                        // An annotated tag: its own date, which GitHub gives with the
+                        // tagger's offset.
                         at: Some("2026-10-12T09:00:00Z".parse().unwrap()),
                     }),
                 },
