@@ -190,8 +190,10 @@ fn literal_ranges(source: &str) -> Vec<Literal> {
         });
     }
     let flush = |text: &mut Option<Range<usize>>, found: &mut Vec<Literal>| {
-        if let Some(run) = text.take() {
-            for url in bare_urls(&source[run.clone()]) {
+        if let Some(run) = text.take()
+            && let Some(run_text) = source.get(run.clone())
+        {
+            for url in bare_urls(run_text) {
                 found.push(Literal {
                     range: run.start + url.start..run.start + url.end,
                     url: true,
@@ -238,6 +240,13 @@ fn literal_ranges(source: &str) -> Vec<Literal> {
         }
     }
     flush(&mut text, &mut found);
+    // The parser's offsets fall on characters; a range that didn't would make the pre-pass
+    // slice inside one.
+    found.retain(|literal| {
+        literal.range.start <= literal.range.end
+            && source.is_char_boundary(literal.range.start)
+            && source.is_char_boundary(literal.range.end)
+    });
     found.sort_by_key(|literal| (literal.range.start, std::cmp::Reverse(literal.range.end)));
     found
 }
@@ -358,43 +367,69 @@ fn escape_dollars(text: &str, out: &mut String) {
 // GFM's extended autolinks: `http://`, `https://` and `www.` URLs in text.
 
 /// Byte ranges of the bare URLs in `text`, trailing punctuation left out as GFM does.
+///
+/// Linear in `text`: each prefix's next match and the next stop (whitespace or `<`) are
+/// searched once and reused while still ahead, since a description is untrusted and a
+/// long run of near misses (`(www./(www./...`) must not cost a scan per candidate.
 fn bare_urls(text: &str) -> Vec<Range<usize>> {
+    const PREFIXES: [&str; 3] = ["http://", "https://", "www."];
     let mut found = Vec::new();
+    // Per prefix, the next match at or after `from` (`None` once there is none left).
+    let mut next = PREFIXES.map(|prefix| find_ascii_ci(text, prefix));
+    let mut stop = 0;
     let mut from = 0;
     while from < text.len() {
-        let rest = &text[from..];
-        let Some(at) = ["http://", "https://", "www."]
-            .iter()
-            .filter_map(|prefix| find_ascii_ci(rest, prefix).map(|at| (at, prefix.len())))
-            .min()
-        else {
+        let mut best: Option<(usize, usize)> = None;
+        for (slot, prefix) in next.iter_mut().zip(PREFIXES) {
+            if slot.is_some_and(|at| at < from) {
+                *slot = find_ascii_ci(&text[from..], prefix).map(|at| from + at);
+            }
+            if let Some(at) = *slot
+                && best.is_none_or(|(start, _)| at < start)
+            {
+                best = Some((at, prefix.len()));
+            }
+        }
+        let Some((start, prefix)) = best else {
             break;
         };
-        let (offset, prefix) = at;
-        let start = from + offset;
+        let after = start + prefix;
         let boundary = text[..start]
             .chars()
             .next_back()
             .is_none_or(|c| c.is_whitespace() || "*_~(".contains(c));
-        let mut end = start
-            + text[start..]
+        if !boundary || text[after..].starts_with(['/', '.']) {
+            from = after;
+            continue;
+        }
+        if stop < after {
+            stop = text[after..]
                 .find(|c: char| c.is_whitespace() || c == '<')
-                .unwrap_or(text.len() - start);
-        // Trailing punctuation, and a `)` the URL didn't open, aren't part of it.
-        loop {
-            let url = &text[start..end];
-            match url.chars().next_back() {
-                Some(c) if "?!.,:*_~'\";".contains(c) => end -= 1,
-                Some(')') if url.matches(')').count() > url.matches('(').count() => end -= 1,
+                .map_or(text.len(), |at| after + at);
+        }
+        let mut end = stop;
+        // Trailing punctuation, and a `)` the URL didn't open, aren't part of it; never
+        // into the prefix itself (`www.` alone is no URL).
+        let url = &text[start..end];
+        let opens = url.matches('(').count();
+        let mut closes = url.matches(')').count();
+        while end > after {
+            match text.as_bytes()[end - 1] {
+                b'?' | b'!' | b'.' | b',' | b':' | b'*' | b'_' | b'~' | b'\'' | b'"' | b';' => {
+                    end -= 1
+                }
+                b')' if closes > opens => {
+                    closes -= 1;
+                    end -= 1;
+                }
                 _ => break,
             }
         }
-        let host = &text[start + prefix..end];
-        if boundary && !host.is_empty() && !host.starts_with(['/', '.']) {
+        if end > after {
             found.push(start..end);
             from = end;
         } else {
-            from = start + prefix;
+            from = after;
         }
     }
     found
@@ -1348,6 +1383,138 @@ mod tests {
                 },
             ]
         );
+    }
+
+    fn one(url: Range<usize>) -> Vec<Range<usize>> {
+        vec![url]
+    }
+
+    /// Trailing punctuation never eats into the prefix: `www.` alone, or followed only by
+    /// what GFM trims, is no URL (and used to slice backwards).
+    #[test]
+    fn a_bare_prefix_is_no_url() {
+        for source in [
+            "www.",
+            "see www.",
+            "awww.",
+            "Awww. Nice try",
+            "Visit www. for more",
+            "www..",
+            "WWW.)",
+            "www.!?",
+            "http://.",
+            "http://",
+            "https://)",
+            "https://...",
+            "(www.)",
+            "*www.*",
+            "é www. 😀",
+            "שלום www. עולם",
+            "e\u{301}www.",
+        ] {
+            assert!(bare_urls(source).is_empty(), "{source:?}");
+            assert!(
+                !format!("{:?}", parse(source)).contains("Link"),
+                "{source:?}"
+            );
+        }
+        assert_eq!(bare_urls("www.a."), one(0..5));
+        assert_eq!(bare_urls("(www.a))"), one(1..6));
+        assert_eq!(bare_urls("😀 www.é.org!"), one(5..15));
+        assert_eq!(
+            inline("voir www.exemple.fr, ou https://é.fr."),
+            [
+                text("voir "),
+                link("https://www.exemple.fr", "www.exemple.fr"),
+                text(", ou "),
+                link("https://é.fr", "https://é.fr"),
+                text("."),
+            ]
+        );
+    }
+
+    /// Near misses and long punctuation runs cost one pass, not one per candidate.
+    #[test]
+    fn bare_urls_stay_linear() {
+        let started = std::time::Instant::now();
+        let misses = "(www./".repeat(MAX_SOURCE / 6);
+        assert!(bare_urls(&misses).is_empty());
+        let parens = format!("www.a{}", ")".repeat(MAX_SOURCE));
+        assert_eq!(bare_urls(&parens), one(0..5));
+        let dots = format!("(www.a{}", ".".repeat(MAX_SOURCE));
+        assert_eq!(bare_urls(&dots), one(1..6));
+        let words = "www.a ".repeat(MAX_SOURCE / 6);
+        assert_eq!(bare_urls(&words).len(), MAX_SOURCE / 6);
+        parse(&misses);
+        parse(&parens);
+        assert!(started.elapsed() < std::time::Duration::from_secs(2));
+    }
+
+    /// Escapes, math and literals next to multibyte text slice on characters.
+    #[test]
+    fn never_slices_inside_a_character() {
+        for source in [
+            "\\é",
+            "\\😀",
+            "é$",
+            "$é$",
+            "$`é",
+            "$`é`$",
+            "😀$$é",
+            "$$é$$",
+            "`é$`",
+            "é`$",
+            "<é>$",
+            "[é]: https://a.org/é $",
+            "$5 é $",
+            "\\",
+            "a\\",
+            "$",
+            "$$",
+            "$`",
+            "`$",
+            "www.\u{301}",
+            "http://\u{301})",
+            "(www.é)",
+            "www.é…",
+        ] {
+            normalize_math(source);
+            parse(source);
+        }
+    }
+
+    /// Thousands of strings over the characters the pre-pass and the builder treat
+    /// specially, mixed with multibyte text: parsing never panics and stays within its caps.
+    #[test]
+    fn random_descriptions_never_panic() {
+        const ALPHABET: &[&str] = &[
+            "w", "w", "w", ".", ":", "/", "h", "t", "p", "s", "$", "$", "`", "*", "_", "~", "[",
+            "]", "(", ")", "|", "-", "#", ">", "!", "\\", "\n", "\n", " ", " ", "é", "😀", "<",
+            "&", "'", "\"", "1", "x", "^", ":", "\t", "\u{301}", "ש", "www.", "http://",
+            "https://", "$`", "`$", "$$", "```", "- ", "1. ", "[^a]", "[x] ", "\r\n",
+        ];
+        let mut state: u64 = 0x2545_f491_4f6c_dd1d;
+        let mut random = move || {
+            state ^= state << 13;
+            state ^= state >> 7;
+            state ^= state << 17;
+            state
+        };
+        for round in 0..4000 {
+            let len = if round % 100 == 0 {
+                3000
+            } else {
+                random() % 60
+            };
+            let source: String = (0..len)
+                .map(|_| ALPHABET[(random() % ALPHABET.len() as u64) as usize])
+                .collect();
+            let Some(doc) = document(Some(&source)) else {
+                continue;
+            };
+            assert!(depth(&doc) <= MAX_DEPTH, "{source:?}");
+            assert!(count(&doc) <= MAX_NODES + 2 * MAX_DEPTH + 8, "{source:?}");
+        }
     }
 
     #[test]
