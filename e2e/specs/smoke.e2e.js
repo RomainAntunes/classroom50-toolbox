@@ -67,6 +67,9 @@ describe("Classroom 50 Toolbox", () => {
     const hello = await item("Hello, World");
     await hello.$("button[data-row]").click();
     await expect(hello.$("p.heading")).toHaveText(t("details.failedTests"));
+    // The description is Markdown, parsed by Rust with the manifest.
+    await expect(hello.$(".description strong")).toHaveText("greeting");
+    await expect(hello.$(".description code.math")).toHaveText("x^2");
     const test = hello.$('.//button[contains(@class, "test")][contains(., "prints goodbye")]');
     await test.click();
     const output = hello.$(".output pre");

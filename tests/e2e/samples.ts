@@ -7,6 +7,7 @@ import {
   grade,
   gradeTest,
   hoursFromNow,
+  markdownDescription,
   project,
   scenario,
   settings,
@@ -31,7 +32,7 @@ export function richScenario(over: Partial<Settings> = {}): Scenario {
         project({
           slug: "lab1",
           name: "Lab 1: Hello, World",
-          assignment: { due: hoursFromNow(-30) },
+          assignment: { due: hoursFromNow(-30), ...markdownDescription },
           lateSeconds: 26 * 3600,
           remote: {
             grade: grade(8, 10, {
