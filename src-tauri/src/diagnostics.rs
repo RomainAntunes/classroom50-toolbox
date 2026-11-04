@@ -424,6 +424,14 @@ impl Kind {
             Kind::Host => "host",
         }
     }
+
+    /// Whether a short or common value of this kind may be kept as a bare word
+    /// (`weak_name`): only org, class and repo slugs. Logins and people's or groups' names
+    /// are whose data is at stake, and keys and hosts are secrets, so they are masked
+    /// everywhere whatever their length.
+    fn may_be_weak(self) -> bool {
+        matches!(self, Kind::Org | Kind::Class | Kind::Repo)
+    }
 }
 
 /// Names the last discovery knew besides the snapshot's (`projects::ProjectsState::
@@ -443,8 +451,9 @@ pub struct Discovery {
 pub struct Redactor {
     /// Case-folded name to placeholder; the first kind a name is added with wins.
     terms: HashMap<String, String>,
-    /// Case-folded names too short or too common to mask as bare words (`weak_name`):
-    /// they are masked only where they sit in a path, URL, `owner/repo` or repo name.
+    /// Case-folded org, class and repo slugs too short or too common to mask as bare words
+    /// (`weak_name`): they are masked only where they sit in a path, URL, `owner/repo` or
+    /// repo name.
     weak: HashSet<String>,
     counters: BTreeMap<Kind, usize>,
     /// The home folder, as written, replaced with `~`.
@@ -560,21 +569,22 @@ impl Redactor {
     }
 
     /// Masks `value` as the next placeholder of `kind`, unless it is already masked. A
-    /// short or common name (`weak_name`) is masked only in structured spots; a classroom
-    /// key never counts as one.
+    /// short or common org, class or repo slug (`weak_name`) is masked only in structured
+    /// spots; a login, a name, a key or a host never counts as one, even when the same
+    /// value was added as a slug before.
     pub fn add(&mut self, kind: Kind, value: &str) {
         let value = value.trim();
         if value.is_empty() {
             return;
         }
         let key = fold(value);
-        if kind == Kind::Key {
+        if !kind.may_be_weak() {
             self.weak.remove(&key);
         }
         if self.terms.contains_key(&key) {
             return;
         }
-        if kind != Kind::Key && weak_name(&key) {
+        if kind.may_be_weak() && weak_name(&key) {
             self.weak.insert(key.clone());
         }
         let n = self.counters.entry(kind).or_default();
@@ -1114,32 +1124,33 @@ mod tests {
     }
 
     #[test]
-    fn short_and_common_names_are_kept_as_words() {
+    fn short_and_common_slugs_are_kept_as_words() {
         let mut r = Redactor::default();
         r.add(Kind::Org, "acme-cs");
         r.add(Kind::Class, "c");
         r.add(Kind::Class, "lab");
-        r.add(Kind::Name, "Test");
+        r.add(Kind::Repo, "test");
         r.add(Kind::User, "jo");
+        r.add(Kind::Name, "Li");
         r.add(Kind::Name, "王伟");
-        // In prose they are ordinary words, and count as nothing masked.
+        // In prose org, class and repo slugs are ordinary words, and count as nothing masked.
         assert_eq!(
-            r.apply_counted("[INFO] lab sync: test passed, a C compiler, jo said"),
-            (
-                "[INFO] lab sync: test passed, a C compiler, jo said".to_owned(),
-                0
-            )
+            r.apply_counted("[INFO] lab sync: test passed, a C compiler"),
+            ("[INFO] lab sync: test passed, a C compiler".to_owned(), 0)
         );
-        // A two-char CJK name is a whole name, masked everywhere.
-        assert_eq!(r.apply("王伟 pushed"), "name-2 pushed");
-        // In a path, a URL, `owner/repo` or a repo name they are names.
+        // Logins and people's names are masked as bare words whatever their length.
+        assert_eq!(
+            r.apply_counted("account jo: Li and 王伟 pushed"),
+            ("account user-1: name-1 and name-2 pushed".to_owned(), 3)
+        );
+        // In a path, a URL, `owner/repo` or a repo name slugs are names.
         assert_eq!(
             r.apply("cloned acme-cs/lab-hello-jo to ~/code/lab/c"),
             "cloned org-1/class-2-hello-user-1 to ~/code/class-2/class-1"
         );
         assert_eq!(
             r.apply("GET https://github.com/acme-cs/c-tp1-test failed."),
-            "GET https://github.com/org-1/class-1-tp1-name-1 failed."
+            "GET https://github.com/org-1/class-1-tp1-repo-1 failed."
         );
         assert_eq!(
             r.apply("lab-tp1-jo, c-hello-x, classroom50-lab-teacher: done"),
@@ -1158,6 +1169,10 @@ mod tests {
         r.add(Kind::Class, "lab");
         r.add(Kind::Key, "lab");
         assert_eq!(r.apply("key ab, lab"), "key key-1, class-1");
+        // A login that is also a short class slug stays a login: masked everywhere.
+        r.add(Kind::Class, "al");
+        r.add(Kind::User, "al");
+        assert_eq!(r.apply("al wrote"), "class-2 wrote");
         let token = format!("ghp_{}", "a".repeat(20));
         assert_eq!(r.apply(&format!("test {token}")), "test <token>");
         assert_eq!(r.apply("by jo@uni.edu"), "by <email>");
