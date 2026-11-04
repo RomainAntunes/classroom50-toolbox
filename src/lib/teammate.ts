@@ -11,6 +11,7 @@ import {
   type Project,
   type TeammateEntry,
 } from "#lib/api.js";
+import { groupFull } from "#lib/group.js";
 import { formatList, t } from "#lib/i18n/index.js";
 import { askText } from "#lib/prompt.svelte.js";
 import { session } from "#lib/session.svelte.js";
@@ -61,15 +62,20 @@ export interface Target {
   team: boolean;
 }
 
-/** "Add to my group…" / "Invite a classmate…" from a row's menu. */
+/** "Add to my group…" / "Invite a classmate…" from a row's menu. A full group says so
+ *  before asking for anyone (Rust refuses past the limit too, `GroupFull`). */
 export async function addTeammate(project: Project, name: string): Promise<void> {
   const team = joinsGroup(project);
   if (team) {
-    const reason = notFounderReason(
-      project.group,
-      session.snapshot?.login ?? null,
-      project.assignment?.teamFormation === "teacher",
-    );
+    const max = project.assignment?.maxGroupSize ?? null;
+    const reason =
+      max !== null && groupFull(project.group, max)
+        ? t("teammate.groupFull", { count: max })
+        : notFounderReason(
+            project.group,
+            session.snapshot?.login ?? null,
+            project.assignment?.teamFormation === "teacher",
+          );
     if (reason) {
       await withDialog(() => message(reason, { title: t("teammate.teamTitle"), kind: "info" }));
       return;

@@ -51,6 +51,32 @@ impl Target {
     }
 }
 
+/// A group's size limit (`max_group_size`) and who is in it already, so a queue never
+/// adds past it. Advisory upstream: gh-student's `team add` checks it too, but a founder
+/// can pass it on GitHub.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Cap {
+    pub max: u32,
+    /// The members' logins as the last sync read them (the founder alone for a group
+    /// just founded).
+    pub members: Vec<String>,
+}
+
+impl Cap {
+    /// Whether adding `username` would pass the limit: counts the members plus those this
+    /// queue added since, each once. Someone already in counts as no addition.
+    fn refuses(&self, username: &str, entries: &[TeammateEntry]) -> bool {
+        let mut logins: Vec<String> = self.members.iter().map(|m| m.to_lowercase()).collect();
+        for entry in entries.iter().filter(|e| e.state == AddState::Added) {
+            logins.push(entry.username.to_lowercase());
+        }
+        logins.sort_unstable();
+        logins.dedup();
+        let login = username.to_lowercase();
+        !logins.contains(&login) && logins.len() >= self.max as usize
+    }
+}
+
 /// Where one username stands.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
 #[cfg_attr(test, derive(specta::Type))]
@@ -114,6 +140,8 @@ pub struct TeammateJob {
 struct Job {
     view: TeammateJob,
     target: Arc<Target>,
+    /// The group's limit, as the newest call knew it.
+    cap: Option<Cap>,
     /// Where the entries of the current run start, for its summary.
     run_start: usize,
 }
@@ -147,7 +175,13 @@ impl TeammateJobs {
 
     /// Queues `usernames` on the job of `meta.id` (made with `target` when there is none),
     /// skipping one already waiting or being added. Returns whether a worker must start.
-    fn enqueue(&self, meta: TeammateJob, target: Target, usernames: Vec<String>) -> bool {
+    fn enqueue(
+        &self,
+        meta: TeammateJob,
+        target: Target,
+        cap: Option<Cap>,
+        usernames: Vec<String>,
+    ) -> bool {
         let mut jobs = self.lock();
         let index = match jobs.iter().position(|job| job.view.id == meta.id) {
             Some(index) => index,
@@ -159,12 +193,16 @@ impl TeammateJobs {
                         ..meta
                     },
                     target: Arc::new(target),
+                    cap: None,
                     run_start: 0,
                 });
                 jobs.len() - 1
             }
         };
         let job = &mut jobs[index];
+        if cap.is_some() {
+            job.cap = cap;
+        }
         let start = !job.view.running;
         if start {
             job.run_start = job.view.entries.len();
@@ -195,20 +233,32 @@ impl TeammateJobs {
     }
 
     /// Marks the next waiting username of job `id` as being added, or, with none left,
-    /// ends the run and sums it up.
+    /// ends the run and sums it up. One the group has no room for fails at once with
+    /// `GroupFull`, without running gh.
     fn next(&self, id: &str) -> Next {
         let mut jobs = self.lock();
         let Some(job) = jobs.iter_mut().find(|job| job.view.id == id) else {
             return Next::Done(Summary::default());
         };
-        if let Some(entry) = job
+        while let Some(index) = job
             .view
             .entries
-            .iter_mut()
-            .find(|e| e.state == AddState::Waiting)
+            .iter()
+            .position(|e| e.state == AddState::Waiting)
         {
+            let username = job.view.entries[index].username.clone();
+            let full = job
+                .cap
+                .as_ref()
+                .filter(|cap| cap.refuses(&username, &job.view.entries));
+            let entry = &mut job.view.entries[index];
+            if let Some(cap) = full {
+                entry.state = AddState::Failed;
+                entry.error = Some(Failure(Arc::new(Error::GroupFull { max: cap.max })));
+                continue;
+            }
             entry.state = AddState::Adding;
-            return Next::Add(job.target.clone(), entry.username.clone());
+            return Next::Add(job.target.clone(), username);
         }
         job.view.running = false;
         let mut summary = Summary::default();
@@ -286,9 +336,17 @@ pub fn emit(app: &AppHandle) {
 
 /// Queues `usernames` for the row of `meta` and starts adding them unless that row's queue
 /// is already running.
-pub fn enqueue(app: &AppHandle, meta: TeammateJob, target: Target, usernames: Vec<String>) {
+pub fn enqueue(
+    app: &AppHandle,
+    meta: TeammateJob,
+    target: Target,
+    cap: Option<Cap>,
+    usernames: Vec<String>,
+) {
     let id = meta.id.clone();
-    let start = app.state::<TeammateJobs>().enqueue(meta, target, usernames);
+    let start = app
+        .state::<TeammateJobs>()
+        .enqueue(meta, target, cap, usernames);
     emit(app);
     if start {
         let app = app.clone();
@@ -404,7 +462,7 @@ mod tests {
     #[test]
     fn adds_the_queue_in_order_and_sums_up_the_run() {
         let jobs = TeammateJobs::default();
-        assert!(jobs.enqueue(meta("a"), target(), names(&["alice", "bob"])));
+        assert!(jobs.enqueue(meta("a"), target(), None, names(&["alice", "bob"])));
         let job = &jobs.list()[0];
         // A new job starts empty, whatever the template carried.
         assert!(job.running);
@@ -438,11 +496,11 @@ mod tests {
     #[test]
     fn more_usernames_join_the_running_queue() {
         let jobs = TeammateJobs::default();
-        assert!(jobs.enqueue(meta("a"), target(), names(&["alice"])));
+        assert!(jobs.enqueue(meta("a"), target(), None, names(&["alice"])));
         assert!(matches!(jobs.next("a"), Next::Add(..)));
         // A second batch while alice is being added: no second worker, bob waits his turn,
         // and alice isn't queued twice.
-        assert!(!jobs.enqueue(meta("a"), target(), names(&["Alice", "bob"])));
+        assert!(!jobs.enqueue(meta("a"), target(), None, names(&["Alice", "bob"])));
         assert_eq!(
             states(&jobs),
             vec![
@@ -464,11 +522,11 @@ mod tests {
     #[test]
     fn a_new_run_reports_only_its_own_usernames() {
         let jobs = TeammateJobs::default();
-        jobs.enqueue(meta("a"), target(), names(&["alice"]));
+        jobs.enqueue(meta("a"), target(), None, names(&["alice"]));
         add(&jobs, true);
         assert!(matches!(jobs.next("a"), Next::Done(_)));
         // Add another after it finished: a new worker, and the earlier result stays shown.
-        assert!(jobs.enqueue(meta("a"), target(), names(&["alice", "carol"])));
+        assert!(jobs.enqueue(meta("a"), target(), None, names(&["alice", "carol"])));
         add(&jobs, false);
         add(&jobs, true);
         assert_eq!(
@@ -484,20 +542,20 @@ mod tests {
     #[test]
     fn keeps_the_first_target_of_a_row() {
         let jobs = TeammateJobs::default();
-        jobs.enqueue(meta("a"), target(), names(&["alice"]));
+        jobs.enqueue(meta("a"), target(), None, names(&["alice"]));
         let invite = Target::Invite {
             repo: "o/r".into(),
             clone: None,
         };
-        jobs.enqueue(meta("a"), invite, names(&["bob"]));
+        jobs.enqueue(meta("a"), invite, None, names(&["bob"]));
         assert!(matches!(jobs.next("a"), Next::Add(t, _) if *t == target()));
     }
 
     #[test]
     fn rows_have_their_own_queues() {
         let jobs = TeammateJobs::default();
-        assert!(jobs.enqueue(meta("a"), target(), names(&["alice"])));
-        assert!(jobs.enqueue(meta("b"), target(), names(&["alice"])));
+        assert!(jobs.enqueue(meta("a"), target(), None, names(&["alice"])));
+        assert!(jobs.enqueue(meta("b"), target(), None, names(&["alice"])));
         assert_eq!(jobs.list().len(), 2);
         assert_eq!(jobs.next("unknown"), Next::Done(Summary::default()));
     }
@@ -505,7 +563,7 @@ mod tests {
     #[test]
     fn queues_nothing_without_usernames() {
         let jobs = TeammateJobs::default();
-        assert!(!jobs.enqueue(meta("a"), target(), vec![]));
+        assert!(!jobs.enqueue(meta("a"), target(), None, vec![]));
         assert!(!jobs.list()[0].running);
         assert!(jobs.clear_finished());
         assert!(jobs.list().is_empty());
@@ -514,7 +572,7 @@ mod tests {
     #[test]
     fn done_drops_results_but_never_a_running_queue() {
         let jobs = TeammateJobs::default();
-        jobs.enqueue(meta("a"), target(), names(&["alice", "bob"]));
+        jobs.enqueue(meta("a"), target(), None, names(&["alice", "bob"]));
         add(&jobs, true);
         assert!(jobs.dismiss("a"));
         assert_eq!(states(&jobs), vec![("bob".into(), AddState::Waiting)]);
@@ -533,11 +591,105 @@ mod tests {
         assert!(!jobs.dismiss("a"));
     }
 
+    fn cap(max: u32, members: &[&str]) -> Option<Cap> {
+        Some(Cap {
+            max,
+            members: names(members),
+        })
+    }
+
+    fn kind(jobs: &TeammateJobs, index: usize) -> serde_json::Value {
+        let entry = &jobs.list()[0].entries[index];
+        serde_json::to_value(entry.error.as_ref().unwrap()).unwrap()
+    }
+
+    #[test]
+    fn refuses_adding_past_the_group_size() {
+        let jobs = TeammateJobs::default();
+        // Two of three already: one more fits, the next is refused without running gh.
+        jobs.enqueue(
+            meta("a"),
+            target(),
+            cap(3, &["me", "alice"]),
+            names(&["bob", "carol"]),
+        );
+        assert_eq!(add(&jobs, true).as_deref(), Some("bob"));
+        assert_eq!(
+            jobs.next("a"),
+            Next::Done(Summary {
+                added: names(&["bob"]),
+                failed: names(&["carol"]),
+            })
+        );
+        let error = kind(&jobs, 1);
+        assert_eq!(error["kind"], "groupFull");
+        assert_eq!(error["params"]["max"], "3");
+        assert_eq!(error["message"], "your group is full (at most 3 members)");
+    }
+
+    #[test]
+    fn counts_those_added_earlier_in_the_queue_once() {
+        let jobs = TeammateJobs::default();
+        jobs.enqueue(meta("a"), target(), cap(3, &["me"]), names(&["alice"]));
+        add(&jobs, true);
+        assert!(matches!(jobs.next("a"), Next::Done(_)));
+        // Add another, after a sync that already lists alice: she counts once, so bob fits
+        // and carol doesn't. Someone already in isn't an addition, whatever the count.
+        jobs.enqueue(
+            meta("a"),
+            target(),
+            cap(3, &["me", "Alice"]),
+            names(&["bob", "carol", "ALICE"]),
+        );
+        assert_eq!(add(&jobs, true).as_deref(), Some("bob"));
+        assert_eq!(add(&jobs, true).as_deref(), Some("ALICE"));
+        assert_eq!(
+            jobs.next("a"),
+            Next::Done(Summary {
+                added: names(&["bob", "ALICE"]),
+                failed: names(&["carol"]),
+            })
+        );
+        assert_eq!(kind(&jobs, 2)["kind"], "groupFull");
+    }
+
+    #[test]
+    fn an_oversized_group_takes_no_one_and_no_cap_takes_anyone() {
+        let jobs = TeammateJobs::default();
+        jobs.enqueue(
+            meta("a"),
+            target(),
+            cap(2, &["me", "a", "b"]),
+            names(&["c"]),
+        );
+        assert_eq!(
+            jobs.next("a"),
+            Next::Done(Summary {
+                added: vec![],
+                failed: names(&["c"]),
+            })
+        );
+        jobs.enqueue(meta("b"), target(), None, names(&["c", "d", "e"]));
+        assert_eq!(states(&jobs).len(), 1);
+        for _ in 0..3 {
+            assert!(matches!(jobs.next("b"), Next::Add(..)));
+            let user = jobs.list()[1]
+                .entries
+                .iter()
+                .find(|e| e.state == AddState::Adding)
+                .unwrap()
+                .username
+                .clone();
+            jobs.settle("b", &user, Ok(()));
+        }
+        assert!(matches!(jobs.next("b"), Next::Done(s) if s.added.len() == 3));
+    }
+
     #[test]
     fn hiding_the_popover_drops_finished_jobs_only() {
         let jobs = TeammateJobs::default();
-        jobs.enqueue(meta("a"), target(), names(&["alice"]));
-        jobs.enqueue(meta("b"), target(), names(&["bob"]));
+        jobs.enqueue(meta("a"), target(), None, names(&["alice"]));
+        jobs.enqueue(meta("b"), target(), None, names(&["bob"]));
         add(&jobs, true);
         assert!(matches!(jobs.next("a"), Next::Done(_)));
         assert!(jobs.clear_finished());

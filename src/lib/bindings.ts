@@ -324,6 +324,27 @@ export type Appearance = "system" | "light" | "dark";
  */
 export type Assignment = Assignment_Serialize | Assignment_Deserialize;
 
+/**  How the teacher means to grade an assignment (`assignments-v1` `grading`). */
+export type AssignmentGrading = AssignmentGrading_Serialize | AssignmentGrading_Deserialize;
+
+/**  How the teacher means to grade an assignment (`assignments-v1` `grading`). */
+export type AssignmentGrading_Deserialize = {
+	mode: GradingMode,
+} & {
+	/**  `manual` only: the points the teaching staff mark out of. */
+	max_points: number | null,
+} | {
+	/**  `manual` only: the points the teaching staff mark out of. */
+	maxPoints: number | null,
+};
+
+/**  How the teacher means to grade an assignment (`assignments-v1` `grading`). */
+export type AssignmentGrading_Serialize = {
+	mode: GradingMode,
+	/**  `manual` only: the points the teaching staff mark out of. */
+	maxPoints: number | null,
+};
+
 export type AssignmentMode = "individual" | "group" | "team";
 
 /**
@@ -341,6 +362,11 @@ export type Assignment_Deserialize = {
 	locked: boolean,
 	/**  The only state that actually stops submissions (repos become read-only). */
 	closed: boolean,
+	/**
+	 *  Whether and how the teacher grades it; absent reads as autograded. A value this
+	 *  version can't read (a future mode) counts as absent rather than failing the manifest.
+	 */
+	grading: AssignmentGrading_Deserialize | null,
 	/**  The repo each student repo is generated from; absent on `empty_repo` assignments. */
 	template: Template | null,
 } & {
@@ -358,9 +384,31 @@ export type Assignment_Deserialize = {
 } | {
 	feedbackPr: boolean,
 } & {
+	/**
+	 *  The passing bar, a percentage of the max score; absent means no passing concept at
+	 *  all (not 0%).
+	 */
 	pass_threshold: number | null,
 } | {
+	/**
+	 *  The passing bar, a percentage of the max score; absent means no passing concept at
+	 *  all (not 0%).
+	 */
 	passThreshold: number | null,
+} & {
+	/**
+	 *  `group` and `team` modes: the most members a group may have. Advisory upstream (a
+	 *  student-formed team's founder can pass it on GitHub), so the app shows an oversized
+	 *  group and refuses to add past it.
+	 */
+	max_group_size: number | null,
+} | {
+	/**
+	 *  `group` and `team` modes: the most members a group may have. Advisory upstream (a
+	 *  student-formed team's founder can pass it on GitHub), so the app shows an oversized
+	 *  group and refuses to add past it.
+	 */
+	maxGroupSize: number | null,
 } & {
 	/**  `team` mode only. `gh student accept` doesn't ask, so the UI explains it first. */
 	team_formation: TeamFormation | null,
@@ -414,7 +462,22 @@ export type Assignment_Serialize = {
 	/**  The only state that actually stops submissions (repos become read-only). */
 	closed: boolean,
 	feedbackPr: boolean,
+	/**
+	 *  The passing bar, a percentage of the max score; absent means no passing concept at
+	 *  all (not 0%).
+	 */
 	passThreshold: number | null,
+	/**
+	 *  Whether and how the teacher grades it; absent reads as autograded. A value this
+	 *  version can't read (a future mode) counts as absent rather than failing the manifest.
+	 */
+	grading: AssignmentGrading_Serialize | null,
+	/**
+	 *  `group` and `team` modes: the most members a group may have. Advisory upstream (a
+	 *  student-formed team's founder can pass it on GitHub), so the app shows an oversized
+	 *  group and refuses to add past it.
+	 */
+	maxGroupSize: number | null,
 	/**  `team` mode only. `gh student accept` doesn't ask, so the UI explains it first. */
 	teamFormation: TeamFormation | null,
 	/**  `"public"` when accepting creates a public repo; `gh student accept` only warns. */
@@ -483,6 +546,8 @@ export type CalendarLabels = {
 	group: string,
 	groupNumber: string,
 	graded: string,
+	/**  For an assignment the teacher doesn't grade, in place of a grade. */
+	notGraded: string,
 	submitted: string,
 	notAccepted: string,
 };
@@ -582,7 +647,7 @@ export type EditorInfo = {
 	name: string,
 };
 
-export type ErrorKind = "notInstalled" | "commandFailed" | "timedOut" | "unsupported" | "manualInstall" | "blockedInDev" | "cancelled" | "busy" | "pathExists" | "schemaMismatch" | "student" | "needsTeam" | "submissionsClosed" | "unknownAssignment" | "ghStudentOutdated" | "staleMarker" | "invalidUsername" | "invalidTeamName" | "noTerminal" | "localChanges" | "otherBranch" | "diverged" | "remoteAhead" | "gitInProgress" | "nothingToPush" | "nothingToCommit" | "noIdentity" | "fileTooLarge" | "pushRejected" | "notSignedIn" | "tokenFromEnv" | "rateLimited" | "github" | "offline" | "noSelfUpdate" | "calendarAccess" | "calendarUnavailable" | "invalidShortcut" | "shortcutTaken" | "shortcutUnsupported" | "repoConfig" | "io" | "http" | "tauri" | "updater" | "autostart";
+export type ErrorKind = "notInstalled" | "commandFailed" | "timedOut" | "unsupported" | "manualInstall" | "blockedInDev" | "cancelled" | "busy" | "pathExists" | "schemaMismatch" | "student" | "needsTeam" | "submissionsClosed" | "unknownAssignment" | "ghStudentOutdated" | "staleMarker" | "groupFull" | "invalidUsername" | "invalidTeamName" | "noTerminal" | "localChanges" | "otherBranch" | "diverged" | "remoteAhead" | "gitInProgress" | "nothingToPush" | "nothingToCommit" | "noIdentity" | "fileTooLarge" | "pushRejected" | "notSignedIn" | "tokenFromEnv" | "rateLimited" | "github" | "offline" | "noSelfUpdate" | "calendarAccess" | "calendarUnavailable" | "invalidShortcut" | "shortcutTaken" | "shortcutUnsupported" | "repoConfig" | "io" | "http" | "tauri" | "updater" | "autostart";
 
 /**  The payload of each event, by name: `Events` in `src/lib/bindings.ts`. */
 export type Events = Events_Serialize | Events_Deserialize;
@@ -766,6 +831,17 @@ export type Grading =
  *  error, or the workflow failed before reporting anything.
  */
 { state: "failed"; url: string | null; message: string | null };
+
+export type GradingMode = 
+/**  Not graded. */
+"off" | 
+/**  By the autograder, what an absent `grading` means. */
+"auto" | 
+/**
+ *  By hand, on the web app's submissions page; the marks stay in the private config
+ *  repo, so students can't read them.
+ */
+"manual";
 
 export type Group = {
 	org: string,

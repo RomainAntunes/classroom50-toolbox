@@ -12,7 +12,7 @@ use chrono::{DateTime, TimeDelta, Utc};
 use serde::{Deserialize, Serialize};
 use tauri::{AppHandle, Manager};
 
-use crate::classroom50::SubmissionMode;
+use crate::classroom50::{GradingMode, SubmissionMode};
 use crate::events::{IpcEvent, Notify, SettingsUpdated, UnseenUpdated};
 use crate::github;
 use crate::projects::{Project, Snapshot};
@@ -498,12 +498,18 @@ fn diff(
             }
         }
 
+        // Not graded: a release the autograder made anyway is remembered, never announced.
+        let graded = project
+            .assignment
+            .as_ref()
+            .is_none_or(|a| a.grading_mode() != GradingMode::Off);
         if let Some(grade) = &remote.grade {
             let previous = memory.grades.insert(project.id.clone(), grade.tag.clone());
-            let new = match previous {
-                Some(tag) => tag != grade.tag,
-                None => fresh(grade.published_at),
-            };
+            let new = graded
+                && match previous {
+                    Some(tag) => tag != grade.tag,
+                    None => fresh(grade.published_at),
+                };
             if new {
                 notices.push(Notice::Grade {
                     assignment: name.clone(),
@@ -518,7 +524,7 @@ fn diff(
             let previous = memory
                 .grading_failed
                 .insert(project.id.clone(), head.oid.clone());
-            if previous.as_ref() != Some(&head.oid) && fresh(head.at) {
+            if graded && previous.as_ref() != Some(&head.oid) && fresh(head.at) {
                 notices.push(Notice::GradingFailed {
                     assignment: name.clone(),
                 });
@@ -905,6 +911,50 @@ mod tests {
         assert_eq!(diff(&mut memory, &failed("a"), &[], now), expected);
         assert!(diff(&mut memory, &failed("a"), &[], now).is_empty());
         assert_eq!(diff(&mut memory, &failed("b"), &[], now), expected);
+    }
+
+    #[test]
+    fn an_ungraded_assignment_announces_no_grade_nor_failed_grading() {
+        let now = Utc::now();
+        let mut memory = Memory::default();
+        let lab = |tag: Option<&str>, failed: bool| {
+            let mut lab1 = project("lab1", None);
+            lab1.assignment.as_mut().unwrap().grading =
+                Some(crate::classroom50::AssignmentGrading {
+                    mode: GradingMode::Off,
+                    max_points: None,
+                });
+            let remote = lab1.remote.as_mut().unwrap();
+            remote.head = Some(crate::projects::Commit {
+                oid: "a".into(),
+                at: Some(now),
+                author: None,
+            });
+            remote.grade = tag.map(|tag| Grade {
+                tag: tag.into(),
+                score: 8,
+                max_score: 10,
+                tests_passed: 4,
+                tests_total: 5,
+                tests: Vec::new(),
+                published_at: Some(now),
+                url: "u".into(),
+                release_notes: None,
+            });
+            remote.grading = failed.then_some(Grading::Failed {
+                url: None,
+                message: None,
+            });
+            snapshot(vec![lab1])
+        };
+        diff(&mut memory, &lab(None, false), &[], now);
+        // The autograder ran anyway: nothing to announce, and the tag is remembered.
+        assert!(diff(&mut memory, &lab(Some("submit/a"), true), &[], now).is_empty());
+        assert_eq!(
+            memory.grades.get("org/c-lab1-alice").map(String::as_str),
+            Some("submit/a")
+        );
+        assert!(memory.unseen.is_empty());
     }
 
     #[test]
