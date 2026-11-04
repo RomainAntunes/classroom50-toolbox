@@ -40,6 +40,7 @@ const check = (over: Partial<CommitCheck> = {}): CommitCheck => ({
   tooLarge: [],
   ahead: 0,
   hasIdentity: true,
+  notGraded: [],
   pushBlocked: null,
   ...over,
 });
@@ -72,6 +73,19 @@ describe("commitPush", () => {
     await answer("  Fix the loop ");
     expect(await done).toBe(true);
     expect(api.commitPush).toHaveBeenCalledWith("o/r", "Fix the loop");
+    expect(dialog.ask).not.toHaveBeenCalled();
+  });
+
+  it("names the files the assignment doesn't grade, and still pushes", async () => {
+    api.commitCheck.mockResolvedValue(check({ notGraded: ["notes.md"] }));
+    const done = commitPush(project(), "Lab");
+    await vi.waitFor(() => expect(prompt.current).not.toBeNull());
+    expect(prompt.current?.message).toContain(
+      "Not part of the submission, so not graded: notes.md.",
+    );
+    await answer("Notes");
+    expect(await done).toBe(true);
+    expect(api.commitPush).toHaveBeenCalledWith("o/r", "Notes");
     expect(dialog.ask).not.toHaveBeenCalled();
   });
 
@@ -218,7 +232,7 @@ describe("commitLocal", () => {
 });
 
 describe("submitProject without a marker", () => {
-  const noMarker = { hasMarker: false, uncommitted: [], editorFiles: [] };
+  const noMarker = { hasMarker: false, uncommitted: [], editorFiles: [], notGraded: [] };
   const withActions = (commitActions: Settings["commitActions"]) =>
     (settings.current = { commitActions } as Settings);
   const tooOld = {
@@ -281,7 +295,7 @@ describe("submitProject without a marker", () => {
 });
 
 describe("submitProject with uncommitted changes", () => {
-  const dirty = { hasMarker: true, uncommitted: ["a.c", "b.c"], editorFiles: [] };
+  const dirty = { hasMarker: true, uncommitted: ["a.c", "b.c"], editorFiles: [], notGraded: [] };
   const withActions = (commitActions: Settings["commitActions"]) =>
     (settings.current = { commitActions } as Settings);
   const tagMode = () => ({ ...project({ submissionMode: "tag" }), path: "/c" }) as Project;
@@ -319,6 +333,7 @@ describe("submitProject with uncommitted changes", () => {
       hasMarker: true,
       uncommitted: [],
       editorFiles: [".idea/"],
+      notGraded: [],
     });
     api.submitProject.mockResolvedValue({ url: null });
     dialog.ask.mockResolvedValue(true);

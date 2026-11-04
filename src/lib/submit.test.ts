@@ -37,7 +37,7 @@ const project = ({ due = null, local = {}, remote = {} }: Over = {}) =>
     remote: { defaultBranch: "main", head: { oid: HEAD, author: null }, ...remote },
   }) as unknown as Project;
 
-const clean: SubmitCheck = { hasMarker: true, uncommitted: [], editorFiles: [] };
+const clean: SubmitCheck = { hasMarker: true, uncommitted: [], editorFiles: [], notGraded: [] };
 const tooOld = {
   kind: "ghStudentOutdated",
   message: "too old",
@@ -99,6 +99,15 @@ describe("the confirm", () => {
     dialog.ask.mockResolvedValue(false);
     await submitProject(project(), "Lab");
     expect(asked()[0]).toContain("sent too: .vscode/, .DS_Store.");
+  });
+
+  it("names the files the assignment doesn't grade, and still submits", async () => {
+    api.submitCheck.mockResolvedValue({ ...clean, notGraded: ["notes.md", "scratch.c"] });
+    dialog.ask.mockResolvedValue(true);
+    expect(await submitProject(project(), "Lab")).toBe(true);
+    expect(dialog.ask).toHaveBeenCalledOnce();
+    expect(asked()[0]).toContain("Not part of the submission, so not graded: notes.md, scratch.c.");
+    expect(api.submitProject).toHaveBeenCalledOnce();
   });
 
   it("Cancel submits nothing and announces nothing", async () => {

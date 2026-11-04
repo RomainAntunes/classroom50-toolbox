@@ -26,6 +26,7 @@ for (const os of SKINS) {
           tooLarge: [],
           ahead: 0,
           hasIdentity: true,
+          notGraded: [],
           pushBlocked: "tagMode",
         }),
       ];

@@ -5,7 +5,7 @@ import { fail, ok, project, scenario, settings, snapshot } from "./fixtures";
 import type { Reply } from "./fixtures";
 
 const lab = project({ slug: "lab1", name: "Lab 1", pending: "unsubmitted" });
-const clean = { hasMarker: true, uncommitted: [], editorFiles: [] };
+const clean = { hasMarker: true, uncommitted: [], editorFiles: [], notGraded: [] };
 
 async function submitFails(app: App, reply: Reply, language = "en") {
   await app.start(
