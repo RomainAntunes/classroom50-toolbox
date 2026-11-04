@@ -10,15 +10,20 @@ use objc2::rc::Retained;
 use objc2::runtime::Bool;
 use objc2_event_kit::{
     EKAlarm, EKAuthorizationStatus, EKCalendar, EKEntityType, EKEvent, EKEventAvailability,
-    EKEventStore, EKSpan,
+    EKEventStore, EKSource, EKSourceType, EKSpan,
 };
 use objc2_foundation::{NSArray, NSDate, NSError, NSString, NSURL};
 
 use crate::error::{Error, Result};
-use crate::platform::{CalendarEvent, NativeCalendar, Written, WrittenEvents};
+use crate::platform::{self, CalendarEvent, NativeCalendar, Written, WrittenEvents};
 
 /// How long to wait for the user to answer the access prompt.
 const PROMPT_TIMEOUT: Duration = Duration::from_secs(120);
+/// The calendar the last write used (`calendar_id`) and its account (`event_id`, the
+/// source's identifier), so one the user deletes is made again in the same account.
+const CALENDAR_KEY: &str = "@macos/calendar";
+/// The title of a calendar made again after the chosen one was deleted.
+const NEW_TITLE: &str = "Classroom 50";
 
 fn status() -> EKAuthorizationStatus {
     unsafe { EKEventStore::authorizationStatusForEntityType(EKEntityType::Event) }
@@ -116,24 +121,120 @@ fn failed(err: Retained<NSError>) -> Error {
     Error::Unsupported(format!("Calendar: {}", err.localizedDescription()))
 }
 
+/// The calendar to write to: `calendar_id`, else (deleted by the user) one made earlier
+/// that the setting hasn't caught up with, else a new "Classroom 50" calendar in the
+/// deleted one's account, the default calendar's or On My Mac, at most once an hour
+/// (`platform::may_recreate`). Returns it with its new id when it isn't `calendar_id`.
+fn calendar(
+    store: &EKEventStore,
+    calendar_id: &str,
+    written: &mut WrittenEvents,
+) -> Result<(Retained<EKCalendar>, Option<String>)> {
+    let by_id = |id: &str| unsafe { store.calendarWithIdentifier(&NSString::from_str(id)) };
+    if let Some(found) = by_id(calendar_id) {
+        return Ok((found, None));
+    }
+    let last = written.get(CALENDAR_KEY).cloned();
+    if let Some(last) = &last
+        && last.calendar_id != calendar_id
+        && let Some(found) = by_id(&last.calendar_id)
+    {
+        return Ok((found, Some(last.calendar_id.clone())));
+    }
+    let now = chrono::Utc::now().timestamp();
+    if !platform::may_recreate(written, now) {
+        return Err(Error::Unsupported("that calendar no longer exists".into()));
+    }
+    platform::recreating(written, now);
+    let same = last
+        .as_ref()
+        .and_then(|l| unsafe { store.sourceWithIdentifier(&NSString::from_str(&l.event_id)) });
+    let default =
+        unsafe { store.defaultCalendarForNewEvents() }.and_then(|c| unsafe { c.source() });
+    let local = unsafe { store.sources() }
+        .iter()
+        .find(|s| unsafe { s.sourceType() } == EKSourceType::Local);
+    let mut tried: Vec<String> = Vec::new();
+    let mut error = Error::CalendarUnavailable;
+    for (source, which) in [
+        (same, "its account"),
+        (default, "the default account"),
+        (local, "On My Mac"),
+    ] {
+        let Some(source) = source else { continue };
+        let id = unsafe { source.sourceIdentifier() }.to_string();
+        if tried.contains(&id) {
+            continue;
+        }
+        tried.push(id);
+        match make(store, &source) {
+            Ok(made) => {
+                platform::recreated(written);
+                log::info!("the chosen calendar was deleted: made a new one in {which}");
+                let id = unsafe { made.calendarIdentifier() }.to_string();
+                return Ok((made, Some(id)));
+            }
+            Err(err) => error = err,
+        }
+    }
+    log::warn!("the chosen calendar was deleted and a new one couldn't be made: {error}");
+    Err(error)
+}
+
+/// A new event calendar named `NEW_TITLE` in `source`, saved.
+fn make(store: &EKEventStore, source: &EKSource) -> Result<Retained<EKCalendar>> {
+    unsafe {
+        let calendar = EKCalendar::calendarForEntityType_eventStore(EKEntityType::Event, store);
+        calendar.setTitle(&NSString::from_str(NEW_TITLE));
+        calendar.setSource(Some(source));
+        store
+            .saveCalendar_commit_error(&calendar, true)
+            .map_err(failed)?;
+        Ok(calendar)
+    }
+}
+
 pub fn write_calendar(
     calendar_id: &str,
     events: &[CalendarEvent],
     written: &mut WrittenEvents,
     _dir: &std::path::Path,
-) -> Result<()> {
+) -> Result<Option<String>> {
     let store = store(false)?;
-    let calendar = if events.is_empty() {
-        None
+    let (calendar, moved) = if events.is_empty() {
+        (None, None)
     } else {
-        let found = unsafe { store.calendarWithIdentifier(&NSString::from_str(calendar_id)) };
-        Some(found.ok_or_else(|| Error::Unsupported("that calendar no longer exists".into()))?)
+        let (calendar, moved) = calendar(&store, calendar_id, written)?;
+        (Some(calendar), moved)
     };
+    let calendar_id = moved.as_deref().unwrap_or(calendar_id);
+    match &calendar {
+        Some(calendar) => {
+            let source = unsafe { calendar.source() }
+                .map(|s| unsafe { s.sourceIdentifier() }.to_string())
+                .unwrap_or_default();
+            written.insert(
+                CALENDAR_KEY.to_owned(),
+                Written {
+                    event_id: source,
+                    calendar_id: calendar_id.to_owned(),
+                    fingerprint: 0,
+                },
+            );
+        }
+        None if calendar_id.is_empty() => {
+            written.remove(CALENDAR_KEY);
+        }
+        None => {}
+    }
 
     // Gone from the list, or written to another calendar: remove.
     let stale: Vec<String> = written
         .iter()
-        .filter(|(uid, w)| w.calendar_id != calendar_id || !events.iter().any(|e| &e.uid == *uid))
+        .filter(|(uid, w)| {
+            !uid.starts_with('@')
+                && (w.calendar_id != calendar_id || !events.iter().any(|e| &e.uid == *uid))
+        })
         .map(|(uid, _)| uid.clone())
         .collect();
     for uid in stale {
@@ -169,5 +270,5 @@ pub fn write_calendar(
             }
         }
     }
-    Ok(())
+    Ok(moved)
 }

@@ -211,6 +211,21 @@ mod tests {
     use crate::editors::ALL;
 
     #[test]
+    fn a_failed_recreation_waits_an_hour() {
+        let mut written = WrittenEvents::new();
+        assert!(may_recreate(&written, 1_000_000));
+        recreating(&mut written, 1_000_000);
+        assert!(!may_recreate(&written, 1_000_000));
+        assert!(!may_recreate(&written, 1_000_000 + 3599));
+        assert!(may_recreate(&written, 1_000_000 + 3600));
+        // The clock moved back past the attempt: no waiting for hours.
+        assert!(may_recreate(&written, 999_000));
+        recreated(&mut written);
+        assert!(may_recreate(&written, 1_000_001));
+        assert!(written.is_empty());
+    }
+
+    #[test]
     fn detects_wayland_sessions() {
         let cases = [
             (Some("wayland"), None, true),
@@ -307,17 +322,54 @@ pub fn native_calendars(ask: bool) -> Result<Vec<NativeCalendar>> {
 /// Makes `calendar_id` hold exactly `events`: adds and updates what changed, removes events
 /// the app wrote earlier that are gone (or sit in another calendar). `written` is updated
 /// as it goes, so a failure halfway loses nothing. `dir` (the app data dir) holds what the
-/// store reads, if anything: Linux's calendars read an `.ics` file there.
+/// store reads, if anything: Linux's calendars read an `.ics` file there. A calendar the
+/// user deleted is made again (`may_recreate`); returns its new id when it changed (macOS),
+/// for the setting to follow.
 pub fn write_calendar(
     calendar_id: &str,
     events: &[CalendarEvent],
     written: &mut WrittenEvents,
     dir: &Path,
-) -> Result<()> {
+) -> Result<Option<String>> {
     imp::write_calendar(calendar_id, events, written, dir)
 }
 
 /// Removes every event the app wrote (the user turned the sync off).
 pub fn clear_calendar(written: &mut WrittenEvents, dir: &Path) -> Result<()> {
-    imp::write_calendar("", &[], written, dir)
+    written.remove(RECREATE_KEY);
+    imp::write_calendar("", &[], written, dir).map(drop)
+}
+
+/// The `WrittenEvents` entry of a failed attempt to make again a calendar the user deleted:
+/// its `fingerprint` is the attempt's time (Unix seconds). Event uids never start with `@`.
+pub const RECREATE_KEY: &str = "@recreate";
+
+/// How long after a failed attempt a deleted calendar is tried again, so one that can't be
+/// made (an account that refuses new calendars, a calendar service that won't start) isn't
+/// tried at every sync.
+const RECREATE_RETRY_SECS: i64 = 3600;
+
+/// Whether a write may make the deleted calendar again `now` (Unix seconds): never tried,
+/// or the last try failed over an hour ago (or in the future: the clock moved back).
+pub fn may_recreate(written: &WrittenEvents, now: i64) -> bool {
+    written.get(RECREATE_KEY).is_none_or(|w| {
+        let at = i64::try_from(w.fingerprint).unwrap_or(i64::MAX);
+        now - at >= RECREATE_RETRY_SECS || at > now
+    })
+}
+
+/// Records an attempt before making it; `recreated` clears it once it worked.
+pub fn recreating(written: &mut WrittenEvents, now: i64) {
+    written.insert(
+        RECREATE_KEY.to_owned(),
+        Written {
+            event_id: String::new(),
+            calendar_id: String::new(),
+            fingerprint: u64::try_from(now).unwrap_or_default(),
+        },
+    );
+}
+
+pub fn recreated(written: &mut WrittenEvents) {
+    written.remove(RECREATE_KEY);
 }
