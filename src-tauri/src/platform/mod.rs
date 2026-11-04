@@ -19,6 +19,9 @@ mod linux;
 mod linux_calendar;
 #[cfg(target_os = "macos")]
 mod macos;
+// Pure (which calendar a write goes to, its markers), so it is tested on every OS.
+#[cfg_attr(not(target_os = "macos"), allow(dead_code))]
+mod macos_calendar;
 mod os_version;
 #[cfg(target_os = "windows")]
 mod windows;
