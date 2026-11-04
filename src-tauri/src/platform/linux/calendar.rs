@@ -136,7 +136,10 @@ pub fn write_calendar(
                     );
                 })?;
                 platform::recreated(written);
-                log::info!("the {} calendar was removed: added it again", t.id());
+                log::info!(
+                    "the {} calendar was removed: added it again (turning the sync off in Settings > Calendar stops this)",
+                    t.id()
+                );
                 written.insert(
                     t.key().to_owned(),
                     Written {
