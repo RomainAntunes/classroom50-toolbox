@@ -281,6 +281,20 @@ fn normalize_math(source: &str) -> String {
         None
     };
 
+    // The next `` `$ `` from `from`; once none is left, later openers don't search again,
+    // so a description of `` $`a `` repeated stays linear.
+    let mut no_backtick_closer = n;
+    let mut backtick_closer = |from: usize| -> Option<usize> {
+        if from >= no_backtick_closer {
+            return None;
+        }
+        let found = source[from..].find("`$").map(|at| from + at);
+        if found.is_none() {
+            no_backtick_closer = from;
+        }
+        found
+    };
+
     while i < n {
         while next < ranges.len() && ranges[next].range.end <= i {
             next += 1;
@@ -317,9 +331,8 @@ fn normalize_math(source: &str) -> String {
             },
             b'$' => {
                 if bytes.get(i + 1) == Some(&b'`')
-                    && let Some(at) = source[i + 2..].find("`$")
+                    && let Some(close) = backtick_closer(i + 2)
                 {
-                    let close = i + 2 + at;
                     out.push('$');
                     out.push_str(&source[i + 2..close].replace('$', "\\$"));
                     out.push('$');
@@ -1093,6 +1106,19 @@ mod tests {
             inline("see $`\\sqrt{3x-1}+(1+x)^2`$ here"),
             [text("see "), math("\\sqrt{3x-1}+(1+x)^2"), text(" here")]
         );
+    }
+
+    /// An opener with no closer after it searches once, not once per opener.
+    #[test]
+    fn unclosed_backtick_openers_stay_linear() {
+        let started = std::time::Instant::now();
+        // Every other `` `a $` `` is a code span; the openers between them have no closer.
+        let source = "$`a ".repeat(MAX_SOURCE / 4);
+        assert_eq!(normalize_math(&source), "\\$`a $`a ".repeat(MAX_SOURCE / 8));
+        parse(&source);
+        // A closer still counts after an opener that found one.
+        assert_eq!(normalize_math("$`a`$ $`b"), "$a$ \\$`b");
+        assert!(started.elapsed() < std::time::Duration::from_secs(2));
     }
 
     /// Unlike remark-math, pulldown-cmark never closes on an escaped dollar, so a body
