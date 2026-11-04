@@ -15,6 +15,7 @@ use serde::Deserialize;
 
 use crate::classroom50::{Assignment, GradingMode};
 use crate::error::Result;
+use crate::events::{IpcEvent, SettingsUpdated};
 use crate::groups::Group;
 use crate::platform::{self, CalendarEvent, WrittenEvents};
 use crate::projects::{self, ProjectsState, Snapshot};
@@ -384,12 +385,13 @@ impl CalendarState {
 
 /// Writes the due dates into `calendar_id` of the OS calendar now, or with `None` removes
 /// every event the app wrote. Runs on a blocking thread: EventKit calls are synchronous.
-pub async fn write_native(app: &AppHandle, calendar_id: Option<String>) -> Result<()> {
+/// Returns the calendar's new id when the chosen one was deleted and made again (macOS).
+pub async fn write_native(app: &AppHandle, calendar_id: Option<String>) -> Result<Option<String>> {
     let app = app.clone();
     tauri::async_runtime::spawn_blocking(move || {
         let state = app.state::<CalendarState>();
         let Ok(mut written) = state.written.lock() else {
-            return Ok(());
+            return Ok(None);
         };
         let result = match calendar_id {
             Some(id) => {
@@ -404,13 +406,33 @@ pub async fn write_native(app: &AppHandle, calendar_id: Option<String>) -> Resul
                 );
                 platform::write_calendar(&id, &events, &mut written, &state.data_dir)
             }
-            None => platform::clear_calendar(&mut written, &state.data_dir),
+            None => platform::clear_calendar(&mut written, &state.data_dir).map(|()| None),
         };
         state.save(&written);
         result
     })
     .await
-    .unwrap_or(Ok(()))
+    .unwrap_or(Ok(None))
+}
+
+/// Points the `nativeCalendar` setting at the calendar made again in place of `old`
+/// (deleted by the user), unless the user picked another one meanwhile, and tells the UI.
+fn follow_calendar(app: &AppHandle, old: &str, new: String) {
+    let store = app.state::<SettingsStore>();
+    let moved = store.update(|settings| {
+        (settings.native_calendar.as_deref() == Some(old)).then(|| Settings {
+            native_calendar: Some(new),
+            ..settings.clone()
+        })
+    });
+    match moved {
+        Ok(Some(saved)) => {
+            let reported = crate::commands::reported_settings(app, saved);
+            let _ = SettingsUpdated::emit(app, &reported);
+        }
+        Ok(None) => {}
+        Err(err) => log::warn!("could not save the new calendar: {err}"),
+    }
 }
 
 /// After a sync or a settings change: rewrites the exported file when its events changed,
@@ -432,10 +454,14 @@ pub fn sync(app: &AppHandle) {
                         let Some(id) = app.state::<SettingsStore>().get().native_calendar else {
                             break;
                         };
-                        let error = write_native(&app, Some(id))
-                            .await
-                            .err()
-                            .map(|e| e.to_string());
+                        let error = match write_native(&app, Some(id.clone())).await {
+                            Ok(Some(new)) => {
+                                follow_calendar(&app, &id, new);
+                                None
+                            }
+                            Ok(None) => None,
+                            Err(err) => Some(err.to_string()),
+                        };
                         let _ = state.note_write(error);
                     }
                     state.busy.store(false, Ordering::SeqCst);

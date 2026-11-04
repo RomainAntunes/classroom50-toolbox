@@ -94,13 +94,19 @@ pub fn targets(eds: bool, akonadi: bool, desktop: Option<&str>) -> Vec<CalendarS
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Step {
     Register(CalendarStore),
+    /// Registered once, then removed by the user (GNOME Calendar or KOrganizer deleted it):
+    /// add it again, at most once an hour (`platform::may_recreate`).
+    Restore(CalendarStore),
     Unregister(CalendarStore),
 }
 
-/// `registered` says which stores hold the calendar now (`WrittenEvents` keys).
+/// `registered` says which stores hold the calendar now (`WrittenEvents` keys); `gone`
+/// whether the target's registration has disappeared since, asked only for a registered
+/// target (it may make a D-Bus call).
 pub fn plan(
     target: Option<CalendarStore>,
     registered: impl Fn(CalendarStore) -> bool,
+    gone: impl FnOnce(CalendarStore) -> bool,
 ) -> Vec<Step> {
     let mut steps = Vec::new();
     // Remove first: switching stores never leaves two calendars behind on a failure.
@@ -109,10 +115,12 @@ pub fn plan(
             steps.push(Step::Unregister(t));
         }
     }
-    if let Some(t) = target
-        && !registered(t)
-    {
-        steps.push(Step::Register(t));
+    if let Some(t) = target {
+        if !registered(t) {
+            steps.push(Step::Register(t));
+        } else if gone(t) {
+            steps.push(Step::Restore(t));
+        }
     }
     steps
 }
@@ -367,17 +375,51 @@ fn instance_suffix(instance: Option<&str>) -> String {
         .unwrap_or_default()
 }
 
+fn control_service(instance: Option<&str>) -> String {
+    format!(
+        "org.freedesktop.Akonadi.Control{}",
+        instance_suffix(instance)
+    )
+}
+
 fn control(instance: Option<&str>, method: &'static str, args: Vec<Arg>) -> Call {
     Call {
-        service: format!(
-            "org.freedesktop.Akonadi.Control{}",
-            instance_suffix(instance)
-        ),
+        service: control_service(instance),
         path: "/AgentManager",
         interface: "org.freedesktop.Akonadi.AgentManager",
         method,
         args,
     }
+}
+
+/// Whether Akonadi is running, without starting it (its control service is D-Bus
+/// activated, so any call to it would): the bus's own `NameHasOwner`.
+pub fn akonadi_running(instance: Option<&str>) -> Call {
+    Call {
+        service: "org.freedesktop.DBus".into(),
+        path: "/org/freedesktop/DBus",
+        interface: "org.freedesktop.DBus",
+        method: "NameHasOwner",
+        args: vec![Arg::Str(control_service(instance))],
+    }
+}
+
+/// A boolean reply: `boolean true` (dbus-send), `(true,)` (gdbus), `true` (qdbus).
+pub fn parse_bool(stdout: &str) -> Option<bool> {
+    let words: Vec<&str> = stdout
+        .split(|c: char| !c.is_ascii_alphabetic())
+        .filter(|w| !w.is_empty())
+        .collect();
+    match (words.contains(&"true"), words.contains(&"false")) {
+        (true, false) => Some(true),
+        (false, true) => Some(false),
+        _ => None,
+    }
+}
+
+/// Whether the `agentInstances` reply lists the resource `id`.
+pub fn instance_listed(bus: Bus, stdout: &str, id: &str) -> bool {
+    parse_strings(bus, stdout).iter().any(|i| i == id)
 }
 
 fn resource_service(id: &str, instance: Option<&str>) -> String {
@@ -507,15 +549,16 @@ mod tests {
     #[test]
     fn plans_switches_by_removing_first() {
         let none = |_| false;
+        let here = |_| false;
         assert_eq!(
-            plan(Some(CalendarStore::Gnome), none),
+            plan(Some(CalendarStore::Gnome), none, here),
             [Step::Register(CalendarStore::Gnome)]
         );
-        assert!(plan(None, none).is_empty());
+        assert!(plan(None, none, here).is_empty());
         let gnome = |t| t == CalendarStore::Gnome;
-        assert!(plan(Some(CalendarStore::Gnome), gnome).is_empty());
+        assert!(plan(Some(CalendarStore::Gnome), gnome, here).is_empty());
         assert_eq!(
-            plan(Some(CalendarStore::Kde), gnome),
+            plan(Some(CalendarStore::Kde), gnome, here),
             [
                 Step::Unregister(CalendarStore::Gnome),
                 Step::Register(CalendarStore::Kde)
@@ -523,12 +566,71 @@ mod tests {
         );
         let both = |_| true;
         assert_eq!(
-            plan(None, both),
+            plan(None, both, |_| panic!("only asked for a registered target")),
             [
                 Step::Unregister(CalendarStore::Gnome),
                 Step::Unregister(CalendarStore::Kde)
             ]
         );
+    }
+
+    #[test]
+    fn plans_to_restore_a_calendar_the_user_removed() {
+        let gnome = |t| t == CalendarStore::Gnome;
+        assert_eq!(
+            plan(Some(CalendarStore::Gnome), gnome, |_| true),
+            [Step::Restore(CalendarStore::Gnome)]
+        );
+        // Not registered yet: a plain registration, without asking.
+        assert_eq!(
+            plan(Some(CalendarStore::Kde), gnome, |_| panic!(
+                "not registered"
+            )),
+            [
+                Step::Unregister(CalendarStore::Gnome),
+                Step::Register(CalendarStore::Kde)
+            ]
+        );
+    }
+
+    #[test]
+    fn asks_the_bus_whether_akonadi_runs() {
+        let call = akonadi_running(Some("work"));
+        assert_eq!(call.method, "NameHasOwner");
+        assert_eq!(
+            call.args,
+            [Arg::Str("org.freedesktop.Akonadi.Control.work".into())]
+        );
+        assert_eq!(
+            call_args(Bus::DbusSend, &call),
+            [
+                "--session",
+                "--print-reply",
+                "--dest=org.freedesktop.DBus",
+                "/org/freedesktop/DBus",
+                "org.freedesktop.DBus.NameHasOwner",
+                "string:org.freedesktop.Akonadi.Control.work"
+            ]
+        );
+        let reply = "method return time=1.2 sender=org.freedesktop.DBus -> destination=:1.9 serial=3 reply_serial=2\n   boolean true\n";
+        assert_eq!(parse_bool(reply), Some(true));
+        assert_eq!(parse_bool("(false,)\n"), Some(false));
+        assert_eq!(parse_bool("true\n"), Some(true));
+        assert_eq!(parse_bool("Error org.freedesktop.DBus.Error.NoReply"), None);
+    }
+
+    #[test]
+    fn finds_our_resource_among_the_instances() {
+        let id = "akonadi_ical_resource_3";
+        let gdbus = "(['akonadi_maildir_resource_0', 'akonadi_ical_resource_3'],)\n";
+        assert!(instance_listed(Bus::Gdbus, gdbus, id));
+        assert!(!instance_listed(
+            Bus::Gdbus,
+            gdbus,
+            "akonadi_ical_resource_30"
+        ));
+        let qdbus = "akonadi_maildir_resource_0\nakonadi_ical_resource_1\n";
+        assert!(!instance_listed(Bus::Qdbus("qdbus6"), qdbus, id));
     }
 
     #[test]
