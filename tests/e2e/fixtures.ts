@@ -258,6 +258,7 @@ export function project(options: ProjectOptions): Project {
           history: [],
           grading: null,
           feedback: null,
+          milestones: [],
           ...options.remote,
         };
   return {
