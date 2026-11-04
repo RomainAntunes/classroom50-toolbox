@@ -78,6 +78,9 @@ export const config = {
   waitforTimeout: 30_000,
   connectionRetryTimeout: 120_000,
   connectionRetryCount: 1,
+  // CI runs the suite under `xvfb-run`, and the app needs X11 (`GDK_BACKEND`): never let the
+  // runner start a display of its own (Weston first) when none is set.
+  displayServerEnabled: false,
 
   async onPrepare() {
     if (!existsSync(application)) {

@@ -101,16 +101,19 @@ describe("Classroom 50 Toolbox", () => {
     // The button asks through a native dialog WebDriver can't reach, so the commands it
     // runs are called the same way the UI calls them. No `error` key in the result: wdio
     // takes a response whose value has one for a failed command.
-    const outcome = await browser.executeAsync((id, done) => {
+    const outcome = await browser.execute(async (id) => {
       const { invoke } = window.__TAURI_INTERNALS__;
-      invoke("submit_check", { id }).then(
-        (check) =>
-          invoke("submit_project", { id }).then(
-            (submitted) => done({ check, submitted }),
-            (refused) => done({ check, refused }),
-          ),
-        (refused) => done({ refused }),
-      );
+      let check;
+      try {
+        check = await invoke("submit_check", { id });
+      } catch (refused) {
+        return { refused };
+      }
+      try {
+        return { check, submitted: await invoke("submit_project", { id }) };
+      } catch (refused) {
+        return { check, refused };
+      }
     }, HELLO_ID);
     expect(outcome.check).toEqual({
       hasMarker: true,
