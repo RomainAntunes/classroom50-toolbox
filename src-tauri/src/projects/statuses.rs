@@ -4,13 +4,17 @@
 use std::collections::HashMap;
 
 use futures_util::future::join_all;
-use serde::Deserialize;
+use serde::de::Error as _;
+use serde::{Deserialize, Deserializer};
+use serde_json::{Map, Value};
 
 use super::{
-    Progress, ProjectsState, REPO_FRAGMENT, RemoteRepo, RepoNode, SyncIssue, fetch_nodes, key,
+    Extra, Progress, ProjectsState, REPO_FRAGMENT, RemoteRepo, RepoNode, SyncIssue,
+    fetch_nodes_with, key,
 };
 use crate::classroom50::RepoConfig;
 use crate::error::{Error, Result};
+use crate::milestones::{self, TagRefs};
 use crate::status::{self, Grade, GradeSummary, StatusFields};
 use crate::sync_progress::Phase;
 use crate::tools;
@@ -33,12 +37,31 @@ pub(super) async fn status_auth(state: &ProjectsState) -> Option<StatusAuth> {
     Some(StatusAuth { token, login })
 }
 
-#[derive(Deserialize)]
 struct StatusNode {
-    #[serde(flatten)]
     repo: RepoNode,
-    #[serde(flatten)]
     status: StatusFields,
+    /// The tags read for each milestone pattern, `m0`, `m1`... in the patterns' order.
+    tags: Vec<Option<TagRefs>>,
+}
+
+impl<'de> Deserialize<'de> for StatusNode {
+    fn deserialize<D: Deserializer<'de>>(deserializer: D) -> std::result::Result<Self, D::Error> {
+        #[derive(Deserialize)]
+        struct Fields {
+            #[serde(flatten)]
+            repo: RepoNode,
+            #[serde(flatten)]
+            status: StatusFields,
+        }
+        let mut map = Map::<String, Value>::deserialize(deserializer)?;
+        let mut tags = Vec::new();
+        while let Some(refs) = map.remove(&format!("m{}", tags.len())) {
+            tags.push(serde_json::from_value(refs).map_err(D::Error::custom)?);
+        }
+        let Fields { repo, status } =
+            serde_json::from_value(Value::Object(map)).map_err(D::Error::custom)?;
+        Ok(Self { repo, status, tags })
+    }
 }
 
 /// Status fields survive a discovery re-read, which doesn't fetch them.
@@ -48,25 +71,36 @@ pub(super) fn keep_status(repo: &mut RemoteRepo, old: &RemoteRepo) {
     repo.history.clone_from(&old.history);
     repo.grading.clone_from(&old.grading);
     repo.feedback.clone_from(&old.feedback);
+    repo.milestones.clone_from(&old.milestones);
 }
 
 /// Re-reads the assignment repos with the status fragment, downloads new grades and
 /// stores the result in the cache. A repo that can't be read keeps its last data.
+/// `patterns[i]` are the milestone tag patterns of `repos[i]`'s assignment, whose tags are
+/// read only for repos that have some.
 pub(super) async fn refresh_statuses(
     state: &ProjectsState,
     http: &reqwest::Client,
     auth: &StatusAuth,
     repos: Vec<(RemoteRepo, RepoConfig)>,
+    patterns: &[Vec<String>],
     progress: &Progress,
 ) -> Vec<(RemoteRepo, RepoConfig)> {
-    let fragments = format!("{REPO_FRAGMENT}{}", status::FRAGMENT);
     let names: Vec<String> = repos
         .iter()
         .map(|(r, _)| format!("{}/{}", r.owner, r.name))
         .collect();
-    let batches: Vec<Vec<&str>> = names
+    let read: Vec<Vec<&str>> = (0..repos.len())
+        .map(|i| {
+            patterns
+                .get(i)
+                .map_or_else(Vec::new, |p| milestones::readable(p))
+        })
+        .collect();
+    let batches: Vec<(Vec<&str>, Vec<Extra>, String)> = names
         .chunks(STATUS_BATCH)
-        .map(|batch| batch.iter().map(String::as_str).collect())
+        .zip(read.chunks(STATUS_BATCH))
+        .map(|(batch, read)| status_batch(batch, read))
         .collect();
     progress.set_total(Phase::Statuses, batches.len());
     let mut responses = Vec::with_capacity(batches.len());
@@ -79,9 +113,16 @@ pub(super) async fn refresh_statuses(
             break;
         }
         responses.extend(
-            join_all(group.iter().map(|batch| async {
-                let response =
-                    fetch_nodes::<StatusNode>(http, &auth.token, batch, "Status", &fragments).await;
+            join_all(group.iter().map(|(batch, extras, fragments)| async move {
+                let response = fetch_nodes_with::<StatusNode>(
+                    http,
+                    &auth.token,
+                    batch,
+                    extras,
+                    "Status",
+                    fragments,
+                )
+                .await;
                 progress.advance(Phase::Statuses);
                 response
             }))
@@ -116,12 +157,19 @@ pub(super) async fn refresh_statuses(
 
     let mut updated = Vec::with_capacity(repos.len());
     for (i, (old, config)) in repos.into_iter().enumerate() {
-        let Some(StatusNode { repo, mut status }) = nodes.remove(&i) else {
+        let Some(StatusNode {
+            repo,
+            mut status,
+            tags,
+        }) = nodes.remove(&i)
+        else {
             updated.push((old, config));
             continue;
         };
         let mut repo = repo.into_remote();
         repo.template.clone_from(&old.template);
+        repo.milestones =
+            milestones::newest(&read[i], tags).unwrap_or_else(|| old.milestones.clone());
         repo.unmerged = status.unmerged(repo.default_branch.as_deref());
         repo.feedback = status.feedback(&auth.login);
         repo.grading = status.grading();
@@ -166,6 +214,31 @@ pub(super) async fn refresh_statuses(
     }
     state.store_remote(cache);
     updated
+}
+
+/// One status request: its names, what each reads beside the fragment (the milestone tags)
+/// and the fragments it uses, the milestones' only when one of its repos reads them.
+fn status_batch<'a>(
+    names: &'a [String],
+    patterns: &[Vec<&str>],
+) -> (Vec<&'a str>, Vec<Extra>, String) {
+    let extras: Vec<Extra> = patterns
+        .iter()
+        .enumerate()
+        .map(|(i, patterns)| {
+            let (fields, variables) = milestones::selection(i, patterns);
+            Extra { fields, variables }
+        })
+        .collect();
+    let mut fragments = format!("{REPO_FRAGMENT}{}", status::FRAGMENT);
+    if patterns.iter().any(|p| !p.is_empty()) {
+        fragments.push_str(milestones::FRAGMENT);
+    }
+    (
+        names.iter().map(String::as_str).collect(),
+        extras,
+        fragments,
+    )
 }
 
 /// The summary of each graded release, newest first. A result is downloaded once per tag;
@@ -278,8 +351,30 @@ mod tests {
         assert_eq!(hello.status.grading(), None);
         assert_eq!(hello.status.feedback("ada-e2e"), None);
         assert!(hello.status.unmerged(Some("main")).is_empty());
+        assert!(hello.tags.is_empty(), "no milestones read for hello");
         let mut sorting = statuses.remove("r1").flatten().unwrap();
         assert!(sorting.status.graded_releases().is_empty());
         assert!(sorting.repo.into_remote().config.is_some());
+        // `draft` and the newest `v*` pushed, `final` not yet; `draft-old` is no `draft`.
+        let milestones = milestones::newest(&["draft", "final", "v*"], sorting.tags).unwrap();
+        let tags: Vec<Option<&str>> = milestones
+            .iter()
+            .map(|m| m.tag.as_ref().map(|t| t.name.as_str()))
+            .collect();
+        assert_eq!(tags, [Some("draft"), None, Some("v2")]);
+        assert!(milestones[2].tag.as_ref().unwrap().at.is_some());
+    }
+
+    #[test]
+    fn reads_milestone_tags_only_where_an_assignment_names_some() {
+        let names = ["o/a".to_owned(), "o/b".to_owned()];
+        let (batch, extras, fragments) = status_batch(&names, &[vec![], vec!["phase1"]]);
+        assert_eq!(batch, ["o/a", "o/b"]);
+        assert!(extras[0].fields.is_empty() && extras[0].variables.is_empty());
+        assert!(extras[1].fields.contains("m0: refs(") && extras[1].fields.contains("$q1_0"));
+        assert!(fragments.contains("fragment Milestone on Ref"));
+        // GitHub rejects a fragment no field uses.
+        let (_, _, fragments) = status_batch(&names, &[vec![], vec![]]);
+        assert!(!fragments.contains("Milestone"));
     }
 }

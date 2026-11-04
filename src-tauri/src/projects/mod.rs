@@ -37,6 +37,7 @@ use crate::classroom50::{self, Assignment, Classroom, RepoConfig};
 use crate::error::{Error, Result};
 use crate::github::{self, HttpCache};
 use crate::groups::Group;
+use crate::milestones::Milestone;
 use crate::status::{Branch, Feedback, Grade, GradeSummary, Grading};
 use crate::sync_progress::Costs;
 
@@ -50,7 +51,7 @@ use git::{check_clones, commit_emails, local_states};
 use identify::{Found, identify, identify_by, without_doubtful_templates};
 use merge::{late_seconds, merge, pending, sort_key};
 use progress::Progress;
-use remote::{REPO_FRAGMENT, RepoNode, fetch_nodes, sync_remote};
+use remote::{Extra, REPO_FRAGMENT, RepoNode, fetch_nodes_with, sync_remote};
 use renames::renamed_clone;
 use scan::{scan_local, watch_targets};
 use schedule::may_call_github;
@@ -123,6 +124,10 @@ pub struct RemoteRepo {
     pub grading: Option<Grading>,
     #[serde(default)]
     pub feedback: Option<Feedback>,
+    /// Each milestone tag pattern of the assignment (`submission_tags`) with the newest tag
+    /// matching it; empty when it names none.
+    #[serde(default)]
+    pub milestones: Vec<Milestone>,
 }
 
 /// How many changed paths `LocalState` names; `changed_files` counts them all.

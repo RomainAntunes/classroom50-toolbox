@@ -20,6 +20,7 @@ pub mod github;
 pub mod groups;
 mod login;
 pub mod markdown;
+pub mod milestones;
 pub mod noise;
 pub mod platform;
 mod popover;

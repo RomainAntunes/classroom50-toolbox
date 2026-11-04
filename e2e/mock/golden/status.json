@@ -125,6 +125,51 @@
     },
     "feedback": {
       "nodes": []
+    },
+    "m0": {
+      "nodes": [
+        {
+          "name": "draft",
+          "target": {
+            "oid": "8888888888888888888888888888888888888888",
+            "committedDate": "2026-10-12T12:00:00Z"
+          }
+        },
+        {
+          "name": "draft-old",
+          "target": {
+            "oid": "8888888888888888888888888888888888888888",
+            "committedDate": "2026-10-12T12:00:00Z"
+          }
+        }
+      ]
+    },
+    "m1": {
+      "nodes": []
+    },
+    "m2": {
+      "nodes": [
+        {
+          "name": "v2",
+          "target": {
+            "oid": "3333333333333333333333333333333333333333",
+            "committedDate": "2026-10-15T12:00:00Z"
+          }
+        },
+        {
+          "name": "v1",
+          "target": {
+            "oid": "ffffffffffffffffffffffffffffffffffffffff",
+            "tagger": {
+              "date": "2026-10-13T13:00:00Z"
+            },
+            "target": {
+              "oid": "9999999999999999999999999999999999999999",
+              "committedDate": "2026-10-13T12:00:00Z"
+            }
+          }
+        }
+      ]
     }
   },
   "r2": {

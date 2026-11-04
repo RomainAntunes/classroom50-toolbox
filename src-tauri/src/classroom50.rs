@@ -130,6 +130,10 @@ pub struct Assignment {
     /// `origin` with the old name (GitHub redirects it), so both still count.
     #[serde(default, alias = "renamedFrom")]
     pub renamed_from: Option<String>,
+    /// Milestone tag patterns (`phase1`, `v*`): a tag the student pushes that matches one
+    /// is a submission of that milestone, next to `submit/*` (`milestones`). Read only.
+    #[serde(default, alias = "submissionTags")]
+    pub submission_tags: Vec<String>,
     /// The repo each student repo is generated from; absent on `empty_repo` assignments.
     #[serde(default)]
     pub template: Option<Template>,
@@ -795,6 +799,8 @@ mod tests {
         );
         assert_eq!(assignments[1].mode, AssignmentMode::Team);
         assert_eq!(assignments[1].due, None);
+        // No milestone tags unless the teacher named some.
+        assert!(assignments[0].submission_tags.is_empty());
     }
 
     #[test]
@@ -877,11 +883,13 @@ mod tests {
         let upstream: Assignment = serde_json::from_value(serde_json::json!({
             "slug": "lab", "name": "Lab", "mode": "team",
             "available_from": "2026-10-01T08:00:00Z", "submission_mode": "tag",
-            "feedback_pr": true, "team_formation": "student", "repo_visibility": "public"
+            "feedback_pr": true, "team_formation": "student", "repo_visibility": "public",
+            "submission_tags": ["phase1", "v*"]
         }))
         .unwrap();
         let saved = serde_json::to_value(&upstream).unwrap();
         assert!(saved.get("feedbackPr").is_some());
+        assert_eq!(saved["submissionTags"], serde_json::json!(["phase1", "v*"]));
         let mut saved = saved;
         // A tree in a file is never read: it comes from the description alone.
         saved["descriptionDoc"] = serde_json::json!([{ "kind": "rule" }]);
@@ -892,6 +900,7 @@ mod tests {
         assert_eq!(restored.team_formation, Some(TeamFormation::Student));
         assert_eq!(restored.available_from, upstream.available_from);
         assert_eq!(restored.repo_visibility.as_deref(), Some("public"));
+        assert_eq!(restored.submission_tags, ["phase1", "v*"]);
     }
 
     /// The mock's manifests (`testenv::golden`) read like published ones.
@@ -914,6 +923,7 @@ mod tests {
         assert_eq!(algo[0].allowed_files, ["*", "!hello.c"]);
         assert!(algo[1].allowed_files.is_empty());
         assert!(algo.iter().all(|a| a.due.is_some()));
+        assert_eq!(algo[1].submission_tags, ["draft", "final", "v*"]);
         let web = parse_assignments("web", &crate::testenv::golden("manifest-web")).unwrap();
         assert_eq!(
             assignment_for_repo("web-portfolio-ada-e2e", "web", &web)

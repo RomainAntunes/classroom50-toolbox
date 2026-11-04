@@ -77,7 +77,11 @@ pub(super) async fn build(
     let remote = without_doubtful_templates(remote);
     let remote = match status {
         Some(auth) => {
-            let remote = refresh_statuses(state, http, auth, remote, progress).await;
+            let patterns: Vec<Vec<String>> = remote
+                .iter()
+                .map(|(repo, config)| milestone_patterns(&repo.owner, config, &manifests))
+                .collect();
+            let remote = refresh_statuses(state, http, auth, remote, &patterns, progress).await;
             progress.finish_phase(Phase::Statuses);
             remote
         }
@@ -178,6 +182,23 @@ pub(super) async fn build(
         Vec::new()
     };
     (projects, unaccepted)
+}
+
+/// The milestone tag patterns of the assignment `config` names in `owner`'s classroom.
+fn milestone_patterns(
+    owner: &str,
+    config: &RepoConfig,
+    manifests: &HashMap<ClassroomKey, Vec<Assignment>>,
+) -> Vec<String> {
+    let key = (
+        owner.to_ascii_lowercase(),
+        config.classroom.to_ascii_lowercase(),
+    );
+    manifests
+        .get(&key)
+        .and_then(|list| classroom50::assignment_for_slug(&config.assignment, list))
+        .map(|a| a.submission_tags.clone())
+        .unwrap_or_default()
 }
 
 /// Open assignments of the user's classrooms with no repo yet, published or upcoming, by
