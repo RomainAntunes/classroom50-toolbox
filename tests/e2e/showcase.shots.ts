@@ -220,6 +220,7 @@ function showcase(over: Partial<Scenario> = {}): Scenario {
           tooLarge: [],
           ahead: 0,
           hasIdentity: true,
+          notGraded: [],
           pushBlocked: null,
         }),
       ],

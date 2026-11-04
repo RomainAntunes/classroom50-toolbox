@@ -22,6 +22,7 @@ function check(over: Partial<CommitCheck> = {}): CommitCheck {
     tooLarge: [],
     ahead: 0,
     hasIdentity: true,
+    notGraded: [],
     pushBlocked: null,
     ...over,
   };
@@ -78,6 +79,30 @@ test("Commit only is the second action and never pushes", async ({ app }) => {
 test("cancelling the prompt writes nothing", async ({ app }) => {
   await open(app, { commit_check: [ok(check())] });
   await app.prompt.getByRole("textbox").fill("never sent");
+  await app.prompt.getByRole("button", { name: "Cancel" }).click();
+  await expect(app.prompt).toHaveCount(0);
+  expect(await app.writes()).toEqual([]);
+});
+
+test("files the assignment doesn't grade are named, and the push goes ahead", async ({ app }) => {
+  await open(app, {
+    commit_check: [ok(check({ notGraded: ["notes.md", "scratch/try.c"] }))],
+    commit_push: [ok({ commit: "abc" })],
+  });
+  await expect(app.prompt).toContainText(
+    "Not part of the submission, so not graded: notes.md, scratch/try.c.",
+  );
+  // Advice only: both actions stay, and nothing else is asked.
+  await expect(app.prompt.getByRole("button", { name: "Commit only" })).toBeVisible();
+  await app.prompt.getByRole("textbox").fill("Add notes");
+  await app.prompt.getByRole("button", { name: "Commit & push" }).click();
+  await app.waitForCall("commit_push");
+  expect(await app.writes()).toEqual(["commit_push"]);
+});
+
+test("files that aren't graded don't change a cancel", async ({ app }) => {
+  await open(app, { commit_check: [ok(check({ notGraded: ["notes.md"] }))] }, "Commit…");
+  await expect(app.prompt).toContainText("Not part of the submission, so not graded: notes.md.");
   await app.prompt.getByRole("button", { name: "Cancel" }).click();
   await expect(app.prompt).toHaveCount(0);
   expect(await app.writes()).toEqual([]);
@@ -170,9 +195,10 @@ test("no git identity, declined: nothing is written", async ({ app }) => {
 test("nothing to commit: Commit & push offers to push the local commits", async ({ app }) => {
   await open(app, {
     commit_check: [fail("nothingToCommit")],
-    push_check: [ok(check({ files: [], untracked: [], ahead: 2 }))],
+    push_check: [ok(check({ files: [], untracked: [], ahead: 2, notGraded: ["notes.md"] }))],
   });
   const dialog = await app.expectDialog([/Push your 2 commits to main on GitHub\?/], "cancel");
+  expect(dialog.message).toContain("Not part of the submission, so not graded: notes.md.");
   expect(dialog.labels.ok).toBe("Push");
   expect(await app.writes()).toEqual([]);
 });

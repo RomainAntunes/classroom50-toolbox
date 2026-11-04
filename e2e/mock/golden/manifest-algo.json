@@ -9,7 +9,8 @@
       "description": "Print a **greeting**, then a farewell, scored $x^2$ for $5.\n\n- [x] `hello`\n- [ ] `goodbye`",
       "due": "2026-10-19T12:00:00Z",
       "submission_mode": "tag",
-      "pass_threshold": 50
+      "pass_threshold": 50,
+      "allowed_files": ["*", "!hello.c"]
     },
     {
       "slug": "sorting",

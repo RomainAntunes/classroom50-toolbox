@@ -152,6 +152,7 @@ export function assignment(over: Partial<Assignment> & { slug: string }): Assign
     repoVisibility: null,
     renamedFrom: null,
     template: null,
+    allowedFiles: [],
     ...over,
   };
 }
@@ -234,6 +235,8 @@ export function project(options: ProjectOptions): Project {
           unmerged: [],
           remoteAhead: false,
           activeAt: null,
+          notGradedFiles: 0,
+          notGradedPaths: [],
           ...options.local,
         };
   const remote: RemoteRepo | null =

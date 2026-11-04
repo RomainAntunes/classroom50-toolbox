@@ -32,7 +32,14 @@ export function richScenario(over: Partial<Settings> = {}): Scenario {
         project({
           slug: "lab1",
           name: "Lab 1: Hello, World",
-          assignment: { due: hoursFromNow(-30), passThreshold: 90, ...markdownDescription },
+          // Only hello.c is graded: the clone's scratch file is listed as not graded.
+          assignment: {
+            due: hoursFromNow(-30),
+            passThreshold: 90,
+            allowedFiles: ["*", "!hello.c"],
+            ...markdownDescription,
+          },
+          local: { notGradedFiles: 1, notGradedPaths: ["scratch.c"] },
           lateSeconds: 26 * 3600,
           remote: {
             grade: grade(8, 10, {
