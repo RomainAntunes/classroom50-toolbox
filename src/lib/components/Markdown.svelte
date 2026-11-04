@@ -16,6 +16,12 @@
     event.preventDefault();
     void openUrl(href);
   }
+
+  // A middle click fires `auxclick`, not `click`: without this the webview would follow
+  // the link or open a window of its own.
+  function openAux(event: MouseEvent, href: string) {
+    if (event.button === 1) open(event, href);
+  }
 </script>
 
 {#snippet inlines(content: MarkdownInline[])}
@@ -29,7 +35,8 @@
       >{:else if inline.kind === "link"}<a
         href={inline.href}
         title={inline.href}
-        onclick={(event) => open(event, inline.href)}>{@render inlines(inline.content)}</a
+        onclick={(event) => open(event, inline.href)}
+        onauxclick={(event) => openAux(event, inline.href)}>{@render inlines(inline.content)}</a
       >{:else if inline.kind === "break"}<br />{:else if inline.kind === "footnoteRef"}<sup
         >{inline.number}</sup
       >{/if}

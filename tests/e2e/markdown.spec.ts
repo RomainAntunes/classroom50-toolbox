@@ -111,6 +111,26 @@ test("a link in a description opens in the browser and nothing else", async ({ a
   expect(await app.writes()).toEqual([]);
 });
 
+test("a middle click on a link opens it in the browser too, never in the webview", async ({
+  app,
+  page,
+}) => {
+  await app.start(described());
+  const row = app.row("Lab 1");
+  await row.locator("[data-row]").click();
+  await row.getByRole("button", { name: "Show more" }).click();
+  const url = page.url();
+  const pages = page.context().pages().length;
+
+  await row.locator(".description").getByRole("link", { name: "spec" }).click({ button: "middle" });
+  const opened = await app.waitForCall("plugin:opener|open_url");
+  expect(opened.map((call) => call.args.url)).toEqual(["https://example.org/spec"]);
+  expect(page.url()).toBe(url);
+  expect(page.context().pages()).toHaveLength(pages);
+  await expect(row.locator(".description")).toBeVisible();
+  expect(await app.writes()).toEqual([]);
+});
+
 test("a link below the fold opens the description when it gets the focus", async ({ app }) => {
   await app.start(described());
   const row = app.row("Lab 1");
