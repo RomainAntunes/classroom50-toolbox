@@ -183,6 +183,7 @@
   "settings.updates.betaHint": "Des versions en avance, avec les nouveautés d'abord. De retour sur Stable, cette version reste jusqu'à la prochaine version stable.",
   "settings.updates.msiHint": "Les versions bêta demandent l'installateur .exe ; cette installation MSI reste sur Stable.",
   "settings.language.system": "Système",
+  "settings.language.loadFailed": "Impossible de charger la langue {language}. La langue actuelle est conservée.",
   "settings.dev.network": "Réseau",
   "settings.dev.networkHint": "Simule une panne de GitHub (erreurs serveur) ou un appareil hors ligne, jusqu'au retour à Normal. Actualisez pour le voir.",
   "settings.dev.network.normal": "Normal",

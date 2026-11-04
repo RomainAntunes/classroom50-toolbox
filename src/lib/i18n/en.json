@@ -182,6 +182,7 @@
   "settings.updates.betaHint": "Early versions, new features first. Back on Stable, this version stays until a newer stable one is out.",
   "settings.updates.msiHint": "Beta versions need the .exe installer; this MSI install stays on Stable.",
   "settings.language.system": "System",
+  "settings.language.loadFailed": "Couldn't load {language}. The current language stays.",
   "settings.dev.network": "Network",
   "settings.dev.networkHint": "Pretends GitHub is down (server errors) or the device is offline, until set back to Normal. Refresh to see it.",
   "settings.dev.network.normal": "Normal",

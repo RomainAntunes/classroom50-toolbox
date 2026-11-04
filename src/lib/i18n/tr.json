@@ -182,6 +182,7 @@
   "settings.updates.betaHint": "Erken sürümler, önce yeni özellikler. Kararlı kanala döndüğünüzde bu sürüm, daha yeni bir kararlı sürüm çıkana kadar kalır.",
   "settings.updates.msiHint": "Beta sürümleri .exe yükleyicisini gerektirir; bu MSI kurulumu Kararlı kanalında kalır.",
   "settings.language.system": "Sistem",
+  "settings.language.loadFailed": "{language} dili yüklenemedi. Geçerli dil korunuyor.",
   "settings.dev.network": "Ağ",
   "settings.dev.networkHint": "Normal'e geri alınana kadar GitHub çökmüş (sunucu hataları) veya cihaz çevrimdışıymış gibi davranır. Görmek için yenileyin.",
   "settings.dev.network.normal": "Normal",

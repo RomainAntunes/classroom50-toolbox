@@ -184,6 +184,7 @@
   "settings.updates.betaHint": "Wczesne wersje, nowości najpierw. Po powrocie na Stabilny ta wersja zostaje, dopóki nie wyjdzie nowsza stabilna.",
   "settings.updates.msiHint": "Wersje beta wymagają instalatora .exe; ta instalacja MSI zostaje na kanale Stabilny.",
   "settings.language.system": "Systemowy",
+  "settings.language.loadFailed": "Nie udało się wczytać języka {language}. Zostaje obecny język.",
   "settings.dev.network": "Sieć",
   "settings.dev.networkHint": "Udaje awarię GitHuba (błędy serwera) albo brak połączenia, dopóki nie przywrócisz opcji Normalna. Odśwież, aby to zobaczyć.",
   "settings.dev.network.normal": "Normalna",

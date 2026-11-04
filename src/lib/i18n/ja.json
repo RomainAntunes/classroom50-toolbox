@@ -181,6 +181,7 @@
   "settings.updates.betaHint": "新しいバージョンと新機能をいち早く試せます。安定版に戻すと、新しい安定版が出るまでこのバージョンのままです。",
   "settings.updates.msiHint": "ベータ版には.exeインストーラーが必要です。MSIでインストールした場合は安定版のままです。",
   "settings.language.system": "システム",
+  "settings.language.loadFailed": "{language}を読み込めませんでした。現在の言語のままです。",
   "settings.dev.network": "ネットワーク",
   "settings.dev.networkHint": "「標準」に戻すまで、GitHubの障害（サーバーエラー）やデバイスのオフラインを再現します。更新すると反映されます。",
   "settings.dev.network.normal": "標準",

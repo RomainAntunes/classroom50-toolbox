@@ -158,8 +158,8 @@ describe("deadlines", () => {
     expect(trayMenu(items, NOW).deadlines).toEqual([]);
   });
 
-  it("speaks the UI's language", () => {
-    setLocale("fr");
+  it("speaks the UI's language", async () => {
+    await setLocale("fr");
     const menu = trayMenu(input([project("1", iso(29, 22, 30))]), NOW);
     expect(labels(menu)).toEqual(["Lab 1 · À rendre demain à 22:30"]);
   });

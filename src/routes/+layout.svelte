@@ -66,23 +66,35 @@
     void api.hidePopover();
   }
 
-  // The `language` setting, live: `t` is reactive, so the whole UI follows at once, and
-  // `dir` lays it out right to left for Arabic, Hebrew... (components use logical CSS
-  // properties only, so they follow). "System" reads the OS's languages from Rust:
-  // WKWebView's `navigator.languages` holds the app bundle's localizations, not the
-  // user's. They stand in until Rust answers.
+  // The `language` setting, live: `t` is reactive, so the whole UI follows once the
+  // catalog is loaded (English until then), and `dir` lays it out right to left for
+  // Arabic, Hebrew... (components use logical CSS properties only, so they follow).
+  // "System" reads the OS's languages from Rust: WKWebView's `navigator.languages` holds
+  // the app bundle's localizations, not the user's. They stand in until Rust answers.
+  // Settings loads a picked language before saving it and says when that fails, so a
+  // failure here (a catalog that won't load at start) only keeps the language shown.
   const language = $derived(settings.current?.language ?? "system");
   let systemLanguages = $state<readonly string[]>(navigator.languages);
   $effect(() => {
-    setLocale(language, systemLanguages);
+    setLocale(language, systemLanguages).catch((err: unknown) => {
+      console.error("couldn't load the catalog", err);
+    });
+  });
+  // The active catalog's, which changes once it is loaded (and with the dev preview).
+  $effect(() => {
     document.documentElement.lang = currentLocale();
     document.documentElement.dir = currentDirection();
   });
+
+  // Whether the saved language shows (or failed to load): the words sent to Rust wait for
+  // it, so Rust gets them once at startup, in that language, not in English first.
+  let localeReady = $state(false);
 
   // Rust writes calendar notes with these words (placeholders filled there; names pass
   // through `t` as themselves, so they are isolated in a right-to-left language, numbers
   // stay bare as `fill` leaves them); sent again when the language changes.
   $effect(() => {
+    if (!localeReady) return;
     void api.setCalendarLabels({
       class: t("calendar.notes.class", { name: "{name}" }),
       group: t("calendar.notes.group", { name: "{name}" }),
@@ -157,9 +169,14 @@
       loadEditors(),
       loadSnapshot(),
     ];
-    void Promise.allSettled(loads).then(() => {
-      trayReady = true;
-    });
+    void Promise.allSettled(loads)
+      // The catalog the effect above started loading, once settings and the OS's languages
+      // are in (the same load, not a second one).
+      .then(() => setLocale(language, systemLanguages).catch(() => {}))
+      .then(() => {
+        localeReady = true;
+        trayReady = true;
+      });
     void api.appInfo().then((info) => initTheme(info.os));
     void api.unseen().then((ids) => {
       session.unseen = ids;

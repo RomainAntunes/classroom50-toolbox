@@ -183,6 +183,7 @@
   "settings.updates.betaHint": "Versioni in anteprima, con le novità prima. Tornando a Stabile, questa versione resta finché non esce una versione stabile più recente.",
   "settings.updates.msiHint": "Le versioni beta richiedono il programma di installazione .exe; questa installazione MSI resta su Stabile.",
   "settings.language.system": "Sistema",
+  "settings.language.loadFailed": "Impossibile caricare la lingua {language}. Resta la lingua attuale.",
   "settings.dev.network": "Rete",
   "settings.dev.networkHint": "Simula GitHub non disponibile (errori del server) o il dispositivo offline, finché non torni a Normale. Aggiorna per vederlo.",
   "settings.dev.network.normal": "Normale",

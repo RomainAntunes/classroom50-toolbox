@@ -181,6 +181,7 @@
   "settings.updates.betaHint": "抢先体验新版本和新功能。切回稳定版后，会保留当前版本，直到有更新的稳定版发布。",
   "settings.updates.msiHint": "测试版需要.exe安装程序；通过MSI安装的版本只能使用稳定版。",
   "settings.language.system": "跟随系统",
+  "settings.language.loadFailed": "无法加载{language}。将继续使用当前语言。",
   "settings.dev.network": "网络",
   "settings.dev.networkHint": "模拟GitHub宕机（服务器错误）或设备离线，直到改回“正常”。刷新后可见。",
   "settings.dev.network.normal": "正常",

@@ -70,8 +70,8 @@ describe("the update item", () => {
     expect(readyVersion(status({ ...downloading, downloaded: 50 }))).toBeNull();
   });
 
-  it("follows the UI's language", () => {
-    setLocale("fr");
+  it("follows the UI's language", async () => {
+    await setLocale("fr");
     expect(menu(status(ready)).update).toBe("Redémarrer pour installer la version 0.14.0");
   });
 });

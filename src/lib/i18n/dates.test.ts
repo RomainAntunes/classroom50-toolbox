@@ -64,11 +64,11 @@ describe("fromNow", () => {
     expect(fromNow(at(25, 23, 30), at(25, 0))).toBe("in 25 hours");
   });
 
-  it("follows the UI's language", () => {
-    setLocale("fr");
+  it("follows the UI's language", async () => {
+    await setLocale("fr");
     expect(fromNow(at(29, 22, 30), at(28, 8))).toBe("demain");
     expect(fromNow(at(30, 9), at(28, 8))).toBe("après-demain");
-    setLocale("de");
+    await setLocale("de");
     expect(fromNow(at(26, 22, 30), at(28, 8))).toBe("vorgestern");
   });
 });
@@ -109,12 +109,12 @@ describe("relativeAt", () => {
     expect(relativeAt(at(31, 23), at(24, 23, 30))).toBe("in 7 days");
   });
 
-  it("speaks the UI's language", () => {
-    setLocale("fr");
+  it("speaks the UI's language", async () => {
+    await setLocale("fr");
     expect(relativeAt(at(29, 22, 30), at(28, 8))).toBe("demain à 22:30");
     expect(relativeAt(at(30, 9, 5), at(28, 8))).toBe("après-demain à 9:05");
     expect(relativeAt(at(27, 22, 30), at(28, 8))).toBe("hier à 22:30");
-    setLocale("de");
+    await setLocale("de");
     expect(relativeAt(at(29, 22, 30), at(28, 8))).toBe("morgen um 22:30");
     expect(relativeAt(at(28, 13), at(28, 8))).toBe("heute um 13:00");
   });
@@ -134,16 +134,16 @@ describe("the OS's clock", () => {
     expect(formatDate(at(29, 0, 5))).toBe("Thu, Oct 29, 00:05");
   });
 
-  it("puts a French UI on 12 hours", () => {
-    setLocale("fr");
+  it("puts a French UI on 12 hours", async () => {
+    await setLocale("fr");
     setHourCycle("h12");
     expect(plain(formatTime(at(29, 22, 30)))).toBe("10:30 PM");
     expect(plain(relativeAt(at(29, 22, 30), at(28, 8)))).toBe("demain à 10:30 PM");
   });
 
-  it("keeps the language's clock when the OS doesn't say", () => {
+  it("keeps the language's clock when the OS doesn't say", async () => {
     expect(plain(formatTime(at(29, 22, 30)))).toBe("10:30 PM");
-    setLocale("fr");
+    await setLocale("fr");
     expect(formatTime(at(29, 22, 30))).toBe("22:30");
   });
 });

@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import pkg from "../../../package.json";
 import i18nSource from "../i18n/index.ts?raw";
-import { catalogs } from "#lib/i18n/index.js";
+import { languages } from "#lib/i18n/index.js";
 import { changelogs, notesFor, versions } from "./index";
 import {
   KINDS,
@@ -111,14 +111,15 @@ describe("drafting", () => {
   });
 
   it("reads the registered catalogs from the i18n module", () => {
-    expect(catalogCodes(i18nSource)).toEqual(Object.keys(catalogs));
-    const later = `export const catalogs: Record<string, Catalog> = {
-      en,
-      fr,
-      "pt-BR": ptBR,
-      'zh-Hans': zhHans,
+    expect(catalogCodes(i18nSource)).toEqual(Object.keys(languages));
+    const later = `export const languages: Record<string, string> = {
+      en: "English",
+      fr: "Français",
+      "pt-BR": "Português (Brasil)",
+      'zh-Hans': '简体中文',
+      xx: "A name, with a comma: and a colon",
     };`;
-    expect(catalogCodes(later)).toEqual(["en", "fr", "pt-BR", "zh-Hans"]);
+    expect(catalogCodes(later)).toEqual(["en", "fr", "pt-BR", "zh-Hans", "xx"]);
   });
 
   it("writes the release body by kind, then where to download", () => {
@@ -174,7 +175,7 @@ describe("changelog files", () => {
   it("has notes for the current version in every registered language", () => {
     const current = changelogs[pkg.version];
     expect(current, `src/lib/changelog/${pkg.version}.json (run pnpm bump)`).toBeDefined();
-    for (const code of Object.keys(catalogs)) {
+    for (const code of Object.keys(languages)) {
       expect(current.notes[code]?.length, `${pkg.version}: notes in ${code}`).toBeGreaterThan(0);
     }
   });

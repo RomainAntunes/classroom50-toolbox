@@ -170,22 +170,15 @@ export function draftChangelog(subjects, codes, date) {
 
 /**
  * The catalog codes registered in `src/lib/i18n/index.ts`, read from its source: the keys
- * of `catalogs = { en, fr, "pt-BR": ptBR }`, in order.
+ * of `export const languages = { en: "English", "pt-BR": "Português (Brasil)" }`, in order.
  * @param {string} source
  * @returns {string[]}
  */
 export function catalogCodes(source) {
-  const body = /\bcatalogs\b[^=]*=\s*\{([^}]*)\}/.exec(source)?.[1];
+  const body = /export const languages\b[^=]*=\s*\{([^}]*)\}/.exec(source)?.[1];
   if (!body) return ["en"];
-  const codes = body
-    .split(",")
-    .map((part) =>
-      part
-        .split(":")[0]
-        .trim()
-        .replace(/^["']|["']$/g, ""),
-    )
-    .filter(Boolean);
+  const entry = /(?:"([^"]+)"|'([^']+)'|([A-Za-z][\w-]*))\s*:\s*(?:"[^"]*"|'[^']*')/g;
+  const codes = [...body.matchAll(entry)].map((match) => match[1] ?? match[2] ?? match[3]);
   return codes.includes("en") ? codes : ["en", ...codes];
 }
 

@@ -5,14 +5,11 @@ import { expect, test } from "./app";
 import { overflow, untranslated } from "./checks";
 import { richScenario } from "./samples";
 import { textDirection } from "../../src/lib/i18n/direction";
+import { catalogCodes } from "../../src/lib/changelog/versions.js";
 
-/** The catalogs `src/lib/i18n/index.ts` registers, read from its `catalogs` line. */
+/** The catalogs `src/lib/i18n/index.ts` registers, read from its `languages` list. */
 const source = readFileSync(new URL("../../src/lib/i18n/index.ts", import.meta.url), "utf8");
-const LOCALES = /export const catalogs[^=]*=\s*\{([^}]*)\}/
-  .exec(source)![1]
-  .split(",")
-  .map((code) => code.trim().replace(/["']/g, "").split(":")[0])
-  .filter(Boolean);
+const LOCALES = catalogCodes(source);
 const SKINS = ["macos", "windows", "linux"] as const;
 
 for (const locale of LOCALES) {

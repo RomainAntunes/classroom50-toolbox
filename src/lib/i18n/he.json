@@ -183,6 +183,7 @@
   "settings.updates.betaHint": "גרסאות מוקדמות, עם התכונות החדשות קודם. בחזרה ל“יציב”, הגרסה הזו נשארת עד שתצא גרסה יציבה חדשה יותר.",
   "settings.updates.msiHint": "גרסאות בטא דורשות את מתקין ה-.exe; התקנת ה-MSI הזו נשארת בערוץ “יציב”.",
   "settings.language.system": "מערכת",
+  "settings.language.loadFailed": "לא ניתן לטעון את השפה {language}. השפה הנוכחית נשארת.",
   "settings.dev.network": "רשת",
   "settings.dev.networkHint": "מדמה תקלה ב-GitHub (שגיאות שרת) או מכשיר לא מקוון, עד שמחזירים ל“רגיל”. יש לרענן כדי לראות.",
   "settings.dev.network.normal": "רגיל",

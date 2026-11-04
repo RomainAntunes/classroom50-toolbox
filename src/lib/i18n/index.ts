@@ -3,20 +3,6 @@
 // A string with a count is stored per CLDR plural category (`foo.one`, `foo.other`, plus
 // `few`/`many`/... where the language has them) and called as `t("foo", { count })`.
 import en from "./en.json";
-import fr from "./fr.json";
-import es from "./es.json";
-import de from "./de.json";
-import it from "./it.json";
-import ptBR from "./pt-BR.json";
-import ptPT from "./pt-PT.json";
-import nl from "./nl.json";
-import pl from "./pl.json";
-import tr from "./tr.json";
-import ar from "./ar.json";
-import he from "./he.json";
-import zhHans from "./zh-Hans.json";
-import ja from "./ja.json";
-import ko from "./ko.json";
 import { isolate, textDirection, type Direction } from "./direction";
 import { locale } from "./locale.svelte";
 import type { HourCycle } from "#lib/api.js";
@@ -26,31 +12,64 @@ export { isolate, textDirection, type Direction } from "./direction";
 type Catalog = Record<string, string>;
 
 /**
- * Every catalog, by BCP 47 code, in the order the language menu lists them. Adding a
- * language: import its JSON and list it here.
+ * Every language, by BCP 47 code, named in itself (its catalog's `language.name`), in the
+ * order the language menu lists them. Adding a language: put its `<code>.json` next to
+ * `en.json` and list it here (`i18n.test.ts` checks the two agree).
  */
-export const catalogs: Record<string, Catalog> = {
-  en,
-  fr,
-  es,
-  de,
-  it,
-  "pt-BR": ptBR,
-  "pt-PT": ptPT,
-  nl,
-  pl,
-  tr,
-  ar,
-  he,
-  "zh-Hans": zhHans,
-  ja,
-  ko,
+export const languages: Record<string, string> = {
+  en: "English",
+  fr: "Français",
+  es: "Español",
+  de: "Deutsch",
+  it: "Italiano",
+  "pt-BR": "Português (Brasil)",
+  "pt-PT": "Português (Portugal)",
+  nl: "Nederlands",
+  pl: "Polski",
+  tr: "Türkçe",
+  ar: "العربية",
+  he: "עברית",
+  "zh-Hans": "简体中文",
+  ja: "日本語",
+  ko: "한국어",
 };
 const fallback = "en";
 
+// English is in the bundle, as every catalog's fallback; each other one is its own chunk,
+// loaded the first time the UI switches to it. No type argument on the call (see
+// `src/lib/changelog/index.ts`).
+const loaders = import.meta.glob(["./*.json", "!./en.json"], { import: "default" }) as Record<
+  string,
+  () => Promise<Catalog>
+>;
+
+/** The catalogs loaded so far, by code: English from the start, the others once shown. */
+export const loaded: Record<string, Catalog> = { en };
+const loading = new Map<string, Promise<void>>();
+
+/**
+ * Loads catalog `code` (as `resolveLocale` gives it) once; rejects when its file can't be
+ * read, and a later call tries again.
+ */
+export function loadCatalog(code: string): Promise<void> {
+  if (loaded[code]) return Promise.resolve();
+  let load = loading.get(code);
+  if (!load) {
+    const file = loaders[`./${code}.json`];
+    if (!file) return Promise.reject(new Error(`no catalog for ${code}`));
+    load = file()
+      .then((catalog) => {
+        loaded[code] = catalog;
+      })
+      .finally(() => loading.delete(code));
+    loading.set(code, load);
+  }
+  return load;
+}
+
 /** The language each catalog is written in, named in itself ("English", "Français"). */
 export function languageName(code: string): string {
-  return catalogs[code]?.["language.name"] ?? code;
+  return languages[code] ?? code;
 }
 
 /**
@@ -62,7 +81,7 @@ export function languageName(code: string): string {
 export function resolveLocale(
   language: string,
   preferred: readonly string[] = [],
-  available: readonly string[] = Object.keys(catalogs),
+  available: readonly string[] = Object.keys(languages),
 ): string {
   const wanted = language === "system" ? preferred : [language];
   const find = (tag: string) => available.find((code) => code.toLowerCase() === tag);
@@ -109,9 +128,42 @@ function pluralRules(code: string): Intl.PluralRules {
   return rules;
 }
 
-/** Switches the catalog (`language` as in `resolveLocale`); the UI follows at once. */
-export function setLocale(language: string, preferred: readonly string[] = []): void {
-  locale.code = resolveLocale(language, preferred);
+// The OS's languages `setLocale` was last given, for `loadLanguage`; and which call is the
+// latest, so a slow catalog never replaces one picked after it.
+let lastPreferred: readonly string[] = [];
+let latest = 0;
+
+/**
+ * Switches the catalog (`language` as in `resolveLocale`) once it is loaded, so the UI
+ * never shows a half-worded page: at once when it already is, English staying until then
+ * otherwise. Rejects, keeping the current language, when the catalog can't load.
+ */
+export function setLocale(language: string, preferred: readonly string[] = []): Promise<void> {
+  lastPreferred = preferred;
+  const code = resolveLocale(language, preferred);
+  const call = ++latest;
+  const apply = () => {
+    if (call === latest) locale.code = code;
+  };
+  if (loaded[code]) {
+    apply();
+    return Promise.resolve();
+  }
+  return loadCatalog(code).then(apply);
+}
+
+/**
+ * Loads the catalog a `language` setting stands for (the OS's languages as `setLocale`
+ * last had them), before the setting is saved: Settings spins meanwhile, and keeps the
+ * language it has when this rejects.
+ */
+export function loadLanguage(language: string): Promise<void> {
+  return loadCatalog(resolveLanguage(language));
+}
+
+/** The catalog a `language` setting stands for, with the OS's languages `setLocale` had. */
+export function resolveLanguage(language: string): string {
+  return resolveLocale(language, lastPreferred);
 }
 
 /** The OS's 12- or 24-hour clock (`system_hour_cycle`); `null` keeps the language's. */
@@ -162,7 +214,8 @@ export function isolated(value: string): string {
 
 /** `key` in one catalog: its plural form for `count` first, then `.other`, then `key`. */
 function lookup(code: string, key: string, count: number | undefined): string | undefined {
-  const catalog = catalogs[code];
+  const catalog = loaded[code];
+  if (!catalog) return undefined;
   if (count !== undefined) {
     const form = catalog[`${key}.${pluralRules(code).select(count)}`] ?? catalog[`${key}.other`];
     if (form !== undefined) return form;
@@ -172,7 +225,7 @@ function lookup(code: string, key: string, count: number | undefined): string | 
 
 /** Whether `key` is worded (in English, which every catalog matches), plural or not. */
 export function hasKey(key: string): boolean {
-  const reference = catalogs[fallback];
+  const reference = loaded[fallback];
   return key in reference || `${key}.other` in reference;
 }
 
