@@ -271,16 +271,27 @@ pub struct Snapshot {
 }
 
 impl Snapshot {
-    /// Parses every assignment's description, which `snapshot.json` doesn't bring back.
-    fn read_descriptions(&mut self) {
+    fn assignments_mut(&mut self) -> impl Iterator<Item = &mut Assignment> {
         let projects = self
             .projects
             .iter_mut()
             .filter_map(|p| p.assignment.as_mut());
         let unaccepted = self.unaccepted.iter_mut().map(|u| &mut u.assignment);
-        projects
-            .chain(unaccepted)
+        projects.chain(unaccepted)
+    }
+
+    /// Parses every assignment's description, which `snapshot.json` doesn't bring back.
+    fn read_descriptions(&mut self) {
+        self.assignments_mut()
             .for_each(Assignment::read_description);
+    }
+
+    /// The snapshot as `snapshot.json` keeps it: the parsed descriptions are left out,
+    /// since loading parses them again (only the UI gets the trees).
+    fn without_descriptions(mut self) -> Self {
+        self.assignments_mut()
+            .for_each(|assignment| assignment.description_doc = None);
+        self
     }
 }
 
@@ -470,7 +481,7 @@ impl ProjectsState {
 
     fn save_state(&self) {
         let saved = Saved {
-            snapshot: self.snapshot(),
+            snapshot: self.snapshot().without_descriptions(),
             stats: self.stats(),
         };
         match serde_json::to_vec(&saved) {
@@ -591,4 +602,51 @@ type ClassroomKey = (String, String);
 
 fn key(name_with_owner: &str) -> String {
     name_with_owner.to_ascii_lowercase()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// `snapshot.json` holds each description once, as Markdown; loading parses it again.
+    #[test]
+    fn the_saved_snapshot_keeps_descriptions_unparsed() {
+        let (classrooms, manifests) = fixtures::renamed_class();
+        let key = ("cs50".to_owned(), "cs".to_owned());
+        let mut assignment = manifests[&key][0].clone();
+        assignment.description = Some("Read **this** first.".into());
+        assignment.read_description();
+        let mut snapshot = Snapshot {
+            unaccepted: vec![Unaccepted {
+                id: "cs50/cs/ps3".into(),
+                classroom: classrooms[&key].clone(),
+                assignment,
+                accept_url: String::new(),
+                group: None,
+            }],
+            ..Snapshot::default()
+        };
+        let doc = snapshot.unaccepted[0].assignment.description_doc.clone();
+        assert!(doc.is_some());
+        // The UI still gets the tree.
+        assert!(
+            serde_json::to_string(&snapshot)
+                .unwrap()
+                .contains("descriptionDoc\":[")
+        );
+        let saved = Saved {
+            snapshot: snapshot.clone().without_descriptions(),
+            stats: SyncStats::default(),
+        };
+        let json = serde_json::to_string(&saved).unwrap();
+        assert!(!json.contains("\"strong\""), "{json}");
+        let mut loaded: Saved = serde_json::from_str(&json).unwrap();
+        loaded.snapshot.read_descriptions();
+        assert_eq!(
+            loaded.snapshot.unaccepted[0].assignment.description_doc,
+            doc
+        );
+        snapshot.read_descriptions();
+        assert_eq!(snapshot.unaccepted[0].assignment.description_doc, doc);
+    }
 }
