@@ -270,6 +270,20 @@ pub struct Snapshot {
     pub login: Option<String>,
 }
 
+impl Snapshot {
+    /// Parses every assignment's description, which `snapshot.json` doesn't bring back.
+    fn read_descriptions(&mut self) {
+        let projects = self
+            .projects
+            .iter_mut()
+            .filter_map(|p| p.assignment.as_mut());
+        let unaccepted = self.unaccepted.iter_mut().map(|u| &mut u.assignment);
+        projects
+            .chain(unaccepted)
+            .for_each(Assignment::read_description);
+    }
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[cfg_attr(test, derive(specta::Type))]
 #[serde(rename_all = "camelCase")]
@@ -385,10 +399,11 @@ impl ProjectsState {
             .and_then(|json| serde_json::from_str(&json).ok())
             .unwrap_or_default();
         let state_path = cache_dir.join(STATE_FILE);
-        let saved: Saved = std::fs::read_to_string(&state_path)
+        let mut saved: Saved = std::fs::read_to_string(&state_path)
             .ok()
             .and_then(|json| serde_json::from_str(&json).ok())
             .unwrap_or_default();
+        saved.snapshot.read_descriptions();
         Self {
             snapshot: Mutex::new(saved.snapshot),
             state_path,

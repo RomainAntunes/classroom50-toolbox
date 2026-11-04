@@ -6,7 +6,7 @@
       "name": "Hello, World",
       "mode": "individual",
       "autograder": "default",
-      "description": "Print a greeting, then a farewell.",
+      "description": "Print a **greeting**, then a farewell, scored $x^2$ for $5.\n\n- [x] `hello`\n- [ ] `goodbye`",
       "due": "2026-10-19T12:00:00Z",
       "submission_mode": "tag"
     },

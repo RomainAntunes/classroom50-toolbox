@@ -301,6 +301,9 @@ export type Action =
 /**  Where one username stands. */
 export type AddState = "waiting" | "adding" | "added" | "failed";
 
+/**  A table column's alignment, by reading direction (`:---` is the start). */
+export type Align = "start" | "center" | "end";
+
 export type AppInfo = {
 	os: Os,
 	version: string,
@@ -331,6 +334,7 @@ export type Assignment_Deserialize = {
 	slug: string,
 	name: string,
 	mode: AssignmentMode,
+	/**  GitHub-flavored Markdown with LaTeX math, as upstream's web app renders it. */
 	description: string | null,
 	/**  Submissions after this are marked late; nothing is blocked. */
 	due: string | null,
@@ -393,7 +397,14 @@ export type Assignment_Serialize = {
 	slug: string,
 	name: string,
 	mode: AssignmentMode,
+	/**  GitHub-flavored Markdown with LaTeX math, as upstream's web app renders it. */
 	description: string | null,
+	/**
+	 *  `description` parsed (`markdown::document`), for the UI. Never read from a file: set
+	 *  by `read_description` when a manifest or the saved snapshot is read, so a manifest
+	 *  can't hand the UI a tree of its own.
+	 */
+	descriptionDoc: Block[] | null,
 	/**  Submissions after this are marked late; nothing is blocked. */
 	due: string | null,
 	availableFrom: string | null,
@@ -432,6 +443,23 @@ export type AuthStatus = {
 	 */
 	envToken: string | null,
 };
+
+export type Block = { kind: "paragraph"; content: Inline[] } | 
+/**  `level` 1 to 6, as written. */
+{ kind: "heading"; level: number; content: Inline[] } | { kind: "list"; ordered: boolean; 
+/**  The first number of an ordered list. */
+start: number; items: ListItem[] } | 
+/**  A fenced or indented block; `lang` is the info string's first word. */
+{ kind: "code"; lang: string | null; text: string } | 
+/**
+ *  Display math (`$$...$$` alone in its paragraph, or a ```` ```math ```` fence), as
+ *  LaTeX source.
+ */
+{ kind: "math"; source: string } | { kind: "table"; 
+/**  One per column; `None` when the delimiter row sets none. */
+align: (Align | null)[]; head: Inline[][]; rows: Inline[][][] } | { kind: "quote"; blocks: Block[] } | { kind: "rule" } | 
+/**  The footnotes, last, in the order they are first referenced (as GitHub lists them). */
+{ kind: "footnotes"; notes: Footnote[] };
 
 /**  A branch with commits that aren't on the default branch. */
 export type Branch = {
@@ -654,6 +682,11 @@ export type Feedback = {
 	latestAt: string | null,
 };
 
+export type Footnote = {
+	number: number,
+	blocks: Block[],
+};
+
 /**  The helpers git asks for github.com's passwords, in order. */
 export type GitCredentials = {
 	/**  gh is one of them: `git push` to github.com signs in with gh's account. */
@@ -766,6 +799,12 @@ export type Identity = {
 	email: string,
 };
 
+export type Inline = { kind: "text"; text: string } | { kind: "code"; text: string } | { kind: "emphasis"; content: Inline[] } | { kind: "strong"; content: Inline[] } | { kind: "strike"; content: Inline[] } | 
+/**  Only `http`, `https` and `mailto` targets; any other link is its text alone. */
+{ kind: "link"; href: string; content: Inline[] } | 
+/**  Inline math, as LaTeX source. */
+{ kind: "math"; source: string } | { kind: "break" } | { kind: "footnoteRef"; number: number };
+
 /**  What installing a tool runs. */
 export type InstallPlan = {
 	program: string,
@@ -797,6 +836,12 @@ export type ListFilter = "all" |
 "week" | 
 /**  Due date passed, or closed. */
 "past";
+
+export type ListItem = {
+	/**  A task list item's checkbox: `Some(true)` when ticked. */
+	task: boolean | null,
+	blocks: Block[],
+};
 
 export type LocalState = {
 	branch: string | null,

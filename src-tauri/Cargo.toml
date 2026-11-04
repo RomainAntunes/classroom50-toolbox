@@ -41,6 +41,8 @@ tauri-plugin-log = "2"
 tauri-plugin-dialog = "2"
 sys-locale = "0.3"
 tauri-plugin-clipboard-manager = "2.5"
+# Assignment descriptions (GitHub-flavored Markdown) parsed into a typed tree; the parser only.
+pulldown-cmark = { version = "0.13", default-features = false }
 
 
 # Typed IPC bindings (`src/lib/bindings.ts`), generated and checked by the `bindings` test only:

@@ -1,0 +1,205 @@
+{
+  "doc": [
+    {
+      "content": [
+        {
+          "kind": "text",
+          "text": "Goal"
+        }
+      ],
+      "kind": "heading",
+      "level": 2
+    },
+    {
+      "content": [
+        {
+          "kind": "text",
+          "text": "Print a "
+        },
+        {
+          "content": [
+            {
+              "kind": "text",
+              "text": "greeting"
+            }
+          ],
+          "kind": "strong"
+        },
+        {
+          "kind": "text",
+          "text": " and the "
+        },
+        {
+          "content": [
+            {
+              "kind": "text",
+              "text": "sum"
+            }
+          ],
+          "kind": "emphasis"
+        },
+        {
+          "kind": "text",
+          "text": " "
+        },
+        {
+          "kind": "math",
+          "source": "a+b"
+        },
+        {
+          "kind": "text",
+          "text": ", for amounts like $5 and $10. Details in the "
+        },
+        {
+          "content": [
+            {
+              "kind": "text",
+              "text": "spec"
+            }
+          ],
+          "href": "https://example.org/spec",
+          "kind": "link"
+        },
+        {
+          "kind": "footnoteRef",
+          "number": 1
+        },
+        {
+          "kind": "text",
+          "text": "."
+        }
+      ],
+      "kind": "paragraph"
+    },
+    {
+      "align": ["start", "end"],
+      "head": [
+        [
+          {
+            "kind": "text",
+            "text": "Test"
+          }
+        ],
+        [
+          {
+            "kind": "text",
+            "text": "Points"
+          }
+        ]
+      ],
+      "kind": "table",
+      "rows": [
+        [
+          [
+            {
+              "kind": "code",
+              "text": "compiles"
+            }
+          ],
+          [
+            {
+              "kind": "text",
+              "text": "3"
+            }
+          ]
+        ],
+        [
+          [
+            {
+              "content": [
+                {
+                  "kind": "text",
+                  "text": "prints hi"
+                }
+              ],
+              "kind": "strike"
+            },
+            {
+              "kind": "text",
+              "text": " prints hello"
+            }
+          ],
+          [
+            {
+              "kind": "text",
+              "text": "5"
+            }
+          ]
+        ]
+      ]
+    },
+    {
+      "items": [
+        {
+          "blocks": [
+            {
+              "content": [
+                {
+                  "kind": "text",
+                  "text": "Read the spec"
+                }
+              ],
+              "kind": "paragraph"
+            }
+          ],
+          "task": true
+        },
+        {
+          "blocks": [
+            {
+              "content": [
+                {
+                  "kind": "text",
+                  "text": "Run the tests"
+                }
+              ],
+              "kind": "paragraph"
+            }
+          ],
+          "task": false
+        }
+      ],
+      "kind": "list",
+      "ordered": false,
+      "start": 1
+    },
+    {
+      "kind": "math",
+      "source": "\\sum_{i=1}^n i = n(n+1)/2"
+    },
+    {
+      "blocks": [
+        {
+          "content": [
+            {
+              "kind": "text",
+              "text": "Late work counts, marked late."
+            }
+          ],
+          "kind": "paragraph"
+        }
+      ],
+      "kind": "quote"
+    },
+    {
+      "kind": "footnotes",
+      "notes": [
+        {
+          "blocks": [
+            {
+              "content": [
+                {
+                  "kind": "text",
+                  "text": "Also on the course page."
+                }
+              ],
+              "kind": "paragraph"
+            }
+          ],
+          "number": 1
+        }
+      ]
+    }
+  ],
+  "source": "## Goal\n\nPrint a **greeting** and the *sum* $a+b$, for amounts like $5 and $10. Details in the [spec](https://example.org/spec)[^1].\n\n| Test | Points |\n| :--- | ---: |\n| `compiles` | 3 |\n| ~~prints hi~~ prints hello | 5 |\n\n- [x] Read the spec\n- [ ] Run the tests\n\n$$\n\\sum_{i=1}^n i = n(n+1)/2\n$$\n\n> Late work counts, marked late.\n\n[^1]: Also on the course page.\n"
+}

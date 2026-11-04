@@ -136,6 +136,7 @@ export function assignment(over: Partial<Assignment> & { slug: string }): Assign
     name: over.slug,
     mode: "individual",
     description: null,
+    descriptionDoc: null,
     due: daysFromNow(3),
     availableFrom: null,
     submissionMode: "tag",

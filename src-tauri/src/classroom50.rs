@@ -81,8 +81,14 @@ pub struct Assignment {
     pub slug: String,
     pub name: String,
     pub mode: AssignmentMode,
+    /// GitHub-flavored Markdown with LaTeX math, as upstream's web app renders it.
     #[serde(default)]
     pub description: Option<String>,
+    /// `description` parsed (`markdown::document`), for the UI. Never read from a file: set
+    /// by `read_description` when a manifest or the saved snapshot is read, so a manifest
+    /// can't hand the UI a tree of its own.
+    #[serde(skip_deserializing)]
+    pub description_doc: Option<Vec<crate::markdown::Block>>,
     /// Submissions after this are marked late; nothing is blocked.
     #[serde(default)]
     pub due: Option<DateTime<FixedOffset>>,
@@ -127,6 +133,11 @@ pub struct Template {
 }
 
 impl Assignment {
+    /// Parses the description into `description_doc`.
+    pub fn read_description(&mut self) {
+        self.description_doc = crate::markdown::document(self.description.as_deref());
+    }
+
     /// `owner/repo` of the template, as GitHub's `templateRepository` names it.
     pub fn template_name(&self) -> Option<String> {
         let template = self.template.as_ref()?;
@@ -462,7 +473,11 @@ pub fn parse_assignments(url: &str, json: &str) -> Result<Vec<Assignment>> {
             expected: ASSIGNMENTS_SCHEMA,
         });
     }
-    Ok(file.assignments)
+    let mut assignments = file.assignments;
+    assignments
+        .iter_mut()
+        .for_each(Assignment::read_description);
+    Ok(assignments)
 }
 
 #[cfg(test)]
@@ -743,7 +758,11 @@ mod tests {
         .unwrap();
         let saved = serde_json::to_value(&upstream).unwrap();
         assert!(saved.get("feedbackPr").is_some());
+        let mut saved = saved;
+        // A tree in a file is never read: it comes from the description alone.
+        saved["descriptionDoc"] = serde_json::json!([{ "kind": "rule" }]);
         let restored: Assignment = serde_json::from_value(saved).unwrap();
+        assert!(restored.description_doc.is_none());
         assert!(restored.feedback_pr);
         assert_eq!(restored.submission_mode, Some(SubmissionMode::Tag));
         assert_eq!(restored.team_formation, Some(TeamFormation::Student));
@@ -758,6 +777,16 @@ mod tests {
         let slugs: Vec<&str> = algo.iter().map(|a| a.slug.as_str()).collect();
         assert_eq!(slugs, ["hello", "sorting", "graphs"]);
         assert_eq!(algo[0].submission_mode, Some(SubmissionMode::Tag));
+        // Its description is Markdown, parsed with the manifest.
+        let doc = algo[0].description_doc.as_ref().expect("parsed");
+        assert!(matches!(
+            doc.as_slice(),
+            [
+                crate::markdown::Block::Paragraph { .. },
+                crate::markdown::Block::List { .. }
+            ]
+        ));
+        assert!(algo[1].description_doc.is_none());
         assert!(algo.iter().all(|a| a.due.is_some()));
         let web = parse_assignments("web", &crate::testenv::golden("manifest-web")).unwrap();
         assert_eq!(
