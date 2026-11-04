@@ -1,5 +1,23 @@
 {
-  "$comment": "Bytes, summed over build/ (pnpm build). Set at about 15% over the bundle of 2026-10-18 before SvelteKit 3 and the module split (JS 906.8 kB raw, 282.0 kB gzip; CSS 29.4 kB raw, 9.1 kB gzip); after both, JS 920.2 kB raw, 286.8 kB gzip and CSS 30.0 kB raw, 9.1 kB gzip, about 12% under. JS raw raised to 1080 kB on 2026-10-28 (tray menu, 1043 kB before it, at 100%): each feature now also adds its strings to 15 catalogs, and the bundled changelogs grow every release. JS raw raised to 1200 kB and gzip to 360 kB on 2026-10-29 (1109.9 kB and 329.8 kB, over both): the 0.14.1-beta.1 and 0.14.1 changelogs added about 60 kB raw and 12 kB gzip, and bump commits skipped this check until ci.yml ran it in release-inputs too. Each release adds about 30 kB raw and 6 kB gzip of notes. Raise a limit only on purpose, saying why in the PR.",
-  "js": { "raw": 1200000, "gzip": 360000 },
-  "css": { "raw": 34000, "gzip": 10500 }
+  "$comment": "Bytes, summed over build/ (pnpm build). Set at about 15% over the bundle of 2026-10-18 before SvelteKit 3 and the module split (JS 906.8 kB raw, 282.0 kB gzip; CSS 29.4 kB raw, 9.1 kB gzip); after both, JS 920.2 kB raw, 286.8 kB gzip and CSS 30.0 kB raw, 9.1 kB gzip, about 12% under. JS raw raised to 1080 kB on 2026-10-28 (tray menu, 1043 kB before it, at 100%): each feature now also adds its strings to 15 catalogs, and the bundled changelogs grow every release. JS raw raised to 1200 kB and gzip to 360 kB on 2026-10-29 (1109.9 kB and 329.8 kB, over both): the 0.14.1-beta.1 and 0.14.1 changelogs added about 60 kB raw and 12 kB gzip, and bump commits skipped this check until ci.yml ran it in release-inputs too. Each release adds about 30 kB raw and 6 kB gzip of notes. Raise a limit only on purpose, saying why in the PR. On 2026-11-04 the catalogs other than English and the changelogs became one chunk each, loaded when shown, and the budget got a second part: `startup`, what the app loads at start (Kit's entries, the root layout and the main page, with their static imports, from Vite's client manifest), set at about 15% over its size then (JS 255.3 kB raw, 89.6 kB gzip; CSS 22.1 kB raw, 6.6 kB gzip; before the split JS was 1099.0 kB raw and 324.0 kB gzip at start). `total` (all of build/, as before) keeps its JS raw limit (1147.3 kB, 1141.3 kB before the split); its JS gzip limit went from 360 kB to 440 kB (382.6 kB, up from 339.1 kB), since each chunk is gzipped alone and 29 small files compress worse than the two big ones they replace, while the bytes the app reads at start fell by 77%.",
+  "total": {
+    "js": {
+      "raw": 1200000,
+      "gzip": 440000
+    },
+    "css": {
+      "raw": 34000,
+      "gzip": 10500
+    }
+  },
+  "startup": {
+    "js": {
+      "raw": 294000,
+      "gzip": 103000
+    },
+    "css": {
+      "raw": 25400,
+      "gzip": 7600
+    }
+  }
 }
