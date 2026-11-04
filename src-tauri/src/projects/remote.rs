@@ -229,6 +229,7 @@ impl RepoNode {
             history: Vec::new(),
             grading: None,
             feedback: None,
+            milestones: Vec::new(),
         }
     }
 }
@@ -471,6 +472,36 @@ pub(super) async fn fetch_nodes<T: DeserializeOwned>(
     fragment: &str,
     fragments: &str,
 ) -> Result<HashMap<String, Option<T>>> {
+    fetch_nodes_with(http, token, names, &[], fragment, fragments).await
+}
+
+/// What one alias selects besides its fragment: GraphQL fields, and the `String!`
+/// variables they name with their values.
+#[derive(Debug, Default)]
+pub(super) struct Extra {
+    pub fields: String,
+    pub variables: Vec<(String, String)>,
+}
+
+/// `fetch_nodes`, with `extras[i]` selected on `names[i]` too (none past its end).
+pub(super) async fn fetch_nodes_with<T: DeserializeOwned>(
+    http: &reqwest::Client,
+    token: &str,
+    names: &[&str],
+    extras: &[Extra],
+    fragment: &str,
+    fragments: &str,
+) -> Result<HashMap<String, Option<T>>> {
+    let (query, variables) = nodes_query(names, extras, fragment, fragments);
+    github::graphql(http, token, &query, variables).await
+}
+
+fn nodes_query(
+    names: &[&str],
+    extras: &[Extra],
+    fragment: &str,
+    fragments: &str,
+) -> (String, Value) {
     let mut params = Vec::new();
     let mut fields = String::new();
     let mut variables = Map::new();
@@ -479,14 +510,20 @@ pub(super) async fn fetch_nodes<T: DeserializeOwned>(
             continue;
         };
         params.push(format!("$o{i}: String!, $n{i}: String!"));
+        let extra = extras.get(i);
+        for (variable, value) in extra.iter().flat_map(|e| &e.variables) {
+            params.push(format!("${variable}: String!"));
+            variables.insert(variable.clone(), value.as_str().into());
+        }
+        let more = extra.map_or("", |e| e.fields.as_str());
         fields.push_str(&format!(
-            "r{i}: repository(owner: $o{i}, name: $n{i}) {{ ...{fragment} }}\n"
+            "r{i}: repository(owner: $o{i}, name: $n{i}) {{ ...{fragment}{more} }}\n"
         ));
         variables.insert(format!("o{i}"), owner.into());
         variables.insert(format!("n{i}"), name.into());
     }
     let query = format!("query({}) {{\n{fields}}}\n{fragments}", params.join(", "));
-    github::graphql(http, token, &query, Value::Object(variables)).await
+    (query, Value::Object(variables))
 }
 
 #[cfg(test)]
@@ -496,6 +533,29 @@ mod tests {
 
     use crate::classroom50;
     use crate::projects::{Found, identify};
+
+    #[test]
+    fn builds_aliased_queries_with_extra_fields() {
+        let extras = [
+            Extra::default(),
+            Extra {
+                fields: " m0: refs(query: $q1_0) { nodes { name } }".into(),
+                variables: vec![("q1_0".into(), "phase1".into())],
+            },
+        ];
+        let (query, variables) = nodes_query(&["o/a", "o/b", "bad"], &extras, "S", "fragment S");
+        assert_eq!(
+            query,
+            "query($o0: String!, $n0: String!, $o1: String!, $n1: String!, $q1_0: String!) {\n\
+             r0: repository(owner: $o0, name: $n0) { ...S }\n\
+             r1: repository(owner: $o1, name: $n1) { ...S m0: refs(query: $q1_0) { nodes { name } } }\n\
+             }\nfragment S"
+        );
+        assert_eq!(
+            variables,
+            json!({"o0": "o", "n0": "a", "o1": "o", "n1": "b", "q1_0": "phase1"})
+        );
+    }
 
     #[test]
     fn parses_submit_tag_time() {

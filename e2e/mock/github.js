@@ -62,6 +62,45 @@ function repoNode(repo, login) {
   };
 }
 
+/**
+ * The milestone tags `milestones::selection` asks for on one repo (`m0`, `m1`... in
+ * `line`, its alias's line of the query): the tags whose name holds the `query` variable,
+ * newest commit first, the `submit/*` ones included as on GitHub.
+ */
+function milestoneRefs(repo, line, variables) {
+  const tags = [
+    ...(repo.tags ?? []),
+    ...repo.submissions.map((s) => ({
+      name: s.tag,
+      commit: s.commit,
+      committedDate: repo.head.committedDate,
+    })),
+  ].sort((a, b) => b.committedDate.localeCompare(a.committedDate));
+  const refs = {};
+  const selections = line.matchAll(
+    /\b(m\d+): refs\(refPrefix: "refs\/tags\/", (?:query: \$(\w+), )?first: (\d+)/g,
+  );
+  for (const [, alias, variable, first] of selections) {
+    const query = variable ? String(variables[variable]).toLowerCase() : "";
+    refs[alias] = {
+      nodes: tags
+        .filter((t) => t.name.toLowerCase().includes(query))
+        .slice(0, Number(first))
+        .map((t) => ({
+          name: t.name,
+          target: t.taggerDate
+            ? {
+                oid: "f".repeat(40),
+                tagger: { date: t.taggerDate },
+                target: { oid: t.commit, committedDate: t.committedDate },
+              }
+            : { oid: t.commit, committedDate: t.committedDate },
+        })),
+    };
+  }
+  return refs;
+}
+
 /** The `Status` fragment of `status.rs`, on top of `Repo`. */
 function statusNode(repo, login, base) {
   return {
@@ -125,13 +164,12 @@ export function graphql(world, base, { query, variables = {} }) {
     case "details":
     case "status": {
       const data = {};
-      for (const alias of query.match(/\br\d+(?=: repository\()/g) ?? []) {
-        const i = alias.slice(1);
+      for (const [line, alias, i] of query.matchAll(/^(r(\d+)): repository\(.*$/gm)) {
         const repo = findRepo(world, variables[`o${i}`], variables[`n${i}`]);
         data[alias] = !repo
           ? null
           : queryKind(query) === "status"
-            ? statusNode(repo, world.login, base)
+            ? { ...statusNode(repo, world.login, base), ...milestoneRefs(repo, line, variables) }
             : repoNode(repo, world.login);
       }
       return data;

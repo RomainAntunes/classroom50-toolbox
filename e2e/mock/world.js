@@ -71,6 +71,8 @@ export function buildWorld({ now = new Date(), heads = {} } = {}) {
             mode: "individual",
             autograder: "default",
             due: iso(-2 * DAY),
+            // Milestone tags: a name each, and a glob whose matches are one set.
+            submission_tags: ["draft", "final", "v*"],
           },
           {
             slug: "graphs",
@@ -191,6 +193,18 @@ export function buildWorld({ now = new Date(), heads = {} } = {}) {
         head: { oid: "3".repeat(40), committedDate: iso(-DAY) },
         config: "classroom: algo\nassignment: sorting\n",
         submissions: [],
+        // `draft` and two `v*` tags pushed, `final` not yet. `v1` is annotated.
+        tags: [
+          { name: "draft", commit: "8".repeat(40), committedDate: iso(-4 * DAY) },
+          {
+            name: "v1",
+            commit: "9".repeat(40),
+            committedDate: iso(-3 * DAY),
+            taggerDate: iso(-3 * DAY + HOUR),
+          },
+          { name: "v2", commit: "3".repeat(40), committedDate: iso(-DAY) },
+          { name: "draft-old", commit: "8".repeat(40), committedDate: iso(-4 * DAY) },
+        ],
         releases: [],
       },
       {

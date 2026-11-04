@@ -1,0 +1,11 @@
+{
+  "_comment": "What milestones::selection asks for on the sorting repo (alias r1) of the mock world: Rust's milestones tests check it is what Rust builds, and the mock's test sends it.",
+  "alias": 1,
+  "patterns": ["draft", "final", "v*"],
+  "fields": " m0: refs(refPrefix: \"refs/tags/\", query: $q1_0, first: 10, orderBy: {field: TAG_COMMIT_DATE, direction: DESC}) { nodes { ...Milestone } } m1: refs(refPrefix: \"refs/tags/\", query: $q1_1, first: 10, orderBy: {field: TAG_COMMIT_DATE, direction: DESC}) { nodes { ...Milestone } } m2: refs(refPrefix: \"refs/tags/\", query: $q1_2, first: 10, orderBy: {field: TAG_COMMIT_DATE, direction: DESC}) { nodes { ...Milestone } }",
+  "variables": {
+    "q1_0": "draft",
+    "q1_1": "final",
+    "q1_2": "v"
+  }
+}

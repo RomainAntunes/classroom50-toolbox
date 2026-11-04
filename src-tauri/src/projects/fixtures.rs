@@ -40,6 +40,7 @@ pub(super) fn remote(name: &str, head: &str, submitted: Option<&str>) -> RemoteR
         history: Vec::new(),
         grading: None,
         feedback: None,
+        milestones: Vec::new(),
     }
 }
 

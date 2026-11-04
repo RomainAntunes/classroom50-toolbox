@@ -437,6 +437,18 @@ export type Assignment_Deserialize = {
 	renamedFrom: string | null,
 } & {
 	/**
+	 *  Milestone tag patterns (`phase1`, `v*`): a tag the student pushes that matches one
+	 *  is a submission of that milestone, next to `submit/*` (`milestones`). Read only.
+	 */
+	submission_tags: string[],
+} | {
+	/**
+	 *  Milestone tag patterns (`phase1`, `v*`): a tag the student pushes that matches one
+	 *  is a submission of that milestone, next to `submit/*` (`milestones`). Read only.
+	 */
+	submissionTags: string[],
+} & {
+	/**
 	 *  Ordered `.gitignore` patterns naming the files that are part of the submission
 	 *  (`allowed.rs`); empty keeps every file. Advice in the app: the runner deletes the
 	 *  others before grading and gh-student leaves them out.
@@ -502,6 +514,11 @@ export type Assignment_Serialize = {
 	 *  `origin` with the old name (GitHub redirects it), so both still count.
 	 */
 	renamedFrom: string | null,
+	/**
+	 *  Milestone tag patterns (`phase1`, `v*`): a tag the student pushes that matches one
+	 *  is a submission of that milestone, next to `submit/*` (`milestones`). Read only.
+	 */
+	submissionTags: string[],
 	/**  The repo each student repo is generated from; absent on `empty_repo` assignments. */
 	template: Template | null,
 	/**
@@ -981,6 +998,22 @@ export type Member = {
 	email: string | null,
 };
 
+/**  One milestone pattern of a repo's assignment, with the newest tag that matches it. */
+export type Milestone = {
+	/**  The teacher's pattern: a tag name or a glob. */
+	pattern: string,
+	/**  `None`: no tag matches it yet. */
+	tag: MilestoneTag | null,
+};
+
+export type MilestoneTag = {
+	name: string,
+	/**  The tagged commit. */
+	commit: string,
+	/**  When the tag was made (an annotated tag's date), else the tagged commit's date. */
+	at: string | null,
+};
+
 /**  A calendar of the OS's calendar app the user can write to. */
 export type NativeCalendar = NativeCalendar_Serialize | NativeCalendar_Deserialize;
 
@@ -1224,6 +1257,11 @@ export type RemoteRepo = {
 	/**  The autograder's run on the head commit, while running or when it broke. */
 	grading: Grading | null,
 	feedback: Feedback | null,
+	/**
+	 *  Each milestone tag pattern of the assignment (`submission_tags`) with the newest tag
+	 *  matching it; empty when it names none.
+	 */
+	milestones: Milestone[],
 };
 
 export type RepoConfig = {
