@@ -154,6 +154,8 @@ export const SYNC_PROGRESS_EVENT = "sync-progress" satisfies EventName;
 export const NOTIFY_EVENT = "notify" satisfies EventName;
 /** Payload: ids of projects and unaccepted assignments with unseen news. */
 export const UNSEEN_EVENT = "unseen-updated" satisfies EventName;
+/** Payload: ids of rows whose grading lines show while `showGradingInfo` hides them. */
+export const GRADING_REVEALED_EVENT = "grading-revealed" satisfies EventName;
 /** Payload: `Settings` Rust changed by itself (hidden ids moved by a rename). */
 export const SETTINGS_UPDATED_EVENT = "settings-updated" satisfies EventName;
 /** A `classroom50-toolbox://` link is waiting; `takeDeepLink` reads it. */

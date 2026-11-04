@@ -87,6 +87,8 @@
   "settings.general.title": "General",
   "settings.launchAtLogin": "Open at login",
   "settings.launchAtLoginHint": "Starts in the background when you log in to your computer, so reminders and new grades still reach you.",
+  "settings.gradingInfo": "Show how assignments are graded",
+  "settings.gradingInfoHint": "Says when an assignment isn't graded or is graded by your teaching staff. Turn it off if your class doesn't use Classroom 50's grading: grades still show, and an assignment your teacher starts grading shows it again.",
   "settings.shortcut": "Keyboard shortcut",
   "settings.shortcut.hint": "Opens and closes the toolbox from any app.",
   "settings.shortcut.wayland": "Not available under Wayland. A shortcut that runs the toolbox, set in your desktop's keyboard settings, opens it.",

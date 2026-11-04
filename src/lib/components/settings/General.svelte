@@ -135,6 +135,12 @@
       >{t(`settings.commitActions.${current.commitActions}`)}</button
     >
   </div>
+  <Toggle
+    label={t("settings.gradingInfo")}
+    hint={t("settings.gradingInfoHint")}
+    checked={current.showGradingInfo}
+    onchange={(on) => save({ showGradingInfo: on })}
+  />
   {#if current.hidden.length || current.hiddenClasses.length}
     <div class="row">
       <span class="text">

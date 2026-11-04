@@ -66,6 +66,9 @@ pub fn update_settings(
     {
         crate::calendar::sync(&app);
     }
+    if saved.show_grading_info != previous.show_grading_info {
+        crate::alerts::clear_revealed(&app);
+    }
     if saved.appearance != previous.appearance {
         popover::apply_appearance(&app, saved.appearance);
     }

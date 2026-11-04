@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { Assignment } from "#lib/api.js";
-import { gradingDetail, gradingMode, passing, passLabel } from "#lib/grading.js";
+import { gradingDetail, gradingMode, passing, passLabel, showsGrading } from "#lib/grading.js";
 
 const assignment = (over: Partial<Assignment>): Assignment =>
   ({ slug: "lab-1", name: "Lab 1", mode: "individual", feedbackPr: false, ...over }) as Assignment;
@@ -46,5 +46,13 @@ describe("grading", () => {
     expect(passLabel({ score: 7, maxScore: 12 }, 50)).toBe("Passing");
     expect(passLabel({ score: 5, maxScore: 12 }, 50)).toBe("Below the passing bar (50%)");
     expect(passLabel({ score: 5, maxScore: 12 }, undefined)).toBeNull();
+  });
+
+  it("hides how it is graded only while nothing changed and nothing is graded", () => {
+    expect(showsGrading(true, false, false)).toBe(true);
+    expect(showsGrading(false, false, false)).toBe(false);
+    // The teacher changed its grading since, or a grade came in: it shows again.
+    expect(showsGrading(false, true, false)).toBe(true);
+    expect(showsGrading(false, false, true)).toBe(true);
   });
 });

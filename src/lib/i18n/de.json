@@ -87,6 +87,8 @@
   "settings.general.title": "Allgemein",
   "settings.launchAtLogin": "Bei der Anmeldung öffnen",
   "settings.launchAtLoginHint": "Startet im Hintergrund, wenn du dich an deinem Computer anmeldest, damit dich Erinnerungen und neue Noten weiter erreichen.",
+  "settings.gradingInfo": "Zeigen, wie Aufgaben bewertet werden",
+  "settings.gradingInfoHint": "Sagt, wenn eine Aufgabe nicht benotet wird oder das Lehrteam sie bewertet. Schalte es aus, wenn deine Klasse die Bewertung von Classroom 50 nicht nutzt: Noten werden weiter angezeigt, und eine Aufgabe, die deine Lehrkraft zu bewerten beginnt, zeigt es wieder an.",
   "settings.shortcut": "Tastenkürzel",
   "settings.shortcut.hint": "Öffnet und schließt die Toolbox aus jeder App.",
   "settings.shortcut.wayland": "Unter Wayland nicht verfügbar. Ein Kürzel, das die Toolbox startet, in den Tastatureinstellungen deines Desktops angelegt, öffnet sie.",
