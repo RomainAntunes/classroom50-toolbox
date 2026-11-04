@@ -1,5 +1,6 @@
 pub mod accounts;
 pub mod alerts;
+pub mod allowed;
 mod calendar;
 pub mod classroom50;
 mod clock;

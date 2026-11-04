@@ -10,6 +10,7 @@ use std::time::Duration;
 
 use serde::Serialize;
 
+use crate::allowed::Allowlist;
 use crate::classroom50::{self, Assignment, REPO_CONFIG_FILE, RepoConfig};
 use crate::error::{Error, Result};
 use crate::process;
@@ -222,6 +223,10 @@ pub struct SubmitCheck {
     /// Untracked editor, OS and build files (`noise`, by root): they don't block a submit,
     /// but `gh student submit` sends them too unless a `.gitignore` lists them.
     pub editor_files: Vec<String>,
+    /// Files of the clone the assignment's `allowed_files` leaves out of the submission
+    /// (`push::not_graded`, editor files aside): gh-student leaves them out of the snapshot
+    /// and the autograder deletes any that reach it. Advice only.
+    pub not_graded: Vec<String>,
 }
 
 /// What the app knows of a clone's assignment, which a clone without `.classroom50.yaml`
@@ -233,6 +238,8 @@ pub struct SubmitTarget<'a> {
     pub assignment_known: bool,
     /// The unlisted classroom's key.
     pub key: Option<&'a str>,
+    /// The assignment's `allowed_files`.
+    pub allowed_files: &'a [String],
 }
 
 /// Lists what `check` reports, without taking the index lock. A clone without a marker is
@@ -243,10 +250,12 @@ pub async fn check(path: &Path, target: SubmitTarget<'_>) -> Result<SubmitCheck>
         markerless(target, || tools::status(Tool::GhStudent)).await?;
     }
     let tree = push::work_tree(path).await?;
+    let not_graded = push::not_graded(path, &Allowlist::new(target.allowed_files)).await;
     Ok(SubmitCheck {
         has_marker,
         uncommitted: tree.files,
         editor_files: tree.skipped,
+        not_graded,
     })
 }
 
@@ -598,6 +607,16 @@ mod tests {
         assert!(clean.has_marker);
         assert!(clean.uncommitted.is_empty());
         assert_eq!(clean.editor_files, [".DS_Store", "target/"]);
+        assert!(clean.not_graded.is_empty());
+        // Only C files count: the marker stays, editor and build files aren't named twice.
+        let allowed_files = ["*", "!*.c"].map(str::to_owned);
+        let only_c = SubmitTarget {
+            allowed_files: &allowed_files,
+            ..SubmitTarget::default()
+        };
+        let clean = check(&root, only_c).await.unwrap();
+        assert_eq!(clean.not_graded, ["Cargo.toml"]);
+        assert_eq!(clean.editor_files, [".DS_Store", "target/"]);
 
         std::fs::remove_file(root.join("a.c")).unwrap();
         std::fs::write(root.join("b.c"), "x").unwrap();
@@ -635,6 +654,7 @@ mod tests {
         let unknown = SubmitTarget {
             assignment_known: false,
             key: Some("a1b2c3d4"),
+            ..SubmitTarget::default()
         };
         assert!(matches!(
             check(&root, unknown).await,
@@ -655,7 +675,7 @@ mod tests {
         };
         let known = SubmitTarget {
             assignment_known: true,
-            key: None,
+            ..SubmitTarget::default()
         };
         let err = markerless(known, gh_student(Some("v1.55.0")))
             .await

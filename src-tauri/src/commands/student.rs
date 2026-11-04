@@ -288,7 +288,8 @@ fn submittable(state: &ProjectsState, id: &str) -> Result<(PathBuf, Project)> {
 
 /// What a clone without a marker needs for `gh student submit`: whether the repo's name
 /// matches its assignment (gh-student reads nothing else: a repo known by its template
-/// alone, or renamed by hand, it can't place), and the unlisted class's key.
+/// alone, or renamed by hand, it can't place), and the unlisted class's key. Plus the
+/// assignment's `allowed_files`, for the files the submission leaves out.
 pub(super) fn submit_target(project: &Project) -> student::SubmitTarget<'_> {
     let named = project
         .repo
@@ -305,6 +306,10 @@ pub(super) fn submit_target(project: &Project) -> student::SubmitTarget<'_> {
     student::SubmitTarget {
         assignment_known: named,
         key: project.classroom.as_ref().and_then(|c| c.secret.as_deref()),
+        allowed_files: project
+            .assignment
+            .as_ref()
+            .map_or(&[], |a| a.allowed_files.as_slice()),
     }
 }
 

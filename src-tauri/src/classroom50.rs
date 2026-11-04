@@ -133,6 +133,11 @@ pub struct Assignment {
     /// The repo each student repo is generated from; absent on `empty_repo` assignments.
     #[serde(default)]
     pub template: Option<Template>,
+    /// Ordered `.gitignore` patterns naming the files that are part of the submission
+    /// (`allowed.rs`); empty keeps every file. Advice in the app: the runner deletes the
+    /// others before grading and gh-student leaves them out.
+    #[serde(default, alias = "allowedFiles")]
+    pub allowed_files: Vec<String>,
 }
 
 /// How the teacher means to grade an assignment (`assignments-v1` `grading`).
@@ -647,6 +652,23 @@ mod tests {
         .unwrap()
     }
 
+    /// `allowed_files` comes in snake_case from the manifest and goes back to the UI and
+    /// `snapshot.json` in camelCase, which reads back too.
+    #[test]
+    fn reads_allowed_files_from_the_manifest_and_the_snapshot() {
+        let upstream: Assignment = serde_json::from_value(serde_json::json!({
+            "slug": "hello", "name": "Hello", "mode": "individual",
+            "allowed_files": ["*", "!hello.py"]
+        }))
+        .unwrap();
+        assert_eq!(upstream.allowed_files, ["*", "!hello.py"]);
+        let saved = serde_json::to_value(&upstream).unwrap();
+        assert_eq!(saved["allowedFiles"], serde_json::json!(["*", "!hello.py"]));
+        let back: Assignment = serde_json::from_value(saved).unwrap();
+        assert_eq!(back.allowed_files, upstream.allowed_files);
+        assert!(assignment("lab", None).allowed_files.is_empty());
+    }
+
     #[test]
     fn matches_repos_by_name() {
         let list: Vec<Assignment> = ["lab01", "labo-3-hogwarts", "lab1", "lab1-extra"]
@@ -889,6 +911,8 @@ mod tests {
             ]
         ));
         assert!(algo[1].description_doc.is_none());
+        assert_eq!(algo[0].allowed_files, ["*", "!hello.c"]);
+        assert!(algo[1].allowed_files.is_empty());
         assert!(algo.iter().all(|a| a.due.is_some()));
         let web = parse_assignments("web", &crate::testenv::golden("manifest-web")).unwrap();
         assert_eq!(

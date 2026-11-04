@@ -154,6 +154,13 @@ pub struct LocalState {
     /// git refreshing it after files changed. Open Recent's order.
     #[serde(default)]
     pub active_at: Option<DateTime<Utc>>,
+    /// Files of the clone its assignment's `allowed_files` leaves out of the submission
+    /// (`push::not_graded`), read only for assignments that set it.
+    #[serde(default)]
+    pub not_graded_files: u32,
+    /// The first `MAX_CHANGED_PATHS` of them, in path order.
+    #[serde(default)]
+    pub not_graded_paths: Vec<String>,
 }
 
 /// The most pressing reason the graded state lags behind the student's work.
