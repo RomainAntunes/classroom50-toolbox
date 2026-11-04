@@ -279,6 +279,16 @@
       // Only the default branch is graded, so another one is worth pointing out.
       if (local.branch !== defaultBranch) add("branch", local.branch);
       if (local.changedFiles) add("changes", changedLines(local, 10));
+      // Files the assignment's `allowed_files` leaves out: the autograder never sees them.
+      if (local.notGradedFiles) {
+        add(
+          "notGraded",
+          changedLines(
+            { changedFiles: local.notGradedFiles, changedPaths: local.notGradedPaths },
+            10,
+          ),
+        );
+      }
     }
     add("folder", path ? tildify(path) : null);
     return items;

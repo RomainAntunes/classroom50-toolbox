@@ -114,6 +114,10 @@ async function commitWork(
     if (check.skipped.length) {
       lines.push(t("push.skipped", { files: fileList(check.skipped) }));
     }
+    // Pushed all the same, but the autograder deletes them before grading: advice only.
+    if (check.notGraded.length) {
+      lines.push(t("submit.notGraded", { files: fileList(check.notGraded) }));
+    }
     if (check.large.length) lines.push(t("push.large", { files: fileList(check.large) }));
     if (canPush && check.ahead) lines.push(t("push.ahead", { count: check.ahead }));
     if (!canPush) lines.push(noPushLine(check.pushBlocked ?? "", branch));
@@ -160,6 +164,9 @@ async function pushOnly(
 ): Promise<boolean> {
   const check = await api.pushCheck(project.id);
   const lines = [t("push.pushOnly", { count: check.ahead, branch })];
+  if (check.notGraded.length) {
+    lines.push(t("submit.notGraded", { files: fileList(check.notGraded) }));
+  }
   if (late(project)) lines.push(t("push.late"));
   if (!(await confirm(lines.join("\n\n"), name, t("push.pushOk")))) return false;
   onChoice?.(true);

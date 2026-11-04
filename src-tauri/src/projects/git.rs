@@ -7,9 +7,11 @@ use chrono::{DateTime, Utc};
 use tokio::task::JoinSet;
 
 use super::{LocalState, MAX_CHANGED_PATHS, Progress, Project};
+use crate::allowed::Allowlist;
 use crate::groups;
 use crate::noise;
 use crate::process;
+use crate::push;
 use crate::sync_progress::Phase;
 
 /// Teammates without a public email on GitHub get the one they commit with in the shared
@@ -141,7 +143,9 @@ pub(super) fn last_activity(path: &Path) -> Option<std::time::SystemTime> {
 }
 
 /// Compares each clone with GitHub's data: unmerged local branches, and whether the
-/// remote head is missing (needs a pull). No network: only the local object store.
+/// remote head is missing (needs a pull). No network: only the local object store. For an
+/// assignment that sets `allowed_files`, also lists the clone's files it leaves out (one
+/// `git ls-files`, two with a new folder).
 pub(super) async fn check_clones(projects: &mut [Project]) {
     let mut tasks = JoinSet::new();
     for (i, project) in projects.iter().enumerate() {
@@ -154,6 +158,11 @@ pub(super) async fn check_clones(projects: &mut [Project]) {
             .and_then(|r| r.head.as_ref())
             .map(|h| h.oid.clone())
             .filter(|oid| local.head.as_deref() != Some(oid.as_str()));
+        let allowed = project
+            .assignment
+            .as_ref()
+            .map(|a| Allowlist::new(&a.allowed_files))
+            .filter(|allowed| !allowed.is_empty());
         tasks.spawn(async move {
             let unmerged = match default_branch {
                 Some(branch) => unmerged_branches(&path, &branch).await,
@@ -163,13 +172,20 @@ pub(super) async fn check_clones(projects: &mut [Project]) {
                 Some(oid) => !has_commit(&path, &oid).await,
                 None => false,
             };
-            (i, unmerged, remote_ahead)
+            let not_graded = match allowed {
+                Some(allowed) => push::not_graded(&path, &allowed).await,
+                None => Vec::new(),
+            };
+            (i, unmerged, remote_ahead, not_graded)
         });
     }
-    while let Some(Ok((i, unmerged, remote_ahead))) = tasks.join_next().await {
+    while let Some(Ok((i, unmerged, remote_ahead, mut not_graded))) = tasks.join_next().await {
         if let Some(local) = projects[i].local.as_mut() {
             local.unmerged = unmerged;
             local.remote_ahead = remote_ahead;
+            local.not_graded_files = u32::try_from(not_graded.len()).unwrap_or(u32::MAX);
+            not_graded.truncate(MAX_CHANGED_PATHS);
+            local.not_graded_paths = not_graded;
         }
     }
 }

@@ -435,6 +435,20 @@ export type Assignment_Deserialize = {
 	 *  `origin` with the old name (GitHub redirects it), so both still count.
 	 */
 	renamedFrom: string | null,
+} & {
+	/**
+	 *  Ordered `.gitignore` patterns naming the files that are part of the submission
+	 *  (`allowed.rs`); empty keeps every file. Advice in the app: the runner deletes the
+	 *  others before grading and gh-student leaves them out.
+	 */
+	allowed_files: string[],
+} | {
+	/**
+	 *  Ordered `.gitignore` patterns naming the files that are part of the submission
+	 *  (`allowed.rs`); empty keeps every file. Advice in the app: the runner deletes the
+	 *  others before grading and gh-student leaves them out.
+	 */
+	allowedFiles: string[],
 };
 
 /**
@@ -490,6 +504,12 @@ export type Assignment_Serialize = {
 	renamedFrom: string | null,
 	/**  The repo each student repo is generated from; absent on `empty_repo` assignments. */
 	template: Template | null,
+	/**
+	 *  Ordered `.gitignore` patterns naming the files that are part of the submission
+	 *  (`allowed.rs`); empty keeps every file. Advice in the app: the runner deletes the
+	 *  others before grading and gh-student leaves them out.
+	 */
+	allowedFiles: string[],
 };
 
 export type AuthStatus = {
@@ -945,6 +965,13 @@ export type LocalState = {
 	 *  git refreshing it after files changed. Open Recent's order.
 	 */
 	activeAt: string | null,
+	/**
+	 *  Files of the clone its assignment's `allowed_files` leaves out of the submission
+	 *  (`push::not_graded`), read only for assignments that set it.
+	 */
+	notGradedFiles: number,
+	/**  The first `MAX_CHANGED_PATHS` of them, in path order. */
+	notGradedPaths: string[],
 };
 
 export type Member = {
@@ -1136,6 +1163,12 @@ export type PushCheck = {
 	ahead: number,
 	/**  git has a `user.name` and `user.email` for this clone. */
 	hasIdentity: boolean,
+	/**
+	 *  Files the commit or the clone already holds that the assignment's `allowed_files`
+	 *  leaves out of the submission (`not_graded`): pushed all the same, but the autograder
+	 *  deletes them before grading. Advice only.
+	 */
+	notGraded: string[],
 };
 
 /**  The new head commit (pushed by Commit & push, local only after a commit). */
@@ -1331,6 +1364,12 @@ export type SubmitCheck = {
 	 *  but `gh student submit` sends them too unless a `.gitignore` lists them.
 	 */
 	editorFiles: string[],
+	/**
+	 *  Files of the clone the assignment's `allowed_files` leaves out of the submission
+	 *  (`push::not_graded`, editor files aside): gh-student leaves them out of the snapshot
+	 *  and the autograder deletes any that reach it. Advice only.
+	 */
+	notGraded: string[],
 };
 
 export type Submitted = {

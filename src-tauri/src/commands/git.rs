@@ -1,11 +1,12 @@
 //! Git writes to a clone, on a click only: clone, pull, commit, commit and push, the
 //! clone's identity.
 
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 use tauri::{AppHandle, Manager, State};
 
 use super::submittable_clone;
+use crate::allowed::Allowlist;
 use crate::clones::{self, CloneStore};
 use crate::error::{Error, Result};
 use crate::projects::{self, Project, ProjectsState};
@@ -157,7 +158,22 @@ pub async fn push_check(
 ) -> Result<push::PushCheck> {
     allow_commit(settings.get().commit_actions, true)?;
     let (path, branch, head) = pushable(&state, &id)?;
-    push::check(&path, &branch, head.as_deref()).await
+    let mut check = push::check(&path, &branch, head.as_deref()).await?;
+    check.not_graded = push::not_graded(&path, &allowlist(&state, &id)).await;
+    Ok(check)
+}
+
+/// Project `id`'s `allowed_files`, empty (every file kept) when its assignment isn't known.
+fn allowlist(state: &ProjectsState, id: &str) -> Allowlist {
+    let snapshot = state.snapshot();
+    let patterns = snapshot
+        .projects
+        .iter()
+        .find(|p| p.id == id)
+        .and_then(|p| p.assignment.as_ref())
+        .map(|a| a.allowed_files.as_slice())
+        .unwrap_or_default();
+    Allowlist::new(patterns)
 }
 
 /// Commits project `id`'s changes with `message` and pushes its default branch, then
@@ -216,8 +232,20 @@ pub async fn commit_check(
 ) -> Result<CommitCheck> {
     allow_commit(settings.get().commit_actions, false)?;
     let path = local_clone(&state, &id)?;
-    let changes = push::commit_check(&path).await?;
-    if allow_commit(settings.get().commit_actions, true).is_err() {
+    let mut check = commit_or_push_check(&state, settings.get().commit_actions, &id, &path).await?;
+    check.check.not_graded = push::not_graded(&path, &allowlist(&state, &id)).await;
+    Ok(check)
+}
+
+/// `commit_check` before the files `allowed_files` leaves out.
+async fn commit_or_push_check(
+    state: &ProjectsState,
+    actions: CommitActions,
+    id: &str,
+    path: &Path,
+) -> Result<CommitCheck> {
+    let changes = push::commit_check(path).await?;
+    if allow_commit(actions, true).is_err() {
         return Ok(CommitCheck {
             check: changes,
             push_blocked: Some("disabled".into()),
@@ -237,7 +265,7 @@ pub async fn commit_check(
             push_blocked: Some("tagMode".into()),
         });
     }
-    let pushed = match pushable(&state, &id) {
+    let pushed = match pushable(state, id) {
         Ok((path, branch, head)) => push::check(&path, &branch, head.as_deref()).await,
         Err(err) => Err(err),
     };
