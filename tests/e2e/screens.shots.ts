@@ -79,6 +79,8 @@ for (const os of SKINS) {
       await new App(notes).start(updated);
       await expect(notes.getByRole("button", { name: /./ }).last()).toBeVisible();
       await expect(notes).toHaveURL(/\/whats-new$/);
+      // The notes, not the spinner shown while they load.
+      await expect(notes.getByRole("heading", { level: 1 })).toBeVisible();
       await notes.screenshot({ path: name("whats-new") });
       await notes.close();
     });

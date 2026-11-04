@@ -1,6 +1,7 @@
 // What's new: once after an update (until "Got it"), never instead of the first-run guide,
 // again from Settings > About, and never in the way of a link being handled.
 import { readdirSync, readFileSync } from "node:fs";
+import type { Page } from "@playwright/test";
 import { expect, test } from "./app";
 import { scenario, settings, VERSION } from "./fixtures";
 import type { DeepLinkTarget } from "../../src/lib/api";
@@ -141,4 +142,97 @@ test("a link being handled goes before the notes", async ({ app, page }) => {
   expect((await app.settings()).lastSeenVersion).toBe(BEFORE);
   await app.emit("popover-hidden", null);
   await expect(page).toHaveURL(/\/whats-new$/);
+});
+
+/** A changelog's chunk: `{date:"2026-11-03",notes:{...}}`. */
+const CHANGELOG = /\{date:\s*[`"'](\d{4}-\d{2}-\d{2})[`"'],\s*notes:/;
+
+/**
+ * Holds every changelog chunk until `settle(true)` serves them or `settle(false)` fails
+ * them; once settled, later requests go through.
+ */
+async function holdChangelogs(page: Page) {
+  let settle!: (ok: boolean) => void;
+  let decided = new Promise<boolean>((resolve) => (settle = resolve));
+  let requested = 0;
+  await page.route("**/_app/immutable/**/*.js", async (route) => {
+    const response = await route.fetch();
+    const body = await response.text();
+    if (!CHANGELOG.test(body)) return route.fulfill({ response, body });
+    requested++;
+    if (await decided) await route.fulfill({ response, body });
+    else await route.abort();
+  });
+  return {
+    settle: (ok: boolean) => settle(ok),
+    /** From now on, every changelog chunk is served. */
+    serve: () => {
+      decided = Promise.resolve(true);
+    },
+    requested: () => requested,
+  };
+}
+
+const loadingNotes = (page: Page) => page.getByText("Loading the notes…");
+
+test("from Settings > About, the notes spin while they load, then show", async ({ app, page }) => {
+  test.skip(!NOTES.includes(VERSION), `no notes for ${VERSION}`);
+  const held = await holdChangelogs(page);
+  await app.start(scenario());
+  await app.openSettings();
+  await page.getByRole("button", { name: "Show", exact: true }).click();
+  await expect(page).toHaveURL(/\/whats-new\?from=settings$/);
+  await expect(loadingNotes(page)).toBeVisible();
+  await expect(page.locator("main")).toHaveAttribute("aria-busy", "true");
+  await expect(page.locator("main .spinner")).toBeVisible();
+  await expect.poll(() => held.requested()).toBe(1);
+  await expect(page.getByRole("heading", { level: 1 })).toHaveCount(0);
+
+  held.settle(true);
+  await expect(page.getByRole("heading", { level: 1 })).toHaveText(`What's new in ${VERSION}`);
+  await expect(page.getByRole("heading", { level: 1 })).toBeFocused();
+  await expect(loadingNotes(page)).toHaveCount(0);
+  await expect(page.locator("main")).toHaveAttribute("aria-busy", "false");
+});
+
+test("every version's notes (the dev preview) spin while they load, then show", async ({
+  app,
+  page,
+}) => {
+  const held = await holdChangelogs(page);
+  // Standing still, the ring and its words still say it's loading.
+  await page.emulateMedia({ reducedMotion: "reduce" });
+  await app.start(scenario(), "/whats-new?from=settings&all");
+  await expect(loadingNotes(page)).toBeVisible();
+  await expect(page.locator("main .spinner")).toBeVisible();
+  await expect(page.locator("main .spinner")).toHaveCSS("animation-name", "none");
+  await expect(page.locator("main")).toHaveAttribute("aria-busy", "true");
+  await expect.poll(() => held.requested()).toBe(NOTES.length);
+
+  held.settle(true);
+  await expect(page.locator(".version-title h2")).toHaveText(
+    NOTES.map((version) => `Version ${version}`),
+  );
+  await expect(loadingNotes(page)).toHaveCount(0);
+});
+
+test("notes that won't load say so, and Retry loads them", async ({ app, page }) => {
+  const held = await holdChangelogs(page);
+  await app.start(
+    scenario({ settings: settings({ lastSeenVersion: BEFORE }), appInfo: at(NEWEST) }),
+  );
+  await expect(page).toHaveURL(/\/whats-new$/);
+  await expect(loadingNotes(page)).toBeVisible();
+  held.settle(false);
+  await expect(page.getByRole("alert")).toHaveText("Couldn't load the notes.");
+  const retry = page.getByRole("button", { name: "Try again" });
+  await expect(retry).toBeFocused();
+  await expect(page.getByText(FIRST_ENTRY)).toHaveCount(0);
+
+  held.serve();
+  await retry.click();
+  await expect(page.getByText(FIRST_ENTRY)).toBeVisible();
+  await expect(page.getByRole("alert")).toHaveCount(0);
+  // Nothing was marked as read on the way.
+  expect((await app.settings()).lastSeenVersion).toBe(BEFORE);
 });

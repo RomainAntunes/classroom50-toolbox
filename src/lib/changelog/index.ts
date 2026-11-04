@@ -17,7 +17,7 @@ const files = import.meta.glob("./*.json", { import: "default" }) as Record<
 const loaders = new Map(
   Object.entries(files).map(([path, load]) => [path.slice(2, -".json".length), load]),
 );
-const loading = new Map<string, Promise<Changelog | null>>();
+const loading = new Map<string, Promise<Changelog>>();
 
 /** The versions with notes, newest first. */
 export function versions(): string[] {
@@ -25,8 +25,9 @@ export function versions(): string[] {
 }
 
 /**
- * The changelogs of `wanted`, by version, each file loaded once. A version without notes,
- * or whose file can't load (logged, tried again next time), is left out.
+ * The changelogs of `wanted`, by version, each file loaded once; a version without notes
+ * is left out. Rejects when a file can't load (logged; the next call tries it again), so
+ * What's new says so and offers to retry instead of showing fewer notes.
  */
 export async function loadChangelogs(
   wanted: readonly string[],
@@ -40,12 +41,11 @@ export async function loadChangelogs(
         changelog = load().catch((err: unknown) => {
           console.error(`couldn't load the ${version} changelog`, err);
           loading.delete(version);
-          return null;
+          throw err;
         });
         loading.set(version, changelog);
       }
-      const loaded = await changelog;
-      return loaded ? ([version, loaded] as const) : null;
+      return [version, await changelog] as const;
     }),
   );
   return Object.fromEntries(found.filter((entry) => entry !== null));
