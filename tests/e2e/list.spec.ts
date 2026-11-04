@@ -331,6 +331,51 @@ test("a test the autograder stopped says so before what it printed", async ({ ap
   await expect(page.locator(".timeout")).toHaveCount(2);
 });
 
+test("the details list each milestone tag, pushed or not yet", async ({ app }) => {
+  await app.start(
+    scenario({
+      snapshot: snapshot({
+        projects: [
+          project({
+            slug: "lab",
+            name: "Lab",
+            assignment: { submissionTags: ["draft", "v*", "final"] },
+            remote: {
+              milestones: [
+                { pattern: "draft", tag: { name: "draft", commit: "c1", at: hoursFromNow(-50) } },
+                // A glob names the tag that matched it.
+                { pattern: "v*", tag: { name: "v2", commit: "c2", at: hoursFromNow(-3) } },
+                { pattern: "final", tag: null },
+              ],
+            },
+          }),
+          project({ slug: "plain", name: "Plain" }),
+        ],
+      }),
+    }),
+  );
+  const lab = app.row("Lab");
+  await lab.locator("[data-row]").click();
+  await expect(lab.locator(".details .heading")).toHaveText("Milestone tags");
+  const items = lab.locator(".milestones li");
+  await expect(items).toHaveCount(3);
+  await expect(items.nth(0)).toHaveText(/^draft\s*Pushed, tagged 2 days ago$/);
+  await expect(items.nth(1)).toHaveText(/^v\*\s*Pushed as v2, tagged 3 hours ago$/);
+  // Not yet, in words and not only in color.
+  await expect(items.nth(2)).toHaveText(/^final\s*Not pushed yet$/);
+  await expect(items.nth(2).locator(".state")).not.toHaveClass(/done/);
+  await expect(items.nth(0).locator(".state")).toHaveClass(/done/);
+  await expect(items.nth(0).locator(".state")).toHaveAttribute("title", /\d/);
+
+  // An assignment without milestone tags shows no such list.
+  const plain = app.row("Plain");
+  await plain.locator("[data-row]").click();
+  await expect(plain.locator(".details")).toBeVisible();
+  await expect(plain.locator(".milestones")).toHaveCount(0);
+  // Reading them is read-only: the app never makes or pushes these tags.
+  expect(await app.writes()).toEqual([]);
+});
+
 test("Clear cache spins until the list is rebuilt", async ({ app, page }) => {
   await app.start(scenario({ responses: { clear_cache: [hold()] } }));
   await app.openSettings();

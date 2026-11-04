@@ -102,8 +102,19 @@ export function richScenario(over: Partial<Settings> = {}): Scenario {
             maxGroupSize: 2,
             grading: { mode: "manual", maxPoints: 50 },
             due: daysFromNow(20),
+            submissionTags: ["proposal", "v*", "final"],
           },
           local: null,
+          remote: {
+            milestones: [
+              {
+                pattern: "proposal",
+                tag: { name: "proposal", commit: "c1", at: daysFromNow(-6) },
+              },
+              { pattern: "v*", tag: { name: "v2", commit: "c2", at: daysFromNow(-1) } },
+              { pattern: "final", tag: null },
+            ],
+          },
           group: {
             org: cs101.org,
             slug: "classroom50-group-abc-4",
