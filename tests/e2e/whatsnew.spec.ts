@@ -47,6 +47,27 @@ test("after an update the notes show once, and Got it records them as read", asy
   await expect(page.getByRole("searchbox")).toBeVisible();
 });
 
+test("only the notes shown are loaded, and the list loads none", async ({ app, page }) => {
+  // Each changelog is a chunk of its own: `{date:"2026-11-03",notes:{...}}`.
+  const changelogs: string[] = [];
+  page.on("response", async (response) => {
+    if (!response.url().endsWith(".js")) return;
+    const body = await response.text().catch(() => "");
+    const date = /\{date:\s*[`"'](\d{4}-\d{2}-\d{2})[`"'],\s*notes:/.exec(body)?.[1];
+    if (date) changelogs.push(date);
+  });
+  await app.start(
+    scenario({ settings: settings({ lastSeenVersion: BEFORE }), appInfo: at(NEWEST) }),
+  );
+  await expect(page.getByText(FIRST_ENTRY)).toBeVisible();
+  const newest = JSON.parse(readFileSync(new URL(`${NEWEST}.json`, DIR), "utf8")).date;
+  await expect.poll(() => changelogs).toEqual([newest]);
+
+  await page.getByRole("button", { name: "Got it" }).click();
+  await expect(page.getByRole("searchbox")).toBeVisible();
+  expect(changelogs).toEqual([newest]);
+});
+
 test("a settings file from before the page shows the current notes once", async ({ app, page }) => {
   test.skip(!NOTES.includes(VERSION), `no notes for ${VERSION}`);
   await app.start(scenario({ settings: settings({ lastSeenVersion: null }) }));
