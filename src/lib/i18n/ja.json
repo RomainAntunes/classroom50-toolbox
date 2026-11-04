@@ -87,6 +87,8 @@
   "settings.general.title": "一般",
   "settings.launchAtLogin": "ログイン時に開く",
   "settings.launchAtLoginHint": "コンピューターにログインするとバックグラウンドで起動し、リマインダーや新しい成績が届き続けます。",
+  "settings.gradingInfo": "課題の採点方法を表示",
+  "settings.gradingInfoHint": "課題が採点されないか、教員チームが採点するかを示します。クラスで Classroom 50 の採点を使っていない場合はオフにしてください。成績は引き続き表示され、先生が採点を始めた課題には再び表示されます。",
   "settings.shortcut": "キーボードショートカット",
   "settings.shortcut.hint": "どのアプリからでもツールボックスを開いたり閉じたりできます。",
   "settings.shortcut.wayland": "Waylandでは使えません。デスクトップのキーボード設定でツールボックスを起動するショートカットを設定すると開けます。",

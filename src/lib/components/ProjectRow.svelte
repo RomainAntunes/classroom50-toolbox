@@ -25,7 +25,18 @@
   import TeammateProgress from "./TeammateProgress.svelte";
   import Spinner from "./Spinner.svelte";
 
-  let { project, now, unseen }: { project: Project; now: Date; unseen: boolean } = $props();
+  let {
+    project,
+    now,
+    unseen,
+    gradingInfo = true,
+  }: {
+    project: Project;
+    now: Date;
+    unseen: boolean;
+    /** Says how the assignment is graded ("Not graded", by the teaching staff). */
+    gradingInfo?: boolean;
+  } = $props();
   const uid = $props.id();
 
   const DAY = 24 * 60 * 60 * 1000;
@@ -63,6 +74,8 @@
   // An assignment the teacher doesn't grade says so, with no grading run's news.
   const ungraded = $derived(gradingMode(project.assignment) === "off");
   const grading = $derived(ungraded ? null : (project.remote?.grading ?? null));
+  // "Not graded" on the row, unless the student hid how assignments are graded.
+  const notGraded = $derived(ungraded && gradingInfo);
   const status = $derived.by(() => {
     if (closed) return { label: t("projects.closed"), warn: false, hint: undefined };
     // The last push isn't graded and won't be until it's pushed again or the teacher regrades.
@@ -264,7 +277,7 @@
     if (a) {
       add("type", t(`details.mode.${a.mode}`));
       add("submission", t(`details.submissionMode.${a.submissionMode ?? "every-push"}`));
-      add("grading", gradingDetail(a));
+      if (gradingInfo) add("grading", gradingDetail(a));
       const opens = a.availableFrom ? new Date(a.availableFrom) : null;
       if (opens && opens > now) add("opens", formatDate(opens));
     }
@@ -467,7 +480,7 @@
       data-row
       aria-expanded={open}
       aria-labelledby="{uid}-name"
-      aria-describedby={grade || ungraded || grading?.state === "running"
+      aria-describedby={grade || notGraded || grading?.state === "running"
         ? `${uid}-meta ${uid}-grade`
         : `${uid}-meta`}
       onclick={() => (open = !open)}
@@ -530,7 +543,7 @@
             >{t("projects.gradeSr", { score: grade.score, max: grade.maxScore })}{#if passText}, {passText}{/if}</span
           ></span
         >
-      {:else if ungraded}
+      {:else if notGraded}
         <span class="grade ungraded" id="{uid}-grade" title={t("projects.notGradedHint")}
           >{t("projects.notGraded")}</span
         >

@@ -64,6 +64,11 @@ pub struct Settings {
     pub last_seen_version: Option<String>,
     /// Which releases self-update follows (`updater.rs`).
     pub update_channel: UpdateChannel,
+    /// Show how each assignment is graded ("Not graded", "By your teaching staff"). Off for
+    /// classes that don't use Classroom 50's grading; UI-only, Rust reads and announces
+    /// everything the same. A row whose grading the teacher changed since (`alerts.rs`'s
+    /// revealed ids) or that has a grade shows it anyway.
+    pub show_grading_info: bool,
 }
 
 /// Releases the app updates to: published stable ones, or also pre-releases.
@@ -134,6 +139,7 @@ impl Default for Settings {
             update_channel: UpdateChannel::Stable,
             last_seen_version: None,
             global_shortcut: None,
+            show_grading_info: true,
         }
     }
 }
@@ -306,6 +312,7 @@ mod tests {
             update_channel: UpdateChannel::Beta,
             last_seen_version: Some(" 0.11.0-beta.2 ".into()),
             global_shortcut: Some("alt+cmd+keyc".into()),
+            show_grading_info: false,
         }
         .normalized();
         assert_eq!(settings.last_seen_version.as_deref(), Some("0.11.0-beta.2"));
@@ -351,6 +358,8 @@ mod tests {
         assert_eq!(settings.update_channel, UpdateChannel::Stable);
         assert_eq!(settings.last_seen_version, None);
         assert_eq!(settings.global_shortcut, None);
+        // A file from before the setting existed shows the grading lines.
+        assert!(settings.show_grading_info);
     }
 
     #[test]

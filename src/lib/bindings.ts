@@ -64,6 +64,11 @@ export const commands = {
 	 *  follows.
 	 */
 	unseen: () => __TAURI_INVOKE<string[]>("unseen"),
+	/**
+	 *  Ids of rows whose grading lines show even while `showGradingInfo` hides them;
+	 *  `grading-revealed` follows.
+	 */
+	gradingRevealed: () => __TAURI_INVOKE<string[]>("grading_revealed"),
 	syncDetails: () => __TAURI_INVOKE<SyncDetails_Serialize>("sync_details"),
 	/**  Drops the GitHub caches and syncs from scratch. */
 	clearCache: () => __TAURI_INVOKE<Snapshot_Serialize>("clear_cache"),
@@ -705,6 +710,11 @@ export type Events_Deserialize = {
 	notify: Notice,
 	/**  Ids of projects and unaccepted assignments with unseen news. */
 	"unseen-updated": string[],
+	/**
+	 *  Ids of rows whose grading the teacher changed since `showGradingInfo` last changed:
+	 *  their grading lines show even while the setting hides them.
+	 */
+	"grading-revealed": string[],
 	/**  Settings Rust changed by itself (hidden ids moved by a rename). */
 	"settings-updated": Settings,
 	/**  The one-time code of the sign-in running. */
@@ -746,6 +756,11 @@ export type Events_Serialize = {
 	notify: Notice,
 	/**  Ids of projects and unaccepted assignments with unseen news. */
 	"unseen-updated": string[],
+	/**
+	 *  Ids of rows whose grading the teacher changed since `showGradingInfo` last changed:
+	 *  their grading lines show even while the setting hides them.
+	 */
+	"grading-revealed": string[],
 	/**  Settings Rust changed by itself (hidden ids moved by a rename). */
 	"settings-updated": Settings,
 	/**  The one-time code of the sign-in running. */
@@ -1339,6 +1354,13 @@ export type Settings = {
 	lastSeenVersion: string | null,
 	/**  Which releases self-update follows (`updater.rs`). */
 	updateChannel: UpdateChannel,
+	/**
+	 *  Show how each assignment is graded ("Not graded", "By your teaching staff"). Off for
+	 *  classes that don't use Classroom 50's grading; UI-only, Rust reads and announces
+	 *  everything the same. A row whose grading the teacher changed since (`alerts.rs`'s
+	 *  revealed ids) or that has a grade shows it anyway.
+	 */
+	showGradingInfo: boolean,
 };
 
 export type Snapshot = Snapshot_Serialize | Snapshot_Deserialize;

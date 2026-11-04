@@ -87,6 +87,8 @@
   "settings.general.title": "Ogólne",
   "settings.launchAtLogin": "Otwieraj po zalogowaniu",
   "settings.launchAtLoginHint": "Uruchamia się w tle po zalogowaniu do komputera, aby przypomnienia i nowe oceny nadal do ciebie docierały.",
+  "settings.gradingInfo": "Pokazuj, jak oceniane są zadania",
+  "settings.gradingInfoHint": "Mówi, kiedy zadanie nie jest oceniane albo oceniają je prowadzący. Wyłącz, jeśli twoja klasa nie korzysta z oceniania Classroom 50: oceny nadal są widoczne, a zadanie, które prowadzący zacznie oceniać, znów to pokaże.",
   "settings.shortcut": "Skrót klawiszowy",
   "settings.shortcut.hint": "Otwiera i zamyka Toolbox z dowolnej aplikacji.",
   "settings.shortcut.wayland": "Niedostępne w Waylandzie. Otworzy go skrót uruchamiający Toolbox, ustawiony w ustawieniach klawiatury twojego pulpitu.",

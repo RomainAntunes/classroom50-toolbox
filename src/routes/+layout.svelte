@@ -15,6 +15,7 @@
     TRAY_ACTION_EVENT,
     TRAY_EXPIRED_EVENT,
     UNSEEN_EVENT,
+    GRADING_REVEALED_EVENT,
     UPDATE_STATE_EVENT,
     type Settings,
     type UpdateStatus,
@@ -190,6 +191,9 @@
     void api.unseen().then((ids) => {
       session.unseen = ids;
     });
+    void api.gradingRevealed().then((ids) => {
+      session.gradingRevealed = ids;
+    });
     // A popover opened mid-download shows where it stands.
     void api.updateStatus().then(setUpdate);
     // Here so a queue that ends on another page is still announced.
@@ -198,6 +202,9 @@
       onEvent(NOTIFY_EVENT, (notice) => void localeLoaded.then(() => showNotice(notice))),
       onEvent(UNSEEN_EVENT, (ids) => {
         session.unseen = ids;
+      }),
+      onEvent(GRADING_REVEALED_EVENT, (ids) => {
+        session.gradingRevealed = ids;
       }),
       onEvent(SETTINGS_UPDATED_EVENT, (saved) => {
         settings.current = saved;

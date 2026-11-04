@@ -13,7 +13,7 @@ use serde::{Deserialize, Serialize};
 use tauri::{AppHandle, Manager};
 
 use crate::classroom50::{GradingMode, SubmissionMode};
-use crate::events::{IpcEvent, Notify, SettingsUpdated, UnseenUpdated};
+use crate::events::{GradingRevealed, IpcEvent, Notify, SettingsUpdated, UnseenUpdated};
 use crate::github;
 use crate::projects::{Project, Snapshot};
 use crate::settings::{Settings, SettingsStore};
@@ -114,6 +114,13 @@ struct Memory {
     unseen: BTreeSet<String>,
     /// The subset of `unseen` that lights the tray badge: a teammate pushed.
     badge: BTreeSet<String>,
+    /// How each assignment was graded when last seen (`grading_mode`), per
+    /// `org/classroom/assignment` (lowercase).
+    gradings: BTreeMap<String, GradingMode>,
+    /// Project and unaccepted-assignment ids whose grading the teacher changed to `auto` or
+    /// `manual` since: the UI shows their grading lines even while `showGradingInfo` hides
+    /// the others. Cleared when that setting changes (`clear_revealed`).
+    revealed: BTreeSet<String>,
 }
 
 pub struct AlertsState {
@@ -140,6 +147,13 @@ impl AlertsState {
         self.memory
             .lock()
             .map(|m| m.unseen.iter().cloned().collect())
+            .unwrap_or_default()
+    }
+
+    pub fn revealed(&self) -> Vec<String> {
+        self.memory
+            .lock()
+            .map(|m| m.revealed.iter().cloned().collect())
             .unwrap_or_default()
     }
 
@@ -179,6 +193,7 @@ pub fn process(app: &AppHandle, snapshot: &Snapshot) {
     let notices = diff(&mut memory, snapshot, &hours, Utc::now());
     state.save(&memory);
     let unseen: Vec<String> = memory.unseen.iter().cloned().collect();
+    let revealed: Vec<String> = memory.revealed.iter().cloned().collect();
     let attention = !memory.badge.is_empty();
     drop(memory);
 
@@ -188,7 +203,23 @@ pub fn process(app: &AppHandle, snapshot: &Snapshot) {
         }
     }
     let _ = UnseenUpdated::emit(app, &unseen);
+    let _ = GradingRevealed::emit(app, &revealed);
     set_badge(app, attention);
+}
+
+/// The `showGradingInfo` setting changed: what was revealed under the old choice starts over.
+pub fn clear_revealed(app: &AppHandle) {
+    let state = app.state::<AlertsState>();
+    let Ok(mut memory) = state.memory.lock() else {
+        return;
+    };
+    if memory.revealed.is_empty() {
+        return;
+    }
+    memory.revealed.clear();
+    state.save(&memory);
+    drop(memory);
+    let _ = GradingRevealed::emit(app, &Vec::new());
 }
 
 /// The settings, with the hidden ids a rename changed (`projects::renamed_ids`) moved to
@@ -263,9 +294,11 @@ fn carry_over(memory: &mut Memory, renames: &[(String, String)]) {
     move_keys(&mut memory.heads, renames);
     move_keys(&mut memory.groups, renames);
     move_keys(&mut memory.dues, renames);
+    move_keys(&mut memory.gradings, renames);
     move_items(&mut memory.closed, renames);
     move_items(&mut memory.unseen, renames);
     move_items(&mut memory.badge, renames);
+    move_items(&mut memory.revealed, renames);
     memory.reminded = std::mem::take(&mut memory.reminded)
         .into_iter()
         .map(|key| match key.split_once('|') {
@@ -410,7 +443,8 @@ fn diff(
         }
     }
 
-    // Deadline moves and closings, for accepted and unaccepted assignments alike.
+    // Deadline moves, closings and grading changes, for accepted and unaccepted assignments
+    // alike, with the row each one shows on.
     let schedule = snapshot
         .projects
         .iter()
@@ -421,15 +455,31 @@ fn diff(
                 classroom_key(p.owner.as_deref()?, &p.config.classroom),
                 p.config.assignment.to_ascii_lowercase()
             );
-            Some((key, assignment))
+            Some((key, &p.id, assignment))
         })
         .chain(
             snapshot
                 .unaccepted
                 .iter()
-                .map(|u| (u.id.clone(), &u.assignment)),
+                .map(|u| (u.id.clone(), &u.id, &u.assignment)),
         );
-    for (key, assignment) in schedule {
+    for (key, row, assignment) in schedule {
+        // A row whose unaccepted twin was revealed stays revealed once accepted.
+        if row != &key {
+            let twin = memory
+                .revealed
+                .iter()
+                .find(|id| id.eq_ignore_ascii_case(&key))
+                .cloned();
+            if let Some(twin) = twin {
+                memory.revealed.remove(&twin);
+                memory.revealed.insert(row.clone());
+            }
+        }
+        if grading_added(&mut memory.gradings, &key, assignment.grading_mode()) {
+            memory.unseen.insert(row.clone());
+            memory.revealed.insert(row.clone());
+        }
         let due = assignment.due.map(|d| d.timestamp());
         let previous = memory.dues.insert(key.clone(), due);
         if assignment.closed {
@@ -503,19 +553,21 @@ fn diff(
             .assignment
             .as_ref()
             .is_none_or(|a| a.grading_mode() != GradingMode::Off);
+        // An ungraded one's new grade still gets the dot, quietly: its row shows the grade.
         if let Some(grade) = &remote.grade {
             let previous = memory.grades.insert(project.id.clone(), grade.tag.clone());
-            let new = graded
-                && match previous {
-                    Some(tag) => tag != grade.tag,
-                    None => fresh(grade.published_at),
-                };
-            if new {
+            let new = match previous {
+                Some(tag) => tag != grade.tag,
+                None => fresh(grade.published_at),
+            };
+            if new && graded {
                 notices.push(Notice::Grade {
                     assignment: name.clone(),
                     score: grade.score,
                     max_score: grade.max_score,
                 });
+            }
+            if new {
                 memory.unseen.insert(project.id.clone());
             }
         }
@@ -581,6 +633,19 @@ fn diff(
             .is_some_and(|due| due > now)
     });
     notices
+}
+
+/// Records how the assignment under `key` is graded now and says whether the teacher added
+/// grading since it was last seen: a change to `auto` or `manual` (one to `off` reveals
+/// nothing). The first sight is a baseline.
+fn grading_added(
+    gradings: &mut BTreeMap<String, GradingMode>,
+    key: &str,
+    mode: GradingMode,
+) -> bool {
+    let key = key.to_ascii_lowercase();
+    let previous = gradings.insert(key, mode);
+    mode != GradingMode::Off && previous.is_some_and(|before| before != mode)
 }
 
 /// The due date of an assignment that can still take work.
@@ -954,6 +1019,111 @@ mod tests {
             memory.grades.get("org/c-lab1-alice").map(String::as_str),
             Some("submit/a")
         );
+        // The row gets the dot all the same: it shows the grade now.
+        assert_eq!(
+            memory.unseen,
+            BTreeSet::from(["org/c-lab1-alice".to_owned()])
+        );
+        memory.unseen.clear();
+        // The same grade again is no news.
+        diff(&mut memory, &lab(Some("submit/a"), false), &[], now);
+        assert!(memory.unseen.is_empty());
+    }
+
+    fn graded(mut project: Project, mode: Option<GradingMode>) -> Project {
+        project.assignment.as_mut().unwrap().grading =
+            mode.map(|mode| crate::classroom50::AssignmentGrading {
+                mode,
+                max_points: None,
+            });
+        project
+    }
+
+    #[test]
+    fn a_teacher_adding_grading_marks_the_row_quietly() {
+        let now = Utc::now();
+        let mut memory = Memory::default();
+        let lab = |mode| snapshot(vec![graded(project("lab1", None), mode)]);
+        // The first sight is a baseline, whatever the mode.
+        assert!(diff(&mut memory, &lab(Some(GradingMode::Off)), &[], now).is_empty());
+        assert!(memory.unseen.is_empty() && memory.revealed.is_empty());
+        // Still off: nothing.
+        diff(&mut memory, &lab(Some(GradingMode::Off)), &[], now);
+        assert!(memory.revealed.is_empty());
+        // Off to manual: a dot and the lines shown again, with no notification.
+        assert!(diff(&mut memory, &lab(Some(GradingMode::Manual)), &[], now).is_empty());
+        let id = BTreeSet::from(["org/c-lab1-alice".to_owned()]);
+        assert_eq!(memory.unseen, id);
+        assert_eq!(memory.revealed, id);
+        memory.unseen.clear();
+        memory.revealed.clear();
+        // Manual to absent (the autograder): a change too.
+        diff(&mut memory, &lab(None), &[], now);
+        assert_eq!(memory.revealed, id);
+        memory.unseen.clear();
+        memory.revealed.clear();
+        // Absent and auto are the same; back to off reveals nothing.
+        diff(&mut memory, &lab(Some(GradingMode::Auto)), &[], now);
+        diff(&mut memory, &lab(Some(GradingMode::Off)), &[], now);
+        assert!(memory.unseen.is_empty() && memory.revealed.is_empty());
+    }
+
+    #[test]
+    fn grading_added_to_an_unaccepted_assignment_follows_it_once_accepted() {
+        let now = Utc::now();
+        let mut memory = Memory::default();
+        let mut item = Unaccepted {
+            id: "org/c/lab1".into(),
+            classroom: Classroom::from_team("org", "classroom50-c", None).unwrap(),
+            assignment: graded(project("lab1", None), Some(GradingMode::Off))
+                .assignment
+                .unwrap(),
+            accept_url: String::new(),
+            group: None,
+        };
+        let unaccepted = |item: &Unaccepted| Snapshot {
+            unaccepted: vec![item.clone()],
+            ..snapshot(Vec::new())
+        };
+        diff(&mut memory, &unaccepted(&item), &[], now);
+        item.assignment.grading = None;
+        diff(&mut memory, &unaccepted(&item), &[], now);
+        assert_eq!(memory.revealed, BTreeSet::from(["org/c/lab1".to_owned()]));
+        // Accepted: the repo's row is the revealed one, and no new change is seen.
+        diff(
+            &mut memory,
+            &snapshot(vec![graded(project("lab1", None), None)]),
+            &[],
+            now,
+        );
+        assert_eq!(
+            memory.revealed,
+            BTreeSet::from(["org/c-lab1-alice".to_owned()])
+        );
+    }
+
+    #[test]
+    fn grading_memory_follows_a_rename() {
+        let mut memory = Memory {
+            gradings: BTreeMap::from([("org/c/old".to_owned(), GradingMode::Off)]),
+            revealed: BTreeSet::from(["org/c-old-alice".to_owned()]),
+            ..Memory::default()
+        };
+        carry_over(
+            &mut memory,
+            &[
+                ("org/c-old-alice".into(), "org/c-new-alice".into()),
+                ("org/c/old".into(), "org/c/new".into()),
+            ],
+        );
+        assert_eq!(memory.gradings.get("org/c/new"), Some(&GradingMode::Off));
+        assert_eq!(
+            memory.revealed,
+            BTreeSet::from(["org/c-new-alice".to_owned()])
+        );
+        // Under its new slug the assignment is no change to announce.
+        let renamed = graded(project("new", None), Some(GradingMode::Off));
+        diff(&mut memory, &snapshot(vec![renamed]), &[], Utc::now());
         assert!(memory.unseen.is_empty());
     }
 

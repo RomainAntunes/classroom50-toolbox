@@ -15,7 +15,18 @@
   import Details from "./Details.svelte";
   import TeammateProgress from "./TeammateProgress.svelte";
 
-  let { item, now, unseen }: { item: Unaccepted; now: Date; unseen: boolean } = $props();
+  let {
+    item,
+    now,
+    unseen,
+    gradingInfo = true,
+  }: {
+    item: Unaccepted;
+    now: Date;
+    unseen: boolean;
+    /** Says how the assignment is graded ("Not graded", by the teaching staff). */
+    gradingInfo?: boolean;
+  } = $props();
   const uid = $props.id();
 
   const due = $derived(item.assignment.due ? new Date(item.assignment.due) : null);
@@ -91,7 +102,7 @@
       [t("details.type"), t(`details.mode.${a.mode}`)],
       [t("details.submission"), t(`details.submissionMode.${a.submissionMode ?? "every-push"}`)],
     ];
-    const grading = gradingDetail(a);
+    const grading = gradingInfo ? gradingDetail(a) : null;
     if (grading) items.push([t("details.grading"), grading]);
     if (opens) items.push([t("details.opens"), formatDate(opens)]);
     if (due) items.push([t("details.due"), formatDate(due)]);

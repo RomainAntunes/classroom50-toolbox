@@ -87,6 +87,8 @@
   "settings.general.title": "Général",
   "settings.launchAtLogin": "Ouvrir à l'ouverture de session",
   "settings.launchAtLoginHint": "Démarre en arrière-plan à l'ouverture de session sur votre ordinateur, pour que les rappels et les nouvelles notes vous parviennent.",
+  "settings.gradingInfo": "Afficher comment les devoirs sont notés",
+  "settings.gradingInfoHint": "Indique quand un devoir n'est pas noté ou est noté par l'équipe pédagogique. Désactivez-le si votre classe n'utilise pas la notation de Classroom 50 : les notes restent affichées, et un devoir que votre enseignant commence à noter l'affiche de nouveau.",
   "settings.shortcut": "Raccourci clavier",
   "settings.shortcut.hint": "Ouvre et ferme la boîte à outils depuis n'importe quelle app.",
   "settings.shortcut.wayland": "Indisponible sous Wayland. Un raccourci qui lance la boîte à outils, défini dans les réglages clavier de votre bureau, l'ouvre.",

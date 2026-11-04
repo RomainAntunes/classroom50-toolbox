@@ -67,6 +67,9 @@ events! {
     Notify = "notify" => Notice;
     /// Ids of projects and unaccepted assignments with unseen news.
     UnseenUpdated = "unseen-updated" => Vec<String>;
+    /// Ids of rows whose grading the teacher changed since `showGradingInfo` last changed:
+    /// their grading lines show even while the setting hides them.
+    GradingRevealed = "grading-revealed" => Vec<String>;
     /// Settings Rust changed by itself (hidden ids moved by a rename).
     SettingsUpdated = "settings-updated" => Settings;
     /// The one-time code of the sign-in running.

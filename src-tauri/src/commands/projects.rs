@@ -97,6 +97,14 @@ pub fn unseen(state: State<'_, crate::alerts::AlertsState>) -> Vec<String> {
     state.unseen()
 }
 
+/// Ids of rows whose grading lines show even while `showGradingInfo` hides them;
+/// `grading-revealed` follows.
+#[tauri::command]
+#[cfg_attr(test, specta::specta)]
+pub fn grading_revealed(state: State<'_, crate::alerts::AlertsState>) -> Vec<String> {
+    state.revealed()
+}
+
 /// Whether a sync is running and how far it is; `sync-progress` follows.
 #[tauri::command]
 #[cfg_attr(test, specta::specta)]
