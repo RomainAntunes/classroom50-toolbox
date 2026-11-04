@@ -151,6 +151,7 @@ export function assignment(over: Partial<Assignment> & { slug: string }): Assign
     teamFormation: null,
     repoVisibility: null,
     renamedFrom: null,
+    submissionTags: [],
     template: null,
     allowedFiles: [],
     ...over,
