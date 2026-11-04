@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import pkg from "../../../package.json";
 import i18nSource from "../i18n/index.ts?raw";
 import { languages } from "#lib/i18n/index.js";
-import { changelogs, notesFor, versions } from "./index";
+import { loadChangelogs, notesFor, versions } from "./index";
 import {
   KINDS,
   catalogCodes,
@@ -14,7 +14,15 @@ import {
   pendingVersions,
   previousTag,
   releaseBody,
+  type Changelog,
 } from "./versions.js";
+
+// Every changelog file, read at once here; the app loads only those What's new shows.
+const changelogs = Object.fromEntries(
+  Object.entries(
+    import.meta.glob("./*.json", { eager: true, import: "default" }) as Record<string, Changelog>,
+  ).map(([path, changelog]) => [path.slice(2, -".json".length), changelog]),
+);
 
 describe("versions", () => {
   it("parses versions and pre-releases", () => {
@@ -166,8 +174,20 @@ describe("what's new", () => {
 
   it("falls back to English per version", () => {
     const [version] = versions();
-    expect(notesFor(version, "xx")).toEqual(changelogs[version].notes.en);
-    expect(notesFor("0.0.0", "en")).toEqual([]);
+    expect(notesFor(changelogs[version], "xx")).toEqual(changelogs[version].notes.en);
+    expect(notesFor(changelogs[version], "en")).toEqual(changelogs[version].notes.en);
+    expect(notesFor(undefined, "en")).toEqual([]);
+  });
+
+  it("lists the versions from the file names, newest first", () => {
+    expect(versions()).toEqual(Object.keys(changelogs).sort((a, b) => compareVersions(b, a)));
+  });
+
+  it("loads only the versions asked for, leaving out those without notes", async () => {
+    const [newest, previous] = versions();
+    expect(await loadChangelogs([newest, "0.0.0"])).toEqual({ [newest]: changelogs[newest] });
+    expect(Object.keys(await loadChangelogs([previous, newest]))).toEqual([previous, newest]);
+    expect(await loadChangelogs([])).toEqual({});
   });
 });
 
