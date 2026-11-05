@@ -12,7 +12,26 @@ use crate::editor_choices;
 use crate::editors;
 use crate::error::{Error, Result};
 use crate::groups;
+use crate::phases::PhaseStore;
 use crate::sync_progress::Phase;
+
+/// Puts the student's phases on every project and sorts the list again, since a project
+/// with no due date sorts by its next phase. Until `alerts::process` moves a renamed
+/// project's phases, the id from before the rename stands in.
+pub(super) fn with_phases(snapshot: &mut Snapshot, store: &PhaseStore, now: DateTime<Utc>) {
+    let all = store.all();
+    for project in &mut snapshot.projects {
+        let phases = all
+            .get(&project.id)
+            .or_else(|| super::previous_id(project).and_then(|old| all.get(&old)))
+            .cloned()
+            .unwrap_or_default();
+        project.phases = phases;
+    }
+    snapshot
+        .projects
+        .sort_by_cached_key(|p| super::merge::sort_key(p, now));
+}
 
 /// Adds what isn't decided by the build: groups, the editor that opened each clone (from
 /// the editors' lists and from the app), the account.

@@ -95,6 +95,10 @@ pub enum Error {
     #[error("a group name needs 1 to 80 characters, on one line")]
     InvalidTeamName,
 
+    /// Phases the UI sent that `phases::validate` refuses.
+    #[error("a phase needs a name of 1 to 80 characters, on one line, and a date")]
+    InvalidPhase,
+
     /// Linux: none of the terminal emulators the app knows is installed.
     #[error("no terminal emulator found")]
     NoTerminal,
@@ -243,6 +247,7 @@ error_kinds! {
     GroupFull = "groupFull",
     InvalidUsername = "invalidUsername",
     InvalidTeamName = "invalidTeamName",
+    InvalidPhase = "invalidPhase",
     NoTerminal = "noTerminal",
     LocalChanges = "localChanges",
     OtherBranch = "otherBranch",
@@ -405,6 +410,7 @@ impl Error {
             Error::GroupFull { .. } => ErrorKind::GroupFull,
             Error::InvalidUsername(_) => ErrorKind::InvalidUsername,
             Error::InvalidTeamName => ErrorKind::InvalidTeamName,
+            Error::InvalidPhase => ErrorKind::InvalidPhase,
             Error::NoTerminal => ErrorKind::NoTerminal,
             Error::LocalChanges => ErrorKind::LocalChanges,
             Error::OtherBranch(_) => ErrorKind::OtherBranch,
@@ -507,6 +513,7 @@ mod tests {
             Error::InvalidUsername("--help".into()),
             Error::GroupFull { max: 3 },
             Error::InvalidTeamName,
+            Error::InvalidPhase,
             Error::NoTerminal,
             Error::LocalChanges,
             Error::OtherBranch("main".into()),

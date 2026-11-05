@@ -17,6 +17,7 @@ use crate::classroom50::{Assignment, GradingMode};
 use crate::error::Result;
 use crate::events::{IpcEvent, SettingsUpdated};
 use crate::groups::Group;
+use crate::phases::open_phases;
 use crate::platform::{self, CalendarEvent, WrittenEvents};
 use crate::projects::{self, ProjectsState, Snapshot};
 use crate::settings::{Settings, SettingsStore};
@@ -46,6 +47,10 @@ pub struct Labels {
     pub not_graded: String,
     pub submitted: String,
     pub not_accepted: String,
+    /// A phase's event title, `{name}` the assignment's and `{phase}` the phase's.
+    pub phase_title: String,
+    /// A phase ticked done.
+    pub phase_done: String,
 }
 
 impl Default for Labels {
@@ -59,6 +64,8 @@ impl Default for Labels {
             not_graded: "Not graded".into(),
             submitted: "Submitted".into(),
             not_accepted: "Not accepted yet".into(),
+            phase_title: "{name}: {phase}".into(),
+            phase_done: "Done".into(),
         }
     }
 }
@@ -68,20 +75,23 @@ enum Status<'a> {
     NotAccepted,
     Graded(&'a crate::status::Grade),
     Submitted,
+    /// A phase ticked done.
+    Done,
     Open,
 }
 
 /// The class, where the work stands (no grade for one the teacher doesn't grade, which
 /// says so), the group with each member's email, then the assignment's own description.
+/// A phase's event passes no assignment: its notes stop at the group.
 fn notes(
     labels: &Labels,
     class: &str,
     status: Status,
     group: Option<&Group>,
-    assignment: &Assignment,
+    assignment: Option<&Assignment>,
 ) -> String {
     let mut lines = vec![labels.class.replace("{name}", class)];
-    if assignment.grading_mode() == GradingMode::Off {
+    if assignment.is_some_and(|a| a.grading_mode() == GradingMode::Off) {
         lines.push(labels.not_graded.clone());
     }
     match status {
@@ -93,6 +103,7 @@ fn notes(
                 .replace("{max}", &grade.max_score.to_string()),
         ),
         Status::Submitted => lines.push(labels.submitted.clone()),
+        Status::Done => lines.push(labels.phase_done.clone()),
         Status::Open => {}
     }
     if let Some(group) = group {
@@ -115,8 +126,7 @@ fn notes(
         }
     }
     if let Some(text) = assignment
-        .description
-        .as_deref()
+        .and_then(|a| a.description.as_deref())
         .map(str::trim)
         .filter(|t| !t.is_empty())
     {
@@ -126,8 +136,9 @@ fn notes(
     lines.join("\n")
 }
 
-/// Every assignment with a due date, accepted or not, minus those the user hid (one by one
-/// or by class, keyed like `filter::classKey`).
+/// Every assignment with a due date, accepted or not, and every phase the student set on a
+/// project (`phases.rs`), minus those the user hid (one by one or by class, keyed like
+/// `filter::classKey`).
 pub fn events(
     snapshot: &Snapshot,
     hidden: &[String],
@@ -138,38 +149,41 @@ pub fn events(
     let class_hidden = |owner: &str, classroom: &str| {
         hidden_classes.contains(&format!("{owner}/{classroom}").to_lowercase())
     };
-    let projects = snapshot
-        .projects
-        .iter()
-        .filter(|p| {
+    let visible = || {
+        snapshot.projects.iter().filter(|p| {
             !hidden.contains(&p.id)
                 && !class_hidden(p.owner.as_deref().unwrap_or(""), &p.config.classroom)
         })
-        .filter_map(|p| {
-            let remote = p.remote.as_ref();
-            // A grade the autograder left on an ungraded assignment isn't one.
-            let graded = p
-                .assignment
-                .as_ref()
-                .is_none_or(|a| a.grading_mode() != GradingMode::Off);
-            let status = match (
-                remote.and_then(|r| r.grade.as_ref()).filter(|_| graded),
-                remote.and_then(|r| r.last_submission.as_ref()),
-            ) {
-                (Some(grade), _) => Status::Graded(grade),
-                (None, Some(_)) => Status::Submitted,
-                (None, None) => Status::Open,
-            };
-            Some((
-                projects::previous_id(p).unwrap_or_else(|| p.id.clone()),
-                p.assignment.as_ref()?,
-                p.classroom.as_ref(),
-                &p.config.classroom,
-                p.web_url.as_deref(),
-                status,
-                p.group.as_ref(),
-            ))
-        });
+    };
+    let mut alarm_hours: Vec<u32> = reminder_hours.to_vec();
+    alarm_hours.push(CALENDAR_ALERT_HOURS);
+    alarm_hours.sort_unstable_by(|a, b| b.cmp(a));
+    alarm_hours.dedup();
+    let projects = visible().filter_map(|p| {
+        let remote = p.remote.as_ref();
+        // A grade the autograder left on an ungraded assignment isn't one.
+        let graded = p
+            .assignment
+            .as_ref()
+            .is_none_or(|a| a.grading_mode() != GradingMode::Off);
+        let status = match (
+            remote.and_then(|r| r.grade.as_ref()).filter(|_| graded),
+            remote.and_then(|r| r.last_submission.as_ref()),
+        ) {
+            (Some(grade), _) => Status::Graded(grade),
+            (None, Some(_)) => Status::Submitted,
+            (None, None) => Status::Open,
+        };
+        Some((
+            projects::previous_id(p).unwrap_or_else(|| p.id.clone()),
+            p.assignment.as_ref()?,
+            p.classroom.as_ref(),
+            &p.config.classroom,
+            p.web_url.as_deref(),
+            status,
+            p.group.as_ref(),
+        ))
+    });
     let unaccepted = snapshot
         .unaccepted
         .iter()
@@ -185,20 +199,58 @@ pub fn events(
                 u.group.as_ref(),
             )
         });
+    let phases = visible().flat_map(|p| {
+        let uid = projects::previous_id(p).unwrap_or_else(|| p.id.clone());
+        let name = p
+            .assignment
+            .as_ref()
+            .map_or(&p.config.assignment, |a| &a.name);
+        let class = p
+            .classroom
+            .as_ref()
+            .and_then(|c| c.name.as_deref())
+            .unwrap_or(&p.config.classroom);
+        let open: Vec<&str> = open_phases(p).map(|phase| phase.id.as_str()).collect();
+        let alarm_hours = &alarm_hours;
+        p.phases.iter().map(move |phase| {
+            let status = if phase.done {
+                Status::Done
+            } else {
+                Status::Open
+            };
+            let mut event = CalendarEvent {
+                uid: format!("{uid}/phase/{}", phase.id),
+                title: labels
+                    .phase_title
+                    .replace("{name}", name)
+                    .replace("{phase}", &phase.name),
+                notes: Some(notes(labels, class, status, p.group.as_ref(), None)),
+                url: p.web_url.clone(),
+                start: phase.due - BLOCK,
+                due: phase.due,
+                // Handed in, or nothing more can be: the event stays, silent.
+                alarm_hours: if open.contains(&phase.id.as_str()) {
+                    alarm_hours.clone()
+                } else {
+                    Vec::new()
+                },
+                fingerprint: 0,
+            };
+            event.fingerprint = fingerprint(&event);
+            event
+        })
+    });
     projects
         .chain(unaccepted)
         .filter_map(|(uid, assignment, classroom, slug, url, status, group)| {
             let due = assignment.due?.with_timezone(&Utc);
             let class = classroom.and_then(|c| c.name.as_deref()).unwrap_or(slug);
-            let mut alarm_hours: Vec<u32> = reminder_hours.to_vec();
-            alarm_hours.push(CALENDAR_ALERT_HOURS);
-            alarm_hours.sort_unstable_by(|a, b| b.cmp(a));
-            alarm_hours.dedup();
+            let alarm_hours = alarm_hours.clone();
             let mut event = CalendarEvent {
                 uid,
                 // Short enough for a week view; the class is in the notes.
                 title: assignment.name.clone(),
-                notes: Some(notes(labels, class, status, group, assignment)),
+                notes: Some(notes(labels, class, status, group, Some(assignment))),
                 url: url.map(str::to_owned),
                 start: due - BLOCK,
                 due,
@@ -208,6 +260,7 @@ pub fn events(
             event.fingerprint = fingerprint(&event);
             Some(event)
         })
+        .chain(phases)
         .collect()
 }
 
@@ -661,6 +714,7 @@ mod tests {
             needs_work: false,
             web_url: None,
             late_seconds: None,
+            phases: Vec::new(),
             editor: None,
             last_editor: None,
             group: None,
@@ -724,6 +778,38 @@ mod tests {
         };
         let events = events(&snapshot, &[], &[], &[], &Labels::default());
         assert_eq!(events[0].uid, "org/poo/lab1");
+    }
+
+    #[test]
+    fn writes_one_event_per_phase() {
+        let project: crate::projects::Project = serde_json::from_value(serde_json::json!({
+            "id": "org/poo-bdr-alex",
+            "owner": "org",
+            "repo": "poo-bdr-alex",
+            "config": { "classroom": "poo", "assignment": "bdr" },
+            "assignment": assignment("BDR", None),
+            "phases": [
+                { "id": "p1", "name": "Phase 1", "due": "2026-11-20T22:59:00Z", "done": true },
+                { "id": "p2", "name": "Phase 2", "due": "2026-12-04T22:59:00Z" },
+            ],
+        }))
+        .unwrap();
+        let snapshot = Snapshot {
+            projects: vec![project],
+            ..Snapshot::default()
+        };
+        let events = events(&snapshot, &[], &[], &[24], &Labels::default());
+        let titles: Vec<_> = events.iter().map(|e| e.title.as_str()).collect();
+        assert_eq!(titles, ["BDR: Phase 1", "BDR: Phase 2"]);
+        assert_eq!(events[0].uid, "org/poo-bdr-alex/phase/p1");
+        assert_eq!(events[0].notes.as_deref(), Some("Class: poo\nDone"));
+        // A phase ticked done stays on the calendar, without alarms.
+        assert!(events[0].alarm_hours.is_empty());
+        assert_eq!(events[1].alarm_hours, [24, 1]);
+        assert_eq!(events[1].notes.as_deref(), Some("Class: poo"));
+
+        let hidden = ["org/poo-bdr-alex".to_owned()];
+        assert!(super::events(&snapshot, &hidden, &[], &[], &Labels::default()).is_empty());
     }
 
     #[test]

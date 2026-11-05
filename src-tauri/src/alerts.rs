@@ -15,6 +15,7 @@ use tauri::{AppHandle, Manager};
 use crate::classroom50::{GradingMode, SubmissionMode};
 use crate::events::{GradingRevealed, IpcEvent, Notify, SettingsUpdated, UnseenUpdated};
 use crate::github;
+use crate::phases::{PhaseStore, open_phases};
 use crate::projects::{Project, Snapshot};
 use crate::settings::{Settings, SettingsStore};
 use crate::status::Grading;
@@ -36,6 +37,12 @@ const FRESH: TimeDelta = TimeDelta::days(1);
 pub enum Notice {
     Due {
         assignment: String,
+        due: DateTime<Utc>,
+    },
+    /// One of the phases the student set (`phases.rs`) is near.
+    PhaseDue {
+        assignment: String,
+        phase: String,
         due: DateTime<Utc>,
     },
     Grade {
@@ -177,6 +184,9 @@ pub fn process(app: &AppHandle, snapshot: &Snapshot) {
     }
     let renames = crate::projects::renamed_ids(snapshot);
     let settings = carry_hidden(app, &renames);
+    if let Err(err) = app.state::<PhaseStore>().rename(&renames) {
+        log::warn!("could not move renamed projects' phases: {err}");
+    }
     let hours = settings.notify_hours_before;
     let snapshot = &without_hidden(snapshot, &settings.hidden, &settings.hidden_classes);
     let state = app.state::<AlertsState>();
@@ -301,12 +311,19 @@ fn carry_over(memory: &mut Memory, renames: &[(String, String)]) {
     move_items(&mut memory.revealed, renames);
     memory.reminded = std::mem::take(&mut memory.reminded)
         .into_iter()
-        .map(|key| match key.split_once('|') {
-            Some((id, rest)) => match renamed(id, renames) {
+        .map(|key| {
+            let Some((id, rest)) = key.split_once('|') else {
+                return key;
+            };
+            // A phase's reminders are kept under `<project id>#<phase id>`.
+            let moved = renamed(id, renames).map(str::to_owned).or_else(|| {
+                let (project, phase) = id.rsplit_once('#')?;
+                renamed(project, renames).map(|new| format!("{new}#{phase}"))
+            });
+            match moved {
                 Some(new) => format!("{new}|{rest}"),
-                None => key,
-            },
-            None => key,
+                None => key.clone(),
+            }
         })
         .collect();
 }
@@ -602,24 +619,24 @@ fn diff(
             }
         }
 
-        if let Some(due) = open_due(project) {
-            // The tightest reminder already reached; the wider ones are skipped with it,
-            // so a late first sync sends one reminder, not one per setting.
-            let mut reached: Vec<u32> = hours_before
-                .iter()
-                .copied()
-                .filter(|h| due > now && due - now <= TimeDelta::hours(i64::from(*h)))
-                .collect();
-            reached.sort_unstable();
-            if let Some(&tightest) = reached.first() {
-                let key = |h: u32| format!("{}|{}|{h}", project.id, due.timestamp());
-                if needs_work(project) && !memory.reminded.contains(&key(tightest)) {
-                    notices.push(Notice::Due {
-                        assignment: name.clone(),
-                        due,
-                    });
-                }
-                memory.reminded.extend(reached.into_iter().map(key));
+        if let Some(due) = open_due(project)
+            && reached_reminder(memory, &project.id, due, hours_before, now)
+            && needs_work(project)
+        {
+            notices.push(Notice::Due {
+                assignment: name.clone(),
+                due,
+            });
+        }
+        // The Done box is what says a phase is handed in, not the clone's state.
+        for phase in open_phases(project) {
+            let id = format!("{}#{}", project.id, phase.id);
+            if reached_reminder(memory, &id, phase.due, hours_before, now) {
+                notices.push(Notice::PhaseDue {
+                    assignment: name.clone(),
+                    phase: phase.name.clone(),
+                    due: phase.due,
+                });
             }
         }
     }
@@ -646,6 +663,31 @@ fn grading_added(
     let key = key.to_ascii_lowercase();
     let previous = gradings.insert(key, mode);
     mode != GradingMode::Off && previous.is_some_and(|before| before != mode)
+}
+
+/// Records the reminders `due` has reached under `id` (`<id>|<due>|<hours>`): the tightest
+/// one and the wider ones with it, so a late first sync sends one reminder, not one per
+/// setting. Whether the tightest one is new.
+fn reached_reminder(
+    memory: &mut Memory,
+    id: &str,
+    due: DateTime<Utc>,
+    hours_before: &[u32],
+    now: DateTime<Utc>,
+) -> bool {
+    let mut reached: Vec<u32> = hours_before
+        .iter()
+        .copied()
+        .filter(|h| due > now && due - now <= TimeDelta::hours(i64::from(*h)))
+        .collect();
+    reached.sort_unstable();
+    let Some(&tightest) = reached.first() else {
+        return false;
+    };
+    let key = |h: u32| format!("{id}|{}|{h}", due.timestamp());
+    let new = !memory.reminded.contains(&key(tightest));
+    memory.reminded.extend(reached.into_iter().map(key));
+    new
 }
 
 /// The due date of an assignment that can still take work.
@@ -741,6 +783,7 @@ mod tests {
             needs_work: false,
             web_url: None,
             late_seconds: None,
+            phases: Vec::new(),
             editor: None,
             last_editor: None,
             group: None,
@@ -1200,6 +1243,83 @@ mod tests {
         let notices = diff(&mut memory, &snap, &[24, 1], now);
         assert_eq!(notices.len(), 1);
         assert!(diff(&mut memory, &snap, &[24, 1], now).is_empty());
+    }
+
+    fn phase(id: &str, due: DateTime<Utc>, done: bool) -> crate::phases::Phase {
+        crate::phases::Phase {
+            id: id.into(),
+            name: format!("Phase {id}"),
+            due,
+            done,
+        }
+    }
+
+    #[test]
+    fn reminds_of_open_phases_once_each() {
+        let now = Utc::now();
+        let mut memory = Memory::default();
+        let mut lab = project("lab1", None);
+        // The clone is clean: a phase reminds anyway, until it's ticked done.
+        lab.path = Some("/tmp/lab1".into());
+        lab.phases = vec![
+            phase("1", now + TimeDelta::minutes(30), false),
+            phase("2", now + TimeDelta::minutes(40), true),
+            phase("3", now + TimeDelta::days(3), false),
+        ];
+        let notices = diff(&mut memory, &snapshot(vec![lab.clone()]), &[24, 1], now);
+        assert_eq!(
+            notices,
+            [Notice::PhaseDue {
+                assignment: "LAB1".into(),
+                phase: "Phase 1".into(),
+                due: lab.phases[0].due,
+            }]
+        );
+        assert!(diff(&mut memory, &snapshot(vec![lab.clone()]), &[24, 1], now).is_empty());
+
+        // A moved date reminds again.
+        lab.phases[0].due = now + TimeDelta::minutes(50);
+        assert_eq!(
+            diff(&mut memory, &snapshot(vec![lab.clone()]), &[24, 1], now).len(),
+            1
+        );
+
+        // Closed submissions or an archived repo: nothing more to hand in.
+        lab.phases[0].due = now + TimeDelta::minutes(20);
+        let phase_due = |n: &Notice| matches!(n, Notice::PhaseDue { .. });
+        let mut closed = lab.clone();
+        closed.assignment.as_mut().unwrap().closed = true;
+        let notices = diff(&mut memory, &snapshot(vec![closed]), &[24, 1], now);
+        assert!(!notices.iter().any(phase_due));
+        let mut archived = lab;
+        archived.remote.as_mut().unwrap().archived = true;
+        let notices = diff(&mut memory, &snapshot(vec![archived]), &[24, 1], now);
+        assert!(!notices.iter().any(phase_due));
+    }
+
+    #[test]
+    fn a_rename_moves_phase_reminders() {
+        let mut memory = Memory::default();
+        memory
+            .reminded
+            .insert("org/c-old-alice#p1|1900000000|1".into());
+        memory
+            .reminded
+            .insert("org/c-old-alice|1900000000|1".into());
+        memory
+            .reminded
+            .insert("org/c-other-alice#p1|1900000000|1".into());
+        let renames = [("org/c-old-alice".to_owned(), "org/c-new-alice".to_owned())];
+        carry_over(&mut memory, &renames);
+        let keys: Vec<_> = memory.reminded.iter().map(String::as_str).collect();
+        assert_eq!(
+            keys,
+            [
+                "org/c-new-alice#p1|1900000000|1",
+                "org/c-new-alice|1900000000|1",
+                "org/c-other-alice#p1|1900000000|1",
+            ]
+        );
     }
 
     #[test]
