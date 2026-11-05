@@ -30,6 +30,9 @@ for (const locale of LOCALES) {
       await page.locator("[data-row]").first().click();
       await page.locator(".details button.test").first().click();
       await expect(page.locator(".details .timeout")).toBeVisible();
+      // And its Markdown description, unfolded: a heading, a table, a task list, math.
+      await page.locator(".details .more-text").click();
+      await expect(page.locator(".details .markdown table")).toBeVisible();
 
       expect(await untranslated(page), "raw keys on the main page").toEqual([]);
       expect(await overflow(page), "overflow on the main page").toEqual([]);

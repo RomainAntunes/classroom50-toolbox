@@ -56,7 +56,8 @@ export function buildWorld({ now = new Date(), heads = {} } = {}) {
             name: "Hello, World",
             mode: "individual",
             autograder: "default",
-            description: "Print a greeting, then a farewell.",
+            description:
+              "Print a **greeting**, then a farewell, scored $x^2$ for $5.\n\n- [x] `hello`\n- [ ] `goodbye`",
             due: iso(3 * DAY),
             submission_mode: "tag",
           },

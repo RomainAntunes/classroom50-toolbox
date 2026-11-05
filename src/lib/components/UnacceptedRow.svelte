@@ -157,7 +157,11 @@
     <TeammateProgress job={teammates} />
   {/if}
   {#if open}
-    <Details description={item.assignment.description} items={details} />
+    <Details
+      description={item.assignment.description}
+      doc={item.assignment.descriptionDoc}
+      items={details}
+    />
   {/if}
 </li>
 

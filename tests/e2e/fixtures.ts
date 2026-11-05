@@ -15,6 +15,7 @@ import type {
   GradeTest,
   HourCycle,
   LocalState,
+  MarkdownBlock,
   Project,
   RemoteRepo,
   Settings,
@@ -25,6 +26,7 @@ import type {
   UpdateStatus,
 } from "../../src/lib/api";
 import pkg from "../../package.json" with { type: "json" };
+import describedSample from "./description.json" with { type: "json" };
 
 /** How the fake answers one call: a value, a rejection shaped like Rust's `Error` (a plugin
  *  rejects with its message alone), a promise the test settles later (`app.release`), or the
@@ -136,6 +138,7 @@ export function assignment(over: Partial<Assignment> & { slug: string }): Assign
     name: over.slug,
     mode: "individual",
     description: null,
+    descriptionDoc: null,
     due: daysFromNow(3),
     availableFrom: null,
     submissionMode: "tag",
@@ -150,6 +153,12 @@ export function assignment(over: Partial<Assignment> & { slug: string }): Assign
     ...over,
   };
 }
+
+/** A Markdown description and the tree Rust makes of it (`markdown.rs` keeps them equal). */
+export const markdownDescription: Pick<Assignment, "description" | "descriptionDoc"> = {
+  description: describedSample.source,
+  descriptionDoc: describedSample.doc as MarkdownBlock[],
+};
 
 export function grade(score: number, maxScore: number, over: Partial<Grade> = {}): Grade {
   return {

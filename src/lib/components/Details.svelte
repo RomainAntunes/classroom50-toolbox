@@ -1,24 +1,29 @@
 <script lang="ts">
   import { openUrl } from "@tauri-apps/plugin-opener";
-  import type { GradeTest, ReleaseNotes } from "#lib/api.js";
+  import type { GradeTest, MarkdownBlock, ReleaseNotes } from "#lib/api.js";
   import { secondsLabel, t } from "#lib/i18n/index.js";
+  import Markdown from "./Markdown.svelte";
 
   /** Failed tests listed before "and N more". */
   const MAX_TESTS = 8;
 
   /**
-   * The expanded part of a row: the assignment's description, label/value lines, then the
+   * The expanded part of a row: the assignment's description (Markdown, folded to a few lines
+   * until "Show more" or the focus reaches a link below the fold), label/value lines, then the
    * tests the last grade failed, each opening on why (the autograder's output, led by a line
    * when it stopped the program at its time limit), and what else the release says.
    */
   let {
     description,
+    doc = null,
     items,
     failed = [],
     notes = null,
     gradeUrl = null,
   }: {
     description: string | null;
+    /** The description parsed by Rust; `null` (a snapshot from before) shows it as text. */
+    doc?: MarkdownBlock[] | null;
     items: [label: string, value: string][];
     failed?: GradeTest[];
     notes?: ReleaseNotes | null;
@@ -29,6 +34,11 @@
   // Which failed tests (by index) and whether the notes are open.
   let opened = $state<Record<number, boolean>>({});
   let notesOpen = $state(false);
+  // The description folds once it is taller than its box.
+  let expanded = $state(false);
+  let boxHeight = $state(0);
+  let contentHeight = $state(0);
+  const overflows = $derived(contentHeight > boxHeight + 1);
   // Until the release body is read, only its page says why.
   const explained = $derived(
     failed.some((test) => test.output !== null || test.timedOutAfter !== null) || !!notes?.notes,
@@ -53,8 +63,23 @@
 {/snippet}
 
 <div class="details">
-  {#if description}
-    <p class="description">{description}</p>
+  {#if doc || description}
+    <div
+      class="description"
+      class:folded={!expanded}
+      class:fade={!expanded && overflows}
+      bind:clientHeight={boxHeight}
+      onfocusin={() => (expanded = true)}
+    >
+      <div bind:offsetHeight={contentHeight}>
+        {#if doc}<Markdown blocks={doc} />{:else}<p class="plain">{description}</p>{/if}
+      </div>
+    </div>
+    {#if expanded || overflows}
+      <button class="link more-text" aria-expanded={expanded} onclick={() => (expanded = !expanded)}
+        >{t(expanded ? "details.showLess" : "details.showMore")}</button
+      >
+    {/if}
   {/if}
   <dl>
     {#each items as [label, value] (label)}
@@ -124,12 +149,25 @@
   .description {
     margin: 0 0 8px;
     color: var(--fg-muted);
-    white-space: pre-line;
-    display: -webkit-box;
-    -webkit-line-clamp: 4;
-    line-clamp: 4;
-    -webkit-box-orient: vertical;
+  }
+
+  .folded {
+    max-height: 7.5em;
     overflow: hidden;
+  }
+
+  .fade {
+    mask-image: linear-gradient(to bottom, #000 60%, transparent);
+  }
+
+  .plain {
+    margin: 0;
+    white-space: pre-line;
+  }
+
+  .more-text {
+    display: block;
+    margin: -4px 0 8px;
   }
 
   dl {

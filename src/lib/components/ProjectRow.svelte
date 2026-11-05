@@ -518,6 +518,7 @@
   {#if open}
     <Details
       description={project.assignment?.description ?? null}
+      doc={project.assignment?.descriptionDoc ?? null}
       items={details}
       failed={failedTests}
       notes={grading?.state === "running" ? null : (grade?.releaseNotes ?? null)}
