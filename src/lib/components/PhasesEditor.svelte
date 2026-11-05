@@ -1,11 +1,16 @@
 <script lang="ts">
-  // Rendered once in the layout; a fresh form for each project opened (`editPhases`).
+  // Rendered once in the layout; a fresh form for each project opened (`editPhases`). The
+  // form is its own chunk, loaded the first time it opens, so it costs nothing at startup.
   import { phasesEditor } from "#lib/phasesEditor.svelte.js";
-  import PhasesForm from "./PhasesForm.svelte";
+
+  const form = () => import("./PhasesForm.svelte");
 </script>
 
 {#if phasesEditor.current}
-  {#key phasesEditor.current}
-    <PhasesForm project={phasesEditor.current.project} resolve={phasesEditor.current.resolve} />
-  {/key}
+  {@const current = phasesEditor.current}
+  {#await form() then { default: PhasesForm }}
+    {#key current}
+      <PhasesForm project={current.project} resolve={current.resolve} />
+    {/key}
+  {/await}
 {/if}
