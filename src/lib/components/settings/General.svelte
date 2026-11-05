@@ -5,9 +5,13 @@
     UPDATE_CHANNELS,
     type AppInfo,
     type Settings,
+    withDialog,
   } from "#lib/api.js";
-  import { catalogs, languageName, t } from "#lib/i18n/index.js";
+  import { atLeast } from "#lib/busy.js";
+  import { languageName, languages, loadLanguage, resolveLanguage, t } from "#lib/i18n/index.js";
   import { CheckMenuItem, Menu } from "@tauri-apps/api/menu";
+  import { message } from "@tauri-apps/plugin-dialog";
+  import Spinner from "#lib/components/Spinner.svelte";
   import { chooseDefaultEditor, defaultEditor, editors } from "#lib/editor.svelte.js";
   import Section from "#lib/components/Section.svelte";
   import Toggle from "#lib/components/Toggle.svelte";
@@ -19,16 +23,41 @@
 
   let { current, info }: { current: Settings; info: AppInfo | null } = $props();
 
+  let loadingLanguage = $state(false);
+
+  /**
+   * The picked language's catalog first, spinning meanwhile, then the setting, which the
+   * layout applies at once; a catalog that won't load keeps the language shown.
+   */
+  async function pickLanguage(code: string) {
+    loadingLanguage = true;
+    let failed = false;
+    try {
+      await atLeast(loadLanguage(code));
+    } catch (err) {
+      console.error("couldn't load the catalog", err);
+      failed = true;
+    }
+    if (!failed) await save({ language: code });
+    loadingLanguage = false;
+    if (failed) {
+      const language = languageName(resolveLanguage(code));
+      await withDialog(() =>
+        message(t("settings.language.loadFailed", { language }), { kind: "error" }),
+      );
+    }
+  }
+
   /** "System", then each catalog named in its own language, as a native menu. */
   async function chooseLanguage(anchor: HTMLElement) {
     const chosen = settings.current?.language ?? "system";
-    const codes = ["system", ...Object.keys(catalogs)];
+    const codes = ["system", ...Object.keys(languages)];
     const items = await Promise.all(
       codes.map((code) =>
         CheckMenuItem.new({
           text: code === "system" ? t("settings.language.system") : languageName(code),
           checked: code === chosen,
-          action: () => void save({ language: code }),
+          action: () => void pickLanguage(code),
         }),
       ),
     );
@@ -142,8 +171,10 @@
           ? t("settings.language.system")
           : languageName(current.language)
       }`}
+      disabled={loadingLanguage}
+      aria-busy={loadingLanguage}
       onclick={(event) => chooseLanguage(event.currentTarget)}
-      >{current.language === "system"
+      >{#if loadingLanguage}<Spinner />{/if}{current.language === "system"
         ? t("settings.language.system")
         : languageName(current.language)}</button
     >

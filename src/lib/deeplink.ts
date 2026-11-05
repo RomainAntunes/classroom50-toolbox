@@ -133,9 +133,11 @@ export function linkActive(): boolean {
 
 /**
  * Takes the waiting link, if any, and acts on it. Rust drops other links until
- * `deepLinkDone`; one let through just after is taken by the next round.
+ * `deepLinkDone`; one let through just after is taken by the next round. It is taken at
+ * once (so What's new leaves it the main page), then waits for `words` (the saved language
+ * at startup) before asking anything.
  */
-export async function handleDeepLink(): Promise<void> {
+export async function handleDeepLink(words: Promise<void> = Promise.resolve()): Promise<void> {
   if (running) {
     again = true;
     return;
@@ -148,6 +150,7 @@ export async function handleDeepLink(): Promise<void> {
       if (!target) continue;
       active = true;
       try {
+        await words;
         if (await ready(target)) await act(target);
       } finally {
         active = false;

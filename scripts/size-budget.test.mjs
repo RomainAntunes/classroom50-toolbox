@@ -1,5 +1,15 @@
 import { describe, expect, it } from "vitest";
-import { compare, formatBytes, formatTable, gzipSize, kindOf, measure } from "./size-budget.mjs";
+import {
+  compare,
+  componentOf,
+  formatBytes,
+  formatTable,
+  gzipSize,
+  kindOf,
+  measure,
+  startupFiles,
+  startupRoots,
+} from "./size-budget.mjs";
 
 const file = (path, text) => ({ path, bytes: new TextEncoder().encode(text) });
 const budget = { js: { raw: 100, gzip: 100 }, css: { raw: 10, gzip: 100 } };
@@ -66,5 +76,108 @@ describe("size budget", () => {
       "| CSS (raw) | 20 B | 10 B | **200%**, over |",
       "| CSS (gzip) | 5 B | 100 B | 5% |",
     ]);
+  });
+
+  describe("at startup", () => {
+    const NODES = ".svelte-kit/generated/build/client-optimized/nodes";
+    // Shaped like Vite's client manifest for a SvelteKit app: Kit's entries, a node per
+    // layout and page, shared chunks, and chunks only imported dynamically.
+    const manifest = {
+      "node_modules/@sveltejs/kit/src/runtime/client/entry.js": {
+        file: "_app/immutable/entry/start.js",
+        isEntry: true,
+        imports: ["_shared.js"],
+        dynamicImports: ["node_modules/@sveltejs/kit/src/runtime/client/client-entry.js"],
+      },
+      ".svelte-kit/generated/build/client-optimized/app.js": {
+        file: "_app/immutable/entry/app.js",
+        isEntry: true,
+        imports: ["_shared.js"],
+        dynamicImports: [`${NODES}/0.js`, `${NODES}/2.js`, `${NODES}/3.js`],
+      },
+      "node_modules/@sveltejs/kit/src/runtime/client/client-entry.js": {
+        file: "_app/immutable/chunks/client.js",
+        isDynamicEntry: true,
+      },
+      [`${NODES}/0.js`]: {
+        file: "_app/immutable/nodes/0.js",
+        isEntry: true,
+        imports: ["_shared.js", "_i18n.js"],
+        css: ["_app/immutable/assets/0.css"],
+      },
+      [`${NODES}/2.js`]: {
+        file: "_app/immutable/nodes/2.js",
+        isEntry: true,
+        imports: ["_i18n.js", "_list.js"],
+        css: ["_app/immutable/assets/2.css"],
+      },
+      [`${NODES}/3.js`]: {
+        file: "_app/immutable/nodes/3.js",
+        isEntry: true,
+        imports: ["_settings.js"],
+        css: ["_app/immutable/assets/3.css"],
+      },
+      "_shared.js": { file: "_app/immutable/chunks/shared.js" },
+      "_i18n.js": {
+        file: "_app/immutable/chunks/i18n.js",
+        dynamicImports: ["src/lib/i18n/fr.json"],
+      },
+      "_list.js": {
+        file: "_app/immutable/chunks/list.js",
+        imports: ["_shared.js"],
+        css: ["_app/immutable/assets/list.css"],
+      },
+      "_settings.js": { file: "_app/immutable/chunks/settings.js" },
+      "src/lib/i18n/fr.json": { file: "_app/immutable/chunks/fr.js", isDynamicEntry: true },
+    };
+    const components = {
+      [`${NODES}/0.js`]: "src/routes/+layout.svelte",
+      [`${NODES}/2.js`]: "src/routes/+page.svelte",
+      [`${NODES}/3.js`]: "src/routes/settings/+page.svelte",
+    };
+
+    it("reads the component a generated node exports", () => {
+      const key = `${NODES}/2.js`;
+      const page = 'export { default as component } from "../../../../../src/routes/+page.svelte";';
+      expect(componentOf(key, page)).toBe("src/routes/+page.svelte");
+      const layout =
+        'import * as universal from "../../../../../src/routes/+layout.ts";\n' +
+        "export { universal };\n" +
+        "export { default as component } from '../../../../../src/routes/+layout.svelte';";
+      expect(componentOf(key, layout)).toBe("src/routes/+layout.svelte");
+      expect(componentOf(key, "export const nodes = [];")).toBeNull();
+    });
+
+    it("starts from Kit's entries, the root layout and the main page", () => {
+      const roots = startupRoots(manifest, (key) => components[key] ?? null);
+      expect(roots).toEqual([
+        "node_modules/@sveltejs/kit/src/runtime/client/entry.js",
+        ".svelte-kit/generated/build/client-optimized/app.js",
+        `${NODES}/0.js`,
+        `${NODES}/2.js`,
+      ]);
+    });
+
+    it("follows static imports and their CSS, never dynamic ones", () => {
+      const roots = startupRoots(manifest, (key) => components[key] ?? null);
+      expect(startupFiles(manifest, roots)).toEqual([
+        "_app/immutable/assets/0.css",
+        "_app/immutable/assets/2.css",
+        "_app/immutable/assets/list.css",
+        "_app/immutable/chunks/i18n.js",
+        "_app/immutable/chunks/list.js",
+        "_app/immutable/chunks/shared.js",
+        "_app/immutable/entry/app.js",
+        "_app/immutable/entry/start.js",
+        "_app/immutable/nodes/0.js",
+        "_app/immutable/nodes/2.js",
+      ]);
+    });
+
+    it("refuses an import the manifest doesn't hold", () => {
+      expect(() => startupFiles({ a: { file: "a.js", imports: ["_gone.js"] } }, ["a"])).toThrow(
+        "the manifest has no _gone.js",
+      );
+    });
   });
 });

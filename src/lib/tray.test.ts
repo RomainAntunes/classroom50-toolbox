@@ -90,8 +90,8 @@ describe("trayMenu", () => {
     expect(trayMenu(input(never), at(28, 15)).synced).toBeNull();
   });
 
-  it("speaks the UI's language", () => {
-    setLocale("fr");
+  it("speaks the UI's language", async () => {
+    await setLocale("fr");
     const menu = trayMenu(input(), at(28, 15));
     expect(menu.refresh).toBe("Actualiser");
     expect(menu.settings).toBe("Réglages…");

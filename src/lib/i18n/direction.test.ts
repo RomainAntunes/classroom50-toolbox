@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it } from "vitest";
 import en from "./en.json";
 import { isolate, textDirection } from "./direction";
-import { catalogs, currentDirection, fill, formatList, isolated, setLocale, t } from "./index";
+import { currentDirection, fill, formatList, isolated, loaded, setLocale, t } from "./index";
 import { locale } from "./locale.svelte";
 
 const FSI = "\u2068";
@@ -69,26 +69,26 @@ describe("fill", () => {
 
 describe("t in a right-to-left UI", () => {
   afterEach(() => {
-    delete catalogs.ar;
+    delete loaded.ar;
     locale.rtlPreview = false;
     setLocale("en");
   });
 
-  it("isolates parameters in a right-to-left catalog only", () => {
-    catalogs.ar = { ...en, "editor.open": "افتح في {editor}" };
+  it("isolates parameters in a right-to-left catalog only", async () => {
+    loaded.ar = { ...en, "editor.open": "افتح في {editor}" };
     expect(currentDirection()).toBe("ltr");
     expect(t("editor.open", { editor: "Zed" })).toBe("Open in Zed");
-    setLocale("ar");
+    await setLocale("ar");
     expect(currentDirection()).toBe("rtl");
     expect(t("editor.open", { editor: "Zed" })).toBe(`افتح في ${FSI}Zed${PDI}`);
   });
 
-  it("isolates them in the dev preview too, and each left-to-right sentence as a whole", () => {
+  it("isolates them in the dev preview too, and each left-to-right sentence as a whole", async () => {
     locale.rtlPreview = true;
     expect(currentDirection()).toBe("rtl");
     expect(t("editor.open", { editor: "Zed" })).toBe(`${FSI}Open in ${FSI}Zed${PDI}${PDI}`);
-    catalogs.ar = { ...en, "editor.open": "افتح في {editor}" };
-    setLocale("ar");
+    loaded.ar = { ...en, "editor.open": "افتح في {editor}" };
+    await setLocale("ar");
     expect(t("editor.open", { editor: "Zed" })).toBe(`افتح في ${FSI}Zed${PDI}`);
   });
 

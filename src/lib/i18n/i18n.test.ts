@@ -1,14 +1,28 @@
 import { afterEach, describe, expect, it } from "vitest";
 import en from "./en.json";
+import { locale } from "./locale.svelte";
 import {
-  catalogs,
+  currentLocale,
   formatNumber,
   languageName,
+  languages,
+  loadCatalog,
+  loaded,
   resolveLocale,
   secondsLabel,
   setLocale,
   t,
 } from "./index";
+
+// Every catalog file, read at once here; the app loads each one when it is shown.
+const catalogs = Object.fromEntries(
+  Object.entries(
+    import.meta.glob("./*.json", { eager: true, import: "default" }) as Record<
+      string,
+      Record<string, string>
+    >,
+  ).map(([path, catalog]) => [path.slice(2, -".json".length), catalog]),
+);
 
 afterEach(() => setLocale("en"));
 
@@ -54,21 +68,21 @@ describe("plurals", () => {
     delete synthetic["editor.openWith"];
 
     afterEach(() => {
-      delete catalogs.pl;
+      delete loaded.pl;
     });
 
-    it("picks the locale's category", () => {
-      catalogs.pl = synthetic;
-      setLocale("pl");
+    it("picks the locale's category", async () => {
+      loaded.pl = synthetic;
+      await setLocale("pl");
       expect(t("test.files", { count: 1 })).toBe("1 plik");
       expect(t("test.files", { count: 3 })).toBe("3 pliki");
       expect(t("test.files", { count: 5 })).toBe("5 plików");
       expect(t("test.files", { count: 1.5 })).toBe("1.5 pliku");
     });
 
-    it("falls back to other, then to English", () => {
-      catalogs.pl = synthetic;
-      setLocale("pl");
+    it("falls back to other, then to English", async () => {
+      loaded.pl = synthetic;
+      await setLocale("pl");
       expect(t("test.partial", { count: 3 })).toBe("inne 3");
       expect(t("editor.open", { editor: "Zed" })).toBe("Otwórz w Zed");
       expect(t("editor.openWith")).toBe("Open with");
@@ -128,33 +142,72 @@ describe("locales", () => {
     expect(pick("ko-KR")).toBe("ko");
   });
 
-  it("formats numbers in the UI's language", () => {
-    setLocale("fr");
+  it("formats numbers in the UI's language", async () => {
+    await setLocale("fr");
     expect(formatNumber(1.54, 1)).toBe("1,5");
     setLocale("en");
     expect(formatNumber(2, 1)).toBe("2.0");
   });
 
-  it("spells a time limit exactly, in the UI's language", () => {
+  it("spells a time limit exactly, in the UI's language", async () => {
     setLocale("en");
     expect(secondsLabel(1)).toBe("1 second");
     expect(secondsLabel(10)).toBe("10 seconds");
     expect(secondsLabel(90)).toBe("90 seconds");
     expect(secondsLabel(120)).toBe("2 minutes");
     expect(secondsLabel(7200)).toBe("2 hours");
-    setLocale("fr");
+    await setLocale("fr");
     expect(secondsLabel(10)).toMatch(/^10\s+secondes$/);
     setLocale("en");
   });
 
-  it("names each language in itself", () => {
+  it("names each language in itself, as its catalog does", () => {
     expect(languageName("en")).toBe("English");
     expect(languageName("fr")).toBe("Français");
-    expect(languageName("es")).toBe("Español");
-    expect(languageName("de")).toBe("Deutsch");
-    for (const code of Object.keys(catalogs)) {
-      expect(languageName(code), code).not.toBe(code);
+    expect(languageName("xx")).toBe("xx");
+    for (const code of Object.keys(languages)) {
+      expect(languageName(code), code).toBe(catalogs[code]?.["language.name"]);
     }
+  });
+
+  it("lists exactly the catalogs there are, English first", () => {
+    expect(Object.keys(languages).sort()).toEqual(Object.keys(catalogs).sort());
+    expect(Object.keys(languages)[0]).toBe("en");
+  });
+});
+
+describe("loading catalogs", () => {
+  afterEach(() => {
+    delete loaded.nl;
+  });
+
+  it("has only English before a language is shown", async () => {
+    delete loaded.nl;
+    expect(t("settings.language")).toBe("Language");
+    await setLocale("nl");
+    expect(loaded.nl).toEqual(catalogs.nl);
+    expect(currentLocale()).toBe("nl");
+    expect(t("settings.language")).toBe(catalogs.nl["settings.language"]);
+  });
+
+  it("switches at once to a catalog already loaded", async () => {
+    await loadCatalog("nl");
+    void setLocale("nl");
+    expect(currentLocale()).toBe("nl");
+  });
+
+  it("keeps the latest language when an earlier one loads after it", async () => {
+    delete loaded.nl;
+    const slow = setLocale("nl");
+    await setLocale("fr");
+    await slow;
+    expect(currentLocale()).toBe("fr");
+  });
+
+  it("refuses a catalog that isn't there, and words a code without one in English", async () => {
+    await expect(loadCatalog("xx")).rejects.toThrow("no catalog for xx");
+    locale.code = "xx";
+    expect(t("settings.language")).toBe("Language");
   });
 });
 

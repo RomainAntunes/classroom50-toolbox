@@ -7,8 +7,8 @@ afterEach(() => {
 });
 
 describe("errorMessage", () => {
-  it("words a known kind in the UI's language, filling in its params", () => {
-    setLocale("fr");
+  it("words a known kind in the UI's language, filling in its params", async () => {
+    await setLocale("fr");
     const err = {
       kind: "otherBranch",
       message: "the clone isn't on main",

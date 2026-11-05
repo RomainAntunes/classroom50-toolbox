@@ -1,8 +1,8 @@
 import { describe, expect, it } from "vitest";
 import pkg from "../../../package.json";
 import i18nSource from "../i18n/index.ts?raw";
-import { catalogs } from "#lib/i18n/index.js";
-import { changelogs, notesFor, versions } from "./index";
+import { languages } from "#lib/i18n/index.js";
+import { loadChangelogs, notesFor, versions } from "./index";
 import {
   KINDS,
   catalogCodes,
@@ -14,7 +14,15 @@ import {
   pendingVersions,
   previousTag,
   releaseBody,
+  type Changelog,
 } from "./versions.js";
+
+// Every changelog file, read at once here; the app loads only those What's new shows.
+const changelogs = Object.fromEntries(
+  Object.entries(
+    import.meta.glob("./*.json", { eager: true, import: "default" }) as Record<string, Changelog>,
+  ).map(([path, changelog]) => [path.slice(2, -".json".length), changelog]),
+);
 
 describe("versions", () => {
   it("parses versions and pre-releases", () => {
@@ -111,14 +119,15 @@ describe("drafting", () => {
   });
 
   it("reads the registered catalogs from the i18n module", () => {
-    expect(catalogCodes(i18nSource)).toEqual(Object.keys(catalogs));
-    const later = `export const catalogs: Record<string, Catalog> = {
-      en,
-      fr,
-      "pt-BR": ptBR,
-      'zh-Hans': zhHans,
+    expect(catalogCodes(i18nSource)).toEqual(Object.keys(languages));
+    const later = `export const languages: Record<string, string> = {
+      en: "English",
+      fr: "Français",
+      "pt-BR": "Português (Brasil)",
+      'zh-Hans': '简体中文',
+      xx: "A name, with a comma: and a colon",
     };`;
-    expect(catalogCodes(later)).toEqual(["en", "fr", "pt-BR", "zh-Hans"]);
+    expect(catalogCodes(later)).toEqual(["en", "fr", "pt-BR", "zh-Hans", "xx"]);
   });
 
   it("writes the release body by kind, then where to download", () => {
@@ -165,8 +174,20 @@ describe("what's new", () => {
 
   it("falls back to English per version", () => {
     const [version] = versions();
-    expect(notesFor(version, "xx")).toEqual(changelogs[version].notes.en);
-    expect(notesFor("0.0.0", "en")).toEqual([]);
+    expect(notesFor(changelogs[version], "xx")).toEqual(changelogs[version].notes.en);
+    expect(notesFor(changelogs[version], "en")).toEqual(changelogs[version].notes.en);
+    expect(notesFor(undefined, "en")).toEqual([]);
+  });
+
+  it("lists the versions from the file names, newest first", () => {
+    expect(versions()).toEqual(Object.keys(changelogs).sort((a, b) => compareVersions(b, a)));
+  });
+
+  it("loads only the versions asked for, leaving out those without notes", async () => {
+    const [newest, previous] = versions();
+    expect(await loadChangelogs([newest, "0.0.0"])).toEqual({ [newest]: changelogs[newest] });
+    expect(Object.keys(await loadChangelogs([previous, newest]))).toEqual([previous, newest]);
+    expect(await loadChangelogs([])).toEqual({});
   });
 });
 
@@ -174,7 +195,7 @@ describe("changelog files", () => {
   it("has notes for the current version in every registered language", () => {
     const current = changelogs[pkg.version];
     expect(current, `src/lib/changelog/${pkg.version}.json (run pnpm bump)`).toBeDefined();
-    for (const code of Object.keys(catalogs)) {
+    for (const code of Object.keys(languages)) {
       expect(current.notes[code]?.length, `${pkg.version}: notes in ${code}`).toBeGreaterThan(0);
     }
   });

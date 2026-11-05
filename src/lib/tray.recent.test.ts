@@ -107,14 +107,14 @@ describe("recent", () => {
     expect(labels(input(projects, { hidden }))).toEqual(["mario"]);
   });
 
-  it("adds the class when two picks share a name", () => {
+  it("adds the class when two picks share a name", async () => {
     const projects = [
       clone("lab-1", { name: "Lab 1", classroom: "algo", activeAt: hour(12) }),
       clone("lab-1", { name: "Lab 1", classroom: "web", activeAt: hour(11) }),
       clone("hello", { activeAt: hour(10) }),
     ];
     expect(labels(input(projects))).toEqual(["Lab 1 (ALGO)", "Lab 1 (WEB)", "hello"]);
-    setLocale("ja");
+    await setLocale("ja");
     expect(labels(input(projects))[0]).toBe("Lab 1（ALGO）");
   });
 

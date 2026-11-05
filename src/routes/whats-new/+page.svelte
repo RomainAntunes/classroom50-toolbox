@@ -3,8 +3,16 @@
   import { onMount, tick } from "svelte";
   import { goto } from "$app/navigation";
   import { page } from "$app/state";
-  import { changelogs, notesFor, versions } from "#lib/changelog/index.js";
-  import { compareVersions, KINDS, type Entry, type EntryKind } from "#lib/changelog/versions.js";
+  import { loadChangelogs, notesFor, versions } from "#lib/changelog/index.js";
+  import {
+    compareVersions,
+    KINDS,
+    type Changelog,
+    type Entry,
+    type EntryKind,
+  } from "#lib/changelog/versions.js";
+  import { atLeast } from "#lib/busy.js";
+  import Spinner from "#lib/components/Spinner.svelte";
   import { currentLocale, formatDay, t } from "#lib/i18n/index.js";
   import { loadSettings, saveSettings, settings } from "#lib/settings.svelte.js";
   import { appVersion, pendingNotes, seenVersion } from "#lib/whatsnew.js";
@@ -14,7 +22,14 @@
   const from = page.url.searchParams.get("from");
   const all = page.url.searchParams.has("all");
   let shown = $state<string[] | null>(null);
+  // The shown versions' notes, loaded before they show.
+  let notes = $state.raw<Record<string, Changelog>>({});
   let heading = $state<HTMLHeadingElement | null>(null);
+  // Loading the notes (each version's file is its own chunk), or failed to: the page says
+  // so, and Retry loads them again, rather than showing an empty page.
+  let loading = $state(true);
+  let failed = $state(false);
+  let retry = $state<HTMLButtonElement | null>(null);
   const many = $derived((shown?.length ?? 0) > 1);
 
   interface Group {
@@ -24,7 +39,7 @@
 
   /** The entries in the UI's language (else English): kindless first, then by kind. */
   function groups(version: string): Group[] {
-    const entries = notesFor(version, currentLocale());
+    const entries = notesFor(notes[version], currentLocale());
     return [
       { kind: null, entries: entries.filter((entry) => !entry.kind) },
       ...KINDS.map((kind) => ({ kind, entries: entries.filter((entry) => entry.kind === kind) })),
@@ -33,7 +48,7 @@
 
   /** "Released 16 October 2026": the file's date read as a local day. */
   function released(version: string): string | null {
-    const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(changelogs[version]?.date ?? "");
+    const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(notes[version]?.date ?? "");
     if (!match) return null;
     const day = new Date(Number(match[1]), Number(match[2]) - 1, Number(match[3]));
     return t("whatsNew.released", { date: formatDay(day) });
@@ -44,22 +59,50 @@
     await goto(from === "settings" ? "/settings" : "/", { replace: true });
   }
 
+  /** The versions to show and their notes; the spinner shows at least `MIN_BUSY_MS`. */
+  async function load() {
+    loading = true;
+    failed = false;
+    try {
+      const [wanted, loadedNotes] = await atLeast(
+        (async () => {
+          const [loaded, current] = await Promise.all([loadSettings(), appVersion()]);
+          const known = versions();
+          let wanted: string[];
+          if (all) wanted = known;
+          else if (from) wanted = known.filter((v) => compareVersions(v, current) <= 0).slice(0, 1);
+          else wanted = await pendingNotes(loaded);
+          return [wanted, await loadChangelogs(wanted)] as const;
+        })(),
+      );
+      notes = loadedNotes;
+      shown = wanted;
+    } catch (err) {
+      console.error("couldn't load the notes", err);
+      failed = true;
+    } finally {
+      loading = false;
+    }
+    // Screen readers start at the title (Tab then reaches Got it), or at Retry.
+    await tick();
+    (failed ? retry : heading)?.focus();
+  }
+
   onMount(() => {
-    void (async () => {
-      const [loaded, current] = await Promise.all([loadSettings(), appVersion()]);
-      const known = versions();
-      if (all) shown = known;
-      else if (from) shown = known.filter((v) => compareVersions(v, current) <= 0).slice(0, 1);
-      else shown = await pendingNotes(loaded);
-      // Screen readers start at the title; Tab then reaches Got it.
-      await tick();
-      heading?.focus();
-    })();
+    void load();
   });
 </script>
 
-<main>
-  {#if shown}
+<main aria-busy={loading}>
+  {#if loading}
+    <!-- No live region: `aria-busy` holds it back, and the title takes the focus next. -->
+    <p class="state"><Spinner alone /><span>{t("whatsNew.loading")}</span></p>
+  {:else if failed}
+    <div class="state">
+      <p role="alert">{t("whatsNew.loadFailed")}</p>
+      <button bind:this={retry} onclick={load}>{t("whatsNew.retry")}</button>
+    </div>
+  {:else if shown}
     <section class="hero">
       <img class="hero-logo" src={logo} alt="" />
       <h1 class="hero-title" tabindex="-1" bind:this={heading}>
@@ -172,6 +215,23 @@
 
   .empty {
     text-align: center;
+  }
+
+  /* Loading or failed: centered where the notes go. */
+  .state {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: var(--space);
+    margin: 0;
+    color: var(--fg-muted);
+    text-align: center;
+  }
+
+  .state p {
+    margin: 0;
   }
 
   .date {

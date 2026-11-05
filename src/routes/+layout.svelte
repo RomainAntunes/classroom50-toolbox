@@ -66,23 +66,35 @@
     void api.hidePopover();
   }
 
-  // The `language` setting, live: `t` is reactive, so the whole UI follows at once, and
-  // `dir` lays it out right to left for Arabic, Hebrew... (components use logical CSS
-  // properties only, so they follow). "System" reads the OS's languages from Rust:
-  // WKWebView's `navigator.languages` holds the app bundle's localizations, not the
-  // user's. They stand in until Rust answers.
+  // The `language` setting, live: `t` is reactive, so the whole UI follows once the
+  // catalog is loaded (English until then), and `dir` lays it out right to left for
+  // Arabic, Hebrew... (components use logical CSS properties only, so they follow).
+  // "System" reads the OS's languages from Rust: WKWebView's `navigator.languages` holds
+  // the app bundle's localizations, not the user's. They stand in until Rust answers.
+  // Settings loads a picked language before saving it and says when that fails, so a
+  // failure here (a catalog that won't load at start) only keeps the language shown.
   const language = $derived(settings.current?.language ?? "system");
   let systemLanguages = $state<readonly string[]>(navigator.languages);
   $effect(() => {
-    setLocale(language, systemLanguages);
+    setLocale(language, systemLanguages).catch((err: unknown) => {
+      console.error("couldn't load the catalog", err);
+    });
+  });
+  // The active catalog's, which changes once it is loaded (and with the dev preview).
+  $effect(() => {
     document.documentElement.lang = currentLocale();
     document.documentElement.dir = currentDirection();
   });
+
+  // Whether the saved language shows (or failed to load): the words sent to Rust wait for
+  // it, so Rust gets them once at startup, in that language, not in English first.
+  let localeReady = $state(false);
 
   // Rust writes calendar notes with these words (placeholders filled there; names pass
   // through `t` as themselves, so they are isolated in a right-to-left language, numbers
   // stay bare as `fill` leaves them); sent again when the language changes.
   $effect(() => {
+    if (!localeReady) return;
     void api.setCalendarLabels({
       class: t("calendar.notes.class", { name: "{name}" }),
       group: t("calendar.notes.group", { name: "{name}" }),
@@ -145,11 +157,24 @@
 
   // Lives in the layout so notices arrive whichever page is shown, and while hidden.
   onMount(() => {
-    const loads = [
+    const languageLoads = [
       loadSettings(),
       api.systemLanguages().then((languages) => {
         if (languages.length) systemLanguages = languages;
       }),
+    ];
+    // The catalog the effect above started loading, once settings and the OS's languages
+    // are in (the same load, not a second one). The notices and the link Rust sends in the
+    // first moments (a grade that came while the app was closed, the link that started it)
+    // wait for it too, each in the order it came; one that won't load lets them through in
+    // English.
+    const localeLoaded = Promise.allSettled(languageLoads)
+      .then(() => setLocale(language, systemLanguages).catch(() => {}))
+      .then(() => {
+        localeReady = true;
+      });
+    const loads = [
+      ...languageLoads,
       // The OS's 12- or 24-hour clock, for every time shown (the tray menu's first one
       // included); Rust reads it again as the popover shows (where that runs no program)
       // and sends `hour-cycle` only on a change.
@@ -157,7 +182,7 @@
       loadEditors(),
       loadSnapshot(),
     ];
-    void Promise.allSettled(loads).then(() => {
+    void Promise.allSettled([...loads, localeLoaded]).then(() => {
       trayReady = true;
     });
     void api.appInfo().then((info) => initTheme(info.os));
@@ -169,7 +194,7 @@
     // Here so a queue that ends on another page is still announced.
     watchTeammateJobs();
     const unlisteners = [
-      onEvent(NOTIFY_EVENT, (notice) => void showNotice(notice)),
+      onEvent(NOTIFY_EVENT, (notice) => void localeLoaded.then(() => showNotice(notice))),
       onEvent(UNSEEN_EVENT, (ids) => {
         session.unseen = ids;
       }),
@@ -177,7 +202,7 @@
         settings.current = saved;
       }),
       onEvent(UPDATE_STATE_EVENT, (status) => setUpdate(status)),
-      onEvent(DEEP_LINK_EVENT, () => void handleDeepLink()),
+      onEvent(DEEP_LINK_EVENT, () => void handleDeepLink(localeLoaded)),
       // The only listener: Tauri parses the payload once per listener.
       onEvent(PROJECTS_UPDATED_EVENT, (snapshot) => {
         // `gh auth switch`: the footer follows the account the data now belongs to.
@@ -199,7 +224,7 @@
       }),
     ];
     // A link that started the app came before this page could hear about it.
-    void handleDeepLink();
+    void handleDeepLink(localeLoaded);
     return () => {
       for (const unlisten of unlisteners) void unlisten.then((stop) => stop());
     };
