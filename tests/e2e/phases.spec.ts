@@ -23,10 +23,14 @@ const phase = (id: string, name: string, due: string, done = false): ProjectPhas
 });
 
 // No due date of its own, as a project the teacher gives phases for out of band.
-const bdr = project({ slug: "bdr", name: "BDR project", assignment: { due: null } });
+const dbProject = project({
+  slug: "db-project",
+  name: "Database project",
+  assignment: { due: null },
+});
 const withPhases = project({
-  slug: "bdr",
-  name: "BDR project",
+  slug: "db-project",
+  name: "Database project",
   assignment: { due: null },
   phases: [
     phase("p1", "Schema", "2026-10-27T22:59:00Z", true),
@@ -36,13 +40,13 @@ const withPhases = project({
 
 async function open(app: App, row: Project, responses: Record<string, Reply[]> = {}) {
   await app.start(scenario({ snapshot: snapshot({ projects: [row] }), responses }));
-  await app.rowMenu("BDR project");
+  await app.rowMenu("Database project");
   await app.pickMenu("Phases…");
-  await expect(app.prompt.getByRole("heading")).toHaveText("Phases of BDR project");
+  await expect(app.prompt.getByRole("heading")).toHaveText("Phases of Database project");
 }
 
 test("phases are added, ticked and saved, and the row shows the next one", async ({ app }) => {
-  await open(app, bdr);
+  await open(app, dbProject);
   await expect(app.prompt).toContainText("No phases yet. Add the dates your teacher gave.");
   const add = app.prompt.getByRole("button", { name: "Add a phase" });
   const save = app.prompt.getByRole("button", { name: "Save" });
@@ -64,7 +68,7 @@ test("phases are added, ticked and saved, and the row shows the next one", async
   await save.click();
 
   const [call] = await app.waitForCall("set_phases");
-  expect(call.args.id).toBe(bdr.id);
+  expect(call.args.id).toBe(dbProject.id);
   // By date, local times as UTC.
   expect(call.args.phases).toEqual([
     {
@@ -82,7 +86,7 @@ test("phases are added, ticked and saved, and the row shows the next one", async
   ]);
   await expect(app.prompt).toHaveCount(0);
   // The done phase is skipped; the row says when the next one is.
-  await expect(app.row("BDR project").locator(".meta")).toContainText(
+  await expect(app.row("Database project").locator(".meta")).toContainText(
     /Report due tomorrow at 6:00\sPM/,
   );
   expect(await app.writes()).toEqual(["set_phases"]);
@@ -112,14 +116,14 @@ test("Cancel, Escape and a click outside save nothing", async ({ app }) => {
   await app.prompt.getByRole("button", { name: "Cancel" }).click();
   await expect(app.prompt).toHaveCount(0);
 
-  await app.rowMenu("BDR project");
+  await app.rowMenu("Database project");
   await app.pickMenu("Phases…");
   // The edit was dropped.
   await expect(app.prompt.getByLabel("Name of phase 1")).toHaveValue("Schema");
   await app.page.keyboard.press("Escape");
   await expect(app.prompt).toHaveCount(0);
 
-  await app.rowMenu("BDR project");
+  await app.rowMenu("Database project");
   await app.pickMenu("Phases…");
   await app.page.mouse.click(5, 5);
   await expect(app.prompt).toHaveCount(0);
@@ -152,13 +156,13 @@ test("a refusal from Rust shows in the editor, edits kept", async ({ app }) => {
 
 test("a teacher's due date stays on the row; the phases are in the details", async ({ app }) => {
   const dated = project({
-    slug: "bdr",
-    name: "BDR project",
+    slug: "db-project",
+    name: "Database project",
     assignment: { due: "2026-11-30T22:59:00Z" },
     phases: withPhases.phases,
   });
   await app.start(scenario({ snapshot: snapshot({ projects: [dated] }) }));
-  const row = app.row("BDR project");
+  const row = app.row("Database project");
   await expect(row.locator(".meta")).toContainText("Due ");
   await expect(row.locator(".meta")).not.toContainText("Queries");
   await row.locator("[data-row]").click();
@@ -176,11 +180,11 @@ test("open phases are tray deadlines that open their row", async ({ app }) => {
       (await menus()).at(-1)?.deadlines.map((d) => ({ ...d, label: plain(d.label) })),
     )
     .toEqual([
-      { id: `${withPhases.id}#p2`, label: "BDR project: Queries · Due tomorrow at 6:00 PM" },
+      { id: `${withPhases.id}#p2`, label: "Database project: Queries · Due tomorrow at 6:00 PM" },
     ]);
   await app.emit("tray-action", { kind: "focus", id: `${withPhases.id}#p2` });
-  await expect(app.row("BDR project")).toHaveClass(/linked/);
-  await expect(app.row("BDR project").locator("[data-row]")).toHaveAttribute(
+  await expect(app.row("Database project")).toHaveClass(/linked/);
+  await expect(app.row("Database project").locator("[data-row]")).toHaveAttribute(
     "aria-expanded",
     "true",
   );

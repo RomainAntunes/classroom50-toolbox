@@ -783,11 +783,11 @@ mod tests {
     #[test]
     fn writes_one_event_per_phase() {
         let project: crate::projects::Project = serde_json::from_value(serde_json::json!({
-            "id": "org/poo-bdr-alex",
+            "id": "org/db101-project-alex",
             "owner": "org",
-            "repo": "poo-bdr-alex",
-            "config": { "classroom": "poo", "assignment": "bdr" },
-            "assignment": assignment("BDR", None),
+            "repo": "db101-project-alex",
+            "config": { "classroom": "db101", "assignment": "project" },
+            "assignment": assignment("Database", None),
             "phases": [
                 { "id": "p1", "name": "Phase 1", "due": "2026-11-20T22:59:00Z", "done": true },
                 { "id": "p2", "name": "Phase 2", "due": "2026-12-04T22:59:00Z" },
@@ -800,15 +800,15 @@ mod tests {
         };
         let events = events(&snapshot, &[], &[], &[24], &Labels::default());
         let titles: Vec<_> = events.iter().map(|e| e.title.as_str()).collect();
-        assert_eq!(titles, ["BDR: Phase 1", "BDR: Phase 2"]);
-        assert_eq!(events[0].uid, "org/poo-bdr-alex/phase/p1");
-        assert_eq!(events[0].notes.as_deref(), Some("Class: poo\nDone"));
+        assert_eq!(titles, ["Database: Phase 1", "Database: Phase 2"]);
+        assert_eq!(events[0].uid, "org/db101-project-alex/phase/p1");
+        assert_eq!(events[0].notes.as_deref(), Some("Class: db101\nDone"));
         // A phase ticked done stays on the calendar, without alarms.
         assert!(events[0].alarm_hours.is_empty());
         assert_eq!(events[1].alarm_hours, [24, 1]);
-        assert_eq!(events[1].notes.as_deref(), Some("Class: poo"));
+        assert_eq!(events[1].notes.as_deref(), Some("Class: db101"));
 
-        let hidden = ["org/poo-bdr-alex".to_owned()];
+        let hidden = ["org/db101-project-alex".to_owned()];
         assert!(super::events(&snapshot, &hidden, &[], &[], &Labels::default()).is_empty());
     }
 
