@@ -313,7 +313,7 @@ pub fn write_calendar(
     _events: &[super::CalendarEvent],
     _written: &mut super::WrittenEvents,
     _dir: &Path,
-) -> Result<()> {
+) -> Result<Option<String>> {
     Err(Error::Unsupported("no calendar store on this OS".into()))
 }
 

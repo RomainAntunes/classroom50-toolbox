@@ -1,7 +1,7 @@
 <script lang="ts">
   import { Menu, MenuItem, PredefinedMenuItem, Submenu } from "@tauri-apps/api/menu";
   import { openUrl, revealItemInDir } from "@tauri-apps/plugin-opener";
-  import { api, type Project } from "#lib/api.js";
+  import { api, type Milestone, type Project } from "#lib/api.js";
   import { cloneProject, type CloneMode } from "#lib/clone.js";
   import { editorFor, editors, openInEditor } from "#lib/editor.svelte.js";
   import { pullProject } from "#lib/pull.js";
@@ -25,7 +25,18 @@
   import TeammateProgress from "./TeammateProgress.svelte";
   import Spinner from "./Spinner.svelte";
 
-  let { project, now, unseen }: { project: Project; now: Date; unseen: boolean } = $props();
+  let {
+    project,
+    now,
+    unseen,
+    gradingInfo = true,
+  }: {
+    project: Project;
+    now: Date;
+    unseen: boolean;
+    /** Says how the assignment is graded ("Not graded", by the teaching staff). */
+    gradingInfo?: boolean;
+  } = $props();
   const uid = $props.id();
 
   const DAY = 24 * 60 * 60 * 1000;
@@ -63,6 +74,8 @@
   // An assignment the teacher doesn't grade says so, with no grading run's news.
   const ungraded = $derived(gradingMode(project.assignment) === "off");
   const grading = $derived(ungraded ? null : (project.remote?.grading ?? null));
+  // "Not graded" on the row, unless the student hid how assignments are graded.
+  const notGraded = $derived(ungraded && gradingInfo);
   const status = $derived.by(() => {
     if (closed) return { label: t("projects.closed"), warn: false, hint: undefined };
     // The last push isn't graded and won't be until it's pushed again or the teacher regrades.
@@ -126,6 +139,24 @@
     grading?.state === "running" ? [] : (grade?.tests.filter((test) => !test.passed) ?? []),
   );
   const feedback = $derived(project.remote?.feedback ?? null);
+  // Each milestone tag pattern: the newest tag pushed for it, or not yet.
+  const milestones = $derived(
+    (project.remote?.milestones ?? []).map((m) => ({
+      pattern: m.pattern,
+      done: m.tag !== null,
+      text: milestoneText(m),
+      title: m.tag?.at ? formatDate(new Date(m.tag.at)) : null,
+    })),
+  );
+  function milestoneText({ pattern, tag }: Milestone): string {
+    if (!tag) return t("details.milestoneNotYet");
+    if (!tag.at) return t("details.milestonePushedUndated", { tag: tag.name });
+    const when = fromNow(new Date(tag.at), now);
+    // A glob names the tag that matched it.
+    return tag.name === pattern
+      ? t("details.milestonePushed", { when })
+      : t("details.milestonePushedAs", { tag: tag.name, when });
+  }
   // Grades before the current one, newest first.
   const earlier = $derived((project.remote?.history ?? []).filter((g) => g.tag !== grade?.tag));
   const gradeLine = (g: { score: number; maxScore: number; publishedAt: string | null }) =>
@@ -246,7 +277,7 @@
     if (a) {
       add("type", t(`details.mode.${a.mode}`));
       add("submission", t(`details.submissionMode.${a.submissionMode ?? "every-push"}`));
-      add("grading", gradingDetail(a));
+      if (gradingInfo) add("grading", gradingDetail(a));
       const opens = a.availableFrom ? new Date(a.availableFrom) : null;
       if (opens && opens > now) add("opens", formatDate(opens));
     }
@@ -449,7 +480,7 @@
       data-row
       aria-expanded={open}
       aria-labelledby="{uid}-name"
-      aria-describedby={grade || ungraded || grading?.state === "running"
+      aria-describedby={grade || notGraded || grading?.state === "running"
         ? `${uid}-meta ${uid}-grade`
         : `${uid}-meta`}
       onclick={() => (open = !open)}
@@ -512,7 +543,7 @@
             >{t("projects.gradeSr", { score: grade.score, max: grade.maxScore })}{#if passText}, {passText}{/if}</span
           ></span
         >
-      {:else if ungraded}
+      {:else if notGraded}
         <span class="grade ungraded" id="{uid}-grade" title={t("projects.notGradedHint")}
           >{t("projects.notGraded")}</span
         >
@@ -553,6 +584,7 @@
       description={project.assignment?.description ?? null}
       doc={project.assignment?.descriptionDoc ?? null}
       items={details}
+      {milestones}
       failed={failedTests}
       notes={grading?.state === "running" ? null : (grade?.releaseNotes ?? null)}
       gradeUrl={grade?.url ?? null}

@@ -9,14 +9,16 @@
 
   /**
    * The expanded part of a row: the assignment's description (Markdown, folded to a few lines
-   * until "Show more" or the focus reaches a link below the fold), label/value lines, then the
-   * tests the last grade failed, each opening on why (the autograder's output, led by a line
+   * until "Show more" or the focus reaches a link below the fold), label/value lines, the
+   * milestone tags pushed or not yet, then the tests the last grade failed, each opening on
+   * why (the autograder's output, led by a line
    * when it stopped the program at its time limit), and what else the release says.
    */
   let {
     description,
     doc = null,
     items,
+    milestones = [],
     failed = [],
     notes = null,
     gradeUrl = null,
@@ -25,6 +27,8 @@
     /** The description parsed by Rust; `null` (a snapshot from before) shows it as text. */
     doc?: MarkdownBlock[] | null;
     items: [label: string, value: string][];
+    /** Each milestone tag pattern, worded by the row: `title` is the tag's full date. */
+    milestones?: { pattern: string; done: boolean; text: string; title: string | null }[];
     failed?: GradeTest[];
     notes?: ReleaseNotes | null;
     /** The graded release, for output cut short here. */
@@ -87,6 +91,20 @@
       <dd title={value} class:lines={value.includes("\n")}><bdi>{value}</bdi></dd>
     {/each}
   </dl>
+  {#if milestones.length}
+    <p class="heading">{t("details.milestones")}</p>
+    <!-- svelte-ignore a11y_no_redundant_roles -->
+    <ul class="milestones" role="list">
+      {#each milestones as milestone (milestone.pattern)}
+        <li>
+          <span class="name" title={milestone.pattern}><bdi>{milestone.pattern}</bdi></span>
+          <span class="state" class:done={milestone.done} title={milestone.title}
+            >{milestone.text}</span
+          >
+        </li>
+      {/each}
+    </ul>
+  {/if}
   {#if failed.length}
     <p class="heading">{t(explained ? "details.failedTests" : "details.failedTestsHint")}</p>
     <!-- An explicit role: WebKit drops the list semantics of a list without bullets. -->
@@ -313,5 +331,37 @@
   .more {
     margin: 3px 0 0;
     color: var(--fg-muted);
+  }
+
+  .milestones {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .milestones li {
+    display: flex;
+    align-items: baseline;
+    gap: 8px;
+  }
+
+  .milestones .name {
+    flex: 0 1 auto;
+    max-width: 50%;
+    font-family: var(--font-mono);
+    font-size: 0.95em;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .milestones .state {
+    flex: 1;
+    min-width: 0;
+    color: var(--fg-muted);
+  }
+
+  .milestones .state.done {
+    color: var(--success);
   }
 </style>

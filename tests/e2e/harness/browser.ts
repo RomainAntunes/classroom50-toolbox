@@ -159,9 +159,18 @@ export function install(scenario: Scenario): E2E {
         return state.appInfo;
       case "get_settings":
         return state.settings;
-      case "update_settings":
-        state.settings = { ...(args.next as Settings) };
+      case "update_settings": {
+        const next = args.next as Settings;
+        if (
+          next.showGradingInfo !== state.settings.showGradingInfo &&
+          state.gradingRevealed.length
+        ) {
+          state.gradingRevealed = [];
+          void emit("grading-revealed", []);
+        }
+        state.settings = { ...next };
         return state.settings;
+      }
       case "tool_statuses":
         return state.tools;
       case "tool_jobs":
@@ -208,6 +217,8 @@ export function install(scenario: Scenario): E2E {
         return state.syncDetails;
       case "unseen":
         return state.unseen;
+      case "grading_revealed":
+        return state.gradingRevealed;
       case "system_languages":
         return state.systemLanguages;
       case "system_hour_cycle":

@@ -7,7 +7,7 @@ use std::time::{Duration, Instant};
 
 use crate::error::{Error, Result};
 use crate::platform::linux_calendar::{self as cal, Bus, CalendarStore, Call, Step};
-use crate::platform::{CalendarEvent, NativeCalendar, Written, WrittenEvents, home_dir};
+use crate::platform::{self, CalendarEvent, NativeCalendar, Written, WrittenEvents, home_dir};
 use crate::process;
 
 /// One D-Bus call's limit: past the bus's own 25 s reply timeout, so a call that starts
@@ -89,7 +89,7 @@ pub fn write_calendar(
     events: &[CalendarEvent],
     written: &mut WrittenEvents,
     dir: &Path,
-) -> Result<()> {
+) -> Result<Option<String>> {
     let target = CalendarStore::from_id(calendar_id);
     if !calendar_id.is_empty() && target.is_none() {
         return Err(Error::Unsupported("that calendar no longer exists".into()));
@@ -99,10 +99,47 @@ pub fn write_calendar(
     if target.is_some() {
         write_file(&ics, events, written)?;
     }
-    for step in cal::plan(target, |t| written.contains_key(t.key())) {
+    let steps = cal::plan(
+        target,
+        |t| written.contains_key(t.key()),
+        |t| {
+            gone(
+                t,
+                written.get(t.key()).map(|w| w.event_id.as_str()),
+                deadline,
+            )
+        },
+    );
+    for step in steps {
         match step {
             Step::Register(t) => {
                 let id = register(t, &ics, deadline)?;
+                written.insert(
+                    t.key().to_owned(),
+                    Written {
+                        event_id: id,
+                        calendar_id: t.id().to_owned(),
+                        fingerprint: 0,
+                    },
+                );
+            }
+            Step::Restore(t) => {
+                let now = chrono::Utc::now().timestamp();
+                if !platform::may_recreate(written, now) {
+                    return Err(Error::Unsupported("that calendar no longer exists".into()));
+                }
+                platform::recreating(written, now);
+                let id = register(t, &ics, deadline).inspect_err(|err| {
+                    log::warn!(
+                        "the {} calendar was removed and couldn't be added again: {err}",
+                        t.id()
+                    );
+                })?;
+                platform::recreated(written);
+                log::info!(
+                    "the {} calendar was removed: added it again (turning the sync off in Settings > Calendar stops this)",
+                    t.id()
+                );
                 written.insert(
                     t.key().to_owned(),
                     Written {
@@ -132,7 +169,31 @@ pub fn write_calendar(
         }
         written.remove(cal::ICS_KEY);
     }
-    Ok(())
+    Ok(None)
+}
+
+/// Whether the calendar the app added to `target` was removed since (the user deleted it
+/// in GNOME Calendar or KOrganizer): our source file is missing, or Akonadi runs and no
+/// longer lists our resource. When it can't tell (no bus program, Akonadi not running,
+/// which a call would start), it isn't gone.
+fn gone(target: CalendarStore, id: Option<&str>, deadline: Instant) -> bool {
+    match target {
+        CalendarStore::Gnome => sources_dir()
+            .is_some_and(|dir| !dir.join(format!("{}.source", cal::SOURCE_UID)).is_file()),
+        CalendarStore::Kde => {
+            let (Some(id), Some(bus)) = (id.filter(|id| cal::valid_instance_id(id)), bus()) else {
+                return false;
+            };
+            let instance = env("AKONADI_INSTANCE");
+            let instance = instance.as_deref();
+            let running = call(bus, &cal::akonadi_running(instance), deadline)
+                .ok()
+                .and_then(|reply| cal::parse_bool(&reply));
+            running == Some(true)
+                && call(bus, &cal::list_instances(instance), deadline)
+                    .is_ok_and(|listed| !cal::instance_listed(bus, &listed, id))
+        }
+    }
 }
 
 /// Rewrites the file when an event changed (or it is gone); the calendars reload it.
@@ -216,7 +277,7 @@ fn unregister(target: CalendarStore, id: Option<&str>, deadline: Instant) -> Res
             let instance = instance.as_deref();
             // Removed by the user already (KOrganizer's settings): nothing to do.
             let listed = call_until_up(bus, &cal::list_instances(instance), true, deadline)?;
-            if !cal::parse_strings(bus, &listed).iter().any(|i| i == id) {
+            if !cal::instance_listed(bus, &listed, id) {
                 return Ok(());
             }
             call(bus, &cal::remove_instance(id, instance), deadline).map(drop)

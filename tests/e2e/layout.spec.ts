@@ -48,6 +48,17 @@ for (const locale of LOCALES) {
       await expect(page.locator("main section").first()).toBeVisible();
       expect(await untranslated(page), "raw keys in Settings").toEqual([]);
       expect(await overflow(page), "overflow in Settings").toEqual([]);
+
+      // And the list with how assignments are graded hidden (the group's details stay open).
+      const catalog = JSON.parse(
+        readFileSync(new URL(`../../src/lib/i18n/${locale}.json`, import.meta.url), "utf8"),
+      ) as Record<string, string>;
+      await page.getByRole("switch", { name: catalog["settings.gradingInfo"] }).click();
+      await expect.poll(async () => (await app.settings()).showGradingInfo).toBe(false);
+      await page.locator(".titlebar .icon").first().click();
+      await expect(page.locator("li[data-item]").first()).toBeVisible();
+      expect(await untranslated(page), "raw keys with grading hidden").toEqual([]);
+      expect(await overflow(page), "overflow with grading hidden").toEqual([]);
     });
   }
 }

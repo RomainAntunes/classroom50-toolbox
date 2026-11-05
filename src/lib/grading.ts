@@ -31,6 +31,13 @@ export function passLabel(
   return pass ? t("projects.passing") : t("projects.belowPassing", { percent: threshold! });
 }
 
+/** Whether a row says how its assignment is graded: unless the student hid it
+ *  (`showGradingInfo`), and then still once the teacher changed its grading since (`revealed`,
+ *  from Rust) or it has a grade. */
+export function showsGrading(shown: boolean, revealed: boolean, hasGrade: boolean): boolean {
+  return shown || revealed || hasGrade;
+}
+
 /** The details' "Grading" line for an assignment that isn't autograded: not graded, or by
  *  the teaching staff out of so many points, with where their feedback comes since the
  *  mark itself isn't shown to students. Null for autograded ones. */

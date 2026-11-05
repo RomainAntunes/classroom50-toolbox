@@ -64,6 +64,10 @@ updates:
     cooldown:
       default-days: 7
     groups:
+      # Every @wdio package and webdriverio share a version: a major moves them in one PR.
+      wdio:
+        patterns: ["@wdio/*", "webdriverio"]
+        update-types: [major, minor, patch]
       e2e-minor:
         update-types: [minor, patch]
 

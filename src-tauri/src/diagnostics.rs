@@ -424,6 +424,14 @@ impl Kind {
             Kind::Host => "host",
         }
     }
+
+    /// Whether a short or common value of this kind may be kept as a bare word
+    /// (`weak_name`): only org, class and repo slugs. Logins and people's or groups' names
+    /// are whose data is at stake, and keys and hosts are secrets, so they are masked
+    /// everywhere whatever their length.
+    fn may_be_weak(self) -> bool {
+        matches!(self, Kind::Org | Kind::Class | Kind::Repo)
+    }
 }
 
 /// Names the last discovery knew besides the snapshot's (`projects::ProjectsState::
@@ -443,6 +451,10 @@ pub struct Discovery {
 pub struct Redactor {
     /// Case-folded name to placeholder; the first kind a name is added with wins.
     terms: HashMap<String, String>,
+    /// Case-folded org, class and repo slugs too short or too common to mask as bare words
+    /// (`weak_name`): they are masked only where they sit in a path, URL, `owner/repo` or
+    /// repo name.
+    weak: HashSet<String>,
     counters: BTreeMap<Kind, usize>,
     /// The home folder, as written, replaced with `~`.
     home: Vec<String>,
@@ -556,15 +568,24 @@ impl Redactor {
         }
     }
 
-    /// Masks `value` as the next placeholder of `kind`, unless it is already masked.
+    /// Masks `value` as the next placeholder of `kind`, unless it is already masked. A
+    /// short or common org, class or repo slug (`weak_name`) is masked only in structured
+    /// spots; a login, a name, a key or a host never counts as one, even when the same
+    /// value was added as a slug before.
     pub fn add(&mut self, kind: Kind, value: &str) {
         let value = value.trim();
         if value.is_empty() {
             return;
         }
         let key = fold(value);
+        if !kind.may_be_weak() {
+            self.weak.remove(&key);
+        }
         if self.terms.contains_key(&key) {
             return;
+        }
+        if kind.may_be_weak() && weak_name(&key) {
+            self.weak.insert(key.clone());
         }
         let n = self.counters.entry(kind).or_default();
         *n += 1;
@@ -586,14 +607,14 @@ impl Redactor {
     /// last what paths under the home folder say beyond well-known folders and masked
     /// names. Also returns how many distinct names and secrets it actually masked.
     pub fn apply_counted(&self, text: &str) -> (String, usize) {
-        let mut needles: Vec<(Vec<char>, &str)> = self
+        let mut needles: Vec<Needle> = self
             .home
             .iter()
-            .map(|h| (fold(h).chars().collect(), "~"))
+            .map(|h| (fold(h).chars().collect(), "~", false))
             .chain(
                 self.terms
                     .iter()
-                    .map(|(k, v)| (k.chars().collect(), v.as_str())),
+                    .map(|(k, v)| (k.chars().collect(), v.as_str(), self.weak.contains(k))),
             )
             .collect();
         needles.sort_by(|a, b| b.0.len().cmp(&a.0.len()).then_with(|| a.0.cmp(&b.0)));
@@ -698,6 +719,62 @@ enum Segment<'a> {
     Masked { original: &'a str, mask: String },
 }
 
+/// A name to mask: its case-folded chars, its placeholder and whether it is weak.
+type Needle<'n> = (Vec<char>, &'n str, bool);
+
+/// Names shorter than this (in ASCII letters and digits) are masked only in structured
+/// spots: a class `c` or a login `jo` would otherwise mask every such word of the log.
+const MIN_BARE_LEN: usize = 3;
+
+/// Words the log itself uses all the time (its levels, the app's own words, git's), so a
+/// class, group, repo or login named after one would make the report unreadable when
+/// masked as a bare word. Matched case-folded, kept short on purpose: anything else is
+/// masked everywhere.
+const STOP_WORDS: &[&str] = &[
+    "app", "class", "code", "debug", "demo", "error", "git", "group", "home", "info", "lab",
+    "labs", "main", "none", "null", "project", "repo", "student", "sync", "team", "test", "tests",
+    "trace", "tray", "user", "warn",
+];
+
+/// Whether a case-folded name is too short or too common to mask as a bare word. Only
+/// ASCII names count as short: two CJK chars make a whole name, not a word of the log.
+fn weak_name(folded: &str) -> bool {
+    let short = folded.chars().count() < MIN_BARE_LEN && folded.is_ascii();
+    short || STOP_WORDS.contains(&folded)
+}
+
+/// Whether the name at `start..end` of `text` sits where it is a name, not a word: in a
+/// run of text holding a `/` or `\` (a path, a URL, `owner/repo`), before `.github.io`,
+/// or as a whole part of a name with at least three `-`-separated parts
+/// (`<classroom>-<assignment>-<suffix>`, `classroom50-<classroom>-teacher`).
+fn structured_spot(text: &str, start: usize, end: usize) -> bool {
+    let ends_run = |c: char| c.is_whitespace() || "\"'`<>|,;()[]{}".contains(c);
+    let run_start = text[..start]
+        .char_indices()
+        .rev()
+        .find(|&(_, c)| ends_run(c))
+        .map_or(0, |(at, c)| at + c.len_utf8());
+    let run_end = text[end..]
+        .char_indices()
+        .find(|&(_, c)| ends_run(c))
+        .map_or(text.len(), |(at, _)| end + at);
+    let run = text[run_start..run_end].trim_end_matches(['.', ':']);
+    if run.contains(['/', '\\']) {
+        return true;
+    }
+    let after = &text[end..];
+    if after
+        .get(..".github.io".len())
+        .is_some_and(|a| a.eq_ignore_ascii_case(".github.io"))
+    {
+        return true;
+    }
+    let before_ok = start == run_start || text[..start].ends_with('-');
+    let run_end = run_start + run.len();
+    let after_ok = end >= run_end || after.starts_with('-');
+    before_ok && after_ok && run.matches('-').count() >= 2
+}
+
 /// Case folding for matching names: full Unicode lowercase per char (so `É` matches `é`
 /// and `İ` its two-char lowercase), with the final sigma folded like any sigma.
 fn fold_char(c: char) -> impl Iterator<Item = char> {
@@ -733,10 +810,11 @@ fn folded_match(text: &str, needle: &[char]) -> Option<usize> {
 }
 
 /// Appends `text` to `out` with each needle (matched with Unicode case folding, not inside
-/// a longer word) replaced by its placeholder, recording the placeholders used.
+/// a longer word, a weak one only in a structured spot) replaced by its placeholder,
+/// recording the placeholders used.
 fn replace_terms<'n>(
     text: &str,
-    needles: &[(Vec<char>, &'n str)],
+    needles: &[Needle<'n>],
     out: &mut String,
     used: &mut HashSet<&'n str>,
 ) {
@@ -754,16 +832,14 @@ fn replace_terms<'n>(
         let found = previous
             .is_none_or(|c| !word_char(c))
             .then(|| {
-                needles.iter().find_map(|(needle, placeholder)| {
+                needles.iter().find_map(|(needle, placeholder, weak)| {
                     if !needle.starts_with(&first[..first.len().min(needle.len())]) {
                         return None;
                     }
                     let len = folded_match(rest, needle)?;
-                    rest[len..]
-                        .chars()
-                        .next()
-                        .is_none_or(|c| !word_char(c))
-                        .then_some((len, *placeholder))
+                    let whole = rest[len..].chars().next().is_none_or(|c| !word_char(c));
+                    let here = !weak || structured_spot(text, i, i + len);
+                    (whole && here).then_some((len, *placeholder))
                 })
             })
             .flatten();
@@ -1040,9 +1116,66 @@ mod tests {
         assert_eq!(r.apply("CS50-Hello-Alice"), "repo-1");
         // A login that looks like a placeholder isn't masked twice.
         let mut r = Redactor::default();
-        r.add(Kind::User, "user");
-        r.add(Kind::Repo, "user-1");
-        assert_eq!(r.apply("user user-1"), "user-1 repo-1");
+        r.add(Kind::User, "usr");
+        r.add(Kind::Repo, "usr-1");
+        r.add(Kind::Org, "user");
+        assert_eq!(r.apply("usr usr-1"), "user-1 repo-1");
+        assert_eq!(r.apply("user/usr-1"), "org-1/repo-1");
+    }
+
+    #[test]
+    fn short_and_common_slugs_are_kept_as_words() {
+        let mut r = Redactor::default();
+        r.add(Kind::Org, "acme-cs");
+        r.add(Kind::Class, "c");
+        r.add(Kind::Class, "lab");
+        r.add(Kind::Repo, "test");
+        r.add(Kind::User, "jo");
+        r.add(Kind::Name, "Li");
+        r.add(Kind::Name, "王伟");
+        // In prose org, class and repo slugs are ordinary words, and count as nothing masked.
+        assert_eq!(
+            r.apply_counted("[INFO] lab sync: test passed, a C compiler"),
+            ("[INFO] lab sync: test passed, a C compiler".to_owned(), 0)
+        );
+        // Logins and people's names are masked as bare words whatever their length.
+        assert_eq!(
+            r.apply_counted("account jo: Li and 王伟 pushed"),
+            ("account user-1: name-1 and name-2 pushed".to_owned(), 3)
+        );
+        // In a path, a URL, `owner/repo` or a repo name slugs are names.
+        assert_eq!(
+            r.apply("cloned acme-cs/lab-hello-jo to ~/code/lab/c"),
+            "cloned org-1/class-2-hello-user-1 to ~/code/class-2/class-1"
+        );
+        assert_eq!(
+            r.apply("GET https://github.com/acme-cs/c-tp1-test failed."),
+            "GET https://github.com/org-1/class-1-tp1-repo-1 failed."
+        );
+        assert_eq!(
+            r.apply("lab-tp1-jo, c-hello-x, classroom50-lab-teacher: done"),
+            "class-2-tp1-user-1, class-1-hello-x, classroom50-class-2-teacher: done"
+        );
+        assert_eq!(r.apply("see lab.github.io"), "see class-2.github.io");
+        // Two parts only is a word with a hyphen.
+        assert_eq!(r.apply("a lab-based test"), "a lab-based test");
+        assert_eq!(r.apply_counted("lab and acme-cs/lab").1, 2);
+    }
+
+    #[test]
+    fn secrets_are_never_kept_as_words() {
+        let mut r = Redactor::default();
+        r.add(Kind::Key, "ab");
+        r.add(Kind::Class, "lab");
+        r.add(Kind::Key, "lab");
+        assert_eq!(r.apply("key ab, lab"), "key key-1, class-1");
+        // A login that is also a short class slug stays a login: masked everywhere.
+        r.add(Kind::Class, "al");
+        r.add(Kind::User, "al");
+        assert_eq!(r.apply("al wrote"), "class-2 wrote");
+        let token = format!("ghp_{}", "a".repeat(20));
+        assert_eq!(r.apply(&format!("test {token}")), "test <token>");
+        assert_eq!(r.apply("by jo@uni.edu"), "by <email>");
     }
 
     #[test]
@@ -1066,14 +1199,14 @@ mod tests {
     #[test]
     fn numbering_is_per_kind_and_stable() {
         let mut r = Redactor::default();
-        r.add(Kind::User, "a1");
-        r.add(Kind::Org, "o1");
-        r.add(Kind::User, "A1");
-        r.add(Kind::Org, "a1");
-        r.add(Kind::User, "a2");
+        r.add(Kind::User, "ab1");
+        r.add(Kind::Org, "ob1");
+        r.add(Kind::User, "AB1");
+        r.add(Kind::Org, "ab1");
+        r.add(Kind::User, "ab2");
         r.add(Kind::User, "  ");
         assert_eq!(
-            r.apply_counted("a1 o1 a2"),
+            r.apply_counted("ab1 ob1 ab2"),
             ("user-1 org-1 user-2".to_owned(), 3)
         );
     }

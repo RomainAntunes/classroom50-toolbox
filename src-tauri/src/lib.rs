@@ -20,6 +20,7 @@ pub mod github;
 pub mod groups;
 mod login;
 pub mod markdown;
+pub mod milestones;
 pub mod noise;
 pub mod platform;
 mod popover;
@@ -69,6 +70,7 @@ macro_rules! ipc_commands {
             crate::commands::sync_progress,
             crate::commands::rescan_local,
             crate::commands::unseen,
+            crate::commands::grading_revealed,
             crate::commands::sync_details,
             crate::commands::clear_cache,
             crate::commands::list_accounts,

@@ -10,12 +10,13 @@ use objc2::rc::Retained;
 use objc2::runtime::Bool;
 use objc2_event_kit::{
     EKAlarm, EKAuthorizationStatus, EKCalendar, EKEntityType, EKEvent, EKEventAvailability,
-    EKEventStore, EKSpan,
+    EKEventStore, EKSource, EKSourceType, EKSpan,
 };
 use objc2_foundation::{NSArray, NSDate, NSError, NSString, NSURL};
 
 use crate::error::{Error, Result};
-use crate::platform::{CalendarEvent, NativeCalendar, Written, WrittenEvents};
+use crate::platform::macos_calendar::{self as mac, Pick};
+use crate::platform::{self, CalendarEvent, NativeCalendar, Written, WrittenEvents};
 
 /// How long to wait for the user to answer the access prompt.
 const PROMPT_TIMEOUT: Duration = Duration::from_secs(120);
@@ -116,24 +117,144 @@ fn failed(err: Retained<NSError>) -> Error {
     Error::Unsupported(format!("Calendar: {}", err.localizedDescription()))
 }
 
+fn by_id(store: &EKEventStore, id: &str) -> Option<Retained<EKCalendar>> {
+    unsafe { store.calendarWithIdentifier(&NSString::from_str(id)) }
+}
+
+fn source_id(calendar: &EKCalendar) -> String {
+    unsafe { calendar.source() }
+        .map(|s| unsafe { s.sourceIdentifier() }.to_string())
+        .unwrap_or_default()
+}
+
+/// The calendar to write to (`macos_calendar::pick`): `calendar_id`, else (deleted by the
+/// user) the one the app made for it that the setting hasn't caught up with, else a
+/// "Classroom 50" calendar in the deleted one's account, the default calendar's or On My
+/// Mac: one already there by that title, else a new one, at most once an hour
+/// (`platform::may_recreate`). Returns it with its id when it isn't `calendar_id`.
+fn calendar(
+    store: &EKEventStore,
+    calendar_id: &str,
+    written: &mut WrittenEvents,
+) -> Result<(Retained<EKCalendar>, Option<String>)> {
+    let sources = unsafe { store.sources() };
+    let now = chrono::Utc::now().timestamp();
+    let picked = mac::pick(
+        written,
+        calendar_id,
+        |id| by_id(store, id).is_some(),
+        sources.count() > 0,
+        now,
+    );
+    match picked {
+        Pick::Chosen => {
+            return by_id(store, calendar_id)
+                .map(|found| (found, None))
+                .ok_or(Error::CalendarUnavailable);
+        }
+        Pick::Made(id) => {
+            return by_id(store, &id)
+                .map(|found| (found, Some(id)))
+                .ok_or(Error::CalendarUnavailable);
+        }
+        Pick::NotReady => return Err(Error::CalendarUnavailable),
+        Pick::Wait => return Err(Error::Unsupported("that calendar no longer exists".into())),
+        Pick::Make => {}
+    }
+    platform::recreating(written, now);
+    let same = mac::last_source(written)
+        .and_then(|id| unsafe { store.sourceWithIdentifier(&NSString::from_str(id)) });
+    let default =
+        unsafe { store.defaultCalendarForNewEvents() }.and_then(|c| unsafe { c.source() });
+    let local = sources
+        .iter()
+        .find(|s| unsafe { s.sourceType() } == EKSourceType::Local);
+    let existing: Vec<mac::Existing> = unsafe { store.calendarsForEntityType(EKEntityType::Event) }
+        .iter()
+        .filter(|c| unsafe { c.allowsContentModifications() })
+        .map(|c| mac::Existing {
+            id: unsafe { c.calendarIdentifier() }.to_string(),
+            source: source_id(&c),
+            title: unsafe { c.title() }.to_string(),
+        })
+        .collect();
+    let mut tried: Vec<String> = Vec::new();
+    let mut error = Error::CalendarUnavailable;
+    for (source, which) in [
+        (same, "its account"),
+        (default, "the default account"),
+        (local, "On My Mac"),
+    ] {
+        let Some(source) = source else { continue };
+        let source_id = unsafe { source.sourceIdentifier() }.to_string();
+        if tried.contains(&source_id) {
+            continue;
+        }
+        tried.push(source_id.clone());
+        let reused = mac::reusable(&existing, &source_id).and_then(|id| by_id(store, id));
+        let (calendar, how) = match reused {
+            Some(found) => (found, "used the Classroom 50 calendar already"),
+            None => match make(store, &source) {
+                Ok(made) => (made, "made a new one"),
+                Err(err) => {
+                    error = err;
+                    continue;
+                }
+            },
+        };
+        let id = unsafe { calendar.calendarIdentifier() }.to_string();
+        mac::made(written, &id, &source_id);
+        log::info!(
+            "the chosen calendar was deleted: {how} in {which} (turning the sync off in Settings > Calendar stops this)"
+        );
+        return Ok((calendar, Some(id)));
+    }
+    log::warn!("the chosen calendar was deleted and a new one couldn't be made: {error}");
+    Err(error)
+}
+
+/// A new event calendar named `NEW_TITLE` in `source`, saved.
+fn make(store: &EKEventStore, source: &EKSource) -> Result<Retained<EKCalendar>> {
+    unsafe {
+        let calendar = EKCalendar::calendarForEntityType_eventStore(EKEntityType::Event, store);
+        calendar.setTitle(&NSString::from_str(mac::NEW_TITLE));
+        calendar.setSource(Some(source));
+        store
+            .saveCalendar_commit_error(&calendar, true)
+            .map_err(failed)?;
+        Ok(calendar)
+    }
+}
+
 pub fn write_calendar(
     calendar_id: &str,
     events: &[CalendarEvent],
     written: &mut WrittenEvents,
     _dir: &std::path::Path,
-) -> Result<()> {
+) -> Result<Option<String>> {
     let store = store(false)?;
-    let calendar = if events.is_empty() {
-        None
+    let (calendar, moved) = if calendar_id.is_empty() {
+        mac::forget(written);
+        (None, None)
+    } else if events.is_empty() {
+        // Nothing to write, but the calendar found still counts as the one chosen.
+        (by_id(&store, calendar_id), None)
     } else {
-        let found = unsafe { store.calendarWithIdentifier(&NSString::from_str(calendar_id)) };
-        Some(found.ok_or_else(|| Error::Unsupported("that calendar no longer exists".into()))?)
+        let (calendar, moved) = calendar(&store, calendar_id, written)?;
+        (Some(calendar), moved)
     };
+    let calendar_id = moved.as_deref().unwrap_or(calendar_id);
+    if let Some(calendar) = &calendar {
+        mac::wrote_to(written, calendar_id, &source_id(calendar));
+    }
 
     // Gone from the list, or written to another calendar: remove.
     let stale: Vec<String> = written
         .iter()
-        .filter(|(uid, w)| w.calendar_id != calendar_id || !events.iter().any(|e| &e.uid == *uid))
+        .filter(|(uid, w)| {
+            !uid.starts_with('@')
+                && (w.calendar_id != calendar_id || !events.iter().any(|e| &e.uid == *uid))
+        })
         .map(|(uid, _)| uid.clone())
         .collect();
     for uid in stale {
@@ -169,5 +290,5 @@ pub fn write_calendar(
             }
         }
     }
-    Ok(())
+    Ok(moved)
 }

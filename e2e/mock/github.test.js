@@ -23,22 +23,40 @@ const LIST = rustConst("projects/remote.rs", "LIST_QUERY");
 const TEAMS = rustConst("projects/remote.rs", "TEAMS_QUERY");
 const REPO = rustConst("projects/remote.rs", "REPO_FRAGMENT");
 const STATUS = rustConst("status.rs", "FRAGMENT");
+const MILESTONE = rustConst("milestones.rs", "FRAGMENT");
+/** What Rust selects for the sorting repo's milestone tags (checked by Rust's tests). */
+const SELECTION = JSON.parse(
+  readFileSync(new URL("golden/milestones-selection.json", import.meta.url), "utf8"),
+);
 const BODY = rustConst("status.rs", "RELEASE_BODY");
 
-/** `projects::fetch_nodes`'s aliased query. */
-function nodesQuery(names, fragment, fragments) {
-  const params = names.map((_, i) => `$o${i}: String!, $n${i}: String!`);
-  const fields = names
-    .map((_, i) => `r${i}: repository(owner: $o${i}, name: $n${i}) { ...${fragment} }\n`)
-    .join("");
+/**
+ * `projects::fetch_nodes_with`'s aliased query, `extras[i]` (`{ fields, variables }`)
+ * selected on `names[i]` too.
+ */
+function nodesQuery(names, fragment, fragments, extras = {}) {
+  const params = [];
   const variables = {};
-  names.forEach((full, i) => {
-    const [owner, name] = full.split("/");
-    variables[`o${i}`] = owner;
-    variables[`n${i}`] = name;
-  });
+  const fields = names
+    .map((full, i) => {
+      const [owner, name] = full.split("/");
+      params.push(`$o${i}: String!, $n${i}: String!`);
+      for (const [variable, value] of Object.entries(extras[i]?.variables ?? {})) {
+        params.push(`$${variable}: String!`);
+        variables[variable] = value;
+      }
+      variables[`o${i}`] = owner;
+      variables[`n${i}`] = name;
+      const more = extras[i]?.fields ?? "";
+      return `r${i}: repository(owner: $o${i}, name: $n${i}) { ...${fragment}${more} }\n`;
+    })
+    .join("");
   return { query: `query(${params.join(", ")}) {\n${fields}}\n${fragments}`, variables };
 }
+
+/** The status query, reading the sorting repo's milestone tags as Rust does. */
+const statusQuery = (names) =>
+  nodesQuery(names, "Status", REPO + STATUS + MILESTONE, { [SELECTION.alias]: SELECTION });
 
 /** `groups::members_query`'s aliased query, for one team. */
 const GROUPS =
@@ -58,6 +76,11 @@ describe("the mock GitHub", () => {
     expect(queryKind(TEAMS)).toBe("teams");
     expect(queryKind(nodesQuery(names, "Repo", REPO).query)).toBe("details");
     expect(queryKind(nodesQuery(names, "Status", REPO + STATUS).query)).toBe("status");
+    expect(queryKind(statusQuery(names).query)).toBe("status");
+    // The aliased query the mock copies is the one Rust builds.
+    expect(rust("projects/remote.rs")).toContain(
+      '"r{i}: repository(owner: $o{i}, name: $n{i}) {{ ...{fragment}{more} }}\\n"',
+    );
     expect(queryKind(BODY)).toBe("releaseBody");
     expect(queryKind(GROUPS)).toBe("groups");
     expect(queryKind("query { viewer { email } }")).toBe(null);
@@ -70,7 +93,7 @@ describe("the mock GitHub", () => {
       list: graphql(world, BASE, { query: LIST, variables: { cursor: null } }),
       teams: graphql(world, BASE, { query: TEAMS, variables: { login: world.login } }),
       details: graphql(world, BASE, nodesQuery(names, "Repo", REPO)),
-      status: graphql(world, BASE, nodesQuery(names, "Status", REPO + STATUS)),
+      status: graphql(world, BASE, statusQuery(names)),
       "release-body": graphql(world, BASE, {
         query: BODY,
         variables: { owner: "c50-e2e-school", name: "algo-hello-ada-e2e", tag: helloTag },
@@ -86,8 +109,21 @@ describe("the mock GitHub", () => {
     }
   });
 
+  it("answers the milestone tags each pattern asks for", () => {
+    const status = graphql(world, BASE, statusQuery(names));
+    const sorting = status[`r${SELECTION.alias}`];
+    const tagNames = (alias) => sorting[alias].nodes.map((t) => t.name);
+    // Tags holding `draft`, `final` and `v`, newest commit first.
+    expect(tagNames("m0")).toEqual(["draft", "draft-old"]);
+    expect(tagNames("m1")).toEqual([]);
+    expect(tagNames("m2")).toEqual(["v2", "v1"]);
+    expect(sorting.m2.nodes[1].target.tagger.date).toBeTruthy();
+    // Only the repo that reads milestones gets them.
+    expect(status.r0.m0).toBeUndefined();
+  });
+
   it("lists only the hello repo's grade and points at its asset", () => {
-    const status = graphql(world, BASE, nodesQuery(names, "Status", REPO + STATUS));
+    const status = graphql(world, BASE, statusQuery(names));
     const url = status.r0.releases.nodes[0].result.nodes[0].url;
     expect(url).toBe(
       `${BASE}/assets/c50-e2e-school/algo-hello-ada-e2e/${encodeURIComponent(helloTag)}/result.json`,

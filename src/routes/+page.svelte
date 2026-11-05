@@ -31,6 +31,7 @@
   import ProjectRow from "#lib/components/ProjectRow.svelte";
   import { classKey, showsProject, showsUnaccepted } from "#lib/filter.js";
   import { isClassHidden, isCollapsed, setClassHidden, setCollapsed } from "#lib/hidden.js";
+  import { showsGrading } from "#lib/grading.js";
   import UnacceptedRow from "#lib/components/UnacceptedRow.svelte";
   import LoginStatus from "#lib/components/LoginStatus.svelte";
   import UpdateBanner from "#lib/components/UpdateBanner.svelte";
@@ -78,6 +79,8 @@
   const allProjects = $derived(session.snapshot?.projects ?? []);
   const query = $derived(session.search.trim().toLowerCase());
   const unseen = $derived(new Set(session.unseen));
+  const revealed = $derived(new Set(session.gradingRevealed));
+  const gradingShown = $derived(settings.current?.showGradingInfo ?? true);
   const FILTERS: ListFilter[] = ["all", "open", "week", "past"];
   const filter = $derived(settings.current?.listFilter ?? "all");
   const groups = $derived.by(() => {
@@ -445,10 +448,24 @@
           onmenu={(anchor) => classMenu(group.key, anchor)}
         >
           {#each group.projects as project (project.id)}
-            <ProjectRow {project} {now} unseen={unseen.has(project.id)} />
+            <ProjectRow
+              {project}
+              {now}
+              unseen={unseen.has(project.id)}
+              gradingInfo={showsGrading(
+                gradingShown,
+                revealed.has(project.id),
+                Boolean(project.remote?.grade),
+              )}
+            />
           {/each}
           {#each group.unaccepted as item (item.id)}
-            <UnacceptedRow {item} {now} unseen={unseen.has(item.id)} />
+            <UnacceptedRow
+              {item}
+              {now}
+              unseen={unseen.has(item.id)}
+              gradingInfo={showsGrading(gradingShown, revealed.has(item.id), false)}
+            />
           {/each}
         </Section>
       {:else}

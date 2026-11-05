@@ -96,11 +96,14 @@ pub async fn set_native_calendar(
     // Writing to a new calendar also removes what sits in the old one (best effort on
     // Linux, where a store may have gone). Turning the sync off always works: what
     // couldn't be removed is logged, and the setting is saved anyway.
+    let mut id = id;
     if id.is_some() || current.native_calendar.is_some() {
         let written = crate::calendar::write_native(&app, id.clone()).await;
         match written {
             Err(err) if id.is_none() => log::warn!("could not clear the calendar: {err}"),
-            other => other?,
+            // Deleted between the list and the click, and made again.
+            Ok(Some(new)) => id = Some(new),
+            other => drop(other?),
         }
     }
     settings.set(Settings {

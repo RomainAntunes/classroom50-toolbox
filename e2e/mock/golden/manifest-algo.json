@@ -17,7 +17,8 @@
       "name": "Sorting",
       "mode": "individual",
       "autograder": "default",
-      "due": "2026-10-14T12:00:00Z"
+      "due": "2026-10-14T12:00:00Z",
+      "submission_tags": ["draft", "final", "v*"]
     },
     {
       "slug": "graphs",
