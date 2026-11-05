@@ -1,5 +1,6 @@
-// Every registered catalog in every platform skin: the main page and Settings show no raw
-// catalog key or unfilled placeholder, and nothing spills out of the popover's width.
+// Every registered catalog in every platform skin: the main page, the phases editor and
+// Settings show no raw catalog key or unfilled placeholder, and nothing spills out of the
+// popover's width.
 import { readFileSync } from "node:fs";
 import { expect, test } from "./app";
 import { overflow, untranslated } from "./checks";
@@ -42,6 +43,15 @@ for (const locale of LOCALES) {
 
       expect(await untranslated(page), "raw keys on the main page").toEqual([]);
       expect(await overflow(page), "overflow on the main page").toEqual([]);
+
+      // The phases editor: two rows of inputs, a checkbox and buttons in one card.
+      await app.rowMenu("Portfolio");
+      await app.pickMenu("phases");
+      await expect(app.prompt.locator("li")).toHaveCount(2);
+      expect(await untranslated(page), "raw keys in the phases editor").toEqual([]);
+      expect(await overflow(page), "overflow in the phases editor").toEqual([]);
+      await page.keyboard.press("Escape");
+      await expect(app.prompt).toHaveCount(0);
 
       await page.locator(".titlebar .icon").last().click();
       await expect(page).toHaveURL(/\/settings$/);

@@ -18,6 +18,7 @@ export const WRITES = [
   "clone_project",
   "pull_project",
   "add_teammates",
+  "set_phases",
   "set_git_identity",
   "set_up_git_credentials",
   "install_tool",
