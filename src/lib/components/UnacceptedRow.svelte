@@ -9,6 +9,7 @@
   import { session } from "#lib/session.svelte.js";
   import { acceptLink, copyLink } from "#lib/links.js";
   import { groupDetails, groupName } from "#lib/group.js";
+  import { gradingDetail } from "#lib/grading.js";
   import { formatDate, relativeAt, t } from "#lib/i18n/index.js";
   import { jobFor } from "#lib/teammateJobs.svelte.js";
   import Details from "./Details.svelte";
@@ -90,9 +91,11 @@
       [t("details.type"), t(`details.mode.${a.mode}`)],
       [t("details.submission"), t(`details.submissionMode.${a.submissionMode ?? "every-push"}`)],
     ];
+    const grading = gradingDetail(a);
+    if (grading) items.push([t("details.grading"), grading]);
     if (opens) items.push([t("details.opens"), formatDate(opens)]);
     if (due) items.push([t("details.due"), formatDate(due)]);
-    if (item.group) items.push(...groupDetails(item.group));
+    if (item.group) items.push(...groupDetails(item.group, a.maxGroupSize));
     return items;
   });
 </script>

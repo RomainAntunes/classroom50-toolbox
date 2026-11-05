@@ -82,6 +82,11 @@ pub enum Error {
     #[error("this assignment was renamed: pull the clone before you submit")]
     StaleMarker,
 
+    /// Adding a classmate refused: the group already has the most members the assignment
+    /// allows (`max_group_size`), counting those added earlier in the same queue.
+    #[error("your group is full (maximum: {max})")]
+    GroupFull { max: u32 },
+
     /// Not a GitHub login, checked before it reaches `gh student`.
     #[error("\"{0}\" isn't a GitHub username")]
     InvalidUsername(String),
@@ -235,6 +240,7 @@ error_kinds! {
     UnknownAssignment = "unknownAssignment",
     GhStudentOutdated = "ghStudentOutdated",
     StaleMarker = "staleMarker",
+    GroupFull = "groupFull",
     InvalidUsername = "invalidUsername",
     InvalidTeamName = "invalidTeamName",
     NoTerminal = "noTerminal",
@@ -354,6 +360,7 @@ impl Error {
             Error::OtherBranch(branch) => vec![("branch", branch.clone())],
             Error::TokenFromEnv(var) => vec![("var", var.clone())],
             Error::InvalidUsername(name) => vec![("username", name.clone())],
+            Error::GroupFull { max } => vec![("max", max.to_string())],
             Error::ManualInstall { reason, .. } => vec![("reason", reason.code().to_owned())],
             Error::GhStudentOutdated { version } => {
                 vec![("version", version.clone()), ("min", min_gh_student())]
@@ -395,6 +402,7 @@ impl Error {
             Error::UnknownAssignment => ErrorKind::UnknownAssignment,
             Error::GhStudentOutdated { .. } => ErrorKind::GhStudentOutdated,
             Error::StaleMarker => ErrorKind::StaleMarker,
+            Error::GroupFull { .. } => ErrorKind::GroupFull,
             Error::InvalidUsername(_) => ErrorKind::InvalidUsername,
             Error::InvalidTeamName => ErrorKind::InvalidTeamName,
             Error::NoTerminal => ErrorKind::NoTerminal,
@@ -497,6 +505,7 @@ mod tests {
             },
             Error::StaleMarker,
             Error::InvalidUsername("--help".into()),
+            Error::GroupFull { max: 3 },
             Error::InvalidTeamName,
             Error::NoTerminal,
             Error::LocalChanges,

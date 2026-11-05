@@ -1,6 +1,6 @@
-// A list with every kind of row, for layout checks and screenshots: late, graded, grading,
-// uncommitted, local changes, commit then pull, behind, feedback, closed, a group, not
-// cloned, unaccepted and upcoming.
+// A list with every kind of row, for layout checks and screenshots: late, graded below the
+// passing bar, grading, uncommitted and not graded, local changes, commit then pull, behind,
+// feedback, closed, a full group graded by hand, not cloned, unaccepted and upcoming.
 import {
   classroom,
   daysFromNow,
@@ -32,7 +32,7 @@ export function richScenario(over: Partial<Settings> = {}): Scenario {
         project({
           slug: "lab1",
           name: "Lab 1: Hello, World",
-          assignment: { due: hoursFromNow(-30), ...markdownDescription },
+          assignment: { due: hoursFromNow(-30), passThreshold: 90, ...markdownDescription },
           lateSeconds: 26 * 3600,
           remote: {
             grade: grade(8, 10, {
@@ -54,7 +54,7 @@ export function richScenario(over: Partial<Settings> = {}): Scenario {
         project({
           slug: "lab2",
           name: "Lab 2: Loops and Conditions",
-          assignment: { due: hoursFromNow(5) },
+          assignment: { due: hoursFromNow(5), grading: { mode: "off", maxPoints: null } },
           pending: "uncommitted",
           local: { changedFiles: 3, changedPaths: ["mario.c", "cash.c", "README.md"] },
         }),
@@ -89,7 +89,13 @@ export function richScenario(over: Partial<Settings> = {}): Scenario {
         project({
           slug: "proj",
           name: "Final Project with a Rather Long Name for Wrapping",
-          assignment: { mode: "team", teamFormation: "student", due: daysFromNow(20) },
+          assignment: {
+            mode: "team",
+            teamFormation: "student",
+            maxGroupSize: 2,
+            grading: { mode: "manual", maxPoints: 50 },
+            due: daysFromNow(20),
+          },
           local: null,
           group: {
             org: cs101.org,

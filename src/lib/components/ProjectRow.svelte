@@ -12,6 +12,7 @@
   import { durationLabel, formatDate, fromNow, isolated, relativeAt, t } from "#lib/i18n/index.js";
   import { tildify } from "#lib/paths.svelte.js";
   import { groupDetails } from "#lib/group.js";
+  import { gradingDetail, gradingMode, passing, passLabel } from "#lib/grading.js";
   import { session } from "#lib/session.svelte.js";
   import { settings } from "#lib/settings.svelte.js";
   import { cloneUrls, copyLink, gitProtocol, openLink } from "#lib/links.js";
@@ -59,7 +60,9 @@
       !project.local?.ahead,
   );
   // One status at most, most important first; `warn` ones need the student's action.
-  const grading = $derived(project.remote?.grading ?? null);
+  // An assignment the teacher doesn't grade says so, with no grading run's news.
+  const ungraded = $derived(gradingMode(project.assignment) === "off");
+  const grading = $derived(ungraded ? null : (project.remote?.grading ?? null));
   const status = $derived.by(() => {
     if (closed) return { label: t("projects.closed"), warn: false, hint: undefined };
     // The last push isn't graded and won't be until it's pushed again or the teacher regrades.
@@ -114,6 +117,10 @@
     return null;
   });
   const grade = $derived(project.remote?.grade ?? null);
+  // Against the passing bar, when the teacher set one.
+  const threshold = $derived(project.assignment?.passThreshold ?? null);
+  const pass = $derived(passing(grade, threshold));
+  const passText = $derived(passLabel(grade, threshold));
   // A grade older than the head says nothing about it while the new one is on its way.
   const failedTests = $derived(
     grading?.state === "running" ? [] : (grade?.tests.filter((test) => !test.passed) ?? []),
@@ -239,6 +246,7 @@
     if (a) {
       add("type", t(`details.mode.${a.mode}`));
       add("submission", t(`details.submissionMode.${a.submissionMode ?? "every-push"}`));
+      add("grading", gradingDetail(a));
       const opens = a.availableFrom ? new Date(a.availableFrom) : null;
       if (opens && opens > now) add("opens", formatDate(opens));
     }
@@ -253,14 +261,18 @@
     }
     if (grading?.state === "running") add("grade", t("projects.grading"));
     else if (grade) {
+      const tests = t("projects.gradeTests", {
+        passed: grade.testsPassed,
+        count: grade.testsTotal,
+      });
       add(
         "grade",
-        `${grade.score}/${grade.maxScore} · ${t("projects.gradeTests", { passed: grade.testsPassed, count: grade.testsTotal })}`,
+        [`${grade.score}/${grade.maxScore}`, tests, passText].filter(Boolean).join(" · "),
       );
     }
     if (earlier.length) add("earlierGrades", earlier.map(gradeLine).join("\n"));
     if (feedback?.comments) add("feedback", String(feedback.comments));
-    if (project.group) items.push(...groupDetails(project.group));
+    if (project.group) items.push(...groupDetails(project.group, a?.maxGroupSize ?? null));
     if (unmerged.length) add("unmerged", unmerged.join(", "));
     if (project.local) {
       const local = project.local;
@@ -427,7 +439,7 @@
       data-row
       aria-expanded={open}
       aria-labelledby="{uid}-name"
-      aria-describedby={grade || grading?.state === "running"
+      aria-describedby={grade || ungraded || grading?.state === "running"
         ? `${uid}-meta ${uid}-grade`
         : `${uid}-meta`}
       onclick={() => (open = !open)}
@@ -474,14 +486,25 @@
           >{t("projects.grading")}</span
         >
       {:else if grade}
+        {@const tests = t("projects.gradeTests", {
+          passed: grade.testsPassed,
+          count: grade.testsTotal,
+        })}
+        <!-- The passing bar's verdict is in words for screen readers and the hover title;
+             the color only repeats it. -->
         <span
           class="grade"
           class:full={grade.score === grade.maxScore}
+          class:below={pass === false}
           id="{uid}-grade"
-          title={t("projects.gradeTests", { passed: grade.testsPassed, count: grade.testsTotal })}
+          title={passText ? `${tests} · ${passText}` : tests}
           ><span aria-hidden="true">{grade.score}/{grade.maxScore}</span><span class="sr-only"
-            >{t("projects.gradeSr", { score: grade.score, max: grade.maxScore })}</span
+            >{t("projects.gradeSr", { score: grade.score, max: grade.maxScore })}{#if passText}, {passText}{/if}</span
           ></span
+        >
+      {:else if ungraded}
+        <span class="grade ungraded" id="{uid}-grade" title={t("projects.notGradedHint")}
+          >{t("projects.notGraded")}</span
         >
       {/if}
     </button>
@@ -635,6 +658,14 @@
 
   .grade.full {
     color: var(--success);
+  }
+
+  .grade.below {
+    color: var(--warning);
+  }
+
+  .grade.ungraded {
+    font-weight: 500;
   }
 
   .grade.grading {

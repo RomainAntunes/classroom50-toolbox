@@ -100,6 +100,7 @@
       group: t("calendar.notes.group", { name: "{name}" }),
       groupNumber: t("calendar.notes.groupNumber"),
       graded: t("calendar.notes.graded"),
+      notGraded: t("calendar.notes.notGraded"),
       submitted: t("calendar.notes.submitted"),
       notAccepted: t("calendar.notes.notAccepted"),
     });

@@ -134,18 +134,28 @@ pub async fn add_teammates(
     usernames: Vec<String>,
 ) -> Result<()> {
     // Async only to stay off the main thread, where Tauri runs sync commands.
-    let project = state.snapshot().projects.into_iter().find(|p| p.id == id);
-    let (meta, target) = match project {
+    let snapshot = state.snapshot();
+    let project = snapshot.projects.iter().find(|p| p.id == id).cloned();
+    let (meta, target, cap) = match project {
         None => {
             let group = founded
                 .get(&id)
                 .ok_or_else(|| Error::Unsupported(format!("unknown project {id}")))?;
-            let assignment = state
-                .snapshot()
-                .unaccepted
-                .iter()
-                .find(|u| u.id == id)
-                .map_or_else(|| group.assignment.clone(), |u| u.assignment.name.clone());
+            let listed = snapshot.unaccepted.iter().find(|u| u.id == id);
+            let assignment =
+                listed.map_or_else(|| group.assignment.clone(), |u| u.assignment.name.clone());
+            // Founded from the app moments ago: unless a sync read it since, its founder is
+            // the only member yet.
+            let cap = listed.and_then(|u| {
+                let members = match &u.group {
+                    Some(group) => group.members.iter().map(|m| m.login.clone()).collect(),
+                    None => vec![snapshot.login.clone()?],
+                };
+                Some(teammates::Cap {
+                    max: u.assignment.max_group_size?,
+                    members,
+                })
+            });
             let meta = job(
                 &id,
                 group.repo.to_ascii_lowercase(),
@@ -159,7 +169,7 @@ pub async fn add_teammates(
                 assignment: group.assignment,
                 key: group.key,
             };
-            (meta, target)
+            (meta, target, cap)
         }
         Some(project) => {
             let (Some(owner), Some(repo)) = (project.owner.as_deref(), project.repo.as_deref())
@@ -193,10 +203,25 @@ pub async fn add_teammates(
                     clone: project.path.clone(),
                 }
             };
-            (job(&id, id.clone(), &full_name, assignment, team), target)
+            // `invite` checks a legacy group's size itself, in the founder's clone.
+            let cap = project
+                .assignment
+                .as_ref()
+                .and_then(|a| a.max_group_size)
+                .zip(project.group.as_ref())
+                .filter(|_| team)
+                .map(|(max, group)| teammates::Cap {
+                    max,
+                    members: group.members.iter().map(|m| m.login.clone()).collect(),
+                });
+            (
+                job(&id, id.clone(), &full_name, assignment, team),
+                target,
+                cap,
+            )
         }
     };
-    teammates::enqueue(&app, meta, target, usernames);
+    teammates::enqueue(&app, meta, target, cap, usernames);
     Ok(())
 }
 

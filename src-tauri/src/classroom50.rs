@@ -104,8 +104,21 @@ pub struct Assignment {
     pub closed: bool,
     #[serde(default, alias = "feedbackPr")]
     pub feedback_pr: bool,
+    /// The passing bar, a percentage of the max score; absent means no passing concept at
+    /// all (not 0%).
     #[serde(default, alias = "passThreshold")]
     pub pass_threshold: Option<u8>,
+    /// Whether and how the teacher grades it; absent reads as autograded. A value this
+    /// version can't read (a future mode) counts as absent rather than failing the manifest.
+    #[serde(default, deserialize_with = "lenient")]
+    #[cfg_attr(test, specta(type = Option<AssignmentGrading>))]
+    pub grading: Option<AssignmentGrading>,
+    /// `group` and `team` modes: the most members a group may have. Advisory upstream (a
+    /// student-formed team's founder can pass it on GitHub), so the app shows an oversized
+    /// group and refuses to add past it.
+    #[serde(default, alias = "maxGroupSize", deserialize_with = "lenient")]
+    #[cfg_attr(test, specta(type = Option<u32>))]
+    pub max_group_size: Option<u32>,
     /// `team` mode only. `gh student accept` doesn't ask, so the UI explains it first.
     #[serde(default, alias = "teamFormation")]
     pub team_formation: Option<TeamFormation>,
@@ -120,6 +133,41 @@ pub struct Assignment {
     /// The repo each student repo is generated from; absent on `empty_repo` assignments.
     #[serde(default)]
     pub template: Option<Template>,
+}
+
+/// How the teacher means to grade an assignment (`assignments-v1` `grading`).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(test, derive(specta::Type))]
+#[serde(rename_all(serialize = "camelCase"))]
+pub struct AssignmentGrading {
+    pub mode: GradingMode,
+    /// `manual` only: the points the teaching staff mark out of.
+    #[serde(default, alias = "maxPoints")]
+    pub max_points: Option<u32>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(test, derive(specta::Type))]
+#[serde(rename_all = "lowercase")]
+pub enum GradingMode {
+    /// Not graded.
+    Off,
+    /// By the autograder, what an absent `grading` means.
+    Auto,
+    /// By hand, on the web app's submissions page; the marks stay in the private config
+    /// repo, so students can't read them.
+    Manual,
+}
+
+/// `None` for a value that doesn't read as `T`, so one field a newer upstream changed
+/// doesn't drop the whole manifest.
+fn lenient<'de, D, T>(deserializer: D) -> std::result::Result<Option<T>, D::Error>
+where
+    D: serde::Deserializer<'de>,
+    T: serde::de::DeserializeOwned,
+{
+    let value = serde_json::Value::deserialize(deserializer)?;
+    Ok(serde_json::from_value(value).ok())
 }
 
 /// An assignment's starter repo (`assignments-v1` `template`).
@@ -142,6 +190,11 @@ impl Assignment {
     pub fn template_name(&self) -> Option<String> {
         let template = self.template.as_ref()?;
         Some(format!("{}/{}", template.owner, template.repo))
+    }
+
+    /// How it is graded; absent means autograded.
+    pub fn grading_mode(&self) -> GradingMode {
+        self.grading.as_ref().map_or(GradingMode::Auto, |g| g.mode)
     }
 
     /// The slug a rename left behind, when there was one.
@@ -720,6 +773,55 @@ mod tests {
         );
         assert_eq!(assignments[1].mode, AssignmentMode::Team);
         assert_eq!(assignments[1].due, None);
+    }
+
+    #[test]
+    fn reads_grading_and_group_size() {
+        let json = r#"{
+            "schema": "classroom50/assignments/v1",
+            "assignments": [
+                {"slug": "lab-1", "name": "Lab 1", "mode": "individual", "grading": {"mode": "off"}},
+                {"slug": "lab-2", "name": "Lab 2", "mode": "team", "team_formation": "student",
+                 "max_group_size": 2, "grading": {"mode": "manual", "max_points": 50},
+                 "pass_threshold": 60},
+                {"slug": "lab-3", "name": "Lab 3", "mode": "individual", "grading": {"mode": "auto"}},
+                {"slug": "lab-4", "name": "Lab 4", "mode": "individual"},
+                {"slug": "lab-5", "name": "Lab 5", "mode": "group", "max_group_size": "three",
+                 "grading": {"mode": "peer", "max_points": 10}}
+            ]
+        }"#;
+        let assignments = parse_assignments("u", json).unwrap();
+        let modes: Vec<GradingMode> = assignments.iter().map(|a| a.grading_mode()).collect();
+        assert_eq!(
+            modes,
+            [
+                GradingMode::Off,
+                GradingMode::Manual,
+                GradingMode::Auto,
+                GradingMode::Auto,
+                // A mode this version doesn't know: autograded, as before it existed.
+                GradingMode::Auto,
+            ]
+        );
+        let manual = &assignments[1];
+        assert_eq!(manual.grading.as_ref().unwrap().max_points, Some(50));
+        assert_eq!(manual.max_group_size, Some(2));
+        assert_eq!(manual.pass_threshold, Some(60));
+        assert_eq!(manual.team_formation, Some(TeamFormation::Student));
+        assert_eq!(assignments[0].max_group_size, None);
+        assert_eq!(assignments[4].grading, None);
+        assert_eq!(assignments[4].max_group_size, None);
+
+        // `snapshot.json` keeps them in camelCase and reads them back.
+        let saved = serde_json::to_value(manual).unwrap();
+        assert_eq!(
+            saved["grading"],
+            serde_json::json!({"mode": "manual", "maxPoints": 50})
+        );
+        assert_eq!(saved["maxGroupSize"], 2);
+        let back: Assignment = serde_json::from_value(saved).unwrap();
+        assert_eq!(back.grading, manual.grading);
+        assert_eq!(back.max_group_size, Some(2));
     }
 
     #[test]

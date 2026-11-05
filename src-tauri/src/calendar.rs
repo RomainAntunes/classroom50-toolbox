@@ -13,6 +13,7 @@ use tauri::{AppHandle, Manager};
 
 use serde::Deserialize;
 
+use crate::classroom50::{Assignment, GradingMode};
 use crate::error::Result;
 use crate::groups::Group;
 use crate::platform::{self, CalendarEvent, WrittenEvents};
@@ -40,6 +41,8 @@ pub struct Labels {
     pub group: String,
     pub group_number: String,
     pub graded: String,
+    /// For an assignment the teacher doesn't grade, in place of a grade.
+    pub not_graded: String,
     pub submitted: String,
     pub not_accepted: String,
 }
@@ -52,6 +55,7 @@ impl Default for Labels {
             group: "Group: {name}".into(),
             group_number: "Group {n}".into(),
             graded: "Grade: {score}/{max}".into(),
+            not_graded: "Not graded".into(),
             submitted: "Submitted".into(),
             not_accepted: "Not accepted yet".into(),
         }
@@ -66,16 +70,19 @@ enum Status<'a> {
     Open,
 }
 
-/// The class, where the work stands, the group with each member's email, then the
-/// assignment's own description.
+/// The class, where the work stands (no grade for one the teacher doesn't grade, which
+/// says so), the group with each member's email, then the assignment's own description.
 fn notes(
     labels: &Labels,
     class: &str,
     status: Status,
     group: Option<&Group>,
-    description: Option<&str>,
+    assignment: &Assignment,
 ) -> String {
     let mut lines = vec![labels.class.replace("{name}", class)];
+    if assignment.grading_mode() == GradingMode::Off {
+        lines.push(labels.not_graded.clone());
+    }
     match status {
         Status::NotAccepted => lines.push(labels.not_accepted.clone()),
         Status::Graded(grade) => lines.push(
@@ -106,7 +113,12 @@ fn notes(
             lines.push(line);
         }
     }
-    if let Some(text) = description.map(str::trim).filter(|t| !t.is_empty()) {
+    if let Some(text) = assignment
+        .description
+        .as_deref()
+        .map(str::trim)
+        .filter(|t| !t.is_empty())
+    {
         lines.push(String::new());
         lines.push(text.to_owned());
     }
@@ -134,8 +146,13 @@ pub fn events(
         })
         .filter_map(|p| {
             let remote = p.remote.as_ref();
+            // A grade the autograder left on an ungraded assignment isn't one.
+            let graded = p
+                .assignment
+                .as_ref()
+                .is_none_or(|a| a.grading_mode() != GradingMode::Off);
             let status = match (
-                remote.and_then(|r| r.grade.as_ref()),
+                remote.and_then(|r| r.grade.as_ref()).filter(|_| graded),
                 remote.and_then(|r| r.last_submission.as_ref()),
             ) {
                 (Some(grade), _) => Status::Graded(grade),
@@ -180,13 +197,7 @@ pub fn events(
                 uid,
                 // Short enough for a week view; the class is in the notes.
                 title: assignment.name.clone(),
-                notes: Some(notes(
-                    labels,
-                    class,
-                    status,
-                    group,
-                    assignment.description.as_deref(),
-                )),
+                notes: Some(notes(labels, class, status, group, assignment)),
                 url: url.map(str::to_owned),
                 start: due - BLOCK,
                 due,
@@ -579,6 +590,71 @@ mod tests {
             super::ics(&snapshot, &[], &[], &[168], &Labels::default(), Utc::now());
         assert!(only_week.contains("TRIGGER;RELATED=END:-PT1H\r\n"));
         assert!(!ics.contains("No date"));
+    }
+
+    #[test]
+    fn says_an_ungraded_assignment_is_not_graded() {
+        let off = serde_json::json!({"mode": "off"});
+        let mut lab1 = unaccepted("org/poo/lab1", "Lab 1", Some("2026-11-02T23:59:00+01:00"));
+        lab1.assignment.grading = serde_json::from_value(off.clone()).unwrap();
+        // Accepted, with a release the autograder left anyway: no grade in the notes.
+        let mut assignment = assignment("Lab 2", Some("2026-11-09T23:59:00+01:00"));
+        assignment.grading = serde_json::from_value(off).unwrap();
+        let mut remote: crate::projects::RemoteRepo = serde_json::from_value(serde_json::json!({
+            "owner": "org", "name": "poo-lab2-alice", "url": "u",
+            "archived": false, "canPush": true, "defaultBranch": "main",
+            "head": null, "lastSubmission": null, "config": null
+        }))
+        .unwrap();
+        remote.grade = Some(crate::status::Grade {
+            tag: "submit/a".into(),
+            score: 8,
+            max_score: 10,
+            tests_passed: 4,
+            tests_total: 5,
+            tests: Vec::new(),
+            published_at: None,
+            url: "u".into(),
+            release_notes: None,
+        });
+        let lab2 = crate::projects::Project {
+            id: "org/poo-lab2-alice".into(),
+            owner: Some("org".into()),
+            repo: Some("poo-lab2-alice".into()),
+            config: crate::classroom50::RepoConfig {
+                classroom: "poo".into(),
+                assignment: "lab2".into(),
+                secret: None,
+            },
+            path: None,
+            local: None,
+            remote: Some(remote),
+            classroom: Some(lab1.classroom.clone()),
+            assignment: Some(assignment),
+            pending: None,
+            needs_work: false,
+            web_url: None,
+            late_seconds: None,
+            editor: None,
+            last_editor: None,
+            group: None,
+        };
+        let snapshot = Snapshot {
+            projects: vec![lab2],
+            unaccepted: vec![lab1],
+            ..Snapshot::default()
+        };
+        let notes: Vec<String> = events(&snapshot, &[], &[], &[], &Labels::default())
+            .into_iter()
+            .filter_map(|e| e.notes)
+            .collect();
+        assert_eq!(
+            notes,
+            [
+                "Class: POO, C\nNot graded",
+                "Class: POO, C\nNot graded\nNot accepted yet"
+            ]
+        );
     }
 
     #[test]

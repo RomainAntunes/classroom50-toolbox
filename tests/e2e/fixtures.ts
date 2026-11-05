@@ -146,6 +146,8 @@ export function assignment(over: Partial<Assignment> & { slug: string }): Assign
     closed: false,
     feedbackPr: false,
     passThreshold: null,
+    grading: null,
+    maxGroupSize: null,
     teamFormation: null,
     repoVisibility: null,
     renamedFrom: null,

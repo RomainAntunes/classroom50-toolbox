@@ -60,6 +60,8 @@ export function buildWorld({ now = new Date(), heads = {} } = {}) {
               "Print a **greeting**, then a farewell, scored $x^2$ for $5.\n\n- [x] `hello`\n- [ ] `goodbye`",
             due: iso(3 * DAY),
             submission_mode: "tag",
+            // 7/12 is about 58%: passing.
+            pass_threshold: 50,
           },
           {
             slug: "sorting",
@@ -74,6 +76,8 @@ export function buildWorld({ now = new Date(), heads = {} } = {}) {
             mode: "individual",
             autograder: "default",
             due: iso(10 * DAY),
+            // Marked by hand on the submissions page; students can't read the marks.
+            grading: { mode: "manual", max_points: 50 },
           },
         ],
       },
@@ -96,6 +100,7 @@ export function buildWorld({ now = new Date(), heads = {} } = {}) {
             mode: "individual",
             autograder: "no_autograder",
             due: iso(14 * DAY),
+            grading: { mode: "off" },
             template: { owner: "c50-e2e-lab", repo: "blog-starter", branch: "main" },
           },
         ],
