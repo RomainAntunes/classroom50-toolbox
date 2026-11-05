@@ -76,6 +76,9 @@ describe("Classroom 50 Toolbox", () => {
     await output.waitForDisplayed();
     expect(await output.getText()).toContain("-goodbye, world");
     expect(await output.getText()).toContain("+hello, world");
+    // The manifest's `allowed_files` grades hello.c only.
+    expect(await hello.getText()).toContain(t("details.notGraded"));
+    expect(await hello.getText()).toContain("notes.txt");
     // Folded again, so the row is back to its line.
     await hello.$("button[data-row]").click();
   });
@@ -109,7 +112,12 @@ describe("Classroom 50 Toolbox", () => {
         (refused) => done({ refused }),
       );
     }, HELLO_ID);
-    expect(outcome.check).toEqual({ hasMarker: true, uncommitted: [], editorFiles: [] });
+    expect(outcome.check).toEqual({
+      hasMarker: true,
+      uncommitted: [],
+      editorFiles: [],
+      notGraded: ["notes.txt"],
+    });
     expect(outcome.submitted).toBeUndefined();
     expect(outcome.refused.kind).toBe("blockedInDev");
     expect(outcome.refused.params.command).toBe("gh student submit");

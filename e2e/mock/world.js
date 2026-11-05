@@ -62,6 +62,8 @@ export function buildWorld({ now = new Date(), heads = {} } = {}) {
             submission_mode: "tag",
             // 7/12 is about 58%: passing.
             pass_threshold: 50,
+            // Only hello.c is graded: the clone's committed notes.txt isn't.
+            allowed_files: ["*", "!hello.c"],
           },
           {
             slug: "sorting",

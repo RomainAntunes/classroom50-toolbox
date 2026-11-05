@@ -35,7 +35,8 @@ function git(cwd, args, date) {
 
 /**
  * Creates the run's folders and the hello clone: a first commit (the one submitted and
- * graded) and a second one (GitHub's head, not submitted yet), origin on GitHub.
+ * graded, with a notes.txt the assignment doesn't grade) and a second one (GitHub's head,
+ * not submitted yet), origin on GitHub.
  */
 export function prepare() {
   const root = mkdtempSync(join(tmpdir(), "c50-e2e-"));
@@ -78,6 +79,8 @@ export function prepare() {
     join(clone, "hello.c"),
     '#include <stdio.h>\n\nint main(void) { puts("hello, world"); }\n',
   );
+  // Outside the assignment's `allowed_files`: listed as not graded.
+  writeFileSync(join(clone, "notes.txt"), "try puts first\n");
   git(clone, ["add", "--all"]);
   git(clone, ["commit", "--quiet", "--message=hello"], "2026-10-01T10:00:00Z");
   const helloSubmitted = git(clone, ["rev-parse", "HEAD"]);

@@ -251,6 +251,40 @@ const graded = snapshot({
   ],
 });
 
+test("files the assignment doesn't grade show in the details, 10 then a count", async ({ app }) => {
+  const paths = Array.from({ length: 12 }, (_, i) => `scratch/f${i + 1}.c`);
+  await app.start(
+    scenario({
+      snapshot: snapshot({
+        projects: [
+          project({
+            slug: "lab1",
+            name: "Lab 1",
+            assignment: { allowedFiles: ["*", "!hello.c"] },
+            local: { notGradedFiles: 14, notGradedPaths: paths },
+          }),
+          project({ slug: "lab2", name: "Lab 2" }),
+        ],
+      }),
+    }),
+  );
+  const row = app.row("Lab 1");
+  await row.locator("[data-row]").click();
+  const label = row.locator(".details dt", { hasText: "Not graded" });
+  await expect(label).toBeVisible();
+  const value = label.locator("xpath=following-sibling::dd[1]");
+  await expect(value).toContainText("scratch/f1.c");
+  await expect(value).toContainText("scratch/f10.c");
+  await expect(value).not.toContainText("scratch/f11.c");
+  await expect(value).toContainText("and 4 more");
+  // A clone with nothing outside the list says nothing about it.
+  const other = app.row("Lab 2");
+  await other.locator("[data-row]").click();
+  await expect(other.locator(".details dt", { hasText: "Changed files" })).toHaveCount(0);
+  await expect(other.locator(".details dt", { hasText: "Not graded" })).toHaveCount(0);
+  expect(await app.writes()).toEqual([]);
+});
+
 test("a test the autograder stopped says so before what it printed", async ({ app, page }) => {
   await app.start(scenario({ snapshot: graded }));
   const mario = app.row("Mario");

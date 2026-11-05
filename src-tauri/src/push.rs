@@ -12,6 +12,7 @@ use std::time::Duration;
 
 use serde::Serialize;
 
+use crate::allowed::Allowlist;
 use crate::error::{Error, Result};
 use crate::noise;
 use crate::process;
@@ -45,6 +46,10 @@ pub struct PushCheck {
     pub ahead: u32,
     /// git has a `user.name` and `user.email` for this clone.
     pub has_identity: bool,
+    /// Files the commit or the clone already holds that the assignment's `allowed_files`
+    /// leaves out of the submission (`not_graded`): pushed all the same, but the autograder
+    /// deletes them before grading. Advice only.
+    pub not_graded: Vec<String>,
 }
 
 /// The new head commit (pushed by Commit & push, local only after a commit).
@@ -122,6 +127,7 @@ async fn changes(path: &Path) -> Result<PushCheck> {
         too_large,
         ahead: 0,
         has_identity,
+        not_graded: Vec::new(),
     })
 }
 
@@ -152,6 +158,108 @@ pub(crate) async fn work_tree(path: &Path) -> Result<WorkTree> {
     )
     .await?;
     Ok(parse_status(&status, &noise::OnDisk::new(path)))
+}
+
+/// The files of the clone's next commit or submission that `allowed` leaves out (`allowed.rs`):
+/// tracked files still on disk and untracked ones git doesn't ignore, editor, OS and build
+/// files (`noise`) and the control files aside, in path order. A new folder git lists whole
+/// is listed again file by file unless it is noise, so a folder holding only a `.DS_Store`
+/// never shows (a nested repo git won't enter stays one entry, with its `/`). No git call
+/// when the assignment keeps every file; a git failure lists nothing, since this is only
+/// advice.
+pub(crate) async fn not_graded(path: &Path, allowed: &Allowlist) -> Vec<String> {
+    if allowed.is_empty() {
+        return Vec::new();
+    }
+    let listed = git(
+        path,
+        &[
+            "ls-files",
+            "-z",
+            "-t",
+            "--cached",
+            "--others",
+            "--exclude-standard",
+            "--directory",
+            "--no-empty-directory",
+        ],
+    )
+    .await;
+    let listed = match listed {
+        Ok(out) => out,
+        Err(err) => {
+            log::debug!("git ls-files in {}: {err}", path.display());
+            return Vec::new();
+        }
+    };
+    let clone = noise::OnDisk::new(path);
+    let ListedFiles { mut files, folders } = parse_ls_files(&listed, &clone);
+    if !folders.is_empty() {
+        let args = [
+            "--literal-pathspecs",
+            "ls-files",
+            "-z",
+            "--others",
+            "--exclude-standard",
+            "--",
+        ]
+        .into_iter()
+        .chain(folders.iter().map(String::as_str));
+        match process::run("git", args, Some(path)).await {
+            Ok(inner) => files.extend(
+                inner
+                    .stdout
+                    .split('\0')
+                    .filter(|f| !f.is_empty() && !noise::is_noise(f, &clone))
+                    .map(|f| (f.to_owned(), false)),
+            ),
+            // Can't tell: the folders count whole, as git listed them.
+            Err(_) => files.extend(folders.into_iter().map(|f| (f, false))),
+        }
+    }
+    let mut out: Vec<String> = files
+        .into_iter()
+        .filter(|(file, tracked)| {
+            !allowed.allows(file)
+                // A tracked file deleted from the clone won't be in the commit.
+                && (!tracked || std::fs::symlink_metadata(path.join(file)).is_ok())
+        })
+        .map(|(file, _)| file)
+        .collect();
+    out.sort();
+    out.dedup();
+    out
+}
+
+/// `git ls-files -t --cached --others --directory`, read for `not_graded`.
+#[derive(Debug, Default, PartialEq)]
+struct ListedFiles {
+    /// Each path, with whether git tracks it; untracked noise left out.
+    files: Vec<(String, bool)>,
+    /// New folders git listed whole, noise aside: listed again file by file.
+    folders: Vec<String>,
+}
+
+fn parse_ls_files(out: &str, clone: &(impl noise::Tree + ?Sized)) -> ListedFiles {
+    let mut listed = ListedFiles::default();
+    for entry in out.split('\0').filter(|e| !e.is_empty()) {
+        let (Some(tag), Some(file)) = (entry.get(..1), entry.get(2..)) else {
+            continue;
+        };
+        if tag != "?" {
+            // An unmerged file shows once per stage.
+            if listed.files.last().is_none_or(|(last, _)| last != file) {
+                listed.files.push((file.to_owned(), true));
+            }
+        } else if noise::is_noise(file, clone) {
+            continue;
+        } else if file.ends_with('/') {
+            listed.folders.push(file.to_owned());
+        } else {
+            listed.files.push((file.to_owned(), false));
+        }
+    }
+    listed
 }
 
 /// `git add --all` and `git commit`, refusing files GitHub would reject and a missing
@@ -881,6 +989,73 @@ mod tests {
             sh(&clone, &["status", "--porcelain", "--untracked-files=all"]),
             "?? .DS_Store\n?? .idea/workspace.xml\n?? .vscode/launch.json\n\
              ?? lab/target/classes/Main.class\n?? lab/target/classes/Util.class"
+        );
+        let _ = std::fs::remove_dir_all(&root);
+    }
+
+    #[test]
+    fn reads_ls_files() {
+        let out = "H hello.py\0M conflict.c\0M conflict.c\0? scratch.py\0? extra/\0\
+            ? .idea/\0? .DS_Store\0? src/a.pyc\0R gone.c\0";
+        let listed = parse_ls_files(out, &[][..]);
+        assert_eq!(
+            listed.files,
+            [
+                ("hello.py".to_owned(), true),
+                ("conflict.c".to_owned(), true),
+                ("scratch.py".to_owned(), false),
+                ("gone.c".to_owned(), true),
+            ]
+        );
+        assert_eq!(listed.folders, ["extra/"]);
+    }
+
+    /// What `allowed_files` leaves out: tracked files and new ones, a new folder file by
+    /// file, but never the control files, a file the commit deletes, ignored files or
+    /// editor, OS and build files.
+    #[tokio::test]
+    async fn lists_the_files_the_assignment_leaves_out() {
+        let root = std::env::temp_dir().join(format!("c50tb-allowed-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&root);
+        let clone = root.join("clone");
+        for dir in [".github/workflows", "src", "extra", "only-noise", ".idea"] {
+            std::fs::create_dir_all(clone.join(dir)).unwrap();
+        }
+        sh(&clone, &["init", "-q", "-b", "main"]);
+        for (file, text) in [
+            (".classroom50.yaml", "classroom: c\nassignment: a\n"),
+            (".github/workflows/autograde.yml", "on: push"),
+            (".gitignore", "*.log\n"),
+            ("hello.py", "print()"),
+            ("notes.md", "n"),
+            ("src/util.py", "u"),
+        ] {
+            std::fs::write(clone.join(file), text).unwrap();
+        }
+        sh(&clone, &["add", "--all"]);
+        sh(&clone, &["commit", "-q", "-m", "one"]);
+        std::fs::remove_file(clone.join("notes.md")).unwrap();
+        for file in [
+            "scratch.py",
+            "extra/b.py",
+            "extra/.DS_Store",
+            "only-noise/.DS_Store",
+            "debug.log",
+            ".idea/workspace.xml",
+        ] {
+            std::fs::write(clone.join(file), "x").unwrap();
+        }
+        let patterns = ["*", "!hello.py", "!.gitignore"].map(str::to_owned);
+        assert_eq!(
+            not_graded(&clone, &Allowlist::new(&patterns)).await,
+            ["extra/b.py", "scratch.py", "src/util.py"]
+        );
+        assert!(not_graded(&clone, &Allowlist::new(&[])).await.is_empty());
+        // Folders can be allowed whole.
+        let patterns = ["/*", "!/src/", "!/extra/", "!hello.py"].map(str::to_owned);
+        assert_eq!(
+            not_graded(&clone, &Allowlist::new(&patterns)).await,
+            [".gitignore", "scratch.py"]
         );
         let _ = std::fs::remove_dir_all(&root);
     }

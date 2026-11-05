@@ -16,7 +16,7 @@ import {
 } from "./fixtures";
 import type { Project, Settings } from "../../src/lib/api";
 
-const clean = { hasMarker: true, uncommitted: [], editorFiles: [] };
+const clean = { hasMarker: true, uncommitted: [], editorFiles: [], notGraded: [] };
 
 function setup(lab: Project, check: object, over: Partial<Settings> = {}) {
   return scenario({
@@ -80,6 +80,38 @@ test("confirming submits, then offers the submission page", async ({ app, page }
   expect((await app.calls("submit_project"))[0].args).toEqual({ id: lab.id });
   const opened = await app.waitForCall("plugin:opener|open_url");
   expect(opened[0].args.url).toBe("https://github.com/cs50-school/commit/1");
+});
+
+test("files the assignment doesn't grade are named; Submit still goes ahead", async ({ app }) => {
+  const lab = ready();
+  const notGraded = ["notes.md", "scratch.c", "a.c", "b.c", "c.c", "d.c"];
+  await app.start(
+    scenario({
+      snapshot: snapshot({ projects: [lab] }),
+      responses: {
+        submit_check: [ok({ ...clean, notGraded })],
+        submit_project: [ok({ url: null })],
+      },
+    }),
+  );
+  await app.row("Lab 1").getByRole("button", { name: "Submit" }).click();
+  const confirm = await app.dialog();
+  // Advice only: the usual question, with five names and a count.
+  expect(confirm.kind).toBe("info");
+  expect(confirm.message).toContain(
+    "Not part of the submission, so not graded: notes.md, scratch.c, a.c, b.c, c.c and 1 more.",
+  );
+  expect(confirm.labels).toEqual({ ok: "Submit", cancel: "Cancel" });
+  await app.answer("ok");
+  await app.expectDialog([/^Submitted\./], "ok");
+  expect(await app.writes()).toEqual(["submit_project"]);
+});
+
+test("cancelling with files that aren't graded sends nothing", async ({ app }) => {
+  await app.start(setup(ready(), { ...clean, notGraded: ["notes.md"] }));
+  await app.row("Lab 1").getByRole("button", { name: "Submit" }).click();
+  await app.expectDialog([/Not part of the submission, so not graded: notes\.md\./], "cancel");
+  expect(await app.writes()).toEqual([]);
 });
 
 test("the same work again is pointed out", async ({ app }) => {

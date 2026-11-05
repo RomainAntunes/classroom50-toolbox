@@ -141,6 +141,10 @@ export async function submitProject(
     if (check.editorFiles.length) {
       lines.push(t("submit.editorFiles", { files: fileList(check.editorFiles) }));
     }
+    // Advice only: gh-student leaves them out and the autograder deletes any that reach it.
+    if (check.notGraded.length) {
+      lines.push(t("submit.notGraded", { files: fileList(check.notGraded) }));
+    }
     if (local?.remoteAhead) {
       lines.push(
         remote?.head?.author
