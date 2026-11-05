@@ -16,6 +16,7 @@ import {
   type UpdateStatus,
 } from "#lib/api.js";
 import { focus } from "#lib/deeplink.js";
+import { openPhases } from "#lib/phases.js";
 import { editorFor, openInEditor } from "#lib/editor.svelte.js";
 import { classKey } from "#lib/filter.js";
 import { relativeAt, t } from "#lib/i18n/index.js";
@@ -85,8 +86,11 @@ const DAY = 24 * 60 * 60 * 1000;
 const DEADLINES = 3;
 
 interface Deadline {
+  /** The project's or assignment's id; `<project id>#<phase id>` for a phase. */
   id: string;
   name: string;
+  /** The phase's name, for one the student set (`phases.ts`). */
+  phase?: string;
   /** Epoch milliseconds. */
   due: number;
 }
@@ -110,6 +114,14 @@ function candidates({ snapshot, hidden }: TrayInput): Deadline[] {
       const name = project.assignment?.name ?? project.config.assignment;
       out.push({ id: project.id, name, due: Date.parse(due) });
     }
+    // The Done box says a phase is handed in, so `needsWork` doesn't count.
+    if (shown(project.id, project.owner, project.config.classroom)) {
+      const name = project.assignment?.name ?? project.config.assignment;
+      for (const phase of openPhases(project)) {
+        const id = `${project.id}#${phase.id}`;
+        out.push({ id, name, phase: phase.name, due: Date.parse(phase.due) });
+      }
+    }
   }
   for (const item of snapshot?.unaccepted ?? []) {
     const { due, closed, name } = item.assignment;
@@ -127,13 +139,13 @@ function deadlines(input: TrayInput, now: Date): TrayItem[] {
     .filter(({ due }) => due > now.getTime() - DAY)
     .sort((a, b) => a.due - b.due)
     .slice(0, DEADLINES)
-    .map(({ id, name, due }) => {
+    .map(({ id, name, phase, due }) => {
       const at = new Date(due);
       const when = relativeAt(at, now, false);
       return {
         id,
         label: t("tray.deadline", {
-          name,
+          name: phase === undefined ? name : t("tray.phase", { name, phase }),
           due: t(at > now ? "projects.due" : "projects.wasDue", { when }),
         }),
       };
@@ -231,8 +243,9 @@ export async function handleTrayAction(action: TrayAction): Promise<void> {
       if (page.url.pathname !== "/welcome") await goto("/settings");
       return;
     case "focus":
-      // Pinned whatever the filters, scrolled to and opened, as a link's row is.
-      await focus(action.id);
+      // Pinned whatever the filters, scrolled to and opened, as a link's row is. A phase's
+      // deadline opens its project's row.
+      await focus(action.id.replace(/#[^#/]*$/, ""));
       return;
     case "open": {
       // The list as it is now (the layout keeps it current): the clone may have moved

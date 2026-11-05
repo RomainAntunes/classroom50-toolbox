@@ -9,6 +9,8 @@
   import { submitProject } from "#lib/submit.js";
   import { addTeammate, joinsGroup } from "#lib/teammate.js";
   import { isHidden, setHidden } from "#lib/hidden.js";
+  import { nextPhase } from "#lib/phases.js";
+  import { editPhases } from "#lib/phasesEditor.svelte.js";
   import { durationLabel, formatDate, fromNow, isolated, relativeAt, t } from "#lib/i18n/index.js";
   import { tildify } from "#lib/paths.svelte.js";
   import { groupDetails } from "#lib/group.js";
@@ -51,6 +53,20 @@
     due === null
       ? null
       : t(due > now ? "projects.due" : "projects.wasDue", { when: relativeAt(due, now) }),
+  );
+  // Without a due date of its own, the next phase the student set stands in.
+  const phase = $derived(due ? null : nextPhase(project));
+  const phaseDue = $derived(phase ? new Date(phase.due) : null);
+  const phaseSoon = $derived(
+    phaseDue !== null && phaseDue > now && phaseDue.getTime() - now.getTime() < DAY,
+  );
+  const phaseLabel = $derived(
+    phase && phaseDue
+      ? t(phaseDue > now ? "phases.due" : "phases.wasDue", {
+          phase: phase.name,
+          when: relativeAt(phaseDue, now),
+        })
+      : null,
   );
   const behind = $derived(project.local?.behind ?? 0);
   // Classmates Rust is adding in the background.
@@ -282,6 +298,11 @@
       if (opens && opens > now) add("opens", formatDate(opens));
     }
     if (due) add("due", formatDate(due));
+    const phases = project.phases.map((p) => {
+      const line = `${isolated(p.name)} · ${formatDate(new Date(p.due))}`;
+      return p.done ? `${line} · ${t("phases.doneTag")}` : line;
+    });
+    add("phases", phases.join("\n"));
     if (remote?.head?.at) {
       const when = fromNow(new Date(remote.head.at), now);
       add("lastPush", remote.head.author ? `${isolated(remote.head.author)}, ${when}` : when);
@@ -453,6 +474,7 @@
         enabled: Boolean(path),
         action: () => path && api.openTerminal(path),
       }),
+      MenuItem.new({ id: "phases", text: t("phases.menu"), action: () => editPhases(project) }),
       separator(),
       Submenu.new({
         text: t("copy.menu"),
@@ -511,6 +533,8 @@
           {/if}
           {#if dueLabel && due}
             <span class:soon={dueSoon} title={formatDate(due)}>{dueLabel}</span> ·
+          {:else if phaseLabel && phaseDue}
+            <span class:soon={phaseSoon} title={formatDate(phaseDue)}>{phaseLabel}</span> ·
           {/if}
           {#if project.lateSeconds}
             <span class="late" title={t("projects.lateHint")}
