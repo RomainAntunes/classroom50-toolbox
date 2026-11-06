@@ -59,6 +59,15 @@ describe("ci scope", () => {
     ).toBe("full");
   });
 
+  it("keeps a stable bump that deletes pre-releases' changelogs light", () => {
+    expect(
+      ciScope([
+        ...bump,
+        { path: "src/lib/changelog/0.12.0-beta.2.json", before: "{}", after: null },
+      ]),
+    ).toBe("bump");
+  });
+
   it("checks everything for a deleted, added or unreadable version file", () => {
     expect(ciScope([{ path: "src/lib/changelog/0.1.0.json", before: "{}", after: null }])).toBe(
       "full",

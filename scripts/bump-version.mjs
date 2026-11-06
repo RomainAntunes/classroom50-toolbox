@@ -1,11 +1,17 @@
 // Sets the app version everywhere it lives: package.json (read by tauri.conf.json and the
 // release workflow), src-tauri/Cargo.toml and its Cargo.lock entry, then drafts the
-// version's changelog from the commits since the previous tag. Usage: pnpm bump 0.2.0 [--force], or pnpm bump
-// 0.3.0-beta.1 for a pre-release (beta channel only; the release workflow accepts no other
-// pre-release label).
+// version's changelog from the commits since the previous tag. A stable version also deletes
+// the pre-releases' changelogs before it, since its notes include theirs. Usage: pnpm bump
+// 0.2.0 [--force], or pnpm bump 0.3.0-beta.1 for a pre-release (beta channel only; the
+// release workflow accepts no other pre-release label).
 import { execFileSync } from "node:child_process";
-import { existsSync, readFileSync, writeFileSync } from "node:fs";
-import { catalogCodes, draftChangelog, previousTag } from "../src/lib/changelog/versions.js";
+import { existsSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
+import {
+  catalogCodes,
+  draftChangelog,
+  previousTag,
+  supersededPrereleases,
+} from "../src/lib/changelog/versions.js";
 import { withVersion } from "./ci-scope.mjs";
 
 const args = process.argv.slice(2);
@@ -34,6 +40,15 @@ for (const key of /** @type {const} */ (["pkg", "cargo", "lock"])) {
 }
 
 console.log(`version set to ${version} in package.json, Cargo.toml and Cargo.lock`);
+
+const available = readdirSync("src/lib/changelog")
+  .filter((name) => name.endsWith(".json"))
+  .map((name) => name.slice(0, -".json".length));
+const superseded = supersededPrereleases(available, version);
+for (const old of superseded) rmSync(`src/lib/changelog/${old}.json`);
+if (superseded.length) {
+  console.log(`deleted the changelogs of ${superseded.join(", ")}, which ${version}'s include`);
+}
 
 const notesPath = `src/lib/changelog/${version}.json`;
 if (existsSync(notesPath) && !force) {
