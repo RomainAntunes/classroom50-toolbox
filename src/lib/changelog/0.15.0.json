@@ -1,0 +1,1235 @@
+{
+  "date": "2026-11-06",
+  "notes": {
+    "en": [
+      {
+        "kind": "new",
+        "text": "You can now choose whether git connects to GitHub over HTTPS or SSH: when you sign in, in the first-run guide or in Settings under Tools. New clones follow your choice, and you can switch an existing clone too."
+      },
+      {
+        "kind": "new",
+        "text": "When SSH can't reach GitHub, the toolbox now says why and offers to fix it, such as trusting GitHub's host keys or setting up your SSH key. If a pull or push over SSH fails, it offers to switch that clone to HTTPS."
+      },
+      {
+        "kind": "new",
+        "text": "A project's row menu now has Phases…, to add the intermediate deadlines your teacher gives in class. Each phase reminds you like a due date and shows in your calendar and the tray icon's menu. When the project has no due date of its own, the row shows the next phase."
+      },
+      {
+        "kind": "new",
+        "text": "Assignment descriptions now show formatted like on Classroom 50: headings, lists, tables, links and math. A long description folds to a few lines, with Show more."
+      },
+      {
+        "kind": "new",
+        "text": "A row now says when an assignment isn't graded, or when your teaching staff grades it and out of how many points. When your teacher sets a passing bar, your grade says whether it reaches it."
+      },
+      {
+        "kind": "new",
+        "text": "A group's details now show how many members it has out of the most the assignment allows, and Add to my group… tells you when the group is full."
+      },
+      {
+        "kind": "new",
+        "text": "Settings > General has a new switch to hide how assignments are graded, for classes that don't use grading. Grades still show, and an assignment shows its grading again if your teacher changes it."
+      },
+      {
+        "kind": "new",
+        "text": "When an assignment grades only some of its files, Submit, Commit and push now list the files that won't be graded, and so do the row's details, so no work ends up where grading never looks."
+      },
+      {
+        "kind": "new",
+        "text": "A row's details now show each milestone tag the assignment expects, as pushed or not yet."
+      },
+      {
+        "kind": "new",
+        "text": "Adding classmates to your group now runs in the background: the row shows each one as waiting, added or not added and why, while you keep using the toolbox. If the window is hidden when it ends, a notification says who was added."
+      },
+      {
+        "kind": "new",
+        "text": "The toolbox now remembers which editor you last opened each assignment in from the app, so the row's menu and Open Recent open it there again."
+      },
+      {
+        "kind": "improved",
+        "text": "Settings is now split into four tabs: General, Assignments, Tools and About. No more long page to scroll, and the Tools intro is shorter."
+      },
+      {
+        "kind": "improved",
+        "text": "Accepting a team assignment takes fewer steps: you name your new group right in the accept summary, then go straight to adding teammates. The usernames field says who you're adding and how many more fit in the group."
+      },
+      {
+        "kind": "improved",
+        "text": "The toolbox opens faster: it loads only your language, and What's new loads its notes only when you open it."
+      },
+      {
+        "kind": "improved",
+        "text": "When you change your GitHub profile picture, the toolbox now shows the new one within a day instead of up to a week."
+      },
+      {
+        "kind": "fixed",
+        "text": "On Windows, the installers that updates leave in the temporary folder are now deleted."
+      },
+      {
+        "kind": "fixed",
+        "text": "Notifications that arrive as the toolbox starts now use your language instead of English."
+      },
+      {
+        "kind": "fixed",
+        "text": "If you deleted the toolbox's Classroom 50 calendar, it's now made again, and events no longer end up in one of your other calendars."
+      },
+      {
+        "kind": "fixed",
+        "text": "The diagnostics report now always hides logins and people's names, and keeps ordinary words readable."
+      },
+      {
+        "kind": "fixed",
+        "text": "The window no longer closes when a menu item asks you to confirm."
+      }
+    ],
+    "fr": [
+      {
+        "kind": "new",
+        "text": "Vous pouvez maintenant choisir si git se connecte à GitHub en HTTPS ou en SSH : à la connexion, dans le guide de démarrage ou dans Réglages, sous Outils. Les nouveaux clones suivent ce choix, et vous pouvez aussi basculer un clone existant."
+      },
+      {
+        "kind": "new",
+        "text": "Quand SSH n'arrive pas à joindre GitHub, la toolbox explique maintenant pourquoi et propose de corriger le problème, par exemple en faisant confiance aux clés d'hôte de GitHub ou en configurant votre clé SSH. Si un pull ou un push en SSH échoue, elle propose de passer ce clone en HTTPS."
+      },
+      {
+        "kind": "new",
+        "text": "Le menu de la ligne d'un projet propose maintenant Phases…, pour ajouter les échéances intermédiaires que votre enseignant donne en cours. Chaque phase vous rappelle comme une date limite et apparaît dans votre calendrier et le menu de l'icône de la toolbox. Si le projet n'a pas de date limite, la ligne affiche la prochaine phase."
+      },
+      {
+        "kind": "new",
+        "text": "Les descriptions des devoirs s'affichent maintenant mises en forme comme sur Classroom 50 : titres, listes, tableaux, liens et formules mathématiques. Une longue description se replie sur quelques lignes, avec Afficher plus."
+      },
+      {
+        "kind": "new",
+        "text": "Une ligne indique maintenant quand un devoir n'est pas noté, ou quand votre équipe pédagogique le note et sur combien de points. Quand votre enseignant fixe un seuil de réussite, votre note indique si elle l'atteint."
+      },
+      {
+        "kind": "new",
+        "text": "Les détails d'un groupe indiquent maintenant combien de membres il compte sur le maximum autorisé par le devoir, et Ajouter à mon groupe… vous prévient quand le groupe est complet."
+      },
+      {
+        "kind": "new",
+        "text": "Réglages > Général propose un nouvel interrupteur pour masquer la façon dont les devoirs sont notés, pour les cours qui n'utilisent pas la notation. Les notes restent affichées, et un devoir montre à nouveau sa notation si votre enseignant la change."
+      },
+      {
+        "kind": "new",
+        "text": "Quand un devoir ne note qu'une partie de ses fichiers, Rendre, Commit et push listent maintenant les fichiers qui ne seront pas notés, tout comme les détails de la ligne, pour qu'aucun travail n'échappe à la correction."
+      },
+      {
+        "kind": "new",
+        "text": "Les détails d'une ligne affichent maintenant chaque tag d'étape attendu par le devoir, et indiquent si son push est fait ou pas encore."
+      },
+      {
+        "kind": "new",
+        "text": "L'ajout de camarades à votre groupe se fait maintenant en arrière-plan : la ligne indique pour chacun s'il est en attente, ajouté ou non ajouté et pourquoi, pendant que vous continuez à utiliser la toolbox. Si la fenêtre est masquée à la fin, une notification indique qui a été ajouté."
+      },
+      {
+        "kind": "new",
+        "text": "La toolbox retient maintenant l'éditeur avec lequel vous avez ouvert chaque devoir en dernier depuis l'app : le menu de la ligne et Ouvrir récent l'y rouvrent."
+      },
+      {
+        "kind": "improved",
+        "text": "Réglages est maintenant divisé en quatre onglets : Général, Devoirs, Outils et À propos. Plus de longue page à faire défiler, et l'introduction d'Outils est plus courte."
+      },
+      {
+        "kind": "improved",
+        "text": "Accepter un devoir en équipe demande moins d'étapes : vous nommez votre nouveau groupe directement dans le résumé d'acceptation, puis passez tout de suite à l'ajout de coéquipiers. Le champ des noms d'utilisateur indique qui vous ajoutez et combien de places il reste dans le groupe."
+      },
+      {
+        "kind": "improved",
+        "text": "La toolbox s'ouvre plus vite : elle ne charge que votre langue, et Nouveautés ne charge ses notes que lorsque vous l'ouvrez."
+      },
+      {
+        "kind": "improved",
+        "text": "Quand vous changez votre photo de profil GitHub, la toolbox affiche maintenant la nouvelle en un jour au plus, au lieu d'une semaine."
+      },
+      {
+        "kind": "fixed",
+        "text": "Sur Windows, les installateurs que les mises à jour laissent dans le dossier temporaire sont maintenant supprimés."
+      },
+      {
+        "kind": "fixed",
+        "text": "Les notifications qui arrivent au démarrage de la toolbox sont maintenant dans votre langue et non plus en anglais."
+      },
+      {
+        "kind": "fixed",
+        "text": "Si vous avez supprimé le calendrier Classroom 50 de la toolbox, il est maintenant recréé, et les événements ne se retrouvent plus dans l'un de vos autres calendriers."
+      },
+      {
+        "kind": "fixed",
+        "text": "Le rapport de diagnostic masque maintenant toujours les identifiants et les noms des personnes, tout en gardant lisibles les mots ordinaires."
+      },
+      {
+        "kind": "fixed",
+        "text": "La fenêtre ne se ferme plus quand un élément de menu vous demande de confirmer."
+      }
+    ],
+    "es": [
+      {
+        "kind": "new",
+        "text": "Ahora puedes elegir si git se conecta a GitHub por HTTPS o por SSH: al iniciar sesión, en la guía de inicio o en Ajustes, en Herramientas. Los nuevos clones siguen tu elección, y también puedes cambiar un clon existente."
+      },
+      {
+        "kind": "new",
+        "text": "Cuando SSH no puede llegar a GitHub, la toolbox ahora explica por qué y ofrece arreglarlo, por ejemplo confiando en las claves de host de GitHub o configurando tu clave SSH. Si un pull o un push por SSH falla, ofrece pasar ese clon a HTTPS."
+      },
+      {
+        "kind": "new",
+        "text": "El menú de la fila de un proyecto ahora tiene Fases…, para añadir las entregas intermedias que tu docente da en clase. Cada fase te avisa como una fecha de entrega y aparece en tu calendario y en el menú del icono de la toolbox. Si el proyecto no tiene fecha de entrega propia, la fila muestra la próxima fase."
+      },
+      {
+        "kind": "new",
+        "text": "Las descripciones de las tareas ahora se muestran con formato, como en Classroom 50: títulos, listas, tablas, enlaces y fórmulas matemáticas. Una descripción larga se pliega a unas pocas líneas, con Mostrar más."
+      },
+      {
+        "kind": "new",
+        "text": "Una fila ahora indica cuándo una tarea no se califica, o cuándo la califica tu equipo docente y sobre cuántos puntos. Cuando tu docente fija una nota mínima para aprobar, tu nota indica si la alcanza."
+      },
+      {
+        "kind": "new",
+        "text": "Los detalles de un grupo ahora muestran cuántos miembros tiene sobre el máximo que permite la tarea, y Añadir a mi grupo… te avisa cuando el grupo está completo."
+      },
+      {
+        "kind": "new",
+        "text": "Ajustes > General tiene un nuevo interruptor para ocultar cómo se califican las tareas, para las clases que no usan calificaciones. Las notas siguen visibles, y una tarea vuelve a mostrar cómo se califica si tu docente lo cambia."
+      },
+      {
+        "kind": "new",
+        "text": "Cuando una tarea solo califica algunos de sus archivos, Entregar, Commit y push ahora muestran los archivos que no se calificarán, igual que los detalles de la fila, para que ningún trabajo quede fuera de la corrección."
+      },
+      {
+        "kind": "new",
+        "text": "Los detalles de una fila ahora muestran cada tag de hito que espera la tarea, e indican si ya le hiciste push o todavía no."
+      },
+      {
+        "kind": "new",
+        "text": "Añadir compañeros a tu grupo ahora se hace en segundo plano: la fila muestra a cada uno como en espera, añadido o no añadido y por qué, mientras sigues usando la toolbox. Si la ventana está oculta cuando termina, una notificación dice a quién se añadió."
+      },
+      {
+        "kind": "new",
+        "text": "La toolbox ahora recuerda con qué editor abriste cada tarea por última vez desde la app, así el menú de la fila y Abrir reciente la vuelven a abrir ahí."
+      },
+      {
+        "kind": "improved",
+        "text": "Ajustes ahora se divide en cuatro pestañas: General, Tareas, Herramientas y Acerca de. Se acabó la página larga, y la introducción de Herramientas es más corta."
+      },
+      {
+        "kind": "improved",
+        "text": "Aceptar una tarea en equipo lleva menos pasos: pones nombre a tu nuevo grupo en el mismo resumen de aceptación y pasas directamente a añadir compañeros. El campo de nombres de usuario indica a quién añades y cuántos caben todavía en el grupo."
+      },
+      {
+        "kind": "improved",
+        "text": "La toolbox se abre más rápido: solo carga tu idioma, y Novedades carga sus notas solo cuando la abres."
+      },
+      {
+        "kind": "improved",
+        "text": "Cuando cambias tu foto de perfil de GitHub, la toolbox ahora muestra la nueva en menos de un día, en lugar de hasta una semana."
+      },
+      {
+        "kind": "fixed",
+        "text": "En Windows, los instaladores que las actualizaciones dejan en la carpeta temporal ahora se eliminan."
+      },
+      {
+        "kind": "fixed",
+        "text": "Las notificaciones que llegan al iniciar la toolbox ahora están en tu idioma y ya no en inglés."
+      },
+      {
+        "kind": "fixed",
+        "text": "Si eliminaste el calendario Classroom 50 de la toolbox, ahora se vuelve a crear, y los eventos ya no acaban en otro de tus calendarios."
+      },
+      {
+        "kind": "fixed",
+        "text": "El informe de diagnóstico ahora siempre oculta los nombres de usuario y los nombres de las personas, y mantiene legibles las palabras comunes."
+      },
+      {
+        "kind": "fixed",
+        "text": "La ventana ya no se cierra cuando un elemento del menú te pide confirmar."
+      }
+    ],
+    "de": [
+      {
+        "kind": "new",
+        "text": "Du kannst jetzt wählen, ob git sich über HTTPS oder SSH mit GitHub verbindet: bei der Anmeldung, in der Einführung oder in den Einstellungen unter Werkzeuge. Neue Klone folgen deiner Wahl, und du kannst auch einen bestehenden Klon umstellen."
+      },
+      {
+        "kind": "new",
+        "text": "Kann SSH GitHub nicht erreichen, erklärt die Toolbox jetzt warum und bietet eine Lösung an, etwa GitHubs Hostschlüsseln zu vertrauen oder deinen SSH-Schlüssel einzurichten. Schlägt ein Pull oder Push über SSH fehl, bietet sie an, diesen Klon auf HTTPS umzustellen."
+      },
+      {
+        "kind": "new",
+        "text": "Das Menü der Zeile eines Projekts hat jetzt Phasen…, um Zwischentermine einzutragen, die deine Lehrperson im Unterricht nennt. Jede Phase erinnert dich wie ein Abgabetermin und erscheint in deinem Kalender und im Menü des Toolbox-Symbols. Hat das Projekt keinen eigenen Abgabetermin, zeigt die Zeile die nächste Phase."
+      },
+      {
+        "kind": "new",
+        "text": "Aufgabenbeschreibungen werden jetzt formatiert angezeigt wie auf Classroom 50: Überschriften, Listen, Tabellen, Links und mathematische Formeln. Eine lange Beschreibung wird auf wenige Zeilen eingeklappt, mit Mehr anzeigen."
+      },
+      {
+        "kind": "new",
+        "text": "Eine Zeile zeigt jetzt, wenn eine Aufgabe nicht bewertet wird oder wenn deine Lehrkräfte sie bewerten, und mit wie vielen Punkten. Legt deine Lehrperson eine Bestehensgrenze fest, zeigt deine Note, ob sie sie erreicht."
+      },
+      {
+        "kind": "new",
+        "text": "Die Details einer Gruppe zeigen jetzt, wie viele Mitglieder sie hat und wie viele die Aufgabe höchstens erlaubt, und Zu meiner Gruppe hinzufügen… sagt dir, wenn die Gruppe voll ist."
+      },
+      {
+        "kind": "new",
+        "text": "Einstellungen > Allgemein hat einen neuen Schalter, um auszublenden, wie Aufgaben bewertet werden, für Kurse ohne Bewertung. Noten bleiben sichtbar, und eine Aufgabe zeigt ihre Bewertung wieder, wenn deine Lehrperson sie ändert."
+      },
+      {
+        "kind": "new",
+        "text": "Bewertet eine Aufgabe nur einige ihrer Dateien, listen Abgeben, Commit und Push jetzt die Dateien auf, die nicht bewertet werden, ebenso die Details der Zeile. So landet keine Arbeit dort, wo die Bewertung nicht hinschaut."
+      },
+      {
+        "kind": "new",
+        "text": "Die Details einer Zeile zeigen jetzt jeden Meilenstein-Tag, den die Aufgabe erwartet, und ob er schon gepusht ist oder noch nicht."
+      },
+      {
+        "kind": "new",
+        "text": "Leute aus deinem Kurs zu deiner Gruppe hinzuzufügen läuft jetzt im Hintergrund: Die Zeile zeigt für jede Person, ob sie wartet, hinzugefügt wurde oder nicht und warum, während du die Toolbox weiter nutzt. Ist das Fenster am Ende ausgeblendet, sagt dir eine Benachrichtigung, wer hinzugefügt wurde."
+      },
+      {
+        "kind": "new",
+        "text": "Die Toolbox merkt sich jetzt, mit welchem Editor du jede Aufgabe zuletzt aus der App geöffnet hast, sodass das Menü der Zeile und Zuletzt geöffnet sie wieder dort öffnen."
+      },
+      {
+        "kind": "improved",
+        "text": "Die Einstellungen sind jetzt in vier Tabs aufgeteilt: Allgemein, Aufgaben, Werkzeuge und Über. Keine lange Seite mehr zum Scrollen, und die Einleitung von Werkzeuge ist kürzer."
+      },
+      {
+        "kind": "improved",
+        "text": "Eine Teamaufgabe anzunehmen geht in weniger Schritten: Du benennst deine neue Gruppe direkt in der Zusammenfassung und kommst gleich danach zum Hinzufügen deines Teams. Das Feld für Benutzernamen zeigt, wen du hinzufügst und wie viele noch in die Gruppe passen."
+      },
+      {
+        "kind": "improved",
+        "text": "Die Toolbox startet schneller: Sie lädt nur deine Sprache, und Neuigkeiten lädt die Hinweise erst, wenn du es öffnest."
+      },
+      {
+        "kind": "improved",
+        "text": "Änderst du dein GitHub-Profilbild, zeigt die Toolbox das neue jetzt innerhalb eines Tages statt erst nach bis zu einer Woche."
+      },
+      {
+        "kind": "fixed",
+        "text": "Unter Windows werden die Installationsprogramme, die Updates im temporären Ordner zurücklassen, jetzt gelöscht."
+      },
+      {
+        "kind": "fixed",
+        "text": "Benachrichtigungen, die beim Start der Toolbox eintreffen, erscheinen jetzt in deiner Sprache statt auf Englisch."
+      },
+      {
+        "kind": "fixed",
+        "text": "Hast du den Kalender Classroom 50 der Toolbox gelöscht, wird er jetzt neu angelegt, und Termine landen nicht mehr in einem deiner anderen Kalender."
+      },
+      {
+        "kind": "fixed",
+        "text": "Der Diagnosebericht verbirgt jetzt immer Anmeldenamen und Namen von Personen und lässt gewöhnliche Wörter lesbar."
+      },
+      {
+        "kind": "fixed",
+        "text": "Das Fenster schließt sich nicht mehr, wenn ein Menüeintrag dich um eine Bestätigung bittet."
+      }
+    ],
+    "it": [
+      {
+        "kind": "new",
+        "text": "Ora puoi scegliere se git si collega a GitHub tramite HTTPS o SSH: all'accesso, nella guida iniziale o in Impostazioni, sotto Strumenti. I nuovi clone seguono la tua scelta, e puoi cambiare anche un clone esistente."
+      },
+      {
+        "kind": "new",
+        "text": "Quando SSH non riesce a raggiungere GitHub, l'app ora spiega perché e propone di risolvere, per esempio fidandosi delle chiavi host di GitHub o configurando la tua chiave SSH. Se un pull o un push via SSH non riesce, propone di passare quel clone a HTTPS."
+      },
+      {
+        "kind": "new",
+        "text": "Il menu della riga di un progetto ora ha Fasi…, per aggiungere le scadenze intermedie che l'insegnante dà in classe. Ogni fase ti avvisa come una scadenza e compare nel tuo calendario e nel menu dell'icona dell'app. Se il progetto non ha una scadenza propria, la riga mostra la fase successiva."
+      },
+      {
+        "kind": "new",
+        "text": "Le descrizioni dei compiti ora sono formattate come su Classroom 50: titoli, elenchi, tabelle, link e formule matematiche. Una descrizione lunga si riduce a poche righe, con Mostra di più."
+      },
+      {
+        "kind": "new",
+        "text": "Una riga ora indica quando un compito non viene valutato, o quando lo valuta il tuo staff didattico e su quanti punti. Quando l'insegnante fissa una soglia di sufficienza, il tuo voto dice se la raggiunge."
+      },
+      {
+        "kind": "new",
+        "text": "I dettagli di un gruppo ora mostrano quanti membri ha rispetto al massimo consentito dal compito, e Aggiungi al mio gruppo… ti avvisa quando il gruppo è pieno."
+      },
+      {
+        "kind": "new",
+        "text": "Impostazioni > Generali ha un nuovo interruttore per nascondere come vengono valutati i compiti, per i corsi che non usano la valutazione. I voti restano visibili, e un compito mostra di nuovo come viene valutato se l'insegnante lo cambia."
+      },
+      {
+        "kind": "new",
+        "text": "Quando un compito valuta solo alcuni dei suoi file, Consegna, Commit e push ora elencano i file che non saranno valutati, come anche i dettagli della riga, così nessun lavoro sfugge alla correzione."
+      },
+      {
+        "kind": "new",
+        "text": "I dettagli di una riga ora mostrano ogni tag di milestone che il compito si aspetta, indicando se ne hai già fatto il push o non ancora."
+      },
+      {
+        "kind": "new",
+        "text": "Aggiungere compagni al tuo gruppo ora avviene in background: la riga mostra per ognuno se è in attesa, aggiunto o non aggiunto e perché, mentre continui a usare l'app. Se la finestra è nascosta alla fine, una notifica dice chi è stato aggiunto."
+      },
+      {
+        "kind": "new",
+        "text": "L'app ora ricorda l'editor con cui hai aperto ogni compito l'ultima volta dall'app, così il menu della riga e Apri recenti lo riaprono lì."
+      },
+      {
+        "kind": "improved",
+        "text": "Impostazioni ora è divisa in quattro schede: Generali, Compiti, Strumenti e Informazioni. Niente più pagina lunga da scorrere, e l'introduzione di Strumenti è più breve."
+      },
+      {
+        "kind": "improved",
+        "text": "Accettare un compito di gruppo richiede meno passaggi: dai il nome al nuovo gruppo direttamente nel riepilogo di accettazione, poi passi subito ad aggiungere i compagni. Il campo dei nomi utente indica chi stai aggiungendo e quanti posti restano nel gruppo."
+      },
+      {
+        "kind": "improved",
+        "text": "L'app si apre più in fretta: carica solo la tua lingua, e Novità carica le sue note solo quando la apri."
+      },
+      {
+        "kind": "improved",
+        "text": "Quando cambi la foto del profilo GitHub, l'app ora mostra quella nuova entro un giorno invece che fino a una settimana dopo."
+      },
+      {
+        "kind": "fixed",
+        "text": "Su Windows, i programmi di installazione che gli aggiornamenti lasciano nella cartella temporanea ora vengono eliminati."
+      },
+      {
+        "kind": "fixed",
+        "text": "Le notifiche che arrivano all'avvio dell'app ora sono nella tua lingua e non più in inglese."
+      },
+      {
+        "kind": "fixed",
+        "text": "Se hai eliminato il calendario Classroom 50 dell'app, ora viene ricreato, e gli eventi non finiscono più in un altro dei tuoi calendari."
+      },
+      {
+        "kind": "fixed",
+        "text": "Il rapporto di diagnostica ora nasconde sempre i nomi utente e i nomi delle persone, lasciando leggibili le parole comuni."
+      },
+      {
+        "kind": "fixed",
+        "text": "La finestra non si chiude più quando una voce di menu ti chiede una conferma."
+      }
+    ],
+    "pt-BR": [
+      {
+        "kind": "new",
+        "text": "Agora você pode escolher se o git se conecta ao GitHub por HTTPS ou SSH: ao entrar, no guia inicial ou em Configurações, em Ferramentas. Os novos clones seguem sua escolha, e você também pode mudar um clone existente."
+      },
+      {
+        "kind": "new",
+        "text": "Quando o SSH não consegue acessar o GitHub, o app agora explica por quê e oferece uma correção, como confiar nas chaves de host do GitHub ou configurar sua chave SSH. Se um pull ou push por SSH falhar, ele oferece passar esse clone para HTTPS."
+      },
+      {
+        "kind": "new",
+        "text": "O menu da linha de um projeto agora tem Fases…, para adicionar os prazos intermediários que seu professor dá em aula. Cada fase avisa você como um prazo e aparece no seu calendário e no menu do ícone do app. Se o projeto não tiver prazo próprio, a linha mostra a próxima fase."
+      },
+      {
+        "kind": "new",
+        "text": "As descrições das tarefas agora aparecem formatadas como no Classroom 50: títulos, listas, tabelas, links e fórmulas matemáticas. Uma descrição longa fica recolhida em poucas linhas, com Mostrar mais."
+      },
+      {
+        "kind": "new",
+        "text": "Uma linha agora diz quando uma tarefa não vale nota, ou quando sua equipe docente dá a nota e em quantos pontos. Quando seu professor define uma nota mínima, sua nota diz se a alcança."
+      },
+      {
+        "kind": "new",
+        "text": "Os detalhes de um grupo agora mostram quantos membros ele tem em relação ao máximo que a tarefa permite, e Adicionar ao meu grupo… avisa quando o grupo está cheio."
+      },
+      {
+        "kind": "new",
+        "text": "Configurações > Geral tem uma nova opção para ocultar como as tarefas são avaliadas, para turmas que não usam notas. As notas continuam visíveis, e uma tarefa volta a mostrar como é avaliada se o professor mudar isso."
+      },
+      {
+        "kind": "new",
+        "text": "Quando uma tarefa só avalia alguns dos arquivos, Entregar, Commit e push agora listam os arquivos que não serão avaliados, assim como os detalhes da linha, para nenhum trabalho ficar de fora da correção."
+      },
+      {
+        "kind": "new",
+        "text": "Os detalhes de uma linha agora mostram cada tag de etapa que a tarefa espera, indicando se você já fez push dela ou ainda não."
+      },
+      {
+        "kind": "new",
+        "text": "Adicionar colegas ao seu grupo agora acontece em segundo plano: a linha mostra cada um como aguardando, adicionado ou não adicionado e por quê, enquanto você continua usando o app. Se a janela estiver oculta quando terminar, uma notificação diz quem foi adicionado."
+      },
+      {
+        "kind": "new",
+        "text": "O app agora lembra com qual editor você abriu cada tarefa por último pelo app, então o menu da linha e Abrir recente a abrem nele de novo."
+      },
+      {
+        "kind": "improved",
+        "text": "Configurações agora está dividida em quatro abas: Geral, Tarefas, Ferramentas e Sobre. Chega de página longa para rolar, e a introdução de Ferramentas ficou mais curta."
+      },
+      {
+        "kind": "improved",
+        "text": "Aceitar uma tarefa em equipe leva menos passos: você dá nome ao novo grupo no próprio resumo de aceitação e vai direto para adicionar colegas. O campo de nomes de usuário diz quem você está adicionando e quantos ainda cabem no grupo."
+      },
+      {
+        "kind": "improved",
+        "text": "O app abre mais rápido: carrega só o seu idioma, e Novidades carrega as notas só quando você a abre."
+      },
+      {
+        "kind": "improved",
+        "text": "Quando você muda sua foto de perfil do GitHub, o app agora mostra a nova em até um dia, em vez de até uma semana."
+      },
+      {
+        "kind": "fixed",
+        "text": "No Windows, os instaladores que as atualizações deixam na pasta temporária agora são apagados."
+      },
+      {
+        "kind": "fixed",
+        "text": "As notificações que chegam quando o app inicia agora estão no seu idioma, não mais em inglês."
+      },
+      {
+        "kind": "fixed",
+        "text": "Se você apagou o calendário Classroom 50 do app, ele agora é criado de novo, e os eventos não vão mais parar em outro dos seus calendários."
+      },
+      {
+        "kind": "fixed",
+        "text": "O relatório de diagnóstico agora sempre oculta logins e nomes de pessoas, mantendo legíveis as palavras comuns."
+      },
+      {
+        "kind": "fixed",
+        "text": "A janela não fecha mais quando um item de menu pede uma confirmação."
+      }
+    ],
+    "pt-PT": [
+      {
+        "kind": "new",
+        "text": "Já podes escolher se o git se liga ao GitHub por HTTPS ou SSH: ao iniciar sessão, no guia inicial ou em Definições, em Ferramentas. Os novos clones seguem a tua escolha, e também podes mudar um clone existente."
+      },
+      {
+        "kind": "new",
+        "text": "Quando o SSH não consegue chegar ao GitHub, a app explica agora porquê e propõe uma correção, como confiar nas chaves de anfitrião do GitHub ou configurar a tua chave SSH. Se um pull ou push por SSH falhar, propõe passar esse clone para HTTPS."
+      },
+      {
+        "kind": "new",
+        "text": "O menu da linha de um projeto tem agora Fases…, para adicionares os prazos intermédios que o teu professor dá na aula. Cada fase avisa-te como um prazo e aparece no teu calendário e no menu do ícone da app. Se o projeto não tiver prazo próprio, a linha mostra a próxima fase."
+      },
+      {
+        "kind": "new",
+        "text": "As descrições das tarefas aparecem agora formatadas como no Classroom 50: títulos, listas, tabelas, ligações e fórmulas matemáticas. Uma descrição longa fica recolhida em poucas linhas, com Mostrar mais."
+      },
+      {
+        "kind": "new",
+        "text": "Uma linha indica agora quando uma tarefa não é avaliada, ou quando é a tua equipa docente a avaliá-la e em quantos pontos. Quando o teu professor define uma nota mínima, a tua nota indica se a atinge."
+      },
+      {
+        "kind": "new",
+        "text": "Os detalhes de um grupo mostram agora quantos membros tem face ao máximo que a tarefa permite, e Adicionar ao meu grupo… avisa-te quando o grupo está cheio."
+      },
+      {
+        "kind": "new",
+        "text": "Definições > Geral tem um novo interruptor para ocultar como as tarefas são avaliadas, para turmas que não usam avaliação. As notas continuam visíveis, e uma tarefa volta a mostrar como é avaliada se o professor o alterar."
+      },
+      {
+        "kind": "new",
+        "text": "Quando uma tarefa só avalia alguns dos ficheiros, Entregar, Commit e push listam agora os ficheiros que não serão avaliados, tal como os detalhes da linha, para que nenhum trabalho fique fora da correção."
+      },
+      {
+        "kind": "new",
+        "text": "Os detalhes de uma linha mostram agora cada tag de etapa que a tarefa espera, indicando se já fizeste push dela ou ainda não."
+      },
+      {
+        "kind": "new",
+        "text": "Adicionar colegas ao teu grupo passa a decorrer em segundo plano: a linha mostra cada um como em espera, adicionado ou não adicionado e porquê, enquanto continuas a usar a app. Se a janela estiver oculta quando terminar, uma notificação diz quem foi adicionado."
+      },
+      {
+        "kind": "new",
+        "text": "A app lembra-se agora do editor com que abriste cada tarefa pela última vez a partir da app, para que o menu da linha e Abrir recente a voltem a abrir aí."
+      },
+      {
+        "kind": "improved",
+        "text": "Definições está agora dividida em quatro separadores: Geral, Tarefas, Ferramentas e Sobre. Acabou a página longa para percorrer, e a introdução de Ferramentas é mais curta."
+      },
+      {
+        "kind": "improved",
+        "text": "Aceitar uma tarefa de grupo leva menos passos: dás o nome ao novo grupo no próprio resumo de aceitação e passas logo a adicionar colegas. O campo dos nomes de utilizador indica quem estás a adicionar e quantos ainda cabem no grupo."
+      },
+      {
+        "kind": "improved",
+        "text": "A app abre mais depressa: carrega só o teu idioma, e Novidades só carrega as notas quando a abres."
+      },
+      {
+        "kind": "improved",
+        "text": "Quando mudas a tua fotografia de perfil do GitHub, a app mostra agora a nova no prazo de um dia, em vez de até uma semana."
+      },
+      {
+        "kind": "fixed",
+        "text": "No Windows, os instaladores que as atualizações deixam na pasta temporária são agora eliminados."
+      },
+      {
+        "kind": "fixed",
+        "text": "As notificações que chegam quando a app arranca estão agora no teu idioma e já não em inglês."
+      },
+      {
+        "kind": "fixed",
+        "text": "Se eliminaste o calendário Classroom 50 da app, é agora criado de novo, e os eventos já não vão parar a outro dos teus calendários."
+      },
+      {
+        "kind": "fixed",
+        "text": "O relatório de diagnóstico oculta agora sempre os nomes de utilizador e os nomes das pessoas, mantendo legíveis as palavras comuns."
+      },
+      {
+        "kind": "fixed",
+        "text": "A janela já não fecha quando um item de menu te pede uma confirmação."
+      }
+    ],
+    "nl": [
+      {
+        "kind": "new",
+        "text": "Je kunt nu kiezen of git via HTTPS of SSH verbinding maakt met GitHub: bij het inloggen, in de startgids of in Instellingen, onder Tools. Nieuwe clones volgen je keuze, en je kunt ook een bestaande clone omzetten."
+      },
+      {
+        "kind": "new",
+        "text": "Als SSH GitHub niet kan bereiken, legt de toolbox nu uit waarom en biedt een oplossing aan, zoals de hostsleutels van GitHub vertrouwen of je SSH-sleutel instellen. Mislukt een pull of push via SSH, dan biedt hij aan die clone naar HTTPS om te zetten."
+      },
+      {
+        "kind": "new",
+        "text": "Het menu van de rij van een project heeft nu Fasen…, om tussentijdse deadlines toe te voegen die je docent in de les geeft. Elke fase herinnert je eraan zoals een deadline en verschijnt in je agenda en in het menu van het toolbox-pictogram. Heeft het project geen eigen deadline, dan toont de rij de volgende fase."
+      },
+      {
+        "kind": "new",
+        "text": "Beschrijvingen van opdrachten worden nu opgemaakt getoond zoals op Classroom 50: koppen, lijsten, tabellen, links en wiskundige formules. Een lange beschrijving wordt ingeklapt tot een paar regels, met Meer tonen."
+      },
+      {
+        "kind": "new",
+        "text": "Een rij laat nu zien wanneer een opdracht niet wordt beoordeeld, of wanneer je docententeam hem beoordeelt en op hoeveel punten. Stelt je docent een grens in om te slagen, dan zegt je cijfer of het die haalt."
+      },
+      {
+        "kind": "new",
+        "text": "De details van een groep tonen nu hoeveel leden hij heeft van het maximum dat de opdracht toestaat, en Toevoegen aan mijn groep… meldt wanneer de groep vol is."
+      },
+      {
+        "kind": "new",
+        "text": "Instellingen > Algemeen heeft een nieuwe schakelaar om te verbergen hoe opdrachten worden beoordeeld, voor klassen die geen beoordeling gebruiken. Cijfers blijven zichtbaar, en een opdracht toont weer hoe hij wordt beoordeeld als je docent dat verandert."
+      },
+      {
+        "kind": "new",
+        "text": "Als een opdracht maar een deel van de bestanden beoordeelt, tonen Inleveren, Commit en push nu welke bestanden niet worden beoordeeld, net als de details van de rij, zodat er geen werk buiten de beoordeling valt."
+      },
+      {
+        "kind": "new",
+        "text": "De details van een rij tonen nu elke mijlpaaltag die de opdracht verwacht, en of je die al hebt gepusht of nog niet."
+      },
+      {
+        "kind": "new",
+        "text": "Klasgenoten aan je groep toevoegen gebeurt nu op de achtergrond: de rij toont per persoon of die wacht, is toegevoegd of niet en waarom, terwijl je de toolbox gewoon blijft gebruiken. Is het venster verborgen als het klaar is, dan zegt een melding wie er is toegevoegd."
+      },
+      {
+        "kind": "new",
+        "text": "De toolbox onthoudt nu met welke editor je elke opdracht het laatst vanuit de app hebt geopend, zodat het menu van de rij en Recent openen hem daar weer openen."
+      },
+      {
+        "kind": "improved",
+        "text": "Instellingen is nu verdeeld over vier tabbladen: Algemeen, Opdrachten, Tools en Over. Geen lange pagina meer om door te scrollen, en de inleiding van Tools is korter."
+      },
+      {
+        "kind": "improved",
+        "text": "Een teamopdracht accepteren kost minder stappen: je geeft je nieuwe groep een naam in de samenvatting zelf en gaat meteen door naar teamgenoten toevoegen. Het veld voor gebruikersnamen zegt wie je toevoegt en hoeveel er nog in de groep passen."
+      },
+      {
+        "kind": "improved",
+        "text": "De toolbox opent sneller: hij laadt alleen jouw taal, en Wat is er nieuw laadt de notities pas als je het opent."
+      },
+      {
+        "kind": "improved",
+        "text": "Als je je GitHub-profielfoto verandert, toont de toolbox de nieuwe nu binnen een dag in plaats van na hooguit een week."
+      },
+      {
+        "kind": "fixed",
+        "text": "Op Windows worden de installatieprogramma's die updates in de tijdelijke map achterlaten nu verwijderd."
+      },
+      {
+        "kind": "fixed",
+        "text": "Meldingen die binnenkomen terwijl de toolbox start, staan nu in jouw taal in plaats van in het Engels."
+      },
+      {
+        "kind": "fixed",
+        "text": "Als je de Classroom 50-agenda van de toolbox hebt verwijderd, wordt hij nu opnieuw gemaakt, en afspraken komen niet meer in een van je andere agenda's terecht."
+      },
+      {
+        "kind": "fixed",
+        "text": "Het diagnoserapport verbergt nu altijd gebruikersnamen en namen van personen, en houdt gewone woorden leesbaar."
+      },
+      {
+        "kind": "fixed",
+        "text": "Het venster sluit niet meer als een menu-item je om bevestiging vraagt."
+      }
+    ],
+    "pl": [
+      {
+        "kind": "new",
+        "text": "Możesz teraz wybrać, czy git łączy się z GitHubem przez HTTPS, czy przez SSH: przy logowaniu, w przewodniku startowym albo w Ustawieniach, w sekcji Narzędzia. Nowe klony używają twojego wyboru, a istniejący klon też możesz przełączyć."
+      },
+      {
+        "kind": "new",
+        "text": "Gdy SSH nie może połączyć się z GitHubem, Toolbox wyjaśnia teraz dlaczego i proponuje naprawę, na przykład zaufanie kluczom hosta GitHuba albo skonfigurowanie twojego klucza SSH. Gdy pull lub push przez SSH się nie uda, proponuje przełączenie tego klonu na HTTPS."
+      },
+      {
+        "kind": "new",
+        "text": "Menu wiersza projektu ma teraz Etapy…, aby dodać pośrednie terminy, które nauczyciel podaje na zajęciach. Każdy etap przypomina o sobie jak termin oddania i pojawia się w twoim kalendarzu oraz w menu ikony Toolbox. Gdy projekt nie ma własnego terminu, wiersz pokazuje najbliższy etap."
+      },
+      {
+        "kind": "new",
+        "text": "Opisy zadań są teraz sformatowane jak w Classroom 50: nagłówki, listy, tabele, linki i wzory matematyczne. Długi opis zwija się do kilku wierszy z przyciskiem Pokaż więcej."
+      },
+      {
+        "kind": "new",
+        "text": "Wiersz pokazuje teraz, kiedy zadanie nie jest oceniane albo kiedy ocenia je kadra prowadząca i na ile punktów. Gdy nauczyciel ustali próg zaliczenia, ocena pokazuje, czy go osiąga."
+      },
+      {
+        "kind": "new",
+        "text": "Szczegóły grupy pokazują teraz, ilu ma członków przy maksymalnej liczbie dozwolonej w zadaniu, a Dodaj do mojej grupy… informuje, gdy grupa jest pełna."
+      },
+      {
+        "kind": "new",
+        "text": "Ustawienia > Ogólne mają nowy przełącznik, który ukrywa sposób oceniania zadań, dla zajęć bez ocen. Oceny nadal są widoczne, a zadanie znów pokazuje sposób oceniania, jeśli nauczyciel go zmieni."
+      },
+      {
+        "kind": "new",
+        "text": "Gdy zadanie ocenia tylko część plików, Oddaj, Commit i push pokazują teraz pliki, które nie będą oceniane, podobnie jak szczegóły wiersza, aby żadna praca nie umknęła ocenie."
+      },
+      {
+        "kind": "new",
+        "text": "Szczegóły wiersza pokazują teraz każdy tag etapu, którego oczekuje zadanie, i czy zrobiono już jego push, czy jeszcze nie."
+      },
+      {
+        "kind": "new",
+        "text": "Dodawanie osób do twojej grupy odbywa się teraz w tle: wiersz pokazuje przy każdej, czy czeka, została dodana, czy nie i dlaczego, a ty możesz dalej korzystać z Toolbox. Jeśli po zakończeniu okno jest ukryte, powiadomienie mówi, kto został dodany."
+      },
+      {
+        "kind": "new",
+        "text": "Toolbox zapamiętuje teraz edytor, w którym każde zadanie zostało ostatnio otwarte z aplikacji, więc menu wiersza i Otwórz ostatnie otwierają je tam ponownie."
+      },
+      {
+        "kind": "improved",
+        "text": "Ustawienia są teraz podzielone na cztery karty: Ogólne, Zadania, Narzędzia i Informacje. Koniec z przewijaniem długiej strony, a wstęp w Narzędziach jest krótszy."
+      },
+      {
+        "kind": "improved",
+        "text": "Przyjęcie zadania zespołowego wymaga mniej kroków: nazwę nowej grupy podajesz od razu w podsumowaniu, a potem przechodzisz prosto do dodawania członków zespołu. Pole nazw użytkowników pokazuje, kogo dodajesz i ile osób jeszcze zmieści się w grupie."
+      },
+      {
+        "kind": "improved",
+        "text": "Toolbox uruchamia się szybciej: wczytuje tylko twój język, a Co nowego wczytuje informacje dopiero po otwarciu."
+      },
+      {
+        "kind": "improved",
+        "text": "Gdy zmienisz zdjęcie profilowe na GitHubie, Toolbox pokazuje teraz nowe w ciągu doby, a nie nawet po tygodniu."
+      },
+      {
+        "kind": "fixed",
+        "text": "Na Windows instalatory, które aktualizacje zostawiają w folderze tymczasowym, są teraz usuwane."
+      },
+      {
+        "kind": "fixed",
+        "text": "Powiadomienia, które przychodzą podczas uruchamiania Toolbox, są teraz w twoim języku, a nie po angielsku."
+      },
+      {
+        "kind": "fixed",
+        "text": "Jeśli kalendarz Classroom 50 utworzony przez Toolbox został usunięty, jest teraz tworzony ponownie, a wydarzenia nie trafiają już do innych twoich kalendarzy."
+      },
+      {
+        "kind": "fixed",
+        "text": "Raport diagnostyczny zawsze ukrywa teraz loginy oraz imiona i nazwiska osób, a zwykłe słowa pozostają czytelne."
+      },
+      {
+        "kind": "fixed",
+        "text": "Okno nie zamyka się już, gdy element menu prosi o potwierdzenie."
+      }
+    ],
+    "tr": [
+      {
+        "kind": "new",
+        "text": "Artık git'in GitHub'a HTTPS mi yoksa SSH üzerinden mi bağlanacağını seçebilirsiniz: oturum açarken, başlangıç rehberinde ya da Ayarlar'da Araçlar altında. Yeni klonlar seçiminize uyar, mevcut bir klonu da değiştirebilirsiniz."
+      },
+      {
+        "kind": "new",
+        "text": "SSH GitHub'a ulaşamadığında Toolbox artık nedenini açıklıyor ve düzeltmeyi öneriyor; örneğin GitHub'ın ana bilgisayar anahtarlarına güvenmek veya SSH anahtarınızı kurmak. SSH üzerinden bir pull veya push başarısız olursa o klonu HTTPS'e geçirmeyi öneriyor."
+      },
+      {
+        "kind": "new",
+        "text": "Bir projenin satır menüsünde artık Aşamalar… var; öğretmeninizin derste verdiği ara teslim tarihlerini buraya ekleyebilirsiniz. Her aşama bir teslim tarihi gibi hatırlatılır, takviminizde ve Toolbox simgesinin menüsünde görünür. Projenin kendi teslim tarihi yoksa satır bir sonraki aşamayı gösterir."
+      },
+      {
+        "kind": "new",
+        "text": "Ödev açıklamaları artık Classroom 50'deki gibi biçimlendirilmiş görünüyor: başlıklar, listeler, tablolar, bağlantılar ve matematik formülleri. Uzun bir açıklama Daha fazla göster ile birkaç satıra katlanır."
+      },
+      {
+        "kind": "new",
+        "text": "Bir satır artık ödevin notlandırılmadığını ya da öğretim ekibinizin kaç puan üzerinden notlandıracağını gösteriyor. Öğretmeniniz bir geçme sınırı belirlediğinde notunuz bu sınıra ulaşıp ulaşmadığını söylüyor."
+      },
+      {
+        "kind": "new",
+        "text": "Bir grubun ayrıntıları artık ödevin izin verdiği en fazla üye sayısına göre kaç üyesi olduğunu gösteriyor ve grup dolduğunda Grubuma ekle… bunu bildiriyor."
+      },
+      {
+        "kind": "new",
+        "text": "Ayarlar > Genel'de, notlandırma kullanmayan dersler için ödevlerin nasıl notlandırıldığını gizleyen yeni bir anahtar var. Notlar görünmeye devam eder; öğretmeniniz notlandırmayı değiştirirse ödev bunu yeniden gösterir."
+      },
+      {
+        "kind": "new",
+        "text": "Bir ödev dosyalarının yalnızca bir kısmını notlandırıyorsa Teslim et, Commit ve push artık notlandırılmayacak dosyaları listeliyor, satırın ayrıntıları da öyle; böylece hiçbir çalışma değerlendirmenin dışında kalmaz."
+      },
+      {
+        "kind": "new",
+        "text": "Bir satırın ayrıntıları artık ödevin beklediği her kilometre taşı etiketini ve push edilip edilmediğini gösteriyor."
+      },
+      {
+        "kind": "new",
+        "text": "Grubunuza sınıf arkadaşı eklemek artık arka planda yapılıyor: siz Toolbox'ı kullanmaya devam ederken satır her birinin beklediğini, eklendiğini ya da eklenmediğini ve nedenini gösteriyor. İş bittiğinde pencere gizliyse bir bildirim kimlerin eklendiğini söylüyor."
+      },
+      {
+        "kind": "new",
+        "text": "Toolbox artık her ödevi uygulamadan en son hangi düzenleyicide açtığınızı hatırlıyor; böylece satırın menüsü ve Son açılanlar onu yine orada açıyor."
+      },
+      {
+        "kind": "improved",
+        "text": "Ayarlar artık dört sekmeye ayrıldı: Genel, Ödevler, Araçlar ve Hakkında. Uzun bir sayfayı kaydırmaya gerek kalmadı ve Araçlar'ın giriş metni kısaldı."
+      },
+      {
+        "kind": "improved",
+        "text": "Takım ödevini kabul etmek daha az adım sürüyor: yeni grubunuzun adını doğrudan kabul özetinde veriyor, ardından hemen takım arkadaşı eklemeye geçiyorsunuz. Kullanıcı adları alanı kimi eklediğinizi ve gruba kaç kişi daha sığdığını gösteriyor."
+      },
+      {
+        "kind": "improved",
+        "text": "Toolbox daha hızlı açılıyor: yalnızca sizin dilinizi yüklüyor, Yenilikler de notlarını ancak siz açtığınızda yüklüyor."
+      },
+      {
+        "kind": "improved",
+        "text": "GitHub profil fotoğrafınızı değiştirdiğinizde Toolbox artık yenisini bir hafta yerine en geç bir gün içinde gösteriyor."
+      },
+      {
+        "kind": "fixed",
+        "text": "Windows'ta güncellemelerin geçici klasörde bıraktığı yükleyiciler artık siliniyor."
+      },
+      {
+        "kind": "fixed",
+        "text": "Toolbox başlarken gelen bildirimler artık İngilizce değil, sizin dilinizde."
+      },
+      {
+        "kind": "fixed",
+        "text": "Toolbox'ın Classroom 50 takvimini sildiyseniz artık yeniden oluşturuluyor ve etkinlikler artık diğer takvimlerinizden birine düşmüyor."
+      },
+      {
+        "kind": "fixed",
+        "text": "Tanılama raporu artık kullanıcı adlarını ve kişi adlarını her zaman gizliyor, sıradan sözcükleri ise okunur bırakıyor."
+      },
+      {
+        "kind": "fixed",
+        "text": "Bir menü öğesi onay istediğinde pencere artık kapanmıyor."
+      }
+    ],
+    "ar": [
+      {
+        "kind": "new",
+        "text": "أصبح بالإمكان اختيار اتصال git بـ GitHub عبر HTTPS أو SSH: عند تسجيل الدخول، أو في دليل البدء، أو في الإعدادات ضمن الأدوات. تتبع النسخ المحلية الجديدة هذا الاختيار، ويمكن أيضًا تبديل نسخة محلية موجودة."
+      },
+      {
+        "kind": "new",
+        "text": "عندما يتعذّر على SSH الوصول إلى GitHub، يوضّح التطبيق الآن السبب ويعرض إصلاحه، مثل الوثوق بمفاتيح المضيف الخاصة بـ GitHub أو إعداد مفتاح SSH. وإذا فشل pull أو push عبر SSH، يعرض تحويل تلك النسخة المحلية إلى HTTPS."
+      },
+      {
+        "kind": "new",
+        "text": "أصبحت قائمة سطر المشروع تضم المراحل، لإضافة المواعيد الوسيطة التي يحددها فريق التدريس في الصف. تُذكّر كل مرحلة بموعدها مثل موعد التسليم، وتظهر في التقويم وفي قائمة أيقونة التطبيق. وإذا لم يكن للمشروع موعد تسليم خاص به، يعرض السطر المرحلة التالية."
+      },
+      {
+        "kind": "new",
+        "text": "أصبحت أوصاف الواجبات تظهر منسّقة كما في Classroom 50: عناوين وقوائم وجداول وروابط وصيغ رياضية. ويُطوى الوصف الطويل إلى بضعة أسطر مع زر عرض المزيد."
+      },
+      {
+        "kind": "new",
+        "text": "يوضّح السطر الآن متى لا يُقيَّم الواجب، أو متى يقيّمه فريق التدريس ومن كم نقطة. وعندما يحدد فريق التدريس حدًّا للنجاح، توضّح الدرجة ما إذا كانت تبلغه."
+      },
+      {
+        "kind": "new",
+        "text": "تعرض تفاصيل المجموعة الآن عدد أعضائها من أصل الحد الأقصى الذي يسمح به الواجب، وينبّه خيار الإضافة إلى مجموعتي عند امتلاء المجموعة."
+      },
+      {
+        "kind": "new",
+        "text": "تضم الإعدادات > عام مفتاحًا جديدًا لإخفاء طريقة تقييم الواجبات، للمقررات التي لا تستخدم التقييم. تبقى الدرجات ظاهرة، ويعود الواجب لعرض طريقة تقييمه إذا غيّرها فريق التدريس."
+      },
+      {
+        "kind": "new",
+        "text": "عندما لا يُقيِّم الواجب إلا بعض ملفاته، تعرض الآن خيارات تسليم وCommit وpush الملفاتِ التي لن تُقيَّم، وكذلك تفاصيل السطر، حتى لا يفوت التقييمَ أي عمل."
+      },
+      {
+        "kind": "new",
+        "text": "تعرض تفاصيل السطر الآن كل علامة مرحلة (tag) يتوقعها الواجب، وما إذا جرى push لها أم ليس بعد."
+      },
+      {
+        "kind": "new",
+        "text": "أصبحت إضافة الزملاء إلى المجموعة تجري في الخلفية: يعرض السطر حالة كل اسم مستخدم، في الانتظار أو تمت إضافته أو لم تتم مع السبب، مع إمكانية مواصلة استخدام التطبيق. وإذا كانت النافذة مخفية عند الانتهاء، يذكر إشعار من تمت إضافتهم."
+      },
+      {
+        "kind": "new",
+        "text": "أصبح التطبيق يتذكّر المحرر الذي فُتح به كل واجب آخر مرة من التطبيق، فتفتحه قائمة السطر وفتح الأخيرة فيه من جديد."
+      },
+      {
+        "kind": "improved",
+        "text": "أصبحت الإعدادات مقسّمة إلى أربع علامات تبويب: عام والواجبات والأدوات وحول. لا مزيد من التمرير في صفحة طويلة، وصارت مقدمة الأدوات أقصر."
+      },
+      {
+        "kind": "improved",
+        "text": "صار قبول واجب جماعي يتطلب خطوات أقل: تتم تسمية المجموعة الجديدة مباشرة في ملخص القبول، ثم الانتقال فورًا إلى إضافة أعضاء الفريق. ويوضّح حقل أسماء المستخدمين من ستتم إضافتهم وكم عضوًا آخر تتسع له المجموعة."
+      },
+      {
+        "kind": "improved",
+        "text": "أصبح التطبيق يفتح أسرع: يحمّل اللغة المختارة فقط، ولا تحمّل صفحة ما الجديد ملاحظاتها إلا عند فتحها."
+      },
+      {
+        "kind": "improved",
+        "text": "عند تغيير صورة الملف الشخصي على GitHub، يعرض التطبيق الآن الصورة الجديدة خلال يوم بدلًا من أسبوع."
+      },
+      {
+        "kind": "fixed",
+        "text": "على Windows، تُحذف الآن ملفات التثبيت التي تتركها التحديثات في المجلد المؤقت."
+      },
+      {
+        "kind": "fixed",
+        "text": "أصبحت الإشعارات التي تصل عند بدء تشغيل التطبيق باللغة المختارة بدلًا من الإنجليزية."
+      },
+      {
+        "kind": "fixed",
+        "text": "إذا حُذف تقويم Classroom 50 الخاص بالتطبيق، يُعاد إنشاؤه الآن، ولم تعد الأحداث تنتهي في تقويم آخر."
+      },
+      {
+        "kind": "fixed",
+        "text": "أصبح تقرير التشخيص يخفي دائمًا أسماء المستخدمين وأسماء الأشخاص، مع إبقاء الكلمات العادية مقروءة."
+      },
+      {
+        "kind": "fixed",
+        "text": "لم تعد النافذة تُغلق عندما يطلب عنصر في القائمة تأكيدًا."
+      }
+    ],
+    "he": [
+      {
+        "kind": "new",
+        "text": "אפשר עכשיו לבחור אם git מתחבר ל-GitHub דרך HTTPS או SSH: בזמן ההתחברות, במדריך הפתיחה או בהגדרות, תחת כלים. שכפולים חדשים פועלים לפי הבחירה, ואפשר גם להחליף שכפול קיים."
+      },
+      {
+        "kind": "new",
+        "text": "כש-SSH לא מצליח להגיע ל-GitHub, האפליקציה מסבירה עכשיו למה ומציעה לתקן, למשל לסמוך על מפתחות המארח של GitHub או להגדיר מפתח SSH. אם pull או push דרך SSH נכשל, היא מציעה להעביר את השכפול הזה ל-HTTPS."
+      },
+      {
+        "kind": "new",
+        "text": "בתפריט של שורת פרויקט יש עכשיו שלבים, להוספת מועדי ביניים שצוות הקורס נותן בשיעור. כל שלב מזכיר את עצמו כמו מועד הגשה ומופיע בלוח השנה ובתפריט של סמל האפליקציה. כשלפרויקט אין מועד הגשה משלו, השורה מציגה את השלב הבא."
+      },
+      {
+        "kind": "new",
+        "text": "תיאורי המטלות מוצגים עכשיו מעוצבים כמו ב-Classroom 50: כותרות, רשימות, טבלאות, קישורים ונוסחאות מתמטיות. תיאור ארוך מקופל לכמה שורות, עם הצגת עוד."
+      },
+      {
+        "kind": "new",
+        "text": "השורה מציינת עכשיו מתי מטלה לא נבדקת לציון, או מתי צוות הקורס בודק אותה ומתוך כמה נקודות. כשצוות הקורס קובע רף מעבר, הציון מציין אם הוא עומד בו."
+      },
+      {
+        "kind": "new",
+        "text": "פרטי הקבוצה מציגים עכשיו כמה חברים יש בה מתוך המספר המרבי שהמטלה מאפשרת, והוספה לקבוצה שלי מודיעה כשהקבוצה מלאה."
+      },
+      {
+        "kind": "new",
+        "text": "בהגדרות > כללי יש מתג חדש להסתרת אופן הבדיקה של המטלות, לקורסים שלא משתמשים בציונים. הציונים נשארים גלויים, ומטלה מציגה שוב את אופן הבדיקה שלה אם צוות הקורס משנה אותו."
+      },
+      {
+        "kind": "new",
+        "text": "כשמטלה בודקת רק חלק מהקבצים שלה, הגשה, Commit ו-push מציגים עכשיו את הקבצים שלא ייבדקו, וכך גם פרטי השורה, כדי ששום עבודה לא תתפספס בבדיקה."
+      },
+      {
+        "kind": "new",
+        "text": "פרטי השורה מציגים עכשיו כל תגית אבן דרך שהמטלה מצפה לה, והאם כבר בוצע לה push או עדיין לא."
+      },
+      {
+        "kind": "new",
+        "text": "הוספת חברי כיתה לקבוצה מתבצעת עכשיו ברקע: השורה מציגה לכל שם משתמש אם הוא ממתין, נוסף או לא נוסף ולמה, ובינתיים אפשר להמשיך להשתמש באפליקציה. אם החלון מוסתר בסיום, התראה מציינת מי נוסף."
+      },
+      {
+        "kind": "new",
+        "text": "האפליקציה זוכרת עכשיו באיזה עורך נפתחה כל מטלה בפעם האחרונה מתוך האפליקציה, כך שהתפריט של השורה ופתיחת אחרונים פותחים אותה שם שוב."
+      },
+      {
+        "kind": "improved",
+        "text": "ההגדרות מחולקות עכשיו לארבע כרטיסיות: כללי, מטלות, כלים ואודות. אין יותר עמוד ארוך לגלול בו, וההקדמה של כלים קצרה יותר."
+      },
+      {
+        "kind": "improved",
+        "text": "קבלת מטלת צוות דורשת פחות שלבים: את שם הקבוצה החדשה נותנים ישירות בסיכום הקבלה, ומשם עוברים מיד להוספת חברי צוות. שדה שמות המשתמש מציין את מי מוסיפים וכמה עוד נכנסים לקבוצה."
+      },
+      {
+        "kind": "improved",
+        "text": "האפליקציה נפתחת מהר יותר: היא טוענת רק את השפה שנבחרה, ומה חדש טוען את ההערות שלו רק כשפותחים אותו."
+      },
+      {
+        "kind": "improved",
+        "text": "אחרי החלפת תמונת הפרופיל ב-GitHub, האפליקציה מציגה עכשיו את החדשה תוך יום במקום עד שבוע."
+      },
+      {
+        "kind": "fixed",
+        "text": "ב-Windows, קובצי ההתקנה שהעדכונים משאירים בתיקייה הזמנית נמחקים עכשיו."
+      },
+      {
+        "kind": "fixed",
+        "text": "התראות שמגיעות בזמן שהאפליקציה עולה מוצגות עכשיו בשפה שנבחרה ולא באנגלית."
+      },
+      {
+        "kind": "fixed",
+        "text": "אם לוח השנה Classroom 50 של האפליקציה נמחק, הוא נוצר עכשיו מחדש, ואירועים כבר לא מגיעים ללוח שנה אחר."
+      },
+      {
+        "kind": "fixed",
+        "text": "דוח האבחון מסתיר עכשיו תמיד שמות משתמש ושמות של אנשים, ומשאיר מילים רגילות קריאות."
+      },
+      {
+        "kind": "fixed",
+        "text": "החלון כבר לא נסגר כשפריט בתפריט מבקש אישור."
+      }
+    ],
+    "zh-Hans": [
+      {
+        "kind": "new",
+        "text": "现在可以选择git通过HTTPS还是SSH连接GitHub：登录时、首次使用指南中，或在设置的工具下都能选择。新的克隆会按你的选择进行，已有的克隆也可以切换。"
+      },
+      {
+        "kind": "new",
+        "text": "当SSH无法连接GitHub时，工具箱现在会说明原因并提供修复，例如信任GitHub的主机密钥或设置你的SSH密钥。如果通过SSH拉取或推送失败，它会建议把这个克隆切换到HTTPS。"
+      },
+      {
+        "kind": "new",
+        "text": "项目所在行的菜单现在有阶段…，可以添加老师在课上布置的中间截止日期。每个阶段会像截止日期一样提醒你，并显示在你的日历和工具箱图标的菜单中。如果项目本身没有截止日期，这一行会显示下一个阶段。"
+      },
+      {
+        "kind": "new",
+        "text": "作业说明现在会像在Classroom 50上一样带格式显示：标题、列表、表格、链接和数学公式。较长的说明会折叠成几行，并提供显示更多。"
+      },
+      {
+        "kind": "new",
+        "text": "现在，行中会显示作业不计分，或由教学团队评分以及满分是多少。老师设置了及格线时，你的成绩会显示是否达到。"
+      },
+      {
+        "kind": "new",
+        "text": "小组详情现在会显示成员人数以及作业允许的最多人数。小组已满时，添加到我的小组…会提示你。"
+      },
+      {
+        "kind": "new",
+        "text": "设置 > 通用新增一个开关，可以隐藏作业的评分方式，适合不使用评分的课程。成绩仍会显示；如果老师更改了评分方式，该作业会重新显示它。"
+      },
+      {
+        "kind": "new",
+        "text": "当作业只对部分文件评分时，上交、提交和推送现在会列出不会被评分的文件，行的详情中也会列出，让你的成果不会被漏评。"
+      },
+      {
+        "kind": "new",
+        "text": "行的详情现在会列出作业要求的每个里程碑标签，并显示是否已经推送。"
+      },
+      {
+        "kind": "new",
+        "text": "向小组添加同学现在在后台进行：这一行会显示每个人是在等待、已添加，还是未添加及其原因，你可以继续使用工具箱。如果完成时窗口处于隐藏状态，会有通知告诉你添加了谁。"
+      },
+      {
+        "kind": "new",
+        "text": "工具箱现在会记住你上次从应用中打开每个作业时用的编辑器，行的菜单和打开最近项目会再次用它打开。"
+      },
+      {
+        "kind": "improved",
+        "text": "设置现在分为四个标签页：通用、作业、工具和关于。不用再滚动长长的页面，工具部分的介绍也更简短了。"
+      },
+      {
+        "kind": "improved",
+        "text": "接受小组作业的步骤更少了：你可以直接在接受摘要中给新小组命名，然后马上开始添加队友。用户名输入框会显示你要添加的人，以及小组还能容纳几人。"
+      },
+      {
+        "kind": "improved",
+        "text": "工具箱打开得更快了：它只加载你使用的语言，新功能也只在你打开时才加载说明。"
+      },
+      {
+        "kind": "improved",
+        "text": "更换GitHub头像后，工具箱现在会在一天内显示新头像，而不是最多要等一周。"
+      },
+      {
+        "kind": "fixed",
+        "text": "在Windows上，更新留在临时文件夹中的安装程序现在会被删除。"
+      },
+      {
+        "kind": "fixed",
+        "text": "工具箱启动时收到的通知现在会使用你的语言，而不再是英文。"
+      },
+      {
+        "kind": "fixed",
+        "text": "如果你删除了工具箱的Classroom 50日历，现在会重新创建它，事件也不会再跑到你的其他日历里。"
+      },
+      {
+        "kind": "fixed",
+        "text": "诊断报告现在始终会隐藏登录名和人名，同时保留普通词语可读。"
+      },
+      {
+        "kind": "fixed",
+        "text": "当菜单项要求你确认时，窗口不会再关闭。"
+      }
+    ],
+    "ja": [
+      {
+        "kind": "new",
+        "text": "gitがGitHubにHTTPSとSSHのどちらで接続するかを選べるようになりました。サインイン時、初回ガイド、または設定の「ツール」で選べます。新しいクローンはこの選択に従い、既存のクローンも切り替えられます。"
+      },
+      {
+        "kind": "new",
+        "text": "SSHでGitHubに接続できないとき、その理由を説明し、GitHubのホスト鍵を信頼する、SSHキーを設定するなどの修正を提案するようになりました。SSHでのプルやpushが失敗したときは、そのクローンをHTTPSに切り替えることを提案します。"
+      },
+      {
+        "kind": "new",
+        "text": "プロジェクトの行のメニューに「フェーズ…」が加わり、先生が授業で伝える途中の締め切りを追加できます。各フェーズは締め切りと同じようにリマインドされ、カレンダーとアイコンのメニューに表示されます。プロジェクトに締め切りがない場合は、行に次のフェーズが表示されます。"
+      },
+      {
+        "kind": "new",
+        "text": "課題の説明が、Classroom 50と同じように書式付きで表示されるようになりました。見出し、リスト、表、リンク、数式に対応します。長い説明は数行に折りたたまれ、「もっと見る」で開けます。"
+      },
+      {
+        "kind": "new",
+        "text": "課題が採点されない場合や、教員が何点満点で採点する場合に、行に表示されるようになりました。合格ラインが設定されているときは、成績がそれに達しているかも表示されます。"
+      },
+      {
+        "kind": "new",
+        "text": "グループの詳細に、メンバー数と課題で認められる最大人数が表示されるようになりました。グループが満員のときは「グループに追加…」でそのことを知らせます。"
+      },
+      {
+        "kind": "new",
+        "text": "設定の「一般」に、課題の採点方法を非表示にするスイッチが加わりました。採点を使わない授業向けです。成績は引き続き表示され、先生が採点方法を変えた課題では再び表示されます。"
+      },
+      {
+        "kind": "new",
+        "text": "課題が一部のファイルだけを採点する場合、提出、コミット、pushのときに採点されないファイルを一覧表示するようになりました。行の詳細にも表示されるので、採点の対象外で作業してしまうことがなくなります。"
+      },
+      {
+        "kind": "new",
+        "text": "行の詳細に、課題が求める各マイルストーンのタグと、pushしたかどうかが表示されるようになりました。"
+      },
+      {
+        "kind": "new",
+        "text": "グループへのクラスメイトの追加がバックグラウンドで行われるようになりました。行には一人ひとりが待機中か、追加済みか、追加できなかったかとその理由が表示され、その間もツールボックスを使い続けられます。終わったときにウィンドウが非表示なら、誰が追加されたかを通知でお知らせします。"
+      },
+      {
+        "kind": "new",
+        "text": "アプリから各課題を最後に開いたエディターを覚えるようになりました。行のメニューや「最近使った項目を開く」から、同じエディターで再び開きます。"
+      },
+      {
+        "kind": "improved",
+        "text": "設定が「一般」「課題」「ツール」「情報」の4つのタブに分かれました。長いページをスクロールする必要がなくなり、「ツール」の説明も短くなりました。"
+      },
+      {
+        "kind": "improved",
+        "text": "チーム課題の受け入れの手順が少なくなりました。受け入れの概要で新しいグループに名前を付け、そのままチームメイトの追加に進めます。ユーザー名の欄には、誰を追加するかと、グループにあと何人入れるかが表示されます。"
+      },
+      {
+        "kind": "improved",
+        "text": "ツールボックスの起動が速くなりました。使っている言語だけを読み込み、「新機能」は開いたときにだけ内容を読み込みます。"
+      },
+      {
+        "kind": "improved",
+        "text": "GitHubのプロフィール画像を変えると、最大1週間ではなく1日以内に新しい画像が表示されるようになりました。"
+      },
+      {
+        "kind": "fixed",
+        "text": "Windowsで、アップデートが一時フォルダーに残すインストーラーを削除するようになりました。"
+      },
+      {
+        "kind": "fixed",
+        "text": "ツールボックスの起動時に届く通知が、英語ではなく設定した言語で表示されるようになりました。"
+      },
+      {
+        "kind": "fixed",
+        "text": "ツールボックスのClassroom 50カレンダーを削除した場合に、作り直すようになりました。予定がほかのカレンダーに入ることもなくなりました。"
+      },
+      {
+        "kind": "fixed",
+        "text": "診断レポートで、ログイン名と人の名前を常に隠し、一般的な単語は読めるまま残すようになりました。"
+      },
+      {
+        "kind": "fixed",
+        "text": "メニュー項目が確認を求めたときに、ウィンドウが閉じなくなりました。"
+      }
+    ],
+    "ko": [
+      {
+        "kind": "new",
+        "text": "이제 git이 GitHub에 HTTPS와 SSH 중 어느 쪽으로 연결할지 고를 수 있어요. 로그인할 때, 처음 사용 안내에서, 또는 설정의 도구에서 고르면 돼요. 새 클론은 이 선택을 따르고, 기존 클론도 바꿀 수 있어요."
+      },
+      {
+        "kind": "new",
+        "text": "SSH로 GitHub에 연결할 수 없으면 이제 도구 상자가 이유를 알려 주고, GitHub 호스트 키를 신뢰하거나 SSH 키를 설정하는 식으로 해결을 제안해요. SSH로 끌어오기나 push가 실패하면 그 클론을 HTTPS로 바꾸자고 제안해요."
+      },
+      {
+        "kind": "new",
+        "text": "이제 프로젝트 행 메뉴에 단계…가 있어서 선생님이 수업에서 알려 준 중간 마감을 추가할 수 있어요. 각 단계는 마감일처럼 알림을 주고 캘린더와 도구 상자 아이콘 메뉴에 나타나요. 프로젝트에 자체 마감일이 없으면 행에 다음 단계가 보여요."
+      },
+      {
+        "kind": "new",
+        "text": "이제 과제 설명이 Classroom 50처럼 서식을 갖춰 보여요. 제목, 목록, 표, 링크, 수식을 지원해요. 긴 설명은 몇 줄로 접히고 더 보기로 펼칠 수 있어요."
+      },
+      {
+        "kind": "new",
+        "text": "이제 과제가 채점되지 않거나 교수진이 몇 점 만점으로 채점하는지 행에 표시돼요. 통과 기준이 정해져 있으면 성적이 그 기준에 닿았는지도 알려 줘요."
+      },
+      {
+        "kind": "new",
+        "text": "이제 그룹 세부 정보에 구성원 수와 과제가 허용하는 최대 인원이 보여요. 그룹이 꽉 차면 내 그룹에 추가…가 알려 줘요."
+      },
+      {
+        "kind": "new",
+        "text": "설정의 일반에 과제 채점 방식을 숨기는 스위치가 생겼어요. 채점을 쓰지 않는 수업을 위한 거예요. 성적은 계속 보이고, 선생님이 채점 방식을 바꾸면 그 과제에서는 다시 보여요."
+      },
+      {
+        "kind": "new",
+        "text": "과제가 일부 파일만 채점하면, 이제 제출, 커밋, push할 때 채점되지 않는 파일을 보여 줘요. 행의 세부 정보에도 나오니 채점에서 빠지는 작업이 없어요."
+      },
+      {
+        "kind": "new",
+        "text": "이제 행의 세부 정보에 과제가 요구하는 마일스톤 태그마다 push했는지 아직인지 표시돼요."
+      },
+      {
+        "kind": "new",
+        "text": "이제 그룹에 반 친구를 추가하는 일이 백그라운드에서 진행돼요. 행에 한 명씩 대기 중, 추가됨, 추가 안 됨과 그 이유가 보이고, 그동안 도구 상자를 계속 쓸 수 있어요. 끝났을 때 창이 숨겨져 있으면 누가 추가됐는지 알림으로 알려 줘요."
+      },
+      {
+        "kind": "new",
+        "text": "이제 도구 상자가 앱에서 각 과제를 마지막으로 연 편집기를 기억해요. 그래서 행 메뉴와 최근 항목 열기에서 그 편집기로 다시 열려요."
+      },
+      {
+        "kind": "improved",
+        "text": "이제 설정이 일반, 과제, 도구, 정보 네 개 탭으로 나뉘어요. 긴 페이지를 스크롤할 필요가 없고, 도구 소개도 짧아졌어요."
+      },
+      {
+        "kind": "improved",
+        "text": "팀 과제 수락 단계가 줄었어요. 수락 요약에서 바로 새 그룹 이름을 정하고 곧장 팀원 추가로 넘어가요. 사용자 이름 칸에는 누구를 추가하는지와 그룹에 몇 명이 더 들어갈 수 있는지 나와요."
+      },
+      {
+        "kind": "improved",
+        "text": "도구 상자가 더 빨리 열려요. 사용하는 언어만 불러오고, 새로운 기능은 열 때만 내용을 불러와요."
+      },
+      {
+        "kind": "improved",
+        "text": "GitHub 프로필 사진을 바꾸면 이제 최대 일주일이 아니라 하루 안에 새 사진이 보여요."
+      },
+      {
+        "kind": "fixed",
+        "text": "Windows에서 업데이트가 임시 폴더에 남기는 설치 파일을 이제 지워요."
+      },
+      {
+        "kind": "fixed",
+        "text": "도구 상자가 시작될 때 오는 알림이 이제 영어가 아니라 설정한 언어로 나와요."
+      },
+      {
+        "kind": "fixed",
+        "text": "도구 상자의 Classroom 50 캘린더를 지웠다면 이제 다시 만들어요. 일정이 다른 캘린더에 들어가는 일도 없어요."
+      },
+      {
+        "kind": "fixed",
+        "text": "이제 진단 보고서가 로그인 이름과 사람 이름을 항상 가리고, 일반 단어는 읽을 수 있게 남겨 둬요."
+      },
+      {
+        "kind": "fixed",
+        "text": "메뉴 항목이 확인을 요청할 때 더 이상 창이 닫히지 않아요."
+      }
+    ]
+  }
+}
