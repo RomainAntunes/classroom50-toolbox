@@ -11,6 +11,7 @@ use std::time::Duration;
 use crate::error::{Error, Result};
 use crate::process;
 use crate::pull::GH_CREDENTIALS;
+use crate::ssh::{self, Who};
 use crate::tools::GitProtocol;
 
 /// A student repo is small; a slow link still gets its time, a hung ssh doesn't.
@@ -61,13 +62,15 @@ impl CloneStore {
 
 /// Clones `owner/repo` into `parent/<repo>` over `protocol`, with git and gh's credentials
 /// for HTTPS passed for this one command (`pull::GH_CREDENTIALS`), so a private repo needs
-/// no git setup and nothing is saved in the clone. An SSH failure is `Error::Ssh`; a clone
-/// stopped by the time limit leaves no half-made folder. Returns the new folder.
+/// no git setup and nothing is saved in the clone. An SSH failure is `Error::Ssh`
+/// (`ssh::failure`, with `who`); a clone stopped by the time limit leaves no half-made
+/// folder. Returns the new folder.
 pub async fn clone(
     owner: &str,
     repo: &str,
     parent: &Path,
     protocol: GitProtocol,
+    who: &Who<'_>,
 ) -> Result<PathBuf> {
     if !is_plain_name(owner) || !is_plain_name(repo) {
         return Err(Error::Unsupported(format!(
@@ -88,8 +91,12 @@ pub async fn clone(
                 let _ = std::fs::remove_dir_all(&target);
             }
             Err(match err {
-                Error::CommandFailed { stderr, .. } => crate::ssh::failure(&stderr)
-                    .unwrap_or_else(|| Error::Unsupported(last_line(&stderr))),
+                Error::CommandFailed { stderr, .. } => match ssh::failure(&stderr, who).await {
+                    Some(err) => err,
+                    None => Error::Unsupported(
+                        ssh::github_error(&stderr).unwrap_or_else(|| last_line(&stderr)),
+                    ),
+                },
                 err => err,
             })
         }
@@ -210,9 +217,13 @@ mod tests {
     async fn refuses_an_existing_folder() {
         let dir = std::env::temp_dir().join(format!("c50tb-exists-{}", std::process::id()));
         std::fs::create_dir_all(dir.join("repo")).unwrap();
-        let result = clone("owner", "repo", &dir, GitProtocol::Https).await;
+        let who = Who::Known {
+            active: None,
+            probe: ssh::SshStatus::NotInstalled,
+        };
+        let result = clone("owner", "repo", &dir, GitProtocol::Https, &who).await;
         assert!(matches!(result, Err(Error::PathExists(_))));
-        let result = clone("owner", "..", &dir, GitProtocol::Ssh).await;
+        let result = clone("owner", "..", &dir, GitProtocol::Ssh, &who).await;
         assert!(matches!(result, Err(Error::Unsupported(_))));
         std::fs::remove_dir_all(&dir).unwrap();
     }

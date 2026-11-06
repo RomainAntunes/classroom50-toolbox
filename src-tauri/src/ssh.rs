@@ -167,20 +167,38 @@ impl std::fmt::Display for SshProblem {
 
 /// An SSH failure in git's or ssh's error output, `None` when it isn't one: the problem,
 /// and for `OtherAccount` the account GitHub named when it did. Only ssh's and GitHub's SSH
-/// wordings count, so an HTTPS failure is never taken for one.
+/// wordings count, so an HTTPS failure is never taken for one, and only for github.com, so
+/// a submodule or hook reaching another server isn't either. `OtherAccount` here only says
+/// GitHub answered for an account (`Permission to o/r.git denied to X`, `Repository not
+/// found`): whether that is the wrong key is `failure`'s to tell.
 pub fn classify(stderr: &str) -> Option<(SshProblem, Option<String>)> {
     // ssh says "Host key verification failed" for a changed key too.
     if stderr.contains("REMOTE HOST IDENTIFICATION HAS CHANGED") {
-        return Some((SshProblem::HostKeyChanged, None));
+        return about_github(
+            stderr,
+            " has changed and you have requested strict checking",
+            "Host key for ",
+        )
+        .then_some((SshProblem::HostKeyChanged, None));
     }
     if stderr.contains("Host key verification failed") {
-        return Some((SshProblem::HostKeyUnknown, None));
-    }
-    // `(publickey)`, or `(publickey,keyboard-interactive)` from another server's config.
-    if stderr.contains("Permission denied (publickey") {
-        return Some((SshProblem::KeyRejected, None));
+        return about_github(
+            stderr,
+            " and you have requested strict checking",
+            " host key is known for ",
+        )
+        .then_some((SshProblem::HostKeyUnknown, None));
     }
     for line in stderr.lines().map(str::trim) {
+        // `git@github.com: Permission denied (publickey).`, or `(publickey,keyboard-interactive)`.
+        if let Some(at) = line.find("Permission denied (publickey") {
+            let server = line[..at].trim_end().trim_end_matches(':');
+            let host = server.rsplit_once('@').map_or(server, |(_, host)| host);
+            if host.is_empty() || is_github_host(host) {
+                return Some((SshProblem::KeyRejected, None));
+            }
+            return None;
+        }
         // GitHub's SSH server; over HTTPS the same words come after `remote: `.
         if let Some(rest) = line.strip_prefix("ERROR: Permission to ") {
             let login = rest
@@ -192,30 +210,138 @@ pub fn classify(stderr: &str) -> Option<(SshProblem, Option<String>)> {
         if line.starts_with("ERROR: Repository not found") {
             return Some((SshProblem::OtherAccount, None));
         }
-        if unreachable_line(line) {
+        if let Some(host) = unreachable_host(line) {
+            return is_github_host(host).then_some((SshProblem::Unreachable, None));
+        }
+        if line.contains("kex_exchange_identification")
+            || line.contains("Connection timed out during banner exchange")
+        {
             return Some((SshProblem::Unreachable, None));
         }
-        // git without ssh: `error: cannot run ssh: No such file or directory`.
-        if line.contains("cannot run ssh") || line.contains("cannot spawn ssh") {
+        // git without ssh: `error: cannot run ssh: No such file or directory`; never
+        // `cannot run ssh-keygen` (SSH commit signing).
+        if line.contains("cannot run ssh:") || line.contains("cannot spawn ssh:") {
             return Some((SshProblem::NotInstalled, None));
         }
     }
     None
 }
 
-/// `ssh: connect to host github.com port 22: Connection refused` (or timed out, no route,
-/// network unreachable), `ssh: Could not resolve hostname`, and a connection a firewall
-/// closes before ssh's greeting.
-fn unreachable_line(line: &str) -> bool {
-    line.starts_with("ssh: connect to host")
-        || line.starts_with("ssh: Could not resolve hostname")
-        || line.contains("kex_exchange_identification")
-        || line.contains("Connection timed out during banner exchange")
+/// Whether ssh's host key message names GitHub: `<before><host><after>` on one of its lines.
+/// A message without that line (another ssh's wording) counts.
+fn about_github(stderr: &str, after: &str, before: &str) -> bool {
+    stderr
+        .lines()
+        .find_map(|line| {
+            let (head, _) = line.split_once(after)?;
+            let (_, host) = head.rsplit_once(before)?;
+            Some(host.trim())
+        })
+        .is_none_or(is_github_host)
 }
 
-/// `Error::Ssh` for an SSH failure in `stderr`.
-pub fn failure(stderr: &str) -> Option<Error> {
-    classify(stderr).map(|(problem, login)| Error::Ssh { problem, login })
+/// `github.com` or its port-443 endpoint `ssh.github.com`, as ssh names it (`[host]:port`
+/// for another port).
+fn is_github_host(host: &str) -> bool {
+    let host = host.trim();
+    let host = match host.strip_prefix('[') {
+        Some(rest) => rest.split_once(']').map_or(rest, |(host, _)| host),
+        None => host,
+    };
+    host.eq_ignore_ascii_case(HOST) || host.eq_ignore_ascii_case("ssh.github.com")
+}
+
+/// The server of `ssh: connect to host <host> port 22: Connection refused` (or timed out, no
+/// route, network unreachable) and `ssh: Could not resolve hostname <host>: ...`.
+fn unreachable_host(line: &str) -> Option<&str> {
+    if let Some(rest) = line.strip_prefix("ssh: connect to host ") {
+        return rest.split_whitespace().next();
+    }
+    let rest = line.strip_prefix("ssh: Could not resolve hostname ")?;
+    Some(rest.split_once(':').map_or(rest, |(host, _)| host))
+}
+
+/// GitHub's own refusal over SSH (`ERROR: This repository was archived so it is read-only.`),
+/// without its `ERROR: `: what git's last line (`Could not read from remote repository.`)
+/// hides.
+pub fn github_error(stderr: &str) -> Option<String> {
+    stderr
+        .lines()
+        .map(str::trim)
+        .find_map(|line| line.strip_prefix("ERROR: "))
+        .map(|rest| rest.trim().to_owned())
+        .filter(|rest| !rest.is_empty())
+}
+
+/// Who git signs in as over SSH, next to gh's active account: what tells a key of another
+/// account from a repository the account itself can't write to or see (a read-only repo
+/// after Close submission, access not granted yet). Each is read only when a failure needs
+/// it.
+pub enum Who<'a> {
+    /// gh's local config, and the probe shared through `SshState`.
+    Live {
+        state: &'a SshState,
+        http: reqwest::Client,
+    },
+    /// Known up front.
+    #[cfg(test)]
+    Known {
+        active: Option<String>,
+        probe: SshStatus,
+    },
+}
+
+impl<'a> Who<'a> {
+    pub fn live(app: &'a tauri::AppHandle) -> Self {
+        use tauri::Manager;
+        Self::Live {
+            state: app.state::<SshState>().inner(),
+            http: app.state::<crate::github::Http>().0.clone(),
+        }
+    }
+
+    async fn active(&self) -> Option<String> {
+        match self {
+            Self::Live { .. } => crate::tools::active_login().await,
+            #[cfg(test)]
+            Self::Known { active, .. } => active.clone(),
+        }
+    }
+
+    async fn probe(&self, active: &str) -> SshStatus {
+        match self {
+            Self::Live { state, http } => state.status(false, status(http, Some(active))).await,
+            #[cfg(test)]
+            Self::Known { probe, .. } => probe.clone(),
+        }
+    }
+}
+
+/// `Error::Ssh` for an SSH failure in `stderr` from a command that reached the network
+/// (clone, pull, push), `None` when SSH isn't to blame and git's own words should stand.
+/// GitHub naming gh's active account (`denied to <active>`) means the key works and the
+/// account lacks access; `Repository not found` is the wrong key only when the probe greets
+/// another account. An unknown active account blames nothing.
+pub async fn failure(stderr: &str, who: &Who<'_>) -> Option<Error> {
+    let (problem, login) = classify(stderr)?;
+    if problem != SshProblem::OtherAccount {
+        return Some(Error::Ssh {
+            problem,
+            login: None,
+        });
+    }
+    let active = who.active().await?;
+    let other = match login {
+        Some(login) => (!login.eq_ignore_ascii_case(&active)).then_some(login),
+        None => match who.probe(&active).await {
+            SshStatus::OtherAccount { login, .. } => Some(login),
+            _ => None,
+        },
+    }?;
+    Some(Error::Ssh {
+        problem,
+        login: Some(other),
+    })
 }
 
 /// The login of GitHub's greeting (`Hi alice! You've successfully authenticated, but GitHub
@@ -987,8 +1113,10 @@ mod tests {
             Host key for github.com has changed and you have requested strict checking.\n\
             Host key verification failed.\n\
             fatal: Could not read from remote repository.\n";
+        let changed_elsewhere =
+            changed.replace("Host key for github.com", "Host key for gitlab.com");
         type Case<'a> = (&'a str, Option<(SshProblem, Option<&'a str>)>);
-        let cases: [Case; 12] = [
+        let cases: [Case; 22] = [
             (changed, Some((SshProblem::HostKeyChanged, None))),
             (
                 "Host key verification failed.\r\nfatal: Could not read from remote repository.\r\n",
@@ -1035,6 +1163,46 @@ mod tests {
                 "remote: Permission to o/r.git denied to bob.\nfatal: unable to access 'https://github.com/o/r.git/': The requested URL returned error: 403\n",
                 None,
             ),
+            // SSH commit signing without ssh-keygen is no missing ssh.
+            (
+                "error: cannot run ssh-keygen: No such file or directory\nfatal: failed to write commit object\n",
+                None,
+            ),
+            (
+                "error: cannot spawn ssh: No such file or directory\n",
+                Some((SshProblem::NotInstalled, None)),
+            ),
+            // Another server (a submodule, a hook) is no GitHub SSH problem.
+            (
+                "ssh: connect to host gitlab.com port 22: Connection refused\n",
+                None,
+            ),
+            (
+                "ssh: Could not resolve hostname gitlab.example.org: Name or service not known\n",
+                None,
+            ),
+            (
+                "git@gitlab.com: Permission denied (publickey).\nfatal: Could not read from remote repository.\n",
+                None,
+            ),
+            (
+                "No ED25519 host key is known for gitlab.com and you have requested strict checking.\nHost key verification failed.\n",
+                None,
+            ),
+            (changed_elsewhere.as_str(), None),
+            // GitHub's port-443 endpoint is GitHub.
+            (
+                "ssh: connect to host ssh.github.com port 443: Operation timed out\n",
+                Some((SshProblem::Unreachable, None)),
+            ),
+            (
+                "No ED25519 host key is known for [ssh.github.com]:443 and you have requested strict checking.\nHost key verification failed.\n",
+                Some((SshProblem::HostKeyUnknown, None)),
+            ),
+            (
+                "ERROR: Permission to acme-cs/lab-2-alex.git denied to alice.\nfatal: Could not read from remote repository.\n",
+                Some((SshProblem::OtherAccount, Some("alice"))),
+            ),
         ];
         for (stderr, expected) in cases {
             let expected = expected.map(|(p, login)| (p, login.map(str::to_owned)));
@@ -1046,8 +1214,87 @@ mod tests {
             ),
             None
         );
+    }
+
+    #[test]
+    fn keeps_githubs_own_refusal() {
+        assert_eq!(
+            github_error(
+                "ERROR: This repository was archived so it is read-only.\nfatal: Could not read from remote repository.\n"
+            )
+            .as_deref(),
+            Some("This repository was archived so it is read-only.")
+        );
+        assert_eq!(
+            github_error("fatal: Could not read from remote repository.\n"),
+            None
+        );
+    }
+
+    /// GitHub naming an account is the wrong key only when it isn't gh's.
+    #[tokio::test]
+    async fn blames_ssh_only_for_another_accounts_key() {
+        let who = |active: Option<&str>, probe: SshStatus| Who::Known {
+            active: active.map(str::to_owned),
+            probe,
+        };
+        let ready = SshStatus::Ready {
+            login: Some("alice".into()),
+        };
+        let bob = SshStatus::OtherAccount {
+            login: "bob".into(),
+            active: Some("alice".into()),
+        };
+        let denied = |to: &str| {
+            format!(
+                "ERROR: Permission to acme-cs/lab-2-alex.git denied to {to}.\nfatal: Could not read from remote repository.\n"
+            )
+        };
+        let not_found =
+            "ERROR: Repository not found.\nfatal: Could not read from remote repository.\n";
+        let other = |err: Option<Error>| match err {
+            Some(Error::Ssh {
+                problem: SshProblem::OtherAccount,
+                login,
+            }) => login,
+            err => panic!("{err:?}"),
+        };
+        // gh's own account: no write access (a read-only repo), not SSH's fault.
+        assert!(
+            failure(&denied("ALICE"), &who(Some("alice"), bob.clone()))
+                .await
+                .is_none()
+        );
+        assert_eq!(
+            other(failure(&denied("bob"), &who(Some("alice"), ready.clone())).await).as_deref(),
+            Some("bob")
+        );
+        // Without gh's account nothing is blamed.
+        assert!(
+            failure(&denied("bob"), &who(None, bob.clone()))
+                .await
+                .is_none()
+        );
+        // Not found: the probe tells.
+        assert!(
+            failure(not_found, &who(Some("alice"), ready.clone()))
+                .await
+                .is_none()
+        );
+        assert!(
+            failure(
+                not_found,
+                &who(Some("alice"), SshStatus::Ready { login: None })
+            )
+            .await
+            .is_none()
+        );
+        assert_eq!(
+            other(failure(not_found, &who(Some("alice"), bob)).await).as_deref(),
+            Some("bob")
+        );
         assert!(matches!(
-            failure("Host key verification failed."),
+            failure("Host key verification failed.", &who(None, ready)).await,
             Some(Error::Ssh {
                 problem: SshProblem::HostKeyUnknown,
                 login: None
