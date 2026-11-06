@@ -34,7 +34,7 @@ impl PopoverState {
             // An unpin whose pin never reached Rust leaves it at 0.
             let _ = self
                 .pinned
-                .fetch_update(Ordering::Relaxed, Ordering::Relaxed, |n| n.checked_sub(1));
+                .try_update(Ordering::Relaxed, Ordering::Relaxed, |n| n.checked_sub(1));
         }
     }
 
