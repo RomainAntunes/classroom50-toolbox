@@ -2,7 +2,7 @@
 // Update for an outdated one (gh installs again, gh-student upgrades) or a newer gh-student,
 // Check again, and a job Rust is running (maybe started elsewhere) with its bar and Cancel.
 import { expect, test, type App } from "./app";
-import { fail, hold, ok, scenario, tools } from "./fixtures";
+import { fail, failPlugin, hold, ok, pass, scenario, tools } from "./fixtures";
 import type { Reply, Scenario } from "./fixtures";
 import type { ToolStatus } from "../../src/lib/api";
 
@@ -395,6 +395,7 @@ test("protocol: SSH known not to work is said in the confirm", async ({ app }) =
   await protocolButton(app).click();
   await app.pickMenu("SSH");
   await app.expectDialog(["Clone and push with SSH", "this network may block it"], "cancel");
+  expect(await app.writes()).toEqual([]);
 });
 
 test("SSH in use (gh on SSH): checked on open", async ({ app }) => {
@@ -442,7 +443,7 @@ for (const [name, status, words, button] of [
   [
     "failed",
     { state: "failed", message: "ssh: weird" },
-    "Couldn't check SSH: ssh: weird",
+    "SSH isn't working: ssh: weird",
     "Check again",
   ],
 ] as const) {
@@ -556,4 +557,111 @@ test("SSH row: hidden while signed out", async ({ app }) => {
   await openTools(app, { auth: { ...scenario().auth, loggedIn: false, login: null } });
   await expect(sshRow(app)).toHaveCount(0);
   expect(await app.calls("git_protocol")).toEqual([]);
+});
+
+test("a fix comes with Check again, for a fix made outside the app", async ({ app }) => {
+  await openTools(app, {
+    gitProtocol: "ssh",
+    ssh: { state: "noKey", localKey: null },
+  });
+  await expect(sshRow(app).getByRole("button", { name: "Set up SSH" })).toBeVisible();
+  await app.respond("ssh_status", ok({ state: "ready", login: "student" }));
+  await sshRow(app).getByRole("button", { name: "Check again" }).click();
+  await expect(sshRow(app)).toContainText("Ready as student");
+  expect((await app.calls("ssh_status")).map((c) => c.args)).toEqual([
+    { fresh: false },
+    { fresh: true },
+  ]);
+  await expect(sshRow(app).getByRole("button")).toHaveText([
+    "SSH",
+    "GitHub's SSH guide",
+    "Your SSH keys on GitHub",
+  ]);
+  expect(await app.writes()).toEqual([]);
+});
+
+test("Set up SSH: GitHub wanting the key scope asks for it, then adds the key", async ({ app }) => {
+  const auth = { ...scenario().auth, canAddSshKeys: true };
+  await openTools(app, {
+    gitProtocol: "ssh",
+    ssh: { state: "noKey", localKey: null },
+    auth,
+    responses: {
+      // The token lost the scope since: GitHub says so.
+      set_up_ssh_key: [fail("ssh", "needs scope", { problem: "needsScope" }), pass()],
+      grant_scopes: [ok(auth)],
+    },
+  });
+  await sshRow(app).getByRole("button", { name: "Set up SSH" }).click();
+  await app.answer("ok");
+  await expect(sshRow(app)).toContainText("Ready as student");
+  expect((await app.calls("grant_scopes"))[0].args).toEqual({ extra: ["writePublicKey"] });
+  expect(await app.writes()).toEqual(["set_up_ssh_key", "grant_scopes", "set_up_ssh_key"]);
+});
+
+test("Set up SSH: Cancel under the code stops the grant and adds no key", async ({ app }) => {
+  await openTools(app, {
+    gitProtocol: "ssh",
+    ssh: { state: "noKey", localKey: null },
+    responses: { grant_scopes: [hold()] },
+  });
+  await sshRow(app).getByRole("button", { name: "Set up SSH" }).click();
+  await app.answer("ok");
+  await app.waitForCall("grant_scopes");
+  await app.emit("login-device-code", {
+    code: "ABCD-1234",
+    url: "https://github.com/login/device",
+  });
+  await sshRow(app).getByRole("button", { name: "Cancel" }).click();
+  await app.waitForCall("cancel_login");
+  await expect(sshRow(app).locator("code")).toHaveCount(0);
+  await app.release("grant_scopes", fail("cancelled"));
+  await expect(sshRow(app).getByRole("button", { name: "Set up SSH" })).toBeEnabled();
+  expect(await app.calls("set_up_ssh_key")).toEqual([]);
+  await expect(sshRow(app).getByRole("alert")).toHaveCount(0);
+});
+
+test("a grant that failed in Settings shows there, not in the main page's footer", async ({
+  app,
+  page,
+}) => {
+  await openTools(app, {
+    gitProtocol: "ssh",
+    ssh: { state: "noKey", localKey: null },
+    responses: { grant_scopes: [fail("timedOut")] },
+  });
+  await sshRow(app).getByRole("button", { name: "Set up SSH" }).click();
+  await app.answer("ok");
+  await expect(sshRow(app).getByRole("alert")).toHaveText(
+    "The code expired. Sign in again to get a new one.",
+  );
+  await page.getByRole("button", { name: "Back" }).click();
+  await expect(page.locator("footer")).toBeVisible();
+  await expect(page.locator("footer").getByRole("alert")).toHaveCount(0);
+});
+
+test("a failed account switch shows in the footer, not in Settings", async ({ app, page }) => {
+  await app.start(
+    scenario({
+      accounts: [
+        { login: "student", active: true },
+        { login: "second", active: false },
+      ],
+      responses: { switch_account: [fail("commandFailed", "gh: no such account")] },
+    }),
+  );
+  await page.getByRole("button", { name: "Signed in as student" }).click();
+  await app.pickMenu("second");
+  await expect(page.locator("footer").getByRole("alert")).toHaveText("gh: no such account");
+  await app.openSettings();
+  await expect(sshRow(app)).toBeVisible();
+  await expect(sshRow(app).getByRole("alert")).toHaveCount(0);
+});
+
+test("an SSH link the OS can't open is spelled out", async ({ app }) => {
+  await openTools(app, {
+    responses: { "plugin:opener|open_url": [failPlugin("no xdg-open")] },
+  });
+  await sshRow(app).getByRole("button", { name: "Your SSH keys on GitHub" }).click();
+  await expect(sshRow(app)).toContainText("https://github.com/settings/keys");
 });

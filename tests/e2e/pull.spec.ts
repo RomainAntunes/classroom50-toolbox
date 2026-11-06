@@ -149,3 +149,59 @@ test("an SSH failure on an HTTPS clone offers no switch", async ({ app }) => {
   expect(dialog.message).not.toContain("Switch it to HTTPS");
   expect(await app.writes()).toEqual(["pull_project"]);
 });
+
+test("a pull over HTTPS that fails again isn't offered HTTPS twice", async ({ app }) => {
+  await start(app, lab({ behind: 2, origin: "ssh" }), { pull_project: [sshFailure] });
+  await pullButton(app).click();
+  await app.expectDialog(["Switch it to HTTPS and try again?"], "ok");
+  const failed = await app.expectDialog(["The pull failed: GitHub didn't accept"], "ok");
+  expect(failed.message).not.toContain("Switch it to HTTPS");
+  expect(await app.writes()).toEqual(["pull_project", "set_clone_remote", "pull_project"]);
+  expect(await app.pendingDialogs()).toEqual([]);
+});
+
+test("GitHub's changed host key at pull: replace it, then pull again", async ({ app }) => {
+  const changed = fail("ssh", "REMOTE HOST IDENTIFICATION HAS CHANGED", {
+    problem: "hostKeyChanged",
+  });
+  await start(app, lab({ behind: 2, origin: "ssh" }), { pull_project: [changed, ok()] });
+  await pullButton(app).click();
+  const dialog = await app.expectDialog(
+    ["doesn't match GitHub's", "known_hosts.old"],
+    "Replace GitHub's old key",
+  );
+  expect(dialog.labels).toEqual({
+    yes: "Replace GitHub's old key",
+    no: "Use HTTPS for this clone",
+    cancel: "Cancel",
+  });
+  await app.waitForCall("pull_project", 2);
+  expect(await app.writes()).toEqual(["pull_project", "replace_github_host_key", "pull_project"]);
+});
+
+test("a key of another account names it", async ({ app }) => {
+  const other = fail("ssh", "Repository not found.", {
+    problem: "otherAccount",
+    login: "old-alex",
+  });
+  await start(app, lab({ behind: 2, origin: "ssh" }), { pull_project: [other] });
+  await pullButton(app).click();
+  await app.expectDialog(
+    ["this computer's SSH key signs in to GitHub as old-alex, which can't reach this repository"],
+    "cancel",
+  );
+  expect(await app.writes()).toEqual(["pull_project"]);
+});
+
+test("GitHub refusing the student's own account offers no switch", async ({ app }) => {
+  // SSH worked: Rust keeps GitHub's line as an `unsupported` refusal.
+  const denied = fail("unsupported", "Permission to acme-cs/lab-1-alex.git denied to alex.");
+  await start(app, lab({ behind: 2, origin: "ssh" }), { pull_project: [denied] });
+  await pullButton(app).click();
+  const dialog = await app.expectDialog(
+    ["The pull failed: Permission to acme-cs/lab-1-alex.git denied to alex."],
+    "ok",
+  );
+  expect(dialog.message).not.toContain("HTTPS");
+  expect(await app.writes()).toEqual(["pull_project"]);
+});

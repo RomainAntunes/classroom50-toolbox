@@ -258,7 +258,9 @@ test("SSH not ready: SSH settings… opens Settings and clones nothing", async (
   await cloneButton(app).click();
   await app.answer("yes");
   await app.expectDialog(["No SSH key of this computer is on your GitHub account."], "no");
-  await expect(page).toHaveURL(/\/settings$/);
+  // Settings, at its SSH row.
+  await expect(page).toHaveURL(/\/settings#ssh$/);
+  await expect(page.locator("#ssh")).toBeFocused();
   expect(await app.writes()).toEqual([]);
 });
 
@@ -314,7 +316,10 @@ test("Clone with SSH checks SSH, then clones with SSH", async ({ app }) => {
   await app.answer("yes");
   const [call] = await app.waitForCall("clone_project");
   expect(call.args.protocol).toBe("ssh");
-  await app.waitForCall("ssh_status");
+  // SSH was checked before the clone, not after.
+  const order = (await app.calls()).map((c) => c.cmd);
+  expect(order.indexOf("ssh_status")).toBeGreaterThan(-1);
+  expect(order.indexOf("ssh_status")).toBeLessThan(order.indexOf("clone_project"));
 });
 
 test("an SSH failure offers Clone with HTTPS, once", async ({ app }) => {
@@ -381,4 +386,75 @@ test("no clone, or an origin elsewhere: no switch in the menu", async ({ app }) 
     expect(texts.some((text) => text.endsWith("for this clone"))).toBe(false);
     await app.page.keyboard.press("Escape");
   }
+});
+
+const cloned = project({ slug: "lab1", name: "Lab 1" });
+
+test("Use SSH for this clone checks SSH first; Trust GitHub, then the switch", async ({ app }) => {
+  await app.start(
+    scenario({ snapshot: snapshot({ projects: [cloned] }), ssh: { state: "hostKeyUnknown" } }),
+  );
+  await app.rowMenu("Lab 1");
+  await app.pickMenu("Use SSH for this clone");
+  const dialog = await app.expectDialog(["doesn't know GitHub's SSH host key yet"], "ok");
+  expect(dialog.labels).toEqual({ ok: "Trust GitHub", cancel: "Cancel" });
+  const [call] = await app.waitForCall("set_clone_remote");
+  expect(call.args).toEqual({ id: cloned.id, protocol: "ssh" });
+  expect(await app.writes()).toEqual(["trust_github_host", "set_clone_remote"]);
+});
+
+test("Use SSH for this clone while SSH has no key: no switch", async ({ app, page }) => {
+  await app.start(
+    scenario({
+      snapshot: snapshot({ projects: [cloned] }),
+      ssh: { state: "noKey", localKey: null },
+    }),
+  );
+  await app.rowMenu("Lab 1");
+  await app.pickMenu("Use SSH for this clone");
+  const dialog = await app.expectDialog(["No SSH key of this computer"], "cancel");
+  expect(dialog.labels).toEqual({ ok: "SSH settings…", cancel: "Cancel" });
+  expect(await app.writes()).toEqual([]);
+  await expect(page).toHaveURL(/\/$/);
+});
+
+test("Use HTTPS for this clone switches at once, with no SSH check", async ({ app }) => {
+  const sshClone = { ...cloned, local: { ...cloned.local!, origin: "ssh" as const } };
+  await app.start(scenario({ snapshot: snapshot({ projects: [sshClone] }) }));
+  await app.rowMenu("Lab 1");
+  await app.pickMenu("Use HTTPS for this clone");
+  await app.waitForCall("set_clone_remote");
+  expect(await app.calls("ssh_status")).toEqual([]);
+});
+
+test("a switch Rust refuses is worded", async ({ app }) => {
+  await app.start(
+    scenario({
+      snapshot: snapshot({ projects: [cloned] }),
+      responses: {
+        set_clone_remote: [fail("unsupported", "the clone's origin isn't acme-cs/lab-1-alex")],
+      },
+    }),
+  );
+  await app.rowMenu("Lab 1");
+  await app.pickMenu("Use SSH for this clone");
+  const dialog = await app.expectDialog(
+    ["Couldn't change how this clone reaches GitHub: the clone's origin isn't acme-cs/lab-1-alex"],
+    "ok",
+  );
+  expect(dialog.kind).toBe("error");
+});
+
+test("no switch while git runs in the clone", async ({ app }) => {
+  const behind = project({ slug: "lab1", name: "Lab 1", local: { behind: 1 } });
+  await app.start(
+    scenario({
+      snapshot: snapshot({ projects: [behind] }),
+      responses: { pull_project: [hold()] },
+    }),
+  );
+  await app.row("Lab 1").getByRole("button", { name: "Pull" }).click();
+  await app.waitForCall("pull_project");
+  const menu = await app.rowMenu("Lab 1");
+  expect(menu.items.find((i) => i.text === "Use SSH for this clone")?.enabled).toBe(false);
 });
