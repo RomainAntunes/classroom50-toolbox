@@ -339,6 +339,17 @@ test("git sign-in: a failure says why and keeps the button", async ({ app }) => 
   await expect(gitRow(app).getByRole("button", { name: "Set up" })).toBeVisible();
 });
 
+test("how tools install is folded under the Tools intro", async ({ app, page }) => {
+  await openTools(app);
+  await expect(page.getByText(/^The toolbox works through git/)).toBeVisible();
+  const more = page.getByRole("button", { name: "How tools install" });
+  await expect(more).toHaveAttribute("aria-expanded", "false");
+  await expect(page.getByText(/Missing ones install through your package manager/)).toBeHidden();
+  await more.click();
+  await expect(more).toHaveAttribute("aria-expanded", "true");
+  await expect(page.getByText(/Missing ones install through your package manager/)).toBeVisible();
+});
+
 // HTTPS or SSH (gh's `git_protocol`) and where SSH stands, with its fix.
 const sshRow = (app: App) => app.page.locator(".ssh");
 const protocolButton = (app: App) =>

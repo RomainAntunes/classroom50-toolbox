@@ -13,6 +13,8 @@
   /** Rows still asking GitHub for a newer version: Check again spins until they're done. */
   let lookups = $state<Record<string, boolean>>({});
   const busy = $derived(checking || Object.values(lookups).some(Boolean));
+  /** How missing tools install: folded, since the rows already offer Install. */
+  let showInstalls = $state(false);
 
   function replaceTool(next: ToolStatus) {
     session.tools = session.tools.map((tool) => (tool.tool === next.tool ? next : tool));
@@ -25,7 +27,22 @@
       >{#if busy}<Spinner />{/if}{t("setup.recheck")}</button
     >
   {/snippet}
-  <p class="hint">{t("settings.tools.hint")}</p>
+  <div class="intro">
+    <p class="hint">{t("settings.tools.hint")}</p>
+    <button
+      class="disclosure"
+      aria-expanded={showInstalls}
+      aria-controls="tool-installs"
+      onclick={() => (showInstalls = !showInstalls)}
+    >
+      <svg class="mirror-rtl" viewBox="0 0 24 24" aria-hidden="true"><path d="m9 18 6-6-6-6" /></svg
+      >
+      {t("settings.tools.howInstalls")}
+    </button>
+    <p class="hint installs" id="tool-installs" hidden={!showInstalls}>
+      {t("settings.tools.installs")}
+    </p>
+  </div>
   {#each session.tools as status (status.tool)}
     <ToolRow
       {status}
@@ -40,4 +57,27 @@
 
 <style>
   @import "./hint.css";
+  @import "./disclosure.css";
+
+  .intro {
+    padding-block: 10px 4px;
+  }
+
+  .intro .hint {
+    padding-block: 0;
+    font-size: 0.85em;
+  }
+
+  .intro .disclosure {
+    padding-block: 6px;
+    font-size: 0.85em;
+  }
+
+  .installs {
+    padding-block-end: 8px;
+  }
+
+  .installs[hidden] {
+    display: none;
+  }
 </style>
