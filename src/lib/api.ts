@@ -54,6 +54,8 @@ export type MarkdownBlock = B.Block;
 export type MarkdownInline = B.Inline;
 /** One assignment repo, merged from GitHub, the watched folders and the Pages manifest. */
 export type Project = B.Project_Serialize;
+/** A dated phase the student set on a project (`phases.rs`). */
+export type ProjectPhase = B.ProjectPhase;
 /** A group team (`classroom50-group-<hash>-<n>`) the user is on. */
 export type Group = B.Group;
 /** The classmates queued for one row (`teammate_jobs`, the `teammate-jobs` event). */

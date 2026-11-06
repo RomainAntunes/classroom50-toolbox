@@ -122,6 +122,11 @@ export const commands = {
 	 *  and removes the events the app wrote.
 	 */
 	setNativeCalendar: (id: string | null) => __TAURI_INVOKE<Settings>("set_native_calendar", { id }),
+	/**
+	 *  Replaces the project's phases with `phases` (validated, sorted by date) and shows them at
+	 *  once: `projects-updated` follows, reminders and calendar events with it, no GitHub call.
+	 */
+	setPhases: (id: string, phases: ProjectPhase[]) => __TAURI_INVOKE<ProjectPhase[]>("set_phases", { id, phases }),
 	/**  Dev builds only: pretends GitHub is down or the device is offline, until set back. */
 	simulateNetwork: (network: Network) => __TAURI_INVOKE<null>("simulate_network", { network }),
 	simulatedNetwork: () => __TAURI_INVOKE<Network>("simulated_network"),
@@ -592,6 +597,10 @@ export type CalendarLabels = {
 	notGraded: string,
 	submitted: string,
 	notAccepted: string,
+	/**  A phase's event title, `{name}` the assignment's and `{phase}` the phase's. */
+	phaseTitle: string,
+	/**  A phase ticked done. */
+	phaseDone: string,
 };
 
 /**
@@ -689,7 +698,7 @@ export type EditorInfo = {
 	name: string,
 };
 
-export type ErrorKind = "notInstalled" | "commandFailed" | "timedOut" | "unsupported" | "manualInstall" | "blockedInDev" | "cancelled" | "busy" | "pathExists" | "schemaMismatch" | "student" | "needsTeam" | "submissionsClosed" | "unknownAssignment" | "ghStudentOutdated" | "staleMarker" | "groupFull" | "invalidUsername" | "invalidTeamName" | "noTerminal" | "localChanges" | "otherBranch" | "diverged" | "remoteAhead" | "gitInProgress" | "nothingToPush" | "nothingToCommit" | "noIdentity" | "fileTooLarge" | "pushRejected" | "notSignedIn" | "tokenFromEnv" | "rateLimited" | "github" | "offline" | "noSelfUpdate" | "calendarAccess" | "calendarUnavailable" | "invalidShortcut" | "shortcutTaken" | "shortcutUnsupported" | "repoConfig" | "io" | "http" | "tauri" | "updater" | "autostart";
+export type ErrorKind = "notInstalled" | "commandFailed" | "timedOut" | "unsupported" | "manualInstall" | "blockedInDev" | "cancelled" | "busy" | "pathExists" | "schemaMismatch" | "student" | "needsTeam" | "submissionsClosed" | "unknownAssignment" | "ghStudentOutdated" | "staleMarker" | "groupFull" | "invalidUsername" | "invalidTeamName" | "invalidPhase" | "noTerminal" | "localChanges" | "otherBranch" | "diverged" | "remoteAhead" | "gitInProgress" | "nothingToPush" | "nothingToCommit" | "noIdentity" | "fileTooLarge" | "pushRejected" | "notSignedIn" | "tokenFromEnv" | "rateLimited" | "github" | "offline" | "noSelfUpdate" | "calendarAccess" | "calendarUnavailable" | "invalidShortcut" | "shortcutTaken" | "shortcutUnsupported" | "repoConfig" | "io" | "http" | "tauri" | "updater" | "autostart";
 
 /**  The payload of each event, by name: `Events` in `src/lib/bindings.ts`. */
 export type Events = Events_Serialize | Events_Deserialize;
@@ -1059,7 +1068,9 @@ export type Network = "normal" |
 "noInternet";
 
 /**  A notification for the UI to word. */
-export type Notice = { kind: "due"; assignment: string; due: string } | { kind: "grade"; assignment: string; score: number; maxScore: number } | 
+export type Notice = { kind: "due"; assignment: string; due: string } | 
+/**  One of the phases the student set (`phases.rs`) is near. */
+{ kind: "phaseDue"; assignment: string; phase: string; due: string } | { kind: "grade"; assignment: string; score: number; maxScore: number } | 
 /**  The autograder couldn't grade the last push (not failing tests: those are a grade). */
 { kind: "gradingFailed"; assignment: string } | { kind: "feedback"; assignment: string; count: number } | { kind: "newAssignment"; assignment: string; classroom: string } | { kind: "teammatePush"; assignment: string; author: string } | 
 /**  Classmates joined the user's group (names, else logins). */
@@ -1114,6 +1125,18 @@ export type PhaseCost = {
 
 export type Project = Project_Serialize | Project_Deserialize;
 
+export type ProjectPhase = {
+	/**
+	 *  Made by the UI (`crypto.randomUUID()`), stable across edits: calendar UIDs and
+	 *  reminder keys go by it.
+	 */
+	id: string,
+	name: string,
+	due: string,
+	/**  Ticked by the student once it's handed in: no more reminders. */
+	done: boolean,
+};
+
 export type Project_Deserialize = {
 	/**  `owner/repo` in lowercase, or the clone path when it has no GitHub origin. */
 	id: string,
@@ -1151,6 +1174,8 @@ export type Project_Deserialize = {
 	lastEditor: string | null,
 	/**  The user's group, on a team assignment. */
 	group: Group | null,
+	/**  The phases the student set on it (`phases::PhaseStore`), by date. */
+	phases: ProjectPhase[],
 };
 
 export type Project_Serialize = {
@@ -1190,6 +1215,8 @@ export type Project_Serialize = {
 	lastEditor: string | null,
 	/**  The user's group, on a team assignment. */
 	group: Group | null,
+	/**  The phases the student set on it (`phases::PhaseStore`), by date. */
+	phases: ProjectPhase[],
 };
 
 /**  What Commit & push would do, for the prompt. */

@@ -214,6 +214,7 @@ export interface ProjectOptions {
   editor?: string | null;
   /** The editor last picked for the clone in the app. */
   lastEditor?: string | null;
+  phases?: Project["phases"];
 }
 
 /** A clone of an accepted assignment, on GitHub and on disk, nothing pending. */
@@ -283,6 +284,7 @@ export function project(options: ProjectOptions): Project {
     editor: options.editor ?? null,
     lastEditor: options.lastEditor ?? null,
     group: options.group ?? null,
+    phases: options.phases ?? [],
   };
 }
 

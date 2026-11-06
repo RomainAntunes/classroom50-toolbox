@@ -43,7 +43,7 @@ use crate::sync_progress::Costs;
 
 pub use renames::{previous_id, previous_unaccepted_id, renamed_ids, unaccepted_key};
 pub use schedule::{refresh_if_stale, start_background_sync};
-pub use sync::{refresh, refresh_after_push, refresh_after_write, refresh_local};
+pub use sync::{refresh, refresh_after_push, refresh_after_write, refresh_local, republish};
 
 // What the parts share, so each imports it from here.
 use build::{Sources, build};
@@ -55,7 +55,7 @@ use remote::{Extra, REPO_FRAGMENT, RepoNode, fetch_nodes_with, sync_remote};
 use renames::renamed_clone;
 use scan::{scan_local, watch_targets};
 use schedule::may_call_github;
-use snapshot::{annotate, full_snapshot, local_snapshot};
+use snapshot::{annotate, full_snapshot, local_snapshot, with_phases};
 use statuses::{StatusAuth, keep_status, refresh_statuses, status_auth};
 use sync::{Mode, refresh_in_background};
 
@@ -223,6 +223,9 @@ pub struct Project {
     /// The user's group, on a team assignment.
     #[serde(default)]
     pub group: Option<Group>,
+    /// The phases the student set on it (`phases::PhaseStore`), by date.
+    #[serde(default)]
+    pub phases: Vec<crate::phases::Phase>,
 }
 
 /// Why the last sync was partial, as `{ kind, message, params }` like command errors.

@@ -30,6 +30,7 @@ pub(super) fn project(
         needs_work: false,
         web_url: None,
         late_seconds: None,
+        phases: Vec::new(),
         editor: None,
         last_editor: None,
         group: None,

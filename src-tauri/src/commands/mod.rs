@@ -13,6 +13,7 @@ mod editors;
 #[cfg(test)]
 mod fixtures;
 mod git;
+mod phases;
 mod projects;
 mod settings;
 mod student;
@@ -27,6 +28,7 @@ pub use developer::*;
 pub use diagnostics::*;
 pub use editors::*;
 pub use git::*;
+pub use phases::*;
 pub use projects::*;
 pub use settings::*;
 pub use student::*;

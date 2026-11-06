@@ -27,8 +27,9 @@
   import { editors, loadEditors } from "#lib/editor.svelte.js";
   import { initTheme } from "#lib/theme/preview.svelte.js";
   import Prompt from "#lib/components/Prompt.svelte";
+  import PhasesEditor from "#lib/components/PhasesEditor.svelte";
   import { announce, announcer } from "#lib/announce.svelte.js";
-  import { prompt } from "#lib/prompt.svelte.js";
+  import { modals } from "#lib/modal.svelte.js";
   import { loadSnapshot, session } from "#lib/session.svelte.js";
   import { loadSettings, settings } from "#lib/settings.svelte.js";
   import { pendingNotes } from "#lib/whatsnew.js";
@@ -52,13 +53,13 @@
     }
   }
 
-  // Escape closes what is open, innermost first: the prompt and a row's details handle it
+  // Escape closes what is open, innermost first: a dialog and a row's details handle it
   // (and mark it handled); with nothing left to close it hides the popover, like a click
   // outside. A text field with text clears it first; a switch or checkbox (whose `value`
   // is "on") doesn't count.
   const TEXT_INPUTS = ["text", "search", "email", "url", "tel", "password", "number"];
   function onKeyDown(event: KeyboardEvent) {
-    if (event.key !== "Escape" || event.defaultPrevented || prompt.current) return;
+    if (event.key !== "Escape" || event.defaultPrevented || modals.open > 0) return;
     const target = event.target;
     if (target instanceof HTMLInputElement && TEXT_INPUTS.includes(target.type) && target.value) {
       return;
@@ -104,6 +105,8 @@
       notGraded: t("calendar.notes.notGraded"),
       submitted: t("calendar.notes.submitted"),
       notAccepted: t("calendar.notes.notAccepted"),
+      phaseTitle: t("calendar.phaseTitle", { name: "{name}", phase: "{phase}" }),
+      phaseDone: t("calendar.notes.phaseDone"),
     });
   });
 
@@ -244,6 +247,7 @@
 <div class="popover">
   {@render children()}
   <Prompt />
+  <PhasesEditor />
   <div class="sr-only" role="status">{announcer.text}</div>
 </div>
 

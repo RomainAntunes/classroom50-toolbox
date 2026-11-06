@@ -1,54 +1,17 @@
 <script lang="ts">
   import { t } from "#lib/i18n/index.js";
   import { prompt } from "#lib/prompt.svelte.js";
+  import Modal from "./Modal.svelte";
 
   let value = $state("");
-  let input = $state<HTMLInputElement | null>(null);
-  let pre = $state<HTMLPreElement | null>(null);
   // A read-only preview (`showText`) has no input; its main action is always available.
   const preview = $derived(prompt.current?.text !== undefined);
   const ready = $derived(preview || value.trim() !== "");
-  let card = $state<HTMLElement | null>(null);
-  /** What had the focus before the prompt opened; it gets it back when the prompt closes. */
-  let restore: HTMLElement | null = null;
 
+  // A prompt that replaces another keeps the shell (and the focus), with an empty field.
   $effect(() => {
-    if (prompt.current) {
-      restore ??= document.activeElement instanceof HTMLElement ? document.activeElement : null;
-      value = "";
-      (input ?? pre)?.focus();
-    } else if (restore) {
-      const previous = restore;
-      restore = null;
-      if (previous.isConnected) previous.focus();
-    }
+    if (prompt.current) value = "";
   });
-
-  /** Keeps Tab and Shift+Tab inside the prompt, and Escape cancels it. */
-  function onKeyDown(event: KeyboardEvent) {
-    if (event.key === "Escape") {
-      event.preventDefault();
-      close(null);
-      return;
-    }
-    if (event.key !== "Tab" || !card) return;
-    const focusable = [
-      ...card.querySelectorAll<HTMLElement>("input, pre[tabindex], button:not(:disabled)"),
-    ];
-    const first = focusable[0];
-    const last = focusable[focusable.length - 1];
-    if (!first || !last) return;
-    // The handler only runs with the focus in the card; on the card itself (a click on
-    // its padding) Tab would otherwise leave it.
-    const onCard = document.activeElement === card;
-    if (event.shiftKey && (document.activeElement === first || onCard)) {
-      event.preventDefault();
-      last.focus();
-    } else if (!event.shiftKey && (document.activeElement === last || onCard)) {
-      event.preventDefault();
-      first.focus();
-    }
-  }
 
   function close(result: string | null, alt = false) {
     prompt.current?.resolve(result, alt);
@@ -57,88 +20,52 @@
 
 {#if prompt.current}
   {@const current = prompt.current}
-  <div class="scrim" role="presentation" onclick={() => close(null)}>
-    <div
-      class="card"
-      role="dialog"
-      aria-modal="true"
-      aria-labelledby="prompt-title"
-      aria-describedby={current.message ? "prompt-message" : undefined}
-      tabindex="-1"
-      bind:this={card}
-      onclick={(event) => event.stopPropagation()}
-      onkeydown={onKeyDown}
+  <Modal
+    labelledby="prompt-title"
+    describedby={current.message ? "prompt-message" : undefined}
+    onclose={() => close(null)}
+  >
+    <form
+      onsubmit={(event) => {
+        event.preventDefault();
+        if (ready) close(preview ? "ok" : value);
+      }}
     >
-      <form
-        onsubmit={(event) => {
-          event.preventDefault();
-          if (ready) close(preview ? "ok" : value);
-        }}
-      >
-        <h2 id="prompt-title"><bdi>{current.title}</bdi></h2>
-        {#if current.message}<p id="prompt-message">{current.message}</p>{/if}
-        {#if current.text !== undefined}
-          <!-- svelte-ignore a11y_no_noninteractive_tabindex -->
-          <pre
-            bind:this={pre}
-            tabindex="0"
-            aria-labelledby="prompt-title"
-            dir="ltr">{current.text}</pre>
-        {:else}
-          <input
-            bind:this={input}
-            bind:value
-            aria-label={current.label ?? current.title}
-            placeholder={current.placeholder}
-            maxlength={current.maxLength}
-            autocomplete="off"
-            autocapitalize="off"
-            spellcheck="false"
-          />
+      <h2 id="prompt-title"><bdi>{current.title}</bdi></h2>
+      {#if current.message}<p id="prompt-message">{current.message}</p>{/if}
+      {#if current.text !== undefined}
+        <!-- svelte-ignore a11y_no_noninteractive_tabindex -->
+        <pre
+          tabindex="0"
+          aria-labelledby="prompt-title"
+          dir="ltr"
+          data-autofocus>{current.text}</pre>
+      {:else}
+        <input
+          bind:value
+          aria-label={current.label ?? current.title}
+          placeholder={current.placeholder}
+          maxlength={current.maxLength}
+          autocomplete="off"
+          autocapitalize="off"
+          spellcheck="false"
+          data-autofocus
+        />
+      {/if}
+      <div class="buttons">
+        <button type="button" onclick={() => close(null)}>{t("prompt.cancel")}</button>
+        {#if current.altLabel}
+          <button type="button" disabled={!value.trim()} onclick={() => close(value, true)}
+            >{current.altLabel}</button
+          >
         {/if}
-        <div class="buttons">
-          <button type="button" onclick={() => close(null)}>{t("prompt.cancel")}</button>
-          {#if current.altLabel}
-            <button type="button" disabled={!value.trim()} onclick={() => close(value, true)}
-              >{current.altLabel}</button
-            >
-          {/if}
-          <button type="submit" class="primary" disabled={!ready}>{current.okLabel}</button>
-        </div>
-      </form>
-    </div>
-  </div>
+        <button type="submit" class="primary" disabled={!ready}>{current.okLabel}</button>
+      </div>
+    </form>
+  </Modal>
 {/if}
 
 <style>
-  .scrim {
-    position: fixed;
-    inset: 0;
-    display: grid;
-    place-items: center;
-    padding: 16px;
-    background: rgb(0 0 0 / 0.3);
-    border-radius: var(--radius-window);
-    z-index: 10;
-  }
-
-  .card {
-    width: 100%;
-    /* Three buttons (Cancel, Commit only, Commit & push) fit on one line at 14px; the
-       380px popover minus the scrim's padding leaves 348px. */
-    max-width: 340px;
-    /* A long message (accept's summary) scrolls inside the popover. */
-    max-height: calc(100vh - 32px);
-    overflow-y: auto;
-    padding: 14px;
-    border: 1px solid var(--border);
-    border-radius: var(--radius-card);
-    background: var(--bg-card);
-    backdrop-filter: blur(30px) saturate(1.6);
-    -webkit-backdrop-filter: blur(30px) saturate(1.6);
-    box-shadow: 0 8px 30px rgb(0 0 0 / 0.25);
-  }
-
   form {
     display: flex;
     flex-direction: column;

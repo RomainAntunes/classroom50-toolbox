@@ -1,6 +1,7 @@
 // A list with every kind of row, for layout checks and screenshots: late, graded below the
 // passing bar, grading, uncommitted and not graded, local changes, commit then pull, behind,
-// feedback, closed, a full group graded by hand, not cloned, unaccepted and upcoming.
+// feedback, closed, a full group graded by hand, phases set by the student, not cloned,
+// unaccepted and upcoming.
 import {
   classroom,
   daysFromNow,
@@ -129,6 +130,21 @@ export function richScenario(over: Partial<Settings> = {}): Scenario {
             classroom: null,
             assignment: null,
           },
+        }),
+        project({
+          slug: "portfolio",
+          name: "Portfolio",
+          classroom: art,
+          assignment: { due: null },
+          phases: [
+            { id: "p1", name: "First draft", due: daysFromNow(-3), done: true },
+            {
+              id: "p2",
+              name: "Final review with the teaching staff",
+              due: hoursFromNow(20),
+              done: false,
+            },
+          ],
         }),
         project({
           slug: "sketch",

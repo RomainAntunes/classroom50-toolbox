@@ -9,12 +9,13 @@ use tauri::{AppHandle, Manager};
 
 use super::{
     LastRun, Progress, ProjectsState, Snapshot, annotate, commit_emails, full_snapshot,
-    local_snapshot, may_call_github, scan_local, sync_remote, watch_targets,
+    local_snapshot, may_call_github, scan_local, sync_remote, watch_targets, with_phases,
 };
 use crate::clones::CloneStore;
 use crate::editor_choices::EditorChoices;
 use crate::events::{IpcEvent, ProjectsUpdated};
 use crate::github::{self, Http};
+use crate::phases::PhaseStore;
 use crate::settings::{Settings, SettingsStore};
 use crate::status::Grading;
 use crate::sync_progress::Phase;
@@ -184,7 +185,10 @@ async fn publish(
             stats.rate_limit = Some(rate);
         }
     }
+    let mut snapshot = snapshot;
+    // Under the lock, so phases saved meanwhile (`republish`) are on it either way.
     if let Ok(mut current) = state.snapshot.lock() {
+        with_phases(&mut snapshot, &app.state::<PhaseStore>(), Utc::now());
         *current = snapshot.clone();
     }
     if let Err(err) = ProjectsUpdated::emit(app, &snapshot) {
@@ -192,6 +196,27 @@ async fn publish(
     }
     state.save_state();
     watch::rewatch(app, targets);
+    crate::alerts::process(app, &snapshot);
+    crate::calendar::sync(app);
+    snapshot
+}
+
+/// Shows a change only the app's own files hold (the student's phases) without a sync:
+/// the last snapshot with it, broadcast, saved and passed on to alerts and calendar. A
+/// sync in flight puts the same change on its own result when it publishes.
+pub fn republish(app: &AppHandle) -> Snapshot {
+    let state = app.state::<ProjectsState>();
+    let snapshot = match state.snapshot.lock() {
+        Ok(mut current) => {
+            with_phases(&mut current, &app.state::<PhaseStore>(), Utc::now());
+            current.clone()
+        }
+        Err(_) => return state.snapshot(),
+    };
+    if let Err(err) = ProjectsUpdated::emit(app, &snapshot) {
+        log::warn!("could not emit {}: {err}", ProjectsUpdated::NAME);
+    }
+    state.save_state();
     crate::alerts::process(app, &snapshot);
     crate::calendar::sync(app);
     snapshot
@@ -225,6 +250,8 @@ async fn sync(
                 local_snapshot(state, http, locals.clone(), now, false, false, &quiet).await;
             let choices = progress.app.state::<EditorChoices>().all();
             annotate(state, &mut snapshot, recents, &choices);
+            let phases = progress.app.state::<PhaseStore>();
+            with_phases(&mut snapshot, &phases, now);
             if let Err(err) = ProjectsUpdated::emit(&progress.app, &snapshot) {
                 log::warn!("could not emit {}: {err}", ProjectsUpdated::NAME);
             }

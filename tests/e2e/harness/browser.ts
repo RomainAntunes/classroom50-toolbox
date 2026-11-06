@@ -5,7 +5,7 @@
 // and menus wait for the test to answer or pick, through `window.__E2E__`.
 import { emit } from "@tauri-apps/api/event";
 import { mockIPC, mockWindows } from "@tauri-apps/api/mocks";
-import type { CommandError, Settings } from "../../../src/lib/api";
+import type { CommandError, ProjectPhase, Settings } from "../../../src/lib/api";
 import type { Reply, Scenario } from "../fixtures";
 
 export interface Call {
@@ -194,6 +194,18 @@ export function install(scenario: Scenario): E2E {
         state.settings = { ...state.settings, calendarFile: args.path as string };
         const { projects, unaccepted } = state.snapshot;
         return [...projects, ...unaccepted].filter((item) => item.assignment?.due).length;
+      }
+      case "set_phases": {
+        // Rust stores them by date and republishes the list without a sync.
+        const phases = [...(args.phases as ProjectPhase[])].sort(
+          (a, b) => Date.parse(a.due) - Date.parse(b.due),
+        );
+        const projects = state.snapshot.projects.map((p) =>
+          p.id === args.id ? { ...p, phases } : p,
+        );
+        state.snapshot = { ...state.snapshot, projects };
+        void emit("projects-updated", state.snapshot);
+        return phases;
       }
       case "active_global_shortcut":
         return state.settings.globalShortcut;

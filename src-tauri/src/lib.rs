@@ -22,6 +22,7 @@ mod login;
 pub mod markdown;
 pub mod milestones;
 pub mod noise;
+pub mod phases;
 pub mod platform;
 mod popover;
 pub mod process;
@@ -86,6 +87,7 @@ macro_rules! ipc_commands {
             crate::commands::system_languages,
             crate::commands::system_hour_cycle,
             crate::commands::set_native_calendar,
+            crate::commands::set_phases,
             crate::commands::simulate_network,
             crate::commands::simulated_network,
             crate::commands::take_deep_link,
@@ -204,6 +206,7 @@ pub fn run() {
             app.manage(editor_choices::EditorChoices::load(
                 &app.path().app_config_dir()?,
             ));
+            app.manage(phases::PhaseStore::load(&app.path().app_config_dir()?));
             app.manage(calendar::CalendarState::load(
                 &app.path().app_config_dir()?,
                 &app.path().app_data_dir()?,

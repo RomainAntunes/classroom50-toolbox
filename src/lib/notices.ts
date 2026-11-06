@@ -18,7 +18,9 @@ export async function showNotice(notice: Notice) {
     values.members = formatList(notice.members);
     values.count = notice.members.length;
   }
-  if (notice.kind === "due") values.when = relativeAt(new Date(notice.due));
+  if (notice.kind === "due" || notice.kind === "phaseDue") {
+    values.when = relativeAt(new Date(notice.due));
+  }
   if (notice.kind === "deadlineChanged") {
     values.when = notice.due ? formatDate(new Date(notice.due)) : t("alerts.noDeadline");
   }
@@ -52,6 +54,7 @@ export function sampleNotices(now = Date.now()): Notice[] {
   const assignment = "Lab 1";
   return [
     { kind: "due", assignment, due: new Date(now + 6 * HOUR).toISOString() },
+    { kind: "phaseDue", assignment, phase: "Phase 2", due: new Date(now + HOUR).toISOString() },
     { kind: "grade", assignment, score: 8, maxScore: 10 },
     { kind: "gradingFailed", assignment },
     { kind: "feedback", assignment, count: 2 },
