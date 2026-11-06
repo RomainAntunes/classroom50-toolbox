@@ -13,7 +13,9 @@
   import { formatDate, relativeAt, t } from "#lib/i18n/index.js";
   import { jobFor } from "#lib/teammateJobs.svelte.js";
   import Details from "./Details.svelte";
-  import TeammateProgress from "./TeammateProgress.svelte";
+  // Its own chunk, loaded the first time classmates are being added, so its styles stay
+  // out of the startup bundle.
+  const teammatePanel = () => import("./TeammateProgress.svelte");
 
   let {
     item,
@@ -115,61 +117,66 @@
 <li class="item" class:linked={linked !== null} data-item bind:this={element}>
   <!-- A right click anywhere on the row opens its menu; the keyboard opens it from the
        row's button (Menu key or Shift+F10). -->
-  <!-- svelte-ignore a11y_no_static_element_interactions -->
-  <div class="row" oncontextmenu={onContextMenu(() => showMenu())}>
-    <button
-      class="toggle"
-      data-row
-      aria-expanded={open}
-      aria-labelledby="{uid}-name"
-      aria-describedby="{uid}-meta"
-      onclick={() => (open = !open)}
-      onkeydown={menuKey((anchor) => showMenu(anchor))}
-    >
-      <span class="text">
-        <span class="name" id="{uid}-name">
-          {#if unseen}<span class="dot" aria-hidden="true"></span>{/if}<bdi
-            >{item.assignment.name}</bdi
-          >{#if unseen}<span class="sr-only">, {t("projects.new")}</span>{/if}
+  <!-- The classmates being added sit under the row and light up with it. -->
+  <div class="head">
+    <!-- svelte-ignore a11y_no_static_element_interactions -->
+    <div class="row" oncontextmenu={onContextMenu(() => showMenu())}>
+      <button
+        class="toggle"
+        data-row
+        aria-expanded={open}
+        aria-labelledby="{uid}-name"
+        aria-describedby="{uid}-meta"
+        onclick={() => (open = !open)}
+        onkeydown={menuKey((anchor) => showMenu(anchor))}
+      >
+        <span class="text">
+          <span class="name" id="{uid}-name">
+            {#if unseen}<span class="dot" aria-hidden="true"></span>{/if}<bdi
+              >{item.assignment.name}</bdi
+            >{#if unseen}<span class="sr-only">, {t("projects.new")}</span>{/if}
+          </span>
+          <span class="meta" id="{uid}-meta">
+            {#if hidden}
+              <span class="hidden-tag">{t("projects.hidden")}</span> ·
+            {/if}
+            <span class="status" class:upcoming
+              >{accepting
+                ? t("projects.accepting")
+                : upcoming && opens
+                  ? t("projects.opens", { when: relativeAt(opens, now) })
+                  : t("projects.notAccepted")}</span
+            >
+            {#if item.group}
+              · {t("projects.inGroup", { group: groupName(item.group) })}
+            {/if}
+            {#if dueLabel && due}
+              · <span title={formatDate(due)}>{dueLabel}</span>
+            {/if}
+            <!-- The disabled Accept button can't take focus, so its hint is read here. -->
+            {#if blocked}<span class="sr-only">. {blocked}</span>{/if}
+          </span>
         </span>
-        <span class="meta" id="{uid}-meta">
-          {#if hidden}
-            <span class="hidden-tag">{t("projects.hidden")}</span> ·
-          {/if}
-          <span class="status" class:upcoming
-            >{accepting
-              ? t("projects.accepting")
-              : upcoming && opens
-                ? t("projects.opens", { when: relativeAt(opens, now) })
-                : t("projects.notAccepted")}</span
-          >
-          {#if item.group}
-            · {t("projects.inGroup", { group: groupName(item.group) })}
-          {/if}
-          {#if dueLabel && due}
-            · <span title={formatDate(due)}>{dueLabel}</span>
-          {/if}
-          <!-- The disabled Accept button can't take focus, so its hint is read here. -->
-          {#if blocked}<span class="sr-only">. {blocked}</span>{/if}
-        </span>
-      </span>
-    </button>
-    <button
-      class="primary"
-      title={blocked ?? undefined}
-      disabled={accepting || blocked !== null}
-      onclick={() => accept()}>{t("projects.accept")}</button
-    >
-    <button
-      title={t("projects.openAcceptPage")}
-      aria-label={t("projects.openAcceptPage")}
-      onclick={() => openUrl(item.acceptUrl)}
-      ><span class="mirror-rtl" aria-hidden="true">↗</span></button
-    >
+      </button>
+      <button
+        class="primary"
+        title={blocked ?? undefined}
+        disabled={accepting || blocked !== null}
+        onclick={() => accept()}>{t("projects.accept")}</button
+      >
+      <button
+        title={t("projects.openAcceptPage")}
+        aria-label={t("projects.openAcceptPage")}
+        onclick={() => openUrl(item.acceptUrl)}
+        ><span class="mirror-rtl" aria-hidden="true">↗</span></button
+      >
+    </div>
+    {#if teammates}
+      {#await teammatePanel() then { default: TeammateProgress }}
+        <TeammateProgress job={teammates} />
+      {/await}
+    {/if}
   </div>
-  {#if teammates}
-    <TeammateProgress job={teammates} />
-  {/if}
   {#if open}
     <Details
       description={item.assignment.description}
@@ -204,10 +211,13 @@
     align-items: center;
     gap: calc(var(--space) / 2);
     padding-inline-end: 12px;
+  }
+
+  .head {
     transition: background-color 0.12s;
   }
 
-  .row:hover {
+  .head:hover {
     background: var(--bg-control);
   }
 
