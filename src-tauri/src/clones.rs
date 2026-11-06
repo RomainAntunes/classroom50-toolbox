@@ -103,18 +103,21 @@ pub async fn clone(
     }
 }
 
-/// Sets the clone's `origin` to `owner/repo` over `protocol`, and its push URL when it has
-/// one, so a pull and a push both switch. Refused unless `origin` is that repo already
-/// (in any spelling: case, `.git`, a user name), so another remote is never rewritten.
+/// Sets the clone's `origin` to `owner/repo` over `protocol`, and each of its push URLs
+/// that is that repo too, so a pull and a push both switch; a push URL elsewhere (a backup,
+/// a mirror) is kept. Refused unless `origin` is that repo already (in any spelling: case,
+/// `.git`, a user name), so another remote is never rewritten.
 pub async fn set_remote(
     clone: &Path,
     owner: &str,
     repo: &str,
     protocol: GitProtocol,
 ) -> Result<()> {
-    let same = crate::discovery::origin_url(clone)
-        .and_then(|url| crate::discovery::parse_github_remote(&url))
-        .is_some_and(|(o, r)| o.eq_ignore_ascii_case(owner) && r.eq_ignore_ascii_case(repo));
+    let is_repo = |url: &str| {
+        crate::discovery::parse_github_remote(url)
+            .is_some_and(|(o, r)| o.eq_ignore_ascii_case(owner) && r.eq_ignore_ascii_case(repo))
+    };
+    let same = crate::discovery::origin_url(clone).is_some_and(|url| is_repo(&url));
     if !same || !is_plain_name(owner) || !is_plain_name(repo) {
         return Err(Error::Unsupported(format!(
             "the clone's origin isn't {owner}/{repo}"
@@ -122,17 +125,39 @@ pub async fn set_remote(
     }
     let url = remote_url(owner, repo, protocol);
     set_url(clone, &["remote", "set-url", "origin", &url]).await?;
-    let push_url = process::run(
+    // None set: exit 1 and nothing printed.
+    let push_urls = process::run(
         "git",
-        ["config", "--get", "remote.origin.pushurl"],
+        ["config", "--get-all", "remote.origin.pushurl"],
         Some(clone),
     )
     .await
-    .is_ok_and(|out| !out.stdout.trim().is_empty());
-    if push_url {
-        set_url(clone, &["remote", "set-url", "--push", "origin", &url]).await?;
+    .map(|out| out.stdout)
+    .unwrap_or_default();
+    for old in push_urls.lines().map(str::trim).filter(|u| !u.is_empty()) {
+        if is_repo(old) {
+            let matching = format!("^{}$", regex_escape(old));
+            set_url(
+                clone,
+                &["remote", "set-url", "--push", "origin", &url, &matching],
+            )
+            .await?;
+        }
     }
     Ok(())
+}
+
+/// `text` as a POSIX extended regex matching only itself (git reads `set-url`'s old URL as
+/// one).
+fn regex_escape(text: &str) -> String {
+    let mut escaped = String::with_capacity(text.len());
+    for c in text.chars() {
+        if r"\.^$|?*+()[]{}".contains(c) {
+            escaped.push('\\');
+        }
+        escaped.push(c);
+    }
+    escaped
 }
 
 async fn set_url(clone: &Path, args: &[&str]) -> Result<()> {
@@ -285,6 +310,43 @@ mod tests {
             git(&["remote", "get-url", "--push", "origin"]),
             "https://github.com/acme-cs/lab-2-alex.git"
         );
+        // Several push URLs: the project's are switched, a backup elsewhere is kept.
+        git(&[
+            "remote",
+            "set-url",
+            "--add",
+            "--push",
+            "origin",
+            "git@github.com:alice/lab-2-backup.git",
+        ]);
+        git(&[
+            "remote",
+            "set-url",
+            "--add",
+            "--push",
+            "origin",
+            "https://alice@github.com/Acme-CS/lab-2-alex",
+        ]);
+        set_remote(&root, "acme-cs", "lab-2-alex", GitProtocol::Ssh)
+            .await
+            .unwrap();
+        assert_eq!(
+            git(&["config", "--get-all", "remote.origin.pushurl"]),
+            "git@github.com:acme-cs/lab-2-alex.git\n\
+             git@github.com:alice/lab-2-backup.git\n\
+             git@github.com:acme-cs/lab-2-alex.git"
+        );
+        assert_eq!(
+            git(&["remote", "get-url", "origin"]),
+            "git@github.com:acme-cs/lab-2-alex.git"
+        );
+        git(&["config", "--unset-all", "remote.origin.pushurl"]);
+        git(&[
+            "remote",
+            "set-url",
+            "origin",
+            "https://github.com/acme-cs/lab-2-alex.git",
+        ]);
         assert!(matches!(
             set_remote(&root, "acme-cs", "other", GitProtocol::Ssh).await,
             Err(Error::Unsupported(_))
@@ -294,6 +356,18 @@ mod tests {
             "https://github.com/acme-cs/lab-2-alex.git"
         );
         std::fs::remove_dir_all(&root).unwrap();
+    }
+
+    #[test]
+    fn escapes_an_old_url_for_git() {
+        assert_eq!(
+            regex_escape("https://u@github.com/o/r.git"),
+            r"https://u@github\.com/o/r\.git"
+        );
+        assert_eq!(
+            regex_escape(r"a+b(c)[d]{e}|^$?*\"),
+            r"a\+b\(c\)\[d\]\{e\}\|\^\$\?\*\\"
+        );
     }
 
     #[test]
