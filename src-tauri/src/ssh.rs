@@ -40,6 +40,7 @@ const STATUS_COOLDOWN: Duration = Duration::from_secs(60);
 const KEY_TITLE: &str = "Classroom 50 Toolbox";
 /// The comment of a key the app makes.
 const KEY_COMMENT: &str = "classroom50-toolbox";
+const KNOWN_HOSTS_OFF: &str = "your ssh config sets UserKnownHostsFile to none or /dev/null, so ssh keeps no host keys and can't trust GitHub's";
 /// The files ssh tries when nothing names one (`ssh -G` lists them), in its order.
 const DEFAULT_KEYS: [&str; 5] = [
     "id_rsa",
@@ -518,7 +519,7 @@ pub async fn status(http: &reqwest::Client, active: Option<&str>) -> SshStatus {
         Probe::Authenticated(login) => greeted(login, active),
         Probe::Refused(stderr) => match classify(&stderr) {
             Some((SshProblem::KeyRejected, _)) => {
-                let config = ssh_config(Some(&command)).await;
+                let config = ssh_config(Some(&command), platform::home_dir().as_deref()).await;
                 let local = local_keys(&config.identity_files);
                 let on_github = match active {
                     Some(login) => account_keys(http, login).await.unwrap_or_default(),
@@ -526,7 +527,17 @@ pub async fn status(http: &reqwest::Client, active: Option<&str>) -> SshStatus {
                 };
                 key_status(&local, &on_github)
             }
-            Some((SshProblem::HostKeyUnknown, _)) => SshStatus::HostKeyUnknown,
+            Some((SshProblem::HostKeyUnknown, _)) => {
+                let config = ssh_config(Some(&command), platform::home_dir().as_deref()).await;
+                // Trusting GitHub can't help when ssh keeps no host keys.
+                if config.keeps_no_host_keys() {
+                    SshStatus::Failed {
+                        message: KNOWN_HOSTS_OFF.into(),
+                    }
+                } else {
+                    SshStatus::HostKeyUnknown
+                }
+            }
             Some((SshProblem::HostKeyChanged, _)) => SshStatus::HostKeyChanged,
             Some((SshProblem::Unreachable, _)) => SshStatus::Unreachable {
                 message: last_line(&stderr),
@@ -590,6 +601,8 @@ fn last_line(stderr: &str) -> String {
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 struct SshConfig {
     known_hosts: Vec<PathBuf>,
+    /// `UserKnownHostsFile` named `none` or `/dev/null`, where ssh keeps nothing.
+    known_hosts_off: bool,
     identity_files: Vec<PathBuf>,
     hostname: Option<String>,
     port: Option<u16>,
@@ -597,11 +610,21 @@ struct SshConfig {
 
 impl SshConfig {
     /// The file `trust_github` writes: ssh's first user file, else `~/.ssh/known_hosts`.
-    fn known_hosts_file(&self, home: Option<&Path>) -> Option<PathBuf> {
-        self.known_hosts
-            .first()
-            .cloned()
-            .or_else(|| home.map(|h| h.join(".ssh").join("known_hosts")))
+    /// Refused when ssh's config turns its user files off (`UserKnownHostsFile none` or
+    /// `/dev/null`), where an added key would never be read.
+    fn known_hosts_file(&self, home: Option<&Path>) -> Result<PathBuf> {
+        if let Some(file) = self.known_hosts.first() {
+            return Ok(file.clone());
+        }
+        if self.keeps_no_host_keys() {
+            return Err(Error::Unsupported(KNOWN_HOSTS_OFF.into()));
+        }
+        home.map(|h| h.join(".ssh").join("known_hosts"))
+            .ok_or_else(|| Error::Unsupported("no home folder for ~/.ssh".into()))
+    }
+
+    fn keeps_no_host_keys(&self) -> bool {
+        self.known_hosts_off && self.known_hosts.is_empty()
     }
 
     /// How `known_hosts` names the server: `github.com`, or `[ssh.github.com]:443` for the
@@ -628,15 +651,26 @@ fn parse_ssh_g(stdout: &str, home: Option<&Path>, windows: bool) -> SshConfig {
             "hostname" => config.hostname = Some(value.to_owned()),
             "port" => config.port = value.parse().ok(),
             "identityfile" => config.identity_files.push(local_path(value, home, windows)),
-            "userknownhostsfile" => config.known_hosts.extend(
-                value
-                    .split_whitespace()
-                    .map(|path| local_path(path, home, windows)),
-            ),
+            "userknownhostsfile" => {
+                for path in value.split_whitespace() {
+                    if is_no_file(path) {
+                        config.known_hosts_off = true;
+                    } else {
+                        config.known_hosts.push(local_path(path, home, windows));
+                    }
+                }
+            }
             _ => {}
         }
     }
     config
+}
+
+/// `none` (no file), or the null device under its Unix or Windows name.
+fn is_no_file(path: &str) -> bool {
+    ["none", "/dev/null", "NUL"]
+        .iter()
+        .any(|name| path.eq_ignore_ascii_case(name))
 }
 
 fn local_path(raw: &str, home: Option<&Path>, windows: bool) -> PathBuf {
@@ -663,9 +697,8 @@ fn local_path(raw: &str, home: Option<&Path>, windows: bool) -> PathBuf {
 }
 
 /// `ssh -G github.com` with `command`'s ssh (or PATH's, for one only git runs). Without an
-/// answer: ssh's defaults under the home folder.
-async fn ssh_config(command: Option<&SshCommand>) -> SshConfig {
-    let home = platform::home_dir();
+/// answer: ssh's defaults under `home`.
+async fn ssh_config(command: Option<&SshCommand>, home: Option<&Path>) -> SshConfig {
     let ssh = match command {
         Some(SshCommand::Direct(ssh)) => Some(ssh.clone()),
         _ => process::find_in_path("ssh"),
@@ -679,12 +712,12 @@ async fn ssh_config(command: Option<&SshCommand>) -> SshConfig {
         )
         .await
         .ok()
-        .map(|out| parse_ssh_g(&out.stdout, home.as_deref(), cfg!(windows))),
+        .map(|out| parse_ssh_g(&out.stdout, home, cfg!(windows))),
         None => None,
     };
     let mut config = read.unwrap_or_default();
     if config.identity_files.is_empty()
-        && let Some(home) = &home
+        && let Some(home) = home
     {
         config.identity_files = DEFAULT_KEYS
             .iter()
@@ -828,23 +861,39 @@ fn missing_host_keys(
         .collect()
 }
 
-/// `ssh-keygen`, next to the ssh git runs when that is a path (Git for Windows' own), else
-/// PATH's.
+/// `ssh-keygen`: next to the ssh git runs (a path, or a name on PATH), then next to Git
+/// for Windows' own ssh and PATH's ssh, then PATH's `ssh-keygen`.
 fn keygen(command: Option<&SshCommand>) -> String {
-    if let Some(SshCommand::Direct(ssh)) = command
-        && ssh.is_absolute()
-    {
-        let name = if cfg!(windows) {
-            "ssh-keygen.exe"
-        } else {
-            "ssh-keygen"
-        };
-        let sibling = ssh.with_file_name(name);
-        if sibling.is_file() {
-            return sibling.to_string_lossy().into_owned();
-        }
-    }
-    "ssh-keygen".into()
+    let direct = match command {
+        Some(SshCommand::Direct(ssh)) if ssh.is_absolute() => Some(ssh.clone()),
+        Some(SshCommand::Direct(ssh)) => process::find_in_path(&ssh.to_string_lossy()),
+        _ => None,
+    };
+    let ssh = direct
+        .into_iter()
+        .chain(platform::git_ssh_program())
+        .chain(process::find_in_path("ssh"));
+    pick_keygen(ssh, |path| path.is_file())
+        .or_else(|| process::find_in_path("ssh-keygen"))
+        .map_or_else(
+            || "ssh-keygen".into(),
+            |path| path.to_string_lossy().into_owned(),
+        )
+}
+
+/// The first `ssh-keygen` that `exists` next to one of `ssh`.
+fn pick_keygen(
+    ssh: impl IntoIterator<Item = PathBuf>,
+    exists: impl Fn(&Path) -> bool,
+) -> Option<PathBuf> {
+    let name = if cfg!(windows) {
+        "ssh-keygen.exe"
+    } else {
+        "ssh-keygen"
+    };
+    ssh.into_iter()
+        .map(|ssh| ssh.with_file_name(name))
+        .find(|keygen| exists(keygen))
 }
 
 /// The keys `known_hosts` holds for `pattern` (hashed lines included, which only
@@ -902,43 +951,110 @@ fn append_lines(file: &Path, lines: &[String]) -> Result<()> {
     Ok(())
 }
 
+/// The file to change for `known_hosts`: the file a symlink points to (a dotfile manager's
+/// link stays a link, where `ssh-keygen -R` would put a copy in its place), refused when it
+/// can't be written (a read-only target, `/nix/store`).
+fn writable_known_hosts(known_hosts: &Path) -> Result<PathBuf> {
+    let file = match std::fs::symlink_metadata(known_hosts) {
+        Ok(meta) if meta.file_type().is_symlink() => {
+            std::fs::canonicalize(known_hosts).map_err(|err| not_writable(known_hosts, &err))?
+        }
+        _ => known_hosts.to_path_buf(),
+    };
+    if std::fs::metadata(&file).is_ok_and(|meta| meta.permissions().readonly()) {
+        return Err(not_writable(
+            &file,
+            &std::io::Error::from(std::io::ErrorKind::PermissionDenied),
+        ));
+    }
+    Ok(file)
+}
+
+fn not_writable(file: &Path, err: &std::io::Error) -> Error {
+    Error::Unsupported(format!(
+        "can't change {} ({err}); add GitHub's host keys to it yourself",
+        file.display()
+    ))
+}
+
+/// `append_lines`, a permission or read-only refusal worded like `writable_known_hosts`'s.
+fn append_known_hosts(file: &Path, lines: &[String]) -> Result<()> {
+    append_lines(file, lines).map_err(|err| match err {
+        Error::Io(io)
+            if matches!(
+                io.kind(),
+                std::io::ErrorKind::PermissionDenied | std::io::ErrorKind::ReadOnlyFilesystem
+            ) =>
+        {
+            not_writable(file, &io)
+        }
+        err => err,
+    })
+}
+
 /// Adds GitHub's published host keys `known_hosts` lacks (none removed).
 pub async fn trust_github(http: &reqwest::Client) -> Result<()> {
     let command = ssh_command().await;
-    let config = ssh_config(command.as_ref()).await;
-    let file = config
-        .known_hosts_file(platform::home_dir().as_deref())
-        .ok_or_else(|| Error::Unsupported("no home folder for ~/.ssh".into()))?;
+    let home = platform::home_dir();
+    let config = ssh_config(command.as_ref(), home.as_deref()).await;
+    let file = config.known_hosts_file(home.as_deref())?;
     let github = github_host_keys(http).await?;
-    let pattern = config.host_pattern();
-    let keygen = keygen(command.as_ref());
-    let present = known_keys(&keygen, &file, &pattern).await?;
-    append_lines(&file, &missing_host_keys(&pattern, &github, &present))
+    trust_in(
+        &keygen(command.as_ref()),
+        &file,
+        &config.host_pattern(),
+        &github,
+    )
+    .await
+}
+
+async fn trust_in(
+    keygen: &str,
+    known_hosts: &Path,
+    pattern: &str,
+    github: &[(String, String)],
+) -> Result<()> {
+    let file = writable_known_hosts(known_hosts)?;
+    let present = known_keys(keygen, &file, pattern).await?;
+    append_known_hosts(&file, &missing_host_keys(pattern, github, &present))
 }
 
 /// Removes every `known_hosts` line for GitHub (`ssh-keygen -R`, which keeps the old file as
 /// `known_hosts.old`), then adds GitHub's published keys.
 pub async fn replace_github_host_key(http: &reqwest::Client) -> Result<()> {
     let command = ssh_command().await;
-    let config = ssh_config(command.as_ref()).await;
-    let file = config
-        .known_hosts_file(platform::home_dir().as_deref())
-        .ok_or_else(|| Error::Unsupported("no home folder for ~/.ssh".into()))?;
+    let home = platform::home_dir();
+    let config = ssh_config(command.as_ref(), home.as_deref()).await;
+    let file = config.known_hosts_file(home.as_deref())?;
     // Read first: nothing is removed when GitHub can't be asked for the new keys.
     let github = github_host_keys(http).await?;
-    let pattern = config.host_pattern();
-    let keygen = keygen(command.as_ref());
+    replace_in(
+        &keygen(command.as_ref()),
+        &file,
+        &config.host_pattern(),
+        &github,
+    )
+    .await
+}
+
+async fn replace_in(
+    keygen: &str,
+    known_hosts: &Path,
+    pattern: &str,
+    github: &[(String, String)],
+) -> Result<()> {
+    let file = writable_known_hosts(known_hosts)?;
     if file.is_file() {
         let args = [
             OsString::from("-R"),
-            OsString::from(&pattern),
+            OsString::from(pattern),
             OsString::from("-f"),
             file.as_os_str().to_owned(),
         ];
-        process::run_with_timeout(&keygen, args, None, Duration::from_secs(10)).await?;
+        process::run_with_timeout(keygen, args, None, Duration::from_secs(10)).await?;
     }
-    let present = known_keys(&keygen, &file, &pattern).await?;
-    append_lines(&file, &missing_host_keys(&pattern, &github, &present))
+    let present = known_keys(keygen, &file, pattern).await?;
+    append_known_hosts(&file, &missing_host_keys(pattern, github, &present))
 }
 
 /// The arguments of `gh ssh-key add` for `public`.
@@ -958,11 +1074,19 @@ fn add_key_args(public: &Path) -> Vec<OsString> {
 /// use, else a new `~/.ssh/id_ed25519` without a passphrase (only when neither file exists),
 /// added with `gh ssh-key add`. Then probes again.
 pub async fn set_up_key(http: &reqwest::Client, active: Option<&str>) -> Result<SshStatus> {
+    set_up_key_in(http, active, platform::home_dir()).await
+}
+
+/// `set_up_key` with `home` as the home folder.
+async fn set_up_key_in(
+    http: &reqwest::Client,
+    active: Option<&str>,
+    home: Option<PathBuf>,
+) -> Result<SshStatus> {
     // Dev builds refuse the upload; refuse before a key is made.
     process::ensure_allowed("gh", add_key_args(Path::new("key.pub")))?;
     let command = ssh_command().await;
-    let config = ssh_config(command.as_ref()).await;
-    let home = platform::home_dir();
+    let config = ssh_config(command.as_ref(), home.as_deref()).await;
     let mut candidates = config.identity_files.clone();
     if let Some(home) = &home {
         for name in DEFAULT_KEYS {
@@ -1463,14 +1587,14 @@ mod tests {
         );
         assert_eq!(config.host_pattern(), "github.com");
         assert_eq!(
-            config.known_hosts_file(None),
+            config.known_hosts_file(None).ok(),
             Some(PathBuf::from("/home/a/.ssh/known_hosts"))
         );
         // Port 443 through ssh.github.com, from the user's config.
         let config = parse_ssh_g("hostname ssh.github.com\nport 443\n", None, false);
         assert_eq!(config.host_pattern(), "[ssh.github.com]:443");
         assert_eq!(
-            config.known_hosts_file(Some(home)),
+            config.known_hosts_file(Some(home)).ok(),
             Some(home.join(".ssh").join("known_hosts"))
         );
         // Git for Windows' ssh writes MSYS paths.
@@ -1486,6 +1610,62 @@ mod tests {
                 Path::new("C:/Users/a").join(".ssh/known_hosts2")
             ]
         );
+    }
+
+    #[test]
+    fn sees_known_hosts_turned_off() {
+        let home = Path::new("/home/a");
+        for value in ["/dev/null", "none", "NUL"] {
+            let config = parse_ssh_g(&format!("userknownhostsfile {value}\n"), Some(home), false);
+            assert!(config.keeps_no_host_keys(), "{value}");
+            assert!(
+                matches!(config.known_hosts_file(Some(home)), Err(Error::Unsupported(m)) if m == KNOWN_HOSTS_OFF),
+                "{value}"
+            );
+        }
+        // Another file next to it is still written.
+        let config = parse_ssh_g(
+            "userknownhostsfile /dev/null ~/.ssh/kh\n",
+            Some(home),
+            false,
+        );
+        assert!(!config.keeps_no_host_keys());
+        assert_eq!(config.known_hosts_file(None).unwrap(), home.join(".ssh/kh"));
+        // Nothing said: ssh's default.
+        let config = parse_ssh_g("", Some(home), false);
+        assert_eq!(
+            config.known_hosts_file(Some(home)).unwrap(),
+            home.join(".ssh").join("known_hosts")
+        );
+    }
+
+    #[test]
+    fn finds_ssh_keygen_next_to_an_ssh() {
+        let name = if cfg!(windows) {
+            "ssh-keygen.exe"
+        } else {
+            "ssh-keygen"
+        };
+        let bundled = PathBuf::from("C:/Program Files/Git/usr/bin/ssh.exe");
+        let on_path = PathBuf::from("/usr/bin/ssh");
+        let present = [on_path.with_file_name(name), bundled.with_file_name(name)];
+        let exists = |p: &Path| present.iter().any(|q| q == p);
+        assert_eq!(
+            pick_keygen(
+                [
+                    PathBuf::from("/opt/ssh/ssh"),
+                    bundled.clone(),
+                    on_path.clone()
+                ],
+                exists
+            ),
+            Some(bundled.with_file_name(name))
+        );
+        assert_eq!(
+            pick_keygen([on_path.clone()], exists),
+            Some(on_path.with_file_name(name))
+        );
+        assert_eq!(pick_keygen([PathBuf::from("/opt/ssh/ssh")], exists), None);
     }
 
     fn key(path: &str, kind: &str, blob: &str) -> PublicKey {
@@ -1657,6 +1837,70 @@ mod tests {
                 .unwrap()
                 .is_empty()
         );
+        std::fs::remove_dir_all(&root).unwrap();
+    }
+
+    /// A symlinked `known_hosts` (a dotfile manager's) stays a link: its target is changed,
+    /// and a read-only one is refused untouched.
+    #[cfg(unix)]
+    #[tokio::test]
+    async fn changes_a_symlinked_known_hosts_through_its_link() {
+        use std::os::unix::fs::PermissionsExt;
+        if process::find_in_path("ssh-keygen").is_none() {
+            return;
+        }
+        let root = std::env::temp_dir().join(format!("c50tb-khlink-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&root);
+        std::fs::create_dir_all(root.join("dotfiles")).unwrap();
+        std::fs::create_dir_all(root.join(".ssh")).unwrap();
+        let target = root.join("dotfiles").join("known_hosts");
+        let link = root.join(".ssh").join("known_hosts");
+        std::fs::write(
+            &target,
+            format!("example.com ssh-ed25519 {ED}\ngithub.com ssh-rsa {OLD_RSA}\n"),
+        )
+        .unwrap();
+        std::os::unix::fs::symlink(&target, &link).unwrap();
+        let github = [("ssh-ed25519".to_owned(), ED.to_owned())];
+        replace_in("ssh-keygen", &link, "github.com", &github)
+            .await
+            .unwrap();
+        assert!(
+            std::fs::symlink_metadata(&link)
+                .unwrap()
+                .file_type()
+                .is_symlink()
+        );
+        let text = std::fs::read_to_string(&target).unwrap();
+        assert!(!text.contains(OLD_RSA), "{text}");
+        assert!(
+            text.contains(&format!("example.com ssh-ed25519 {ED}")),
+            "{text}"
+        );
+        assert!(
+            text.contains(&format!("github.com ssh-ed25519 {ED}")),
+            "{text}"
+        );
+        let before = std::fs::read_to_string(&target).unwrap();
+        // Read-only (a link into /nix/store): refused, nothing changed.
+        std::fs::set_permissions(&target, std::fs::Permissions::from_mode(0o444)).unwrap();
+        let ec = [("ecdsa-sha2-nistp256".to_owned(), EC.to_owned())];
+        assert!(matches!(
+            replace_in("ssh-keygen", &link, "github.com", &ec).await,
+            Err(Error::Unsupported(_))
+        ));
+        assert!(matches!(
+            trust_in("ssh-keygen", &link, "github.com", &ec).await,
+            Err(Error::Unsupported(_))
+        ));
+        assert_eq!(std::fs::read_to_string(&target).unwrap(), before);
+        assert!(
+            std::fs::symlink_metadata(&link)
+                .unwrap()
+                .file_type()
+                .is_symlink()
+        );
+        std::fs::set_permissions(&target, std::fs::Permissions::from_mode(0o644)).unwrap();
         std::fs::remove_dir_all(&root).unwrap();
     }
 
