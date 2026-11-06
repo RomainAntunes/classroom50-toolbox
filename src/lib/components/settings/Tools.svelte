@@ -4,6 +4,7 @@
   import Section from "#lib/components/Section.svelte";
   import ToolRow from "#lib/components/ToolRow.svelte";
   import GitLogin from "#lib/components/settings/GitLogin.svelte";
+  import GitSsh from "#lib/components/settings/GitSsh.svelte";
   import Spinner from "#lib/components/Spinner.svelte";
   import { session } from "#lib/session.svelte.js";
 
@@ -34,6 +35,7 @@
     />
   {/each}
   <GitLogin />
+  <GitSsh />
 </Section>
 
 <style>
