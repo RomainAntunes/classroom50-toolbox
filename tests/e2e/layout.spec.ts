@@ -1,10 +1,11 @@
 // Every registered catalog in every platform skin: the main page, the phases editor and
 // Settings show no raw catalog key or unfilled placeholder, and nothing spills out of the
-// popover's width.
+// popover's width. The first-run guide too, step by step, in one skin.
 import { readFileSync } from "node:fs";
 import { expect, test } from "./app";
 import { overflow, untranslated } from "./checks";
 import { richScenario } from "./samples";
+import { scenario, settings, tools } from "./fixtures";
 import { textDirection } from "../../src/lib/i18n/direction";
 import { catalogCodes } from "../../src/lib/changelog/versions.js";
 
@@ -71,4 +72,30 @@ for (const locale of LOCALES) {
       expect(await overflow(page), "overflow with grading hidden").toEqual([]);
     });
   }
+}
+
+for (const locale of LOCALES) {
+  test(`${locale}: every step of the first-run guide is translated and fits`, async ({
+    app,
+    page,
+  }) => {
+    await app.start(
+      scenario({
+        settings: settings({ onboarded: false, cloneFolder: null, language: locale }),
+        tools: tools(["gh-student"]),
+      }),
+    );
+    await expect(page.locator("html")).toHaveAttribute("lang", locale);
+    const next = page.locator("footer .nav .primary");
+    const dots = page.locator("footer .dots span");
+    const steps = await dots.count();
+    for (let step = 0; step < steps; step += 1) {
+      await expect(dots.nth(step)).toHaveClass(/active/);
+      // The git step: its rows once git and gh answered.
+      if (step === 3) await expect(page.locator("#ssh")).toBeVisible();
+      expect(await untranslated(page), `raw keys in step ${step + 1}`).toEqual([]);
+      expect(await overflow(page), `overflow in step ${step + 1}`).toEqual([]);
+      if (step < steps - 1) await next.click();
+    }
+  });
 }
