@@ -64,7 +64,7 @@ pub async fn login(
     };
     let result = login::login(&app, &state, login::Flow::SignIn, &request).await;
     if protocol.is_some() {
-        app.state::<SshState>().clear().await;
+        app.state::<SshState>().clear();
     }
     signed_in(app.clone(), result)
 }

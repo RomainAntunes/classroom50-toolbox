@@ -27,7 +27,7 @@ pub async fn ssh_status(app: AppHandle, fresh: bool) -> SshStatus {
 #[tauri::command]
 #[cfg_attr(test, specta::specta)]
 pub async fn trust_github_host(app: AppHandle, state: State<'_, SshState>) -> Result<SshStatus> {
-    state.clear().await;
+    state.clear();
     let http = app.state::<Http>().0.clone();
     ssh::trust_github(&http).await?;
     Ok(state.status(true, probe(&app)).await)
@@ -41,7 +41,7 @@ pub async fn replace_github_host_key(
     app: AppHandle,
     state: State<'_, SshState>,
 ) -> Result<SshStatus> {
-    state.clear().await;
+    state.clear();
     let http = app.state::<Http>().0.clone();
     ssh::replace_github_host_key(&http).await?;
     Ok(state.status(true, probe(&app)).await)
@@ -53,11 +53,11 @@ pub async fn replace_github_host_key(
 #[tauri::command]
 #[cfg_attr(test, specta::specta)]
 pub async fn set_up_ssh_key(app: AppHandle, state: State<'_, SshState>) -> Result<SshStatus> {
-    state.clear().await;
+    state.clear();
     let http = app.state::<Http>().0.clone();
     let active = tools::active_login().await;
     let status = ssh::set_up_key(&http, active.as_deref()).await?;
-    state.store(status.clone()).await;
+    state.store(status.clone());
     Ok(status)
 }
 
@@ -69,6 +69,6 @@ pub async fn set_git_protocol(
     state: State<'_, SshState>,
     protocol: GitProtocol,
 ) -> Result<GitProtocol> {
-    state.clear().await;
+    state.clear();
     tools::set_git_protocol(protocol).await
 }

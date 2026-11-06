@@ -1062,35 +1062,69 @@ fn add_key_failure(program: String, code: Option<i32>, stderr: String) -> Error 
 }
 
 /// The last status, reused for `STATUS_COOLDOWN` since each probe connects to GitHub.
-/// Every fix (`trust_github`, `set_up_key`) and protocol change forgets it.
+/// Every fix (`trust_github`, `set_up_key`) and protocol change forgets it at once: the
+/// cache's lock is never held across a probe, so `clear` and `store` don't wait for one.
 #[derive(Default)]
 pub struct SshState {
-    last: tokio::sync::Mutex<Option<Recent<SshStatus>>>,
+    last: std::sync::Mutex<Last>,
+    /// Held across a probe, so calls that overlap share one.
+    probing: tokio::sync::Mutex<()>,
+}
+
+#[derive(Default)]
+struct Last {
+    /// Moves at every `clear` and `store`, so a probe that started before keeps nothing.
+    generation: u64,
+    status: Option<Recent<SshStatus>>,
 }
 
 impl SshState {
-    /// The last status while fresh, unless `fresh`; else `read`'s, kept. The lock is held
-    /// across the read, so calls that overlap share one probe.
+    fn last(&self) -> std::sync::MutexGuard<'_, Last> {
+        self.last
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+    }
+
+    /// The last status while fresh, unless `fresh`; else `read`'s, kept unless `clear` or
+    /// `store` came meanwhile. A call that waited for another's probe takes its answer.
     pub async fn status(&self, fresh: bool, read: impl Future<Output = SshStatus>) -> SshStatus {
-        let mut last = self.last.lock().await;
-        if !fresh
-            && let Some(status) = last
-                .as_ref()
-                .and_then(|recent| recent.fresh(Instant::now(), STATUS_COOLDOWN))
-        {
-            return status.clone();
+        let asked = Instant::now();
+        if !fresh && let Some(status) = self.since(None) {
+            return status;
         }
+        let _probing = self.probing.lock().await;
+        if let Some(status) = self.since(Some(asked)) {
+            return status;
+        }
+        let generation = self.last().generation;
         let status = read.await;
-        *last = Some(Recent::new(Instant::now(), status.clone()));
+        let mut last = self.last();
+        if last.generation == generation {
+            last.status = Some(Recent::new(Instant::now(), status.clone()));
+        }
         status
     }
 
-    pub async fn store(&self, status: SshStatus) {
-        *self.last.lock().await = Some(Recent::new(Instant::now(), status));
+    /// The kept status while fresh, and only one kept after `after`.
+    fn since(&self, after: Option<Instant>) -> Option<SshStatus> {
+        let last = self.last();
+        let recent = last.status.as_ref()?;
+        if after.is_some_and(|after| recent.at() < after) {
+            return None;
+        }
+        recent.fresh(Instant::now(), STATUS_COOLDOWN).cloned()
     }
 
-    pub async fn clear(&self) {
-        *self.last.lock().await = None;
+    pub fn store(&self, status: SshStatus) {
+        let mut last = self.last();
+        last.generation += 1;
+        last.status = Some(Recent::new(Instant::now(), status));
+    }
+
+    pub fn clear(&self) {
+        let mut last = self.last();
+        last.generation += 1;
+        last.status = None;
     }
 }
 
@@ -1704,7 +1738,55 @@ mod tests {
         let other = SshStatus::HostKeyUnknown;
         assert_eq!(state.status(false, async { other.clone() }).await, ready);
         assert_eq!(state.status(true, async { other.clone() }).await, other);
-        state.clear().await;
+        state.clear();
+        assert_eq!(state.status(false, async { ready.clone() }).await, ready);
+        state.store(other.clone());
+        assert_eq!(state.status(false, async { ready.clone() }).await, other);
+    }
+
+    /// Calls that overlap share one probe.
+    #[tokio::test]
+    async fn overlapping_calls_share_one_probe() {
+        use std::sync::atomic::{AtomicUsize, Ordering};
+        let state = SshState::default();
+        let probes = AtomicUsize::new(0);
+        let read = || async {
+            probes.fetch_add(1, Ordering::SeqCst);
+            for _ in 0..5 {
+                tokio::task::yield_now().await;
+            }
+            SshStatus::HostKeyUnknown
+        };
+        let (a, b) = tokio::join!(state.status(false, read()), state.status(true, read()));
+        assert_eq!(
+            (a, b),
+            (SshStatus::HostKeyUnknown, SshStatus::HostKeyUnknown)
+        );
+        assert_eq!(probes.load(Ordering::SeqCst), 1);
+    }
+
+    /// `clear` doesn't wait for a probe in flight, and that probe's answer isn't kept.
+    #[tokio::test]
+    async fn clear_neither_waits_for_nor_keeps_a_stale_probe() {
+        let state = SshState::default();
+        let (tx, rx) = tokio::sync::oneshot::channel::<()>();
+        let stale = async {
+            state
+                .status(false, async {
+                    rx.await.unwrap();
+                    SshStatus::HostKeyUnknown
+                })
+                .await
+        };
+        let fix = async {
+            tokio::task::yield_now().await;
+            // The probe is still waiting: `clear` returns at once all the same.
+            state.clear();
+            tx.send(()).unwrap();
+        };
+        let (stale, ()) = tokio::join!(stale, fix);
+        assert_eq!(stale, SshStatus::HostKeyUnknown);
+        let ready = SshStatus::Ready { login: None };
         assert_eq!(state.status(false, async { ready.clone() }).await, ready);
     }
 

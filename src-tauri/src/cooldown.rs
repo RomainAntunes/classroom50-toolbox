@@ -18,6 +18,11 @@ impl<T> Recent<T> {
         Self { at, value }
     }
 
+    /// When the value was produced.
+    pub fn at(&self) -> Instant {
+        self.at
+    }
+
     /// The value while it's younger than `window` at `now`.
     pub fn fresh(&self, now: Instant, window: Duration) -> Option<&T> {
         (now.saturating_duration_since(self.at) < window).then_some(&self.value)

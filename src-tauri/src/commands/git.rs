@@ -74,7 +74,7 @@ pub async fn set_clone_remote(
         return Err(Error::Unsupported(format!("{id} has no GitHub repository")));
     };
     clones::set_remote(&path, &owner, &repo, protocol).await?;
-    ssh.clear().await;
+    ssh.clear();
     projects::refresh_local(&app, false).await;
     Ok(())
 }
