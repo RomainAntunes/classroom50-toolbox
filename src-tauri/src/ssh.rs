@@ -1956,6 +1956,22 @@ mod tests {
         );
     }
 
+    /// `set_up_key` itself refuses in a dev build before it makes a key in an empty home.
+    #[tokio::test]
+    async fn set_up_key_refuses_in_dev_before_any_key() {
+        if !cfg!(debug_assertions) {
+            return;
+        }
+        let home = std::env::temp_dir().join(format!("c50tb-setup-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&home);
+        std::fs::create_dir_all(&home).unwrap();
+        let result =
+            set_up_key_in(&reqwest::Client::new(), Some("alice"), Some(home.clone())).await;
+        assert!(matches!(result, Err(Error::BlockedInDev(_))), "{result:?}");
+        assert!(!home.join(".ssh").exists());
+        std::fs::remove_dir_all(&home).unwrap();
+    }
+
     #[tokio::test]
     async fn generates_a_key_only_where_none_is() {
         let root = std::env::temp_dir().join(format!("c50tb-genkey-{}", std::process::id()));
