@@ -63,12 +63,17 @@
     );
   });
 
-  async function check(fresh: boolean) {
-    if (checking) return;
+  /** Probes SSH and announces the result, after `lead` when given (what led to the check),
+   *  so one announcement doesn't replace the other. */
+  async function check(fresh: boolean, lead: string | null = null) {
+    if (checking) {
+      if (lead) announce(lead);
+      return;
+    }
     checking = true;
     try {
       status = await atLeast(probe(fresh));
-      announce(statusText(status));
+      announce([lead, statusText(status)].filter((line) => line !== null).join("\n"));
     } finally {
       checking = false;
     }
@@ -102,10 +107,11 @@
     );
     if (!go) return;
     switching = true;
+    let done: string | null = null;
     try {
       protocol = await atLeast(api.setGitProtocol(next));
       rememberProtocol(protocol);
-      announce(t("a11y.protocolSet", { protocol: protocolName(protocol) }));
+      done = t("a11y.protocolSet", { protocol: protocolName(protocol) });
     } catch (err) {
       await withDialog(() =>
         message(t("settings.ssh.failed", { error: errorMessage(err) }), { kind: "error" }),
@@ -113,7 +119,8 @@
     } finally {
       switching = false;
     }
-    if (protocol === "ssh" && !status) void check(false);
+    if (protocol === "ssh" && !status) void check(false, done);
+    else if (done) announce(done);
   }
 
   async function act(run: () => Promise<SshStatus | null>) {

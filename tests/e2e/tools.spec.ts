@@ -373,9 +373,10 @@ test("protocol: the menu switches to SSH after a confirm", async ({ app, page })
   const [call] = await app.waitForCall("set_git_protocol");
   expect(call.args).toEqual({ protocol: "ssh" });
   await expect(protocolButton(app)).toHaveText("SSH");
-  await expect(page.getByRole("status")).toHaveText("git now uses SSH with GitHub");
-  // Now in use: SSH is checked without a click.
+  // Now in use: SSH is checked without a click, and both are said in one announcement.
   await expect(sshRow(app)).toContainText("Ready as student");
+  await expect(page.getByRole("status")).toContainText("git now uses SSH with GitHub");
+  await expect(page.getByRole("status")).toContainText("Ready as student");
   expect(await app.writes()).toEqual(["set_git_protocol"]);
 });
 
