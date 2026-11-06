@@ -16,7 +16,10 @@ export const commands = {
 	 *  copy. Reads only what the app already has; nothing is sent anywhere.
 	 */
 	diagnosticsReport: (ui: UiFacts) => __TAURI_INVOKE<Report>("diagnostics_report", { ui }),
-	/**  Keeps the popover open while the UI shows a native dialog. */
+	/**
+	 *  Keeps the popover open while the UI shows a native dialog: each `true` is matched by a
+	 *  `false`, and nested ones (a menu item opening a confirm) count.
+	 */
 	setPopoverPinned: (pinned: boolean) => __TAURI_INVOKE<void>("set_popover_pinned", { pinned }),
 	/**  Hides the popover, as a click outside it would (Escape with nothing else to close). */
 	hidePopover: () => __TAURI_INVOKE<void>("hide_popover"),

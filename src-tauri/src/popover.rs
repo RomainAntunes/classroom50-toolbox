@@ -2,7 +2,7 @@
 //! focus, like a menu-bar popover.
 
 use std::sync::Mutex;
-use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::atomic::{AtomicUsize, Ordering};
 use std::time::{Duration, Instant};
 
 use tauri::{
@@ -20,14 +20,26 @@ const REOPEN_GUARD: Duration = Duration::from_millis(250);
 #[derive(Default)]
 pub struct PopoverState {
     hidden_at: Mutex<Option<Instant>>,
-    /// Set while a native dialog (folder picker, confirm) is open: it takes focus, and the
-    /// popover must not hide underneath it.
-    pinned: AtomicBool,
+    /// How many native dialogs and menus (folder picker, confirm) are open: they take focus,
+    /// and the popover must not hide underneath them. A count, since a menu's item may open a
+    /// confirm before the menu's own unpin arrives.
+    pinned: AtomicUsize,
 }
 
 impl PopoverState {
     pub fn set_pinned(&self, pinned: bool) {
-        self.pinned.store(pinned, Ordering::Relaxed);
+        if pinned {
+            self.pinned.fetch_add(1, Ordering::Relaxed);
+        } else {
+            // An unpin whose pin never reached Rust leaves it at 0.
+            let _ = self
+                .pinned
+                .fetch_update(Ordering::Relaxed, Ordering::Relaxed, |n| n.checked_sub(1));
+        }
+    }
+
+    fn is_pinned(&self) -> bool {
+        self.pinned.load(Ordering::Relaxed) > 0
     }
 }
 
@@ -58,10 +70,7 @@ pub fn setup(app: &AppHandle) -> tauri::Result<()> {
     window.on_window_event(move |event| {
         if let WindowEvent::Focused(false) = event
             && !crate::testenv::keep_open()
-            && !handle
-                .state::<PopoverState>()
-                .pinned
-                .load(Ordering::Relaxed)
+            && !handle.state::<PopoverState>().is_pinned()
         {
             hide(&handle);
         }
@@ -428,6 +437,22 @@ mod tests {
     use super::*;
 
     const SIZE: (f64, f64) = (380.0, 560.0);
+
+    #[test]
+    fn a_dialog_opened_from_a_menu_stays_pinned_after_the_menu_closes() {
+        let state = PopoverState::default();
+        state.set_pinned(true); // the menu
+        state.set_pinned(true); // the confirm its item opens
+        state.set_pinned(false); // the menu's popup returns after the item's action started
+        assert!(state.is_pinned());
+        state.set_pinned(false);
+        assert!(!state.is_pinned());
+        // An unpin whose pin never reached Rust doesn't wrap around.
+        state.set_pinned(false);
+        assert!(!state.is_pinned());
+        state.set_pinned(true);
+        assert!(state.is_pinned());
+    }
 
     /// A screen given in logical units, reported the way tao reports it in `space`.
     fn screen(space: Space, bounds: Area, work: Area, scale: f64) -> Screen {
