@@ -80,6 +80,10 @@ export type HourCycle = B.HourCycle;
 /** How gh clones github.com repos. */
 export type GitProtocol = B.GitProtocol;
 export type GitCredentials = B.GitCredentials;
+/** Where SSH to GitHub stands (`ssh_status`), by `state`. */
+export type SshStatus = B.SshStatus;
+/** A scope `grantScopes` and `login` may add on top of gh-student's. */
+export type ExtraScope = B.ExtraScope;
 /** A Linux calendar store (`NativeCalendar.kind`), worded as `settings.calendar.store.<kind>`. */
 export type CalendarStore = B.CalendarStore;
 /** Result of `accept_assignment`. */
@@ -196,7 +200,9 @@ export function errorKind(err: unknown): ErrorKind | null {
 export function errorMessage(err: unknown): string {
   if (typeof err === "object" && err !== null && "message" in err) {
     const { kind, message, params } = err as CommandError;
-    const key = `error.${kind}`;
+    // An SSH failure is worded by its problem (`ssh.problem.<code>`).
+    const key =
+      kind === "ssh" && params?.problem ? `ssh.problem.${params.problem}` : `error.${kind}`;
     if (!hasKey(key)) return String(message);
     // A param missing (a sync issue saved by an older version): Rust's words are complete.
     const text = t(key, params ?? {});

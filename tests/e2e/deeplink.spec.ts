@@ -76,7 +76,13 @@ test("a link while signed out asks to sign in first", async ({ app }) => {
   await app.start(
     scenario({
       deepLink: unlisted,
-      auth: { loggedIn: false, login: null, missingScopes: [], envToken: null },
+      auth: {
+        loggedIn: false,
+        login: null,
+        missingScopes: [],
+        envToken: null,
+        canAddSshKeys: false,
+      },
     }),
   );
   await app.expectDialog([/^Sign in to GitHub first/], "ok");

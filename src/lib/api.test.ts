@@ -27,6 +27,18 @@ describe("errorMessage", () => {
     expect(errorMessage(err)).toBe("`gh` exited with code Some(1): boom");
   });
 
+  it("words an SSH failure by its problem", () => {
+    const err = {
+      kind: "ssh",
+      message: "ssh isn't installed",
+      params: { problem: "hostKeyUnknown" },
+    };
+    expect(errorMessage(err)).toBe("this computer doesn't know GitHub's SSH host key yet");
+    // A problem this UI doesn't know keeps Rust's words.
+    const newer = { kind: "ssh", message: "from Rust", params: { problem: "somethingNew" } };
+    expect(errorMessage(newer)).toBe("from Rust");
+  });
+
   it("shows anything else as text", () => {
     expect(errorMessage("plain")).toBe("plain");
   });

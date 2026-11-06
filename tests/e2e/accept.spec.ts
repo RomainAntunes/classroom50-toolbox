@@ -94,7 +94,11 @@ test("a team assignment asks the group's name with the summary, founds it, then 
 
   await app.expectDialog([/Clone it now into ~\/Classroom\/cs101-proj-group-4\?/], "yes");
   const clone = await app.waitForCall("clone_project");
-  expect(clone[0].args).toEqual({ id: "p-proj", parent: "/Users/student/Classroom" });
+  expect(clone[0].args).toEqual({
+    id: "p-proj",
+    parent: "/Users/student/Classroom",
+    protocol: null,
+  });
   // The new clone opens in the default editor.
   const opened = await app.waitForCall("open_in_editor");
   expect(opened[0].args).toEqual({

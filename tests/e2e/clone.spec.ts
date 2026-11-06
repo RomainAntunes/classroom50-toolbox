@@ -42,7 +42,7 @@ test("the question names the destination; Clone clones there and opens the edito
   await app.answer("yes");
 
   const calls = await app.waitForCall("clone_project");
-  expect(calls[0].args).toEqual({ id: lab.id, parent: `${HOME}/Classroom` });
+  expect(calls[0].args).toEqual({ id: lab.id, parent: `${HOME}/Classroom`, protocol: null });
   await expect(app.row("Lab 1")).toContainText("Cloning…");
   await expect(cloneButton(app)).toBeDisabled();
   await app.release("clone_project", ok(`${HOME}/Classroom/${REPO}`));
@@ -84,7 +84,7 @@ test("Choose another folder… picks one, remembers it and clones there", async 
   await app.answer(`${HOME}/Code`);
 
   const calls = await app.waitForCall("clone_project");
-  expect(calls[0].args).toEqual({ id: lab.id, parent: `${HOME}/Code` });
+  expect(calls[0].args).toEqual({ id: lab.id, parent: `${HOME}/Code`, protocol: null });
   expect((await app.settings()).cloneFolder).toBe(`${HOME}/Code`);
 });
 
@@ -109,7 +109,7 @@ test("no clone folder yet: the picker comes first, and Clone remembers it", asyn
 
   await app.expectDialog([`Clone into ~/School/${REPO}?`], "yes");
   const calls = await app.waitForCall("clone_project");
-  expect(calls[0].args).toEqual({ id: lab.id, parent: `${HOME}/School` });
+  expect(calls[0].args).toEqual({ id: lab.id, parent: `${HOME}/School`, protocol: null });
   expect(await savedFolders(app)).toEqual([`${HOME}/School`]);
 });
 
@@ -141,7 +141,7 @@ test("Clone to… in the menu picks a folder directly and remembers it", async (
   expect(picker.type).toBe("open");
   await app.answer(`${HOME}/Elsewhere`);
   const calls = await app.waitForCall("clone_project");
-  expect(calls[0].args).toEqual({ id: lab.id, parent: `${HOME}/Elsewhere` });
+  expect(calls[0].args).toEqual({ id: lab.id, parent: `${HOME}/Elsewhere`, protocol: null });
   expect((await app.settings()).cloneFolder).toBe(`${HOME}/Elsewhere`);
   // No question in between: the menu item was the go-ahead.
   expect(await app.pendingDialogs()).toEqual([]);

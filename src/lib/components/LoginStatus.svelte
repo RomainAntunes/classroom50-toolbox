@@ -46,7 +46,7 @@
     device = null;
     openFailed = false;
     try {
-      const status = await (grant ? api.grantScopes() : api.login());
+      const status = await (grant ? api.grantScopes([]) : api.login(null, false));
       onchange(status);
       await notifySignedIn(status);
     } catch (err) {

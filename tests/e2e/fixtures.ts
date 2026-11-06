@@ -11,6 +11,7 @@ import type {
   DeepLinkTarget,
   EditorInfo,
   ErrorKind,
+  GitProtocol,
   Grade,
   GradeTest,
   HourCycle,
@@ -20,6 +21,7 @@ import type {
   RemoteRepo,
   Settings,
   Snapshot,
+  SshStatus,
   SyncDetails,
   ToolStatus,
   Unaccepted,
@@ -57,6 +59,11 @@ export interface Scenario {
   deepLink: DeepLinkTarget | null;
   /** The home folder `homeDir()` resolves to. */
   home: string;
+  /** gh's `git_protocol` (`git_protocol`); `set_git_protocol` changes it, as gh does. */
+  gitProtocol: GitProtocol;
+  /** What `ssh_status` answers; a fix (`trust_github_host`, `replace_github_host_key`,
+   *  `set_up_ssh_key`) makes it ready, as a probe after it would. */
+  ssh: SshStatus;
   /** Per command: replies used in order, the last one repeating. Beats the defaults. */
   responses: Record<string, Reply[]>;
 }
@@ -243,6 +250,7 @@ export function project(options: ProjectOptions): Project {
           activeAt: null,
           notGradedFiles: 0,
           notGradedPaths: [],
+          origin: "https",
           ...options.local,
         };
   const remote: RemoteRepo | null =
@@ -337,7 +345,13 @@ export function scenario(over: Partial<Scenario> = {}): Scenario {
     appInfo: { os: "macos", version: VERSION, nativeCalendar: true, globalShortcuts: true },
     settings: settings(),
     tools: tools(),
-    auth: { loggedIn: true, login: LOGIN, missingScopes: [], envToken: null },
+    auth: {
+      loggedIn: true,
+      login: LOGIN,
+      missingScopes: [],
+      envToken: null,
+      canAddSshKeys: false,
+    },
     snapshot: snapshot(),
     editors: [{ id: "vscode", name: "Visual Studio Code" }],
     accounts: [{ login: LOGIN, active: true }],
@@ -367,6 +381,8 @@ export function scenario(over: Partial<Scenario> = {}): Scenario {
     update: updateStatus(),
     deepLink: null,
     home: HOME,
+    gitProtocol: "https",
+    ssh: { state: "ready", login: LOGIN },
     responses: {},
     ...over,
   };

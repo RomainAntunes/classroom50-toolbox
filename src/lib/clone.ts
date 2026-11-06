@@ -115,7 +115,7 @@ export async function cloneProject(
 
 async function clone(id: string, parent: string): Promise<string | null> {
   try {
-    const dir = await api.cloneProject(id, parent);
+    const dir = await api.cloneProject(id, parent, null);
     announce(t("a11y.cloned", { folder: dir.split(/[\\/]/).pop() ?? dir }));
     await loadEditors();
     const editor = defaultEditor();

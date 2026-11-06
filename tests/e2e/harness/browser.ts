@@ -5,7 +5,7 @@
 // and menus wait for the test to answer or pick, through `window.__E2E__`.
 import { emit } from "@tauri-apps/api/event";
 import { mockIPC, mockWindows } from "@tauri-apps/api/mocks";
-import type { CommandError, ProjectPhase, Settings } from "../../../src/lib/api";
+import type { CommandError, GitProtocol, ProjectPhase, Settings } from "../../../src/lib/api";
 import type { Reply, Scenario } from "../fixtures";
 
 export interface Call {
@@ -242,7 +242,28 @@ export function install(scenario: Scenario): E2E {
       case "account_avatar":
         throw { kind: "offline", message: "no avatar in tests" } satisfies CommandError;
       case "git_protocol":
-        return "https";
+        return state.gitProtocol;
+      case "set_git_protocol":
+        state.gitProtocol = args.protocol as GitProtocol;
+        return state.gitProtocol;
+      case "ssh_status":
+        return state.ssh;
+      case "trust_github_host":
+      case "replace_github_host_key":
+      case "set_up_ssh_key":
+        state.ssh = { state: "ready", login: state.auth.login };
+        return state.ssh;
+      case "set_clone_remote": {
+        // Rust rewrites origin, then rescans the disk and sends the list again.
+        const projects = state.snapshot.projects.map((p) =>
+          p.id === args.id && p.local
+            ? { ...p, local: { ...p.local, origin: args.protocol as GitProtocol } }
+            : p,
+        );
+        state.snapshot = { ...state.snapshot, projects };
+        void emit("projects-updated", state.snapshot);
+        return null;
+      }
       case "git_credentials":
         return { usesGh: false, others: [] };
       case "set_up_git_credentials":

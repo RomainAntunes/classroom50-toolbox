@@ -3,8 +3,20 @@
 import { expect, test } from "./app";
 import { fail, failPlugin, hold, ok, scenario, snapshot } from "./fixtures";
 
-const signedOut = { loggedIn: false, login: null, missingScopes: [], envToken: null };
-const signedIn = { loggedIn: true, login: "student", missingScopes: [], envToken: null };
+const signedOut = {
+  loggedIn: false,
+  login: null,
+  missingScopes: [],
+  envToken: null,
+  canAddSshKeys: false,
+};
+const signedIn = {
+  loggedIn: true,
+  login: "student",
+  missingScopes: [],
+  envToken: null,
+  canAddSshKeys: false,
+};
 const code = { code: "ABCD-1234", url: "https://github.com/login/device" };
 
 test("the device code shows, opens GitHub, and success fills the list", async ({ app, page }) => {
