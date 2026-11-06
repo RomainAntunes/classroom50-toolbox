@@ -44,6 +44,12 @@ export async function gitProtocol(): Promise<GitProtocol> {
   return protocol ?? read;
 }
 
+/** gh's `git_protocol` just changed (Settings, or a sign-in that set it): the next menu
+ *  follows at once. */
+export function rememberProtocol(value: GitProtocol): void {
+  protocol = value;
+}
+
 export function copyLink(link: string): Promise<void> {
   return writeText(link);
 }

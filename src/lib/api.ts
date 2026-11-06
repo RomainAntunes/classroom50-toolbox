@@ -138,6 +138,7 @@ function every<T extends string>() {
 export const APPEARANCES = every<Appearance>()(["system", "light", "dark"]);
 export const COMMIT_ACTIONS = every<CommitActions>()(["none", "commit", "push"]);
 export const UPDATE_CHANNELS = every<UpdateChannel>()(["stable", "beta"]);
+export const GIT_PROTOCOLS = every<GitProtocol>()(["https", "ssh"]);
 export const CALENDAR_STORES = every<CalendarStore>()(["gnome", "kde"]);
 export const SIMULATED_NETWORKS = every<SimulatedNetwork>()(["normal", "githubDown", "noInternet"]);
 
