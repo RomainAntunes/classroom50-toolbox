@@ -32,7 +32,7 @@ pub async fn switch_account(app: AppHandle, login: String) -> Result<AuthStatus>
     Ok(status)
 }
 
-/// The account's avatar as a `data:` URL (cached for a week).
+/// The account's avatar as a `data:` URL (cached, revalidated daily with its ETag).
 #[tauri::command]
 #[cfg_attr(test, specta::specta)]
 pub async fn account_avatar(app: AppHandle, login: String) -> Result<String> {

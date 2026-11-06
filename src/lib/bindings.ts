@@ -76,7 +76,7 @@ export const commands = {
 	listAccounts: () => __TAURI_INVOKE<Account[]>("list_accounts"),
 	/**  Switches gh to `login`, then syncs that account's projects. */
 	switchAccount: (login: string) => __TAURI_INVOKE<AuthStatus>("switch_account", { login }),
-	/**  The account's avatar as a `data:` URL (cached for a week). */
+	/**  The account's avatar as a `data:` URL (cached, revalidated daily with its ETag). */
 	accountAvatar: (login: string) => __TAURI_INVOKE<string>("account_avatar", { login }),
 	/**
 	 *  Dev builds only: lights the tray badge after a few seconds, once the popover has
