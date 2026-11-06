@@ -200,6 +200,10 @@ mod tests {
 mod calendar;
 mod login_item;
 
+pub fn git_ssh_program() -> Option<PathBuf> {
+    None
+}
+
 pub fn global_shortcuts_supported() -> bool {
     true
 }

@@ -703,5 +703,14 @@
   "error.noSelfUpdate": "this copy of the toolbox can't update itself; download new versions from GitHub",
   "error.invalidShortcut": "a shortcut needs one key and a modifier other than Shift",
   "error.shortcutTaken": "another app or the system already uses this shortcut",
-  "error.shortcutUnsupported": "system-wide shortcuts aren't available on this system"
+  "error.shortcutUnsupported": "system-wide shortcuts aren't available on this system",
+  "ssh.problem.keyRejected": "GitHub didn't accept an SSH key from this computer",
+  "ssh.problem.otherAccount": "the SSH key of this computer belongs to a GitHub account that can't reach this repository",
+  "ssh.problem.hostKeyUnknown": "this computer doesn't know GitHub's SSH host key yet",
+  "ssh.problem.hostKeyChanged": "the GitHub SSH host key saved on this computer doesn't match GitHub's",
+  "ssh.problem.unreachable": "can't reach GitHub over SSH; this network may block it",
+  "ssh.problem.notInstalled": "ssh isn't installed",
+  "ssh.problem.needsScope": "adding an SSH key needs access to your GitHub account's keys; grant it first",
+  "ssh.problem.keyInUse": "this SSH key is already on another GitHub account",
+  "ssh.problem.privateKeyOnly": "~/.ssh/id_ed25519 has no public key next to it, and the app won't replace it"
 }

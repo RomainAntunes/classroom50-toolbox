@@ -176,6 +176,12 @@ pub fn editor_data_dirs() -> Vec<PathBuf> {
     imp::editor_data_dirs()
 }
 
+/// The ssh git runs by default when it isn't PATH's: Git for Windows' own
+/// `usr\bin\ssh.exe`, found from the `git` on PATH. `None` elsewhere.
+pub fn git_ssh_program() -> Option<PathBuf> {
+    imp::git_ssh_program()
+}
+
 /// Whether a shortcut registered by the app works from any app. Not in a Wayland session:
 /// the plugin grabs keys through X11, which Wayland compositors only deliver to a focused
 /// X11 window.

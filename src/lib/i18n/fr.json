@@ -724,5 +724,14 @@
   "error.noSelfUpdate": "cette copie de la toolbox ne peut pas se mettre à jour seule ; téléchargez les nouvelles versions sur GitHub",
   "error.invalidShortcut": "un raccourci demande une touche et une touche de modification autre que Maj",
   "error.shortcutTaken": "une autre app ou le système utilise déjà ce raccourci",
-  "error.shortcutUnsupported": "les raccourcis globaux ne sont pas disponibles sur ce système"
+  "error.shortcutUnsupported": "les raccourcis globaux ne sont pas disponibles sur ce système",
+  "ssh.problem.keyRejected": "GitHub didn't accept an SSH key from this computer",
+  "ssh.problem.otherAccount": "the SSH key of this computer belongs to a GitHub account that can't reach this repository",
+  "ssh.problem.hostKeyUnknown": "this computer doesn't know GitHub's SSH host key yet",
+  "ssh.problem.hostKeyChanged": "the GitHub SSH host key saved on this computer doesn't match GitHub's",
+  "ssh.problem.unreachable": "can't reach GitHub over SSH; this network may block it",
+  "ssh.problem.notInstalled": "ssh isn't installed",
+  "ssh.problem.needsScope": "adding an SSH key needs access to your GitHub account's keys; grant it first",
+  "ssh.problem.keyInUse": "this SSH key is already on another GitHub account",
+  "ssh.problem.privateKeyOnly": "~/.ssh/id_ed25519 has no public key next to it, and the app won't replace it"
 }

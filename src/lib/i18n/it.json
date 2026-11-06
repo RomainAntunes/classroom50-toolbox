@@ -724,5 +724,14 @@
   "error.noSelfUpdate": "questa copia dell'app non può aggiornarsi da sola; scarica le nuove versioni da GitHub",
   "error.invalidShortcut": "una scorciatoia richiede un tasto e un modificatore diverso da Maiusc",
   "error.shortcutTaken": "un'altra app o il sistema usa già questa scorciatoia",
-  "error.shortcutUnsupported": "le scorciatoie globali non sono disponibili su questo sistema"
+  "error.shortcutUnsupported": "le scorciatoie globali non sono disponibili su questo sistema",
+  "ssh.problem.keyRejected": "GitHub didn't accept an SSH key from this computer",
+  "ssh.problem.otherAccount": "the SSH key of this computer belongs to a GitHub account that can't reach this repository",
+  "ssh.problem.hostKeyUnknown": "this computer doesn't know GitHub's SSH host key yet",
+  "ssh.problem.hostKeyChanged": "the GitHub SSH host key saved on this computer doesn't match GitHub's",
+  "ssh.problem.unreachable": "can't reach GitHub over SSH; this network may block it",
+  "ssh.problem.notInstalled": "ssh isn't installed",
+  "ssh.problem.needsScope": "adding an SSH key needs access to your GitHub account's keys; grant it first",
+  "ssh.problem.keyInUse": "this SSH key is already on another GitHub account",
+  "ssh.problem.privateKeyOnly": "~/.ssh/id_ed25519 has no public key next to it, and the app won't replace it"
 }

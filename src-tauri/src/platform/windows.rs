@@ -284,6 +284,13 @@ pub fn open_terminal(dir: &Path) -> Result<()> {
     process::spawn_detached("powershell", ["-NoExit"], Some(dir))
 }
 
+/// Git for Windows runs its bundled ssh, not System32's OpenSSH, unless told otherwise.
+pub fn git_ssh_program() -> Option<PathBuf> {
+    process::find_in_path("git")
+        .and_then(|git| crate::ssh::bundled_ssh(&git))
+        .filter(|ssh| ssh.is_file())
+}
+
 pub fn global_shortcuts_supported() -> bool {
     true
 }

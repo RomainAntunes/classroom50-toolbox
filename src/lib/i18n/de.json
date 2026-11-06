@@ -703,5 +703,14 @@
   "error.noSelfUpdate": "diese Kopie der Toolbox kann sich nicht selbst aktualisieren; lade neue Versionen von GitHub",
   "error.invalidShortcut": "ein Tastenkürzel braucht eine Taste und eine Sondertaste außer Umschalt",
   "error.shortcutTaken": "eine andere App oder das System nutzt dieses Tastenkürzel schon",
-  "error.shortcutUnsupported": "systemweite Tastenkürzel sind auf diesem System nicht verfügbar"
+  "error.shortcutUnsupported": "systemweite Tastenkürzel sind auf diesem System nicht verfügbar",
+  "ssh.problem.keyRejected": "GitHub didn't accept an SSH key from this computer",
+  "ssh.problem.otherAccount": "the SSH key of this computer belongs to a GitHub account that can't reach this repository",
+  "ssh.problem.hostKeyUnknown": "this computer doesn't know GitHub's SSH host key yet",
+  "ssh.problem.hostKeyChanged": "the GitHub SSH host key saved on this computer doesn't match GitHub's",
+  "ssh.problem.unreachable": "can't reach GitHub over SSH; this network may block it",
+  "ssh.problem.notInstalled": "ssh isn't installed",
+  "ssh.problem.needsScope": "adding an SSH key needs access to your GitHub account's keys; grant it first",
+  "ssh.problem.keyInUse": "this SSH key is already on another GitHub account",
+  "ssh.problem.privateKeyOnly": "~/.ssh/id_ed25519 has no public key next to it, and the app won't replace it"
 }

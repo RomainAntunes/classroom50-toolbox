@@ -682,5 +682,14 @@
   "error.noSelfUpdate": "이 도구 상자는 스스로 업데이트할 수 없어요. 새 버전은 GitHub에서 다운로드하세요",
   "error.invalidShortcut": "단축키에는 키 하나와 Shift가 아닌 보조 키가 필요해요",
   "error.shortcutTaken": "다른 앱이나 시스템이 이미 이 단축키를 쓰고 있어요",
-  "error.shortcutUnsupported": "이 시스템에서는 전역 단축키를 쓸 수 없어요"
+  "error.shortcutUnsupported": "이 시스템에서는 전역 단축키를 쓸 수 없어요",
+  "ssh.problem.keyRejected": "GitHub didn't accept an SSH key from this computer",
+  "ssh.problem.otherAccount": "the SSH key of this computer belongs to a GitHub account that can't reach this repository",
+  "ssh.problem.hostKeyUnknown": "this computer doesn't know GitHub's SSH host key yet",
+  "ssh.problem.hostKeyChanged": "the GitHub SSH host key saved on this computer doesn't match GitHub's",
+  "ssh.problem.unreachable": "can't reach GitHub over SSH; this network may block it",
+  "ssh.problem.notInstalled": "ssh isn't installed",
+  "ssh.problem.needsScope": "adding an SSH key needs access to your GitHub account's keys; grant it first",
+  "ssh.problem.keyInUse": "this SSH key is already on another GitHub account",
+  "ssh.problem.privateKeyOnly": "~/.ssh/id_ed25519 has no public key next to it, and the app won't replace it"
 }

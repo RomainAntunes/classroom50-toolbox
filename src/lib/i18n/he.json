@@ -724,5 +724,14 @@
   "error.noSelfUpdate": "העותק הזה של האפליקציה לא יכול לעדכן את עצמו; אפשר להוריד גרסאות חדשות מ-GitHub",
   "error.invalidShortcut": "קיצור צריך מקש אחד ומקש צירוף שאינו Shift",
   "error.shortcutTaken": "אפליקציה אחרת או המערכת כבר משתמשות בקיצור הזה",
-  "error.shortcutUnsupported": "קיצורים כלל-מערכתיים לא זמינים במערכת הזו"
+  "error.shortcutUnsupported": "קיצורים כלל-מערכתיים לא זמינים במערכת הזו",
+  "ssh.problem.keyRejected": "GitHub didn't accept an SSH key from this computer",
+  "ssh.problem.otherAccount": "the SSH key of this computer belongs to a GitHub account that can't reach this repository",
+  "ssh.problem.hostKeyUnknown": "this computer doesn't know GitHub's SSH host key yet",
+  "ssh.problem.hostKeyChanged": "the GitHub SSH host key saved on this computer doesn't match GitHub's",
+  "ssh.problem.unreachable": "can't reach GitHub over SSH; this network may block it",
+  "ssh.problem.notInstalled": "ssh isn't installed",
+  "ssh.problem.needsScope": "adding an SSH key needs access to your GitHub account's keys; grant it first",
+  "ssh.problem.keyInUse": "this SSH key is already on another GitHub account",
+  "ssh.problem.privateKeyOnly": "~/.ssh/id_ed25519 has no public key next to it, and the app won't replace it"
 }

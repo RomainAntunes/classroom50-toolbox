@@ -32,6 +32,7 @@ pub mod push;
 pub mod settings;
 mod shortcut;
 mod simulate;
+pub mod ssh;
 pub mod status;
 pub mod student;
 mod sync_progress;
@@ -171,6 +172,7 @@ pub fn run() {
         .manage(student::FoundedGroups::default())
         .manage(teammates::TeammateJobs::default())
         .manage(login::LoginState::default())
+        .manage(ssh::SshState::default())
         .manage(tools::ToolJobs::default())
         .manage(tools::ToolChecks::default())
         .manage(watch::FolderWatcher::default())
