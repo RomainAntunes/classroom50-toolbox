@@ -503,14 +503,25 @@ mod tests {
                 &"admin:org,read:org,repo,workflow,user:email,write:public_key".to_owned()
             )
         );
-        assert_eq!(&login[login.len() - 2..], ["--git-protocol", "ssh"]);
+        assert!(login.ends_with(&["--git-protocol".to_owned(), "ssh".to_owned()]));
+        assert_eq!(login.iter().filter(|a| *a == "--git-protocol").count(), 1);
         let https = Request {
             protocol: Some(GitProtocol::Https),
             extra: Vec::new(),
         };
         assert_eq!(
-            &args(Flow::SignIn, &https)[login.len() - 2..],
-            ["--git-protocol", "https"]
+            args(Flow::SignIn, &https),
+            [
+                "auth",
+                "login",
+                "--web",
+                "--hostname",
+                "github.com",
+                "--scopes",
+                "admin:org,read:org,repo,workflow,user:email",
+                "--git-protocol",
+                "https",
+            ]
         );
 
         // `gh auth refresh` has no protocol flag; it keeps the token's scopes and adds these.
