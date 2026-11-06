@@ -2,10 +2,11 @@
 // clone folder, picked once and remembered in settings), runs the clone and reports failures
 // in a dialog.
 import { ask, message, open } from "@tauri-apps/plugin-dialog";
-import { api, errorKind, errorMessage, withDialog } from "#lib/api.js";
+import { api, errorKind, errorMessage, withDialog, type GitProtocol } from "#lib/api.js";
 import { t } from "#lib/i18n/index.js";
 import { announce } from "#lib/announce.svelte.js";
 import { defaultEditor, loadEditors, openInEditor } from "#lib/editor.svelte.js";
+import { gitProtocol } from "#lib/links.js";
 import { tildify } from "#lib/paths.svelte.js";
 import { loadSettings, saveSettings, settings } from "#lib/settings.svelte.js";
 import { busy, session } from "#lib/session.svelte.js";
@@ -98,24 +99,40 @@ async function askParent(repo: string, question?: CloneQuestion): Promise<string
 /**
  * Clones project `id`, asking first (`ask`, worded by `question` when given) or picking
  * another folder (`choose`, the menu's "Clone to…"), then opens it in the default editor.
- * `repo` names the folder when the list doesn't hold the project yet. Returns the new folder,
- * or null when cancelled or failed. The row shows the clone (not the question) meanwhile.
+ * `repo` names the folder when the list doesn't hold the project yet. `protocol` overrides
+ * gh's `git_protocol` (the menu's "Clone with"); an SSH clone checks SSH first and offers
+ * HTTPS when it won't work. Returns the new folder, or null when cancelled or failed. The
+ * row shows the clone (not the questions) meanwhile.
  */
 export async function cloneProject(
   id: string,
   mode: CloneMode = "ask",
   question?: CloneQuestion,
   repo?: string,
+  protocol?: GitProtocol,
 ): Promise<string | null> {
   const name = session.snapshot?.projects.find((p) => p.id === id)?.repo ?? repo ?? id;
   const parent = mode === "choose" ? await pickCloneFolder() : await askParent(name, question);
   if (!parent || session.cloning.includes(id)) return null;
-  return busy("cloning", id, () => clone(id, parent));
+  let chosen = protocol ?? null;
+  if ((protocol ?? (await gitProtocol())) === "ssh") {
+    const { checkCloneOverSsh } = await import("#lib/ssh.js");
+    const checked = await checkCloneOverSsh(name);
+    if (!checked) return null;
+    // SSH works: gh's own choice stays implicit.
+    if (checked === "https") chosen = "https";
+  }
+  if (session.cloning.includes(id)) return null;
+  return busy("cloning", id, () => clone(id, parent, chosen));
 }
 
-async function clone(id: string, parent: string): Promise<string | null> {
+async function clone(
+  id: string,
+  parent: string,
+  protocol: GitProtocol | null,
+): Promise<string | null> {
   try {
-    const dir = await api.cloneProject(id, parent, null);
+    const dir = await api.cloneProject(id, parent, protocol);
     announce(t("a11y.cloned", { folder: dir.split(/[\\/]/).pop() ?? dir }));
     await loadEditors();
     const editor = defaultEditor();
@@ -124,6 +141,11 @@ async function clone(id: string, parent: string): Promise<string | null> {
   } catch (err) {
     const key = errorKind(err) === "pathExists" ? "clone.exists" : "clone.failed";
     const text = t(key, { error: errorMessage(err) });
+    // SSH didn't work after all: HTTPS, once.
+    if (errorKind(err) === "ssh" && protocol !== "https") {
+      const { offerHttpsClone } = await import("#lib/ssh.js");
+      return (await offerHttpsClone(text)) ? clone(id, parent, "https") : null;
+    }
     await withDialog(() => message(text, { kind: "error" }));
     return null;
   }

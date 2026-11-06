@@ -1,7 +1,7 @@
 <script lang="ts">
   import { Menu, MenuItem, PredefinedMenuItem, Submenu } from "@tauri-apps/api/menu";
   import { openUrl, revealItemInDir } from "@tauri-apps/plugin-opener";
-  import { api, type Milestone, type Project } from "#lib/api.js";
+  import { api, GIT_PROTOCOLS, type GitProtocol, type Milestone, type Project } from "#lib/api.js";
   import { cloneProject, type CloneMode } from "#lib/clone.js";
   import { editorFor, editors, openInEditor } from "#lib/editor.svelte.js";
   import { pullProject } from "#lib/pull.js";
@@ -268,9 +268,17 @@
   }
 
   const cloning = $derived(session.cloning.includes(project.id));
-  function clone(mode: CloneMode = "ask") {
-    void cloneProject(project.id, mode);
+  function clone(mode: CloneMode = "ask", protocol?: GitProtocol) {
+    void cloneProject(project.id, mode, undefined, undefined, protocol);
   }
+
+  /** Points the clone's origin at GitHub the other way (the menu's "Use … for this clone"). */
+  async function switchRemote(protocol: GitProtocol) {
+    const { setRemote } = await import("#lib/ssh.js");
+    await setRemote(project, name, protocol);
+  }
+  // How the clone reaches GitHub now; null (no clone, or an origin elsewhere) offers no switch.
+  const origin = $derived(project.local?.origin ?? null);
 
   let open = $state(false);
 
@@ -447,6 +455,28 @@
         enabled: cloneable && !cloning,
         action: () => clone("choose"),
       }),
+      Submenu.new({
+        text: t("clone.with"),
+        enabled: cloneable && !cloning,
+        items: await Promise.all(
+          GIT_PROTOCOLS.map((protocol) =>
+            MenuItem.new({
+              text: t(`login.protocol.${protocol}`),
+              action: () => clone("ask", protocol),
+            }),
+          ),
+        ),
+      }),
+      ...(origin
+        ? [
+            MenuItem.new({
+              text: t("clone.useFor", {
+                protocol: t(`login.protocol.${origin === "ssh" ? "https" : "ssh"}`),
+              }),
+              action: () => void switchRemote(origin === "ssh" ? "https" : "ssh"),
+            }),
+          ]
+        : []),
       MenuItem.new({
         text: editor ? t("editor.open", { editor: editor.name }) : t("editor.none"),
         enabled: Boolean(path && editor),
