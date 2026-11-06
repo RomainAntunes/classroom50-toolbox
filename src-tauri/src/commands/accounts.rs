@@ -3,9 +3,10 @@
 use tauri::{AppHandle, Manager, State};
 
 use crate::error::Result;
-use crate::login::{self, LoginState};
+use crate::login::{self, ExtraScope, LoginState};
 use crate::projects;
-use crate::tools::{self, AuthStatus};
+use crate::ssh::SshState;
+use crate::tools::{self, AuthStatus, GitProtocol};
 
 #[tauri::command]
 #[cfg_attr(test, specta::specta)]
@@ -42,24 +43,48 @@ pub async fn account_avatar(app: AppHandle, login: String) -> Result<String> {
 }
 
 /// Runs gh's device flow; the code arrives through the `login-device-code` event. The new
-/// account is gh's active one afterwards, so its projects are synced right away.
+/// account is gh's active one afterwards, so its projects are synced right away. `protocol`
+/// sets gh's `git_protocol` for github.com (`None` keeps it); `ssh_key` also asks for the
+/// scope `set_up_ssh_key` needs.
 #[tauri::command]
 #[cfg_attr(test, specta::specta)]
-pub async fn login(app: AppHandle, state: State<'_, LoginState>) -> Result<AuthStatus> {
-    signed_in(
-        app.clone(),
-        login::login(&app, &state, login::Flow::SignIn).await,
-    )
+pub async fn login(
+    app: AppHandle,
+    state: State<'_, LoginState>,
+    protocol: Option<GitProtocol>,
+    ssh_key: bool,
+) -> Result<AuthStatus> {
+    let request = login::Request {
+        protocol,
+        extra: if ssh_key {
+            vec![ExtraScope::WritePublicKey]
+        } else {
+            Vec::new()
+        },
+    };
+    let result = login::login(&app, &state, login::Flow::SignIn, &request).await;
+    if protocol.is_some() {
+        app.state::<SshState>().clear().await;
+    }
+    signed_in(app.clone(), result)
 }
 
-/// Adds gh-student's missing scopes to the active account (`gh auth refresh`), through the
-/// same device flow as `login`.
+/// Adds gh-student's missing scopes, and `extra`, to the active account (`gh auth refresh`,
+/// which keeps the token's other scopes), through the same device flow as `login`.
 #[tauri::command]
 #[cfg_attr(test, specta::specta)]
-pub async fn grant_scopes(app: AppHandle, state: State<'_, LoginState>) -> Result<AuthStatus> {
+pub async fn grant_scopes(
+    app: AppHandle,
+    state: State<'_, LoginState>,
+    extra: Vec<ExtraScope>,
+) -> Result<AuthStatus> {
+    let request = login::Request {
+        protocol: None,
+        extra,
+    };
     signed_in(
         app.clone(),
-        login::login(&app, &state, login::Flow::GrantScopes).await,
+        login::login(&app, &state, login::Flow::GrantScopes, &request).await,
     )
 }
 

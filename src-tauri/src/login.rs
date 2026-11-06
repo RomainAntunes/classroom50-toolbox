@@ -9,13 +9,18 @@
 //! own store (keychain where available).
 //!
 //! The same flow widens an existing login with `gh auth refresh`, which keeps the account's
-//! current scopes and adds the ones gh-student needs.
+//! current scopes and adds the ones gh-student needs, plus any `ExtraScope` asked for.
+//!
+//! Non-interactive gh never asks for the git protocol (cli/cli `login_flow.go`), so a sign-in
+//! sets it only when the student chose one (`--git-protocol`, gh's config for every account
+//! on github.com). It never uploads an SSH key either: that is `ssh::set_up_key`, after a
+//! sign-in that asked for `ExtraScope::WritePublicKey`.
 
 use std::path::PathBuf;
 use std::sync::Mutex;
 use std::time::Duration;
 
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use tauri::AppHandle;
 use tokio::io::{AsyncBufReadExt, AsyncRead, BufReader};
 use tokio::sync::{mpsc, oneshot};
@@ -23,7 +28,7 @@ use tokio::sync::{mpsc, oneshot};
 use crate::error::{Error, Result};
 use crate::events::{IpcEvent, LoginDeviceCode, LoginEnded};
 use crate::process;
-use crate::tools::{self, AuthStatus};
+use crate::tools::{self, AuthStatus, GitProtocol};
 
 /// The scopes `gh student login` requests (upstream `contract.RequiredOAuthScopes`), on
 /// top of gh's own `repo read:org gist`; one sign-in covers gh-student too.
@@ -35,6 +40,23 @@ const DEFAULT_DEVICE_URL: &str = "https://github.com/login/device";
 /// GitHub's device codes expire after 15 minutes and gh then gives up on its own; this
 /// only catches a gh that hangs past that.
 const TIMEOUT: Duration = Duration::from_secs(16 * 60);
+
+/// A scope beyond gh-student's, asked for one feature: the UI can only ask for these.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(test, derive(specta::Type))]
+#[serde(rename_all = "camelCase")]
+pub enum ExtraScope {
+    /// `write:public_key`: `gh ssh-key add` puts a key on the account.
+    WritePublicKey,
+}
+
+impl ExtraScope {
+    pub fn scope(self) -> &'static str {
+        match self {
+            Self::WritePublicKey => "write:public_key",
+        }
+    }
+}
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Flow {
@@ -67,8 +89,21 @@ impl LoginState {
     }
 }
 
-pub async fn login(app: &AppHandle, state: &LoginState, flow: Flow) -> Result<AuthStatus> {
-    let result = run(app, state, flow).await;
+/// What a sign-in or grant asks gh for, besides gh-student's scopes.
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct Request {
+    /// Sign-in only: gh's `git_protocol` for github.com, `None` to leave it as it is.
+    pub protocol: Option<GitProtocol>,
+    pub extra: Vec<ExtraScope>,
+}
+
+pub async fn login(
+    app: &AppHandle,
+    state: &LoginState,
+    flow: Flow,
+    request: &Request,
+) -> Result<AuthStatus> {
+    let result = run(app, state, flow, request).await;
     if let Ok(mut cancel) = state.cancel.lock() {
         cancel.take();
     }
@@ -76,7 +111,12 @@ pub async fn login(app: &AppHandle, state: &LoginState, flow: Flow) -> Result<Au
     result
 }
 
-async fn run(app: &AppHandle, state: &LoginState, flow: Flow) -> Result<AuthStatus> {
+async fn run(
+    app: &AppHandle,
+    state: &LoginState,
+    flow: Flow,
+    request: &Request,
+) -> Result<AuthStatus> {
     // Checked before anything is spawned or a running sign-in is abandoned.
     require_gh(process::find_in_path("gh"))?;
     // gh refuses to store a login while one of these is set, after the device flow
@@ -91,7 +131,7 @@ async fn run(app: &AppHandle, state: &LoginState, flow: Flow) -> Result<AuthStat
             let _ = previous.send(());
         }
     }
-    let mut child = process::spawn_piped("gh", args(flow))?;
+    let mut child = process::spawn_piped("gh", args(flow, request))?;
 
     // gh writes everything to stderr; stdout is drained too so it can never fill up.
     let (tx, mut rx) = mpsc::unbounded_channel();
@@ -146,16 +186,22 @@ async fn run(app: &AppHandle, state: &LoginState, flow: Flow) -> Result<AuthStat
     Ok(tools::auth_status().await)
 }
 
-/// No `--git-protocol`: gh's default is already https, and passing it would overwrite the
-/// protocol of a user who chose ssh. Non-interactive gh doesn't set up git's credential
-/// helper either, so the user's git config is left alone.
-fn args(flow: Flow) -> Vec<String> {
-    let scopes = REQUIRED_SCOPES
+/// `--git-protocol` only on a sign-in, and only when the student chose one: without it gh
+/// keeps the protocol it has (non-interactive gh never asks), and `gh auth refresh` has no
+/// such flag. Non-interactive gh doesn't set up git's credential helper or upload an SSH key
+/// either, so the user's git config and keys are left alone. A refresh keeps the token's
+/// scopes and adds these.
+fn args(flow: Flow, request: &Request) -> Vec<String> {
+    let mut scopes: Vec<&str> = REQUIRED_SCOPES
         .iter()
         .chain(EXTRA_SCOPES.iter())
         .copied()
-        .collect::<Vec<_>>()
-        .join(",");
+        .collect();
+    for extra in &request.extra {
+        if !scopes.contains(&extra.scope()) {
+            scopes.push(extra.scope());
+        }
+    }
     let mut args: Vec<String> = match flow {
         Flow::SignIn => vec!["auth".into(), "login".into(), "--web".into()],
         Flow::GrantScopes => vec!["auth".into(), "refresh".into()],
@@ -164,8 +210,11 @@ fn args(flow: Flow) -> Vec<String> {
         "--hostname".into(),
         "github.com".into(),
         "--scopes".into(),
-        scopes,
+        scopes.join(","),
     ]);
+    if let (Flow::SignIn, Some(protocol)) = (flow, request.protocol) {
+        args.extend(["--git-protocol".into(), protocol.as_str().into()]);
+    }
     args
 }
 
@@ -438,13 +487,41 @@ mod tests {
     }
 
     #[test]
-    fn requests_gh_students_scopes_without_touching_the_git_protocol() {
-        let login = args(Flow::SignIn);
+    fn requests_gh_students_scopes_and_the_protocol_only_when_chosen() {
+        let login = args(Flow::SignIn, &Request::default());
         assert_eq!(&login[..3], ["auth", "login", "--web"]);
         assert!(login.contains(&"admin:org,read:org,repo,workflow,user:email".to_owned()));
         assert!(!login.iter().any(|a| a == "--git-protocol"));
-        let refresh = args(Flow::GrantScopes);
+
+        let ssh = Request {
+            protocol: Some(GitProtocol::Ssh),
+            extra: vec![ExtraScope::WritePublicKey, ExtraScope::WritePublicKey],
+        };
+        let login = args(Flow::SignIn, &ssh);
+        assert!(
+            login.contains(
+                &"admin:org,read:org,repo,workflow,user:email,write:public_key".to_owned()
+            )
+        );
+        assert_eq!(&login[login.len() - 2..], ["--git-protocol", "ssh"]);
+        let https = Request {
+            protocol: Some(GitProtocol::Https),
+            extra: Vec::new(),
+        };
+        assert_eq!(
+            &args(Flow::SignIn, &https)[login.len() - 2..],
+            ["--git-protocol", "https"]
+        );
+
+        // `gh auth refresh` has no protocol flag; it keeps the token's scopes and adds these.
+        let refresh = args(Flow::GrantScopes, &ssh);
         assert_eq!(&refresh[..2], ["auth", "refresh"]);
         assert!(refresh.contains(&"--hostname".to_owned()));
+        assert!(!refresh.iter().any(|a| a == "--git-protocol"));
+        assert!(refresh.last().unwrap().ends_with(",write:public_key"));
+        assert!(
+            serde_json::from_str::<ExtraScope>("\"writePublicKey\"").unwrap()
+                == ExtraScope::WritePublicKey
+        );
     }
 }
