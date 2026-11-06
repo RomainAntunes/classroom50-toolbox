@@ -115,7 +115,7 @@ export async function cloneProject(
   const parent = mode === "choose" ? await pickCloneFolder() : await askParent(name, question);
   if (!parent || session.cloning.includes(id)) return null;
   let chosen = protocol ?? null;
-  if ((protocol ?? (await gitProtocol())) === "ssh") {
+  if ((protocol ?? (await gitProtocol(true))) === "ssh") {
     const { checkCloneOverSsh } = await import("#lib/ssh.js");
     const checked = await checkCloneOverSsh(name);
     if (!checked) return null;

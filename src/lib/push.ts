@@ -153,12 +153,13 @@ async function commitWork(
   }
 }
 
-/** The push over SSH failed: offers to switch the clone to HTTPS, then pushes once more
- *  (the commit, if any, is already made). Declining writes nothing. */
+/** The push over SSH failed: offers to switch the clone to HTTPS (or to fix GitHub's host
+ *  key), then pushes once more (the commit, if any, is already made). Declining writes
+ *  nothing. */
 async function overHttps(err: unknown, project: Project, name: string, branch: string) {
-  const { switchToHttps } = await import("#lib/ssh.js");
+  const { recoverSsh } = await import("#lib/ssh.js");
   const text = t("push.failed", { error: errorMessage(err) });
-  if (!(await switchToHttps(project, name, text))) return false;
+  if (!(await recoverSsh(project, name, text, err))) return false;
   try {
     await api.commitPush(project.id, null);
     announce(t("a11y.pushed", { name }));

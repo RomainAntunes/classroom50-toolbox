@@ -33,7 +33,7 @@ describe("ssh", () => {
         "Can't reach GitHub over SSH: this network may block it. HTTPS still works.",
       ],
       [{ state: "notInstalled" }, "ssh isn't installed on this computer."],
-      [{ state: "failed", message: "boom" }, "Couldn't check SSH: boom"],
+      [{ state: "failed", message: "boom" }, "SSH isn't working: boom"],
     ];
     for (const [status, text] of cases) expect(statusText(status)).toBe(text);
     expect(statusText({ state: "hostKeyChanged" })).toMatch(/replaced in 2023\.$/);

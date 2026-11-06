@@ -19,6 +19,8 @@
 
   const pending = $derived(login.pending);
   const device = $derived(login.device);
+  // Settings' Set up SSH shows its own error there.
+  const error = $derived(login.error?.from === "footer" ? login.error.text : null);
 
   function startSignIn() {
     if (ghInstalled) void signIn(onchange);
@@ -89,7 +91,7 @@
             // Adding an account runs gh's device flow too, after the same question.
             MenuItem.new({
               text: t(ghInstalled ? "auth.addAccount" : "auth.addAccountNeedsGh"),
-              enabled: ghInstalled,
+              enabled: ghInstalled && !pending,
               action: startSignIn,
             }),
             ...(account
@@ -112,7 +114,7 @@
     try {
       onchange(await api.switchAccount(next));
     } catch (err) {
-      login.error = loginError(err);
+      login.error = { text: loginError(err), from: "footer" };
     }
   }
 
@@ -131,7 +133,7 @@
     try {
       onchange(await api.signOut(name));
     } catch (err) {
-      login.error = loginError(err);
+      login.error = { text: loginError(err), from: "footer" };
     }
   }
 </script>
@@ -182,8 +184,8 @@
     {#if login.step}
       <p class="url">{t(`login.protocol.${login.step}`)}</p>
     {/if}
-    {#if login.error}
-      <p class="error" role="alert">{login.error}</p>
+    {#if error}
+      <p class="error" role="alert">{error}</p>
     {/if}
   </div>
 {:else if auth}
@@ -201,8 +203,8 @@
   {#if login.step}
     <p class="url">{t(`login.protocol.${login.step}`)}</p>
   {/if}
-  {#if login.error}
-    <p class="error" role="alert">{login.error}</p>
+  {#if error}
+    <p class="error" role="alert">{error}</p>
   {/if}
 {/if}
 

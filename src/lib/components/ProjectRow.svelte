@@ -272,7 +272,8 @@
     void cloneProject(project.id, mode, undefined, undefined, protocol);
   }
 
-  /** Points the clone's origin at GitHub the other way (the menu's "Use … for this clone"). */
+  /** Points the clone's origin at GitHub the other way (the menu's "Use … for this clone"),
+   *  to SSH only once SSH works. */
   async function switchRemote(protocol: GitProtocol) {
     const { setRemote } = await import("#lib/ssh.js");
     await setRemote(project, name, protocol);
@@ -473,6 +474,8 @@
               text: t("clone.useFor", {
                 protocol: t(`login.protocol.${origin === "ssh" ? "https" : "ssh"}`),
               }),
+              // Not while git runs in the clone: a push mid-way would change remotes.
+              enabled: !busy && !pulling && !submitting,
               action: () => void switchRemote(origin === "ssh" ? "https" : "ssh"),
             }),
           ]

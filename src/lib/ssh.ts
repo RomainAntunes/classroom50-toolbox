@@ -6,15 +6,17 @@ import { ask, message } from "@tauri-apps/plugin-dialog";
 import { goto } from "$app/navigation";
 import {
   api,
+  errorKind,
   errorMessage,
   withDialog,
+  type AuthStatus,
+  type CommandError,
   type GitProtocol,
   type Project,
   type SshStatus,
 } from "#lib/api.js";
 import { announce } from "#lib/announce.svelte.js";
 import { gitProtocol } from "#lib/links.js";
-import { grant } from "#lib/login.svelte.js";
 import { session } from "#lib/session.svelte.js";
 import { t } from "#lib/i18n/index.js";
 
@@ -68,6 +70,17 @@ export function hostKeyProblem(status: SshStatus): boolean {
   return status.state === "hostKeyUnknown" || status.state === "hostKeyChanged";
 }
 
+/** The problem code of an `ssh` refusal, else null. */
+export function sshProblem(err: unknown): string | null {
+  return errorKind(err) === "ssh" ? ((err as CommandError).params?.problem ?? null) : null;
+}
+
+async function failure(key: string, err: unknown) {
+  await withDialog(() =>
+    message(t(key, { error: errorMessage(err) }), { title: protocolName("ssh"), kind: "error" }),
+  );
+}
+
 /** Adds GitHub's published host keys to known_hosts (or replaces the saved one first),
  *  with no question: the click was it. The new status, or null when it failed (said). */
 export async function fixHostKey(replace: boolean): Promise<SshStatus | null> {
@@ -76,9 +89,7 @@ export async function fixHostKey(replace: boolean): Promise<SshStatus | null> {
     announce(t("a11y.sshTrusted"));
     return status;
   } catch (err) {
-    await withDialog(() =>
-      message(t("ssh.fixFailed", { error: errorMessage(err) }), { kind: "error" }),
-    );
+    await failure("ssh.fixFailed", err);
     return null;
   }
 }
@@ -95,41 +106,104 @@ export async function confirmHostKey(replace: boolean): Promise<SshStatus | null
   return go ? fixHostKey(replace) : null;
 }
 
-async function setUp(): Promise<SshStatus | null> {
+/** Asks GitHub for the key scope (gh's device flow); the new status, null when not granted. */
+export type GrantScope = () => Promise<AuthStatus | null>;
+
+/** Adds this computer's key. GitHub refusing for want of the key scope (the token lost it,
+ *  or the app's view of it was stale) asks for it once, then tries once more. The status
+ *  after it (said when it isn't ready), or null when it failed (said) or wasn't granted. */
+async function setUp(grantScope: GrantScope, retried = false): Promise<SshStatus | null> {
   try {
     const status = await api.setUpSshKey();
-    announce(t("a11y.sshSetUp"));
+    announce(status.state === "ready" ? t("a11y.sshSetUp") : statusText(status));
     return status;
   } catch (err) {
-    await withDialog(() =>
-      message(t("ssh.setUpFailed", { error: errorMessage(err) }), { kind: "error" }),
-    );
+    if (!retried && sshProblem(err) === "needsScope") {
+      return (await grantScope()) ? setUp(grantScope, true) : null;
+    }
+    await failure("ssh.setUpFailed", err);
     return null;
   }
 }
 
-/** Settings' Set up SSH: confirmed, then the key scope granted first when the token lacks
- *  it (gh's device flow; the popover hides meanwhile), then the key added. */
-export async function setUpKey(): Promise<SshStatus | null> {
+/** Set up SSH, confirmed (after `lead`, when given), the key scope granted first when the
+ *  token lacks it (gh's device flow; the popover hides meanwhile), then the key added. */
+export async function setUpKey(
+  grantScope: GrantScope,
+  lead?: string,
+  cancel = t("setup.cancel"),
+): Promise<SshStatus | null> {
   const auth = session.auth;
   const scoped = Boolean(auth?.canAddSshKeys);
   const lines = [t("ssh.setUpConfirm", { login: auth?.login ?? "" })];
+  if (lead) lines.unshift(lead);
   if (!scoped) lines.push(t("ssh.needsGrant"));
   const go = await withDialog(() =>
-    ask(lines.join("\n\n"), {
-      kind: "info",
-      okLabel: t("ssh.setUp"),
-      cancelLabel: t("setup.cancel"),
-    }),
+    ask(lines.join("\n\n"), { kind: "info", okLabel: t("ssh.setUp"), cancelLabel: cancel }),
   );
   if (!go) return null;
-  if (!scoped && !(await grant(["writePublicKey"]))?.canAddSshKeys) return null;
-  return setUp();
+  // Just granted: GitHub refusing again isn't asked twice.
+  if (!scoped && !(await grantScope())) return null;
+  return setUp(grantScope, !scoped);
 }
 
-/** After a sign-in that asked for the key scope: adds the key. */
-export async function setUpAfterSignIn(): Promise<void> {
-  await setUp();
+/** Where SSH stands when it isn't ready and the app can't fix it from here: said, with
+ *  SSH settings as the way on. */
+async function report(status: SshStatus) {
+  const open = await withDialog(() =>
+    ask(statusText(status), {
+      title: protocolName("ssh"),
+      kind: "warning",
+      okLabel: t("ssh.settings"),
+      cancelLabel: t("ssh.later"),
+    }),
+  );
+  if (open) await openSettings();
+}
+
+/** Settings, scrolled to its SSH row. */
+export function openSettings(): Promise<void> {
+  return goto("/settings#ssh");
+}
+
+/**
+ * Once signed in with SSH: checks it again, now as the new account (before the sign-in it
+ * could only answer for gh's previous one). Ready is it; no key is set up (`sshKey`: the
+ * scope came with the sign-in) or offered; a host key is offered its fix; anything else (a
+ * key of another account, one ssh didn't use) is said, never uploaded.
+ */
+export async function afterSignIn(
+  sshKey: boolean,
+  run: { step: (step: "checking" | "settingUp" | null) => void; grant: GrantScope },
+): Promise<void> {
+  run.step("checking");
+  const status = await probe(true);
+  run.step(null);
+  if (status.state === "ready") return;
+  let next: SshStatus | null = null;
+  if (status.state === "noKey") {
+    if (sshKey) {
+      run.step("settingUp");
+      next = await setUp(run.grant);
+    } else {
+      next = await setUpKey(run.grant, statusText(status), t("ssh.later"));
+    }
+  } else if (hostKeyProblem(status)) {
+    const replace = status.state === "hostKeyChanged";
+    const go = await withDialog(() =>
+      ask(`${statusText(status)}\n\n${t(replace ? "ssh.replaceHint" : "ssh.trustHint")}`, {
+        title: protocolName("ssh"),
+        kind: "warning",
+        okLabel: t(replace ? "ssh.replace" : "ssh.trust"),
+        cancelLabel: t("ssh.later"),
+      }),
+    );
+    if (go) next = await fixHostKey(replace);
+  } else {
+    await report(status);
+  }
+  run.step(null);
+  if (next && next.state !== "ready") await report(next);
 }
 
 export interface SignInChoice {
@@ -155,12 +229,13 @@ async function choose(
 /**
  * Before a sign-in: HTTPS or SSH, gh's current protocol first (the default button). SSH is
  * then probed (`onChecking` around it) and anything in the way said, with its fix or HTTPS.
- * Null when cancelled.
+ * Null when cancelled. The probe can only answer for gh's account so far, so `afterSignIn`
+ * checks again.
  */
 export async function askSignInProtocol(
   onChecking: (checking: boolean) => void,
 ): Promise<SignInChoice | null> {
-  const current = await gitProtocol();
+  const current = await gitProtocol(true);
   const other: GitProtocol = current === "ssh" ? "https" : "ssh";
   const picked = await choose(
     t("login.protocol.ask"),
@@ -214,28 +289,45 @@ async function afterProbe(
 }
 
 /**
- * Before an SSH clone: "ssh" when SSH works (or once GitHub's host key is fixed from here),
- * "https" for the fallback, null to stop (Cancel, or SSH settings opened for a fix that
- * needs more than a click).
+ * Before cloning or switching a clone to SSH: "ssh" when SSH works (or once GitHub's host
+ * key is fixed from here), "https" for the fallback (offered only with `https`, a clone's),
+ * null to stop (Cancel, or SSH settings opened for a fix that needs more than a click).
  */
-export async function checkCloneOverSsh(name: string): Promise<GitProtocol | null> {
+export async function checkSsh(name: string, https?: string): Promise<GitProtocol | null> {
   const status = await probe(false);
   if (status.state === "ready") return "ssh";
-  const https = t("clone.withHttps");
   const hostKey = hostKeyProblem(status);
   const replace = status.state === "hostKeyChanged";
   const fix = t(hostKey ? (replace ? "ssh.replace" : "ssh.trust") : "ssh.settings");
-  const text = `${statusText(status)}\n\n${t("clone.sshNotReady")}`;
-  const answer = await choose(text, name, https, fix, t("clone.cancel"));
-  if (answer === https) return "https";
+  let answer: string | null;
+  if (https) {
+    const text = `${statusText(status)}\n\n${t("clone.sshNotReady")}`;
+    answer = await choose(text, name, https, fix, t("clone.cancel"));
+    if (answer === https) return "https";
+  } else {
+    const go = await withDialog(() =>
+      ask(statusText(status), {
+        title: name,
+        kind: "warning",
+        okLabel: fix,
+        cancelLabel: t("clone.cancel"),
+      }),
+    );
+    answer = go ? fix : null;
+  }
   if (answer === null) return null;
   if (!hostKey) {
-    await goto("/settings");
+    await openSettings();
     return null;
   }
   const next = await fixHostKey(replace);
   if (!next) return null;
-  return next.state === "ready" ? "ssh" : checkCloneOverSsh(name);
+  return next.state === "ready" ? "ssh" : checkSsh(name, https);
+}
+
+/** Before an SSH clone (`checkSsh`, with Clone with HTTPS as the fallback). */
+export function checkCloneOverSsh(name: string): Promise<GitProtocol | null> {
+  return checkSsh(name, t("clone.withHttps"));
 }
 
 /** A clone over SSH failed (kind `ssh`): try again with HTTPS? */
@@ -249,12 +341,14 @@ export function offerHttpsClone(text: string): Promise<boolean> {
   );
 }
 
-/** Points the clone's origin at GitHub over `protocol` (its `.git/config` only). */
+/** Points the clone's origin at GitHub over `protocol` (its `.git/config` only); to SSH only
+ *  once SSH works (`checkSsh`). */
 export async function setRemote(
   project: Project,
   name: string,
   protocol: GitProtocol,
 ): Promise<boolean> {
+  if (protocol === "ssh" && (await checkSsh(name)) !== "ssh") return false;
   try {
     await api.setCloneRemote(project.id, protocol);
     announce(t("a11y.remoteSet", { name, protocol: protocolName(protocol) }));
@@ -267,15 +361,32 @@ export async function setRemote(
   }
 }
 
-/** A pull or push over SSH failed (`text` says why): offers to switch the clone to HTTPS.
- *  True once switched, so the caller tries once more; declining writes nothing. */
-export async function switchToHttps(project: Project, name: string, text: string) {
+/** A pull or push over SSH failed (`err`, said by `text`): offers to switch the clone to
+ *  HTTPS, and for GitHub's host key its fix first. True once fixed or switched, so the
+ *  caller tries once more; declining writes nothing. */
+export async function recoverSsh(project: Project, name: string, text: string, err: unknown) {
+  const https = t("clone.useFor", { protocol: protocolName("https") });
+  const problem = sshProblem(err);
+  if (problem === "hostKeyUnknown" || problem === "hostKeyChanged") {
+    const replace = problem === "hostKeyChanged";
+    const fix = t(replace ? "ssh.replace" : "ssh.trust");
+    const hint = t(replace ? "ssh.replaceHint" : "ssh.trustHint");
+    const answer = await choose(
+      `${text}\n\n${hint}\n\n${t("ssh.retryHostKey")}`,
+      name,
+      fix,
+      https,
+      t("clone.cancel"),
+    );
+    if (answer === fix) return (await fixHostKey(replace)) !== null;
+    return answer === https && setRemote(project, name, "https");
+  }
   const yes = await withDialog(() =>
     ask(`${text}\n\n${t("ssh.retryHttps")}`, {
       title: name,
       kind: "warning",
-      okLabel: t("clone.useFor", { protocol: protocolName("https") }),
-      cancelLabel: t("accept.cancel"),
+      okLabel: https,
+      cancelLabel: t("clone.cancel"),
     }),
   );
   return yes && setRemote(project, name, "https");
