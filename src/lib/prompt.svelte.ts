@@ -7,9 +7,16 @@ export interface PromptOptions {
   placeholder?: string;
   /** The input's accessible name, when the title names something else. */
   label?: string;
+  /** A visible label above the input (its accessible name too). */
+  fieldLabel?: string;
+  /** Lines under the input, worked out from what is typed (a format reminder, what the
+   *  answer will do), then a `warning` in the warning color. */
+  hint?: (value: string) => { text: string; warning: string | null } | null;
   /** The input's `maxlength`, in UTF-16 units. */
   maxLength?: number;
   okLabel: string;
+  /** Cancel's label, "Cancel" when unset. */
+  cancelLabel?: string;
   /** A second action next to the main one (`askTextAction` only). */
   altLabel?: string;
   /** Read-only text shown instead of the input (`showText` only). */
