@@ -253,7 +253,7 @@
   "phases.save": "حفظ",
   "phases.saved": "تم حفظ مراحل {name}",
   "phases.problem.name": "يلزم اسم لكل مرحلة.",
-  "phases.problem.date": "يلزم تاريخ لكل مرحلة.",
+  "phases.problem.date": "يلزم إكمال تاريخ {name}: اليوم والشهر والسنة.",
   "time.dayAt": "{day} الساعة {time}",
   "projects.notCloned": "غير مستنسخ",
   "projects.cloning": "جارٍ الاستنساخ…",

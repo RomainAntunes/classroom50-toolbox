@@ -6,6 +6,7 @@ import {
   localDate,
   newDraft,
   newId,
+  nextDate,
   nextPhase,
   openPhases,
   toPhases,
@@ -67,8 +68,8 @@ describe("drafts", () => {
 
   it("sorts by date and trims names when saving", () => {
     const drafts = [
-      { ...newDraft("b", " Report "), date: "2026-12-01" },
-      { ...newDraft("a", "Draft"), date: "2026-11-15", time: "08:30" },
+      newDraft("b", " Report ", "2026-12-01"),
+      { ...newDraft("a", "Draft", "2026-11-15"), time: "08:30" },
     ];
     expect(toPhases(drafts).map((p) => [p.id, p.name, p.due])).toEqual([
       ["a", "Draft", "2026-11-15T07:30:00.000Z"],
@@ -76,15 +77,38 @@ describe("drafts", () => {
     ]);
   });
 
-  it("refuses a blank name, then a missing or impossible date", () => {
-    const ok = { ...newDraft("a", "Phase 1"), date: "2026-11-15" };
+  it("refuses a blank name, then a missing or impossible date, naming the phase", () => {
+    const ok = newDraft("a", "Phase 1", "2026-11-15");
+    const date = (index: number) => ({ kind: "date", index });
     expect(draftProblem([ok])).toBeNull();
     expect(draftProblem([])).toBeNull();
-    expect(draftProblem([ok, { ...ok, id: "b", name: "  " }])).toBe("name");
-    expect(draftProblem([{ ...ok, date: "" }])).toBe("date");
-    expect(draftProblem([{ ...ok, date: "2026-02-31" }])).toBe("date");
-    expect(draftProblem([{ ...ok, date: "15/11/2026" }])).toBe("date");
-    expect(draftProblem([{ ...ok, time: "25:00" }])).toBe("date");
+    expect(draftProblem([ok, { ...ok, id: "b", name: "  " }])).toEqual({ kind: "name", index: 1 });
+    // A name problem comes first, wherever the date problem is.
+    expect(
+      draftProblem([
+        { ...ok, date: "" },
+        { ...ok, name: "" },
+      ]),
+    ).toEqual({
+      kind: "name",
+      index: 1,
+    });
+    expect(draftProblem([{ ...ok, date: "" }])).toEqual(date(0));
+    expect(draftProblem([ok, { ...ok, date: "2026-02-31" }])).toEqual(date(1));
+    expect(draftProblem([{ ...ok, date: "15/11/2026" }])).toEqual(date(0));
+    expect(draftProblem([{ ...ok, time: "25:00" }])).toEqual(date(0));
+  });
+
+  it("dates a new phase a week after the latest one, or after today", () => {
+    const now = new Date(2026, 9, 28, 15, 0);
+    expect(nextDate([], now)).toBe("2026-11-04");
+    // Over a month's end and the change from summer time.
+    expect(nextDate([newDraft("a", "A", "2026-10-29")], now)).toBe("2026-11-05");
+    expect(nextDate([newDraft("a", "A", "2026-12-28")], now)).toBe("2027-01-04");
+    // A past phase or one without a date leaves today as the start.
+    expect(nextDate([newDraft("a", "A", "2026-09-01"), newDraft("b", "B", "")], now)).toBe(
+      "2026-11-04",
+    );
   });
 
   it("takes the end of the day when the time is cleared", () => {

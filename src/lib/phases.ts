@@ -14,8 +14,11 @@ export interface PhaseDraft {
   done: boolean;
 }
 
-/** What keeps the draft from being saved, the first one found. */
-export type DraftProblem = "name" | "date";
+/** What keeps the draft from being saved, the first one found, with the phase it is on. */
+export interface DraftProblem {
+  kind: "name" | "date";
+  index: number;
+}
 
 /** The longest name Rust accepts (`phases::MAX_NAME`), in UTF-16 units. */
 export const MAX_NAME = 80;
@@ -42,13 +45,16 @@ export function nextPhase(project: Project): ProjectPhase | null {
 
 const pad = (n: number) => String(n).padStart(2, "0");
 
+/** `at`'s local day as `<input type="date">` holds it. */
+const dayOf = (at: Date) => `${at.getFullYear()}-${pad(at.getMonth() + 1)}-${pad(at.getDate())}`;
+
 export function draftFrom(phases: readonly ProjectPhase[]): PhaseDraft[] {
   return phases.map((phase) => {
     const at = new Date(phase.due);
     return {
       id: phase.id,
       name: phase.name,
-      date: `${at.getFullYear()}-${pad(at.getMonth() + 1)}-${pad(at.getDate())}`,
+      date: dayOf(at),
       time: `${pad(at.getHours())}:${pad(at.getMinutes())}`,
       done: phase.done,
     };
@@ -62,8 +68,22 @@ export function newId(): string {
   return [...bytes].map((b) => b.toString(16).padStart(2, "0")).join("");
 }
 
-export function newDraft(id: string, name: string): PhaseDraft {
-  return { id, name, date: "", time: DEFAULT_TIME, done: false };
+/** A new phase, dated `date`. */
+export function newDraft(id: string, name: string, date: string): PhaseDraft {
+  return { id, name, date, time: DEFAULT_TIME, done: false };
+}
+
+/** A new phase's date: a week after the latest phase, or after today when that is later.
+ *  A date field that starts empty in WebKit stays empty until its day, month and year are
+ *  all typed, so a new phase starts dated and picking a day keeps the month and year. */
+export function nextDate(drafts: readonly PhaseDraft[], now: Date): string {
+  let base = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  for (const draft of drafts) {
+    const at = localDate(draft.date, "00:00");
+    if (at && at > base) base = at;
+  }
+  base.setDate(base.getDate() + 7);
+  return dayOf(base);
 }
 
 /** The local date and time the inputs hold, or null when they don't make one (a typed
@@ -84,8 +104,10 @@ export function localDate(date: string, time: string): Date | null {
 }
 
 export function draftProblem(drafts: readonly PhaseDraft[]): DraftProblem | null {
-  if (drafts.some((d) => !d.name.trim())) return "name";
-  if (drafts.some((d) => !localDate(d.date, d.time))) return "date";
+  const name = drafts.findIndex((d) => !d.name.trim());
+  if (name >= 0) return { kind: "name", index: name };
+  const date = drafts.findIndex((d) => !localDate(d.date, d.time));
+  if (date >= 0) return { kind: "date", index: date };
   return null;
 }
 

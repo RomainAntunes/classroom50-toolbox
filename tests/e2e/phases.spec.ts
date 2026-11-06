@@ -55,14 +55,23 @@ test("phases are added, ticked and saved, and the row shows the next one", async
   // The new name is selected, so typing replaces "Phase 1".
   await expect(app.prompt.getByLabel("Name of phase 1")).toBeFocused();
   await app.page.keyboard.type("Report");
-  // No date yet: nothing to save.
+  // Dated a week from today, so picking a day keeps the month and year.
+  const date = app.prompt.getByLabel("Date of Report");
+  await expect(date).toHaveValue("2026-11-04");
+  await expect(save).toBeEnabled();
+  // A date cleared (WebKit's value while a part is missing) is named, and keeps Save off.
+  await date.fill("");
   await expect(save).toBeDisabled();
-  await expect(app.prompt).toContainText("Pick a date for each phase.");
-  await app.prompt.getByLabel("Date of Report").fill("2026-10-29");
+  await expect(date).toHaveAttribute("aria-invalid", "true");
+  await expect(app.prompt).toContainText("Complete the date of Report: day, month and year.");
+  await date.fill("2026-10-29");
+  await expect(date).not.toHaveAttribute("aria-invalid");
   await app.prompt.getByLabel("Time of Report").fill("18:00");
 
   await add.click();
   await expect(app.prompt.getByLabel("Name of phase 2")).toHaveValue("Phase 2");
+  // A week after the latest phase.
+  await expect(app.prompt.getByLabel("Date of Phase 2")).toHaveValue("2026-11-05");
   await app.prompt.getByLabel("Date of Phase 2").fill("2026-10-20");
   await app.prompt.getByRole("checkbox").nth(1).check();
   await save.click();

@@ -248,7 +248,7 @@
   "phases.save": "保存",
   "phases.saved": "{name}のフェーズを保存しました",
   "phases.problem.name": "各フェーズに名前を付けてください。",
-  "phases.problem.date": "各フェーズの日付を選んでください。",
+  "phases.problem.date": "{name}の日付を年・月・日まで入力してください。",
   "time.dayAt": "{day}の{time}",
   "projects.notCloned": "未クローン",
   "projects.cloning": "クローン中…",

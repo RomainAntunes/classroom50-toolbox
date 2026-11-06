@@ -249,7 +249,7 @@
   "phases.save": "Kaydet",
   "phases.saved": "{name} aşamaları kaydedildi",
   "phases.problem.name": "Her aşamaya bir ad verin.",
-  "phases.problem.date": "Her aşama için bir tarih seçin.",
+  "phases.problem.date": "{name} için tarihi eksiksiz girin: gün, ay ve yıl.",
   "time.dayAt": "{day} {time}",
   "projects.notCloned": "Klonlanmadı",
   "projects.cloning": "Klonlanıyor…",

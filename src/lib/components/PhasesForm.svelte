@@ -15,6 +15,7 @@
     draftProblem,
     newDraft,
     newId,
+    nextDate,
     toPhases,
     type PhaseDraft,
   } from "#lib/phases.js";
@@ -30,6 +31,11 @@
   let list = $state<HTMLElement | null>(null);
   let addButton = $state<HTMLButtonElement | null>(null);
   const problem = $derived(draftProblem(drafts));
+  const phaseLabel = (index: number) =>
+    drafts[index]?.name.trim() || t("phases.defaultName", { n: index + 1 });
+  /** Whether the field of `kind` on phase `index` is what keeps Save disabled. */
+  const invalid = (kind: "name" | "date", index: number) =>
+    problem?.kind === kind && problem.index === index;
 
   /** Focuses the name field of phase `index` once rendered, else Add. A new phase's name
    *  is selected, so typing replaces "Phase 2". */
@@ -43,7 +49,8 @@
 
   function add() {
     if (drafts.length >= MAX_PHASES) return;
-    drafts.push(newDraft(newId(), t("phases.defaultName", { n: drafts.length + 1 })));
+    const name = t("phases.defaultName", { n: drafts.length + 1 });
+    drafts.push(newDraft(newId(), name, nextDate(drafts, new Date())));
     void focusName(drafts.length - 1, true);
   }
 
@@ -83,6 +90,8 @@
       <ul bind:this={list}>
         {#each drafts as draft, index (draft.id)}
           {@const label = draft.name.trim() || t("phases.defaultName", { n: index + 1 })}
+          {@const badName = invalid("name", index)}
+          {@const badDate = invalid("date", index)}
           <li>
             <div class="line">
               <input
@@ -91,6 +100,8 @@
                 data-autofocus={index === 0 ? "" : undefined}
                 bind:value={draft.name}
                 aria-label={t("phases.nameLabel", { n: index + 1 })}
+                aria-invalid={badName || undefined}
+                aria-describedby={badName ? "phases-problem" : undefined}
                 maxlength={MAX_NAME}
                 autocomplete="off"
               />
@@ -112,6 +123,8 @@
                 dir="ltr"
                 bind:value={draft.date}
                 aria-label={t("phases.dateLabel", { name: label })}
+                aria-invalid={badDate || undefined}
+                aria-describedby={badDate ? "phases-problem" : undefined}
                 required
               />
               <input
@@ -140,7 +153,9 @@
     {#if error}
       <p class="error" role="alert">{error}</p>
     {:else if problem}
-      <p class="problem">{t(`phases.problem.${problem}`)}</p>
+      <p class="problem" id="phases-problem">
+        {t(`phases.problem.${problem.kind}`, { name: phaseLabel(problem.index) })}
+      </p>
     {/if}
     <div class="buttons">
       <button type="button" onclick={() => resolve(false)}>{t("prompt.cancel")}</button>
@@ -217,6 +232,10 @@
   input:not([type="checkbox"]):focus-visible {
     border-color: var(--focus-ring);
     box-shadow: 0 0 0 1px var(--focus-ring);
+  }
+
+  input[aria-invalid="true"] {
+    border-color: var(--danger);
   }
 
   .name {

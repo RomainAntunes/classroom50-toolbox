@@ -251,7 +251,7 @@
   "phases.save": "Zapisz",
   "phases.saved": "Zapisano etapy: {name}",
   "phases.problem.name": "Nadaj nazwę każdemu etapowi.",
-  "phases.problem.date": "Wybierz datę dla każdego etapu.",
+  "phases.problem.date": "Uzupełnij datę etapu {name}: dzień, miesiąc i rok.",
   "time.dayAt": "{day} o {time}",
   "projects.notCloned": "Niesklonowane",
   "projects.cloning": "Klonowanie…",

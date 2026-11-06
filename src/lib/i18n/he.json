@@ -250,7 +250,7 @@
   "phases.save": "שמירה",
   "phases.saved": "השלבים של {name} נשמרו",
   "phases.problem.name": "צריך לתת שם לכל שלב.",
-  "phases.problem.date": "צריך לבחור תאריך לכל שלב.",
+  "phases.problem.date": "צריך להשלים את התאריך של {name}: יום, חודש ושנה.",
   "time.dayAt": "{day} בשעה {time}",
   "projects.notCloned": "לא משוכפל",
   "projects.cloning": "משכפל…",

@@ -248,7 +248,7 @@
   "phases.save": "保存",
   "phases.saved": "已保存{name}的阶段",
   "phases.problem.name": "请为每个阶段命名。",
-  "phases.problem.date": "请为每个阶段选择日期。",
+  "phases.problem.date": "请填完整{name}的日期：年、月、日。",
   "time.dayAt": "{day} {time}",
   "projects.notCloned": "未克隆",
   "projects.cloning": "正在克隆…",

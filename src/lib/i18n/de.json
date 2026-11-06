@@ -249,7 +249,7 @@
   "phases.save": "Speichern",
   "phases.saved": "Phasen von {name} gespeichert",
   "phases.problem.name": "Gib jeder Phase einen Namen.",
-  "phases.problem.date": "Wähle für jede Phase ein Datum.",
+  "phases.problem.date": "Vervollständige das Datum von {name}: Tag, Monat und Jahr.",
   "time.dayAt": "{day} um {time}",
   "projects.notCloned": "Nicht geklont",
   "projects.cloning": "Wird geklont…",

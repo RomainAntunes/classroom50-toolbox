@@ -250,7 +250,7 @@
   "phases.save": "Enregistrer",
   "phases.saved": "Phases de {name} enregistrées",
   "phases.problem.name": "Donnez un nom à chaque phase.",
-  "phases.problem.date": "Choisissez une date pour chaque phase.",
+  "phases.problem.date": "Complétez la date de {name} : jour, mois et année.",
   "time.dayAt": "{day} à {time}",
   "projects.notCloned": "Non cloné",
   "projects.cloning": "Clonage…",

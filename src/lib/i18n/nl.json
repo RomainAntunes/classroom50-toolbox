@@ -249,7 +249,7 @@
   "phases.save": "Opslaan",
   "phases.saved": "Fasen van {name} opgeslagen",
   "phases.problem.name": "Geef elke fase een naam.",
-  "phases.problem.date": "Kies een datum voor elke fase.",
+  "phases.problem.date": "Vul de datum van {name} volledig in: dag, maand en jaar.",
   "time.dayAt": "{day} om {time}",
   "projects.notCloned": "Niet gekloond",
   "projects.cloning": "Klonen…",

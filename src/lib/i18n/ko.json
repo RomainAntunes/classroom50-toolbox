@@ -248,7 +248,7 @@
   "phases.save": "저장",
   "phases.saved": "{name}의 단계를 저장했어요",
   "phases.problem.name": "단계마다 이름을 붙여 주세요.",
-  "phases.problem.date": "단계마다 날짜를 골라 주세요.",
+  "phases.problem.date": "{name}의 날짜를 연, 월, 일까지 모두 입력해 주세요.",
   "time.dayAt": "{day} {time}",
   "projects.notCloned": "복제 안 됨",
   "projects.cloning": "복제 중…",
