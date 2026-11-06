@@ -51,7 +51,9 @@ pub async fn clone_project(
 }
 
 /// Points project `id`'s clone's `origin` at its GitHub repo over `protocol` (its push URL
-/// too, when one is set), only when `origin` already is that repo. Then rescans the disk.
+/// too, when one is set), only when `origin` already is that repo or its name before an
+/// assignment rename (`projects::previous_id`), which becomes the current name. Then
+/// rescans the disk.
 #[tauri::command]
 #[cfg_attr(test, specta::specta)]
 pub async fn set_clone_remote(
@@ -67,13 +69,15 @@ pub async fn set_clone_remote(
         .into_iter()
         .find(|p| p.id == id)
         .ok_or_else(|| Error::Unsupported(format!("unknown project {id}")))?;
+    let previous = projects::previous_id(&project)
+        .and_then(|old| old.split_once('/').map(|(_, name)| name.to_owned()));
     let path = project
         .path
         .ok_or_else(|| Error::Unsupported(format!("{id} has no local clone")))?;
     let (Some(owner), Some(repo)) = (project.owner, project.repo) else {
         return Err(Error::Unsupported(format!("{id} has no GitHub repository")));
     };
-    clones::set_remote(&path, &owner, &repo, protocol).await?;
+    clones::set_remote(&path, &owner, &repo, previous.as_deref(), protocol).await?;
     ssh.clear();
     projects::refresh_local(&app, false).await;
     Ok(())

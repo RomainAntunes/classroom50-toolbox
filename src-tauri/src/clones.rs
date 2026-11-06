@@ -106,16 +106,22 @@ pub async fn clone(
 /// Sets the clone's `origin` to `owner/repo` over `protocol`, and each of its push URLs
 /// that is that repo too, so a pull and a push both switch; a push URL elsewhere (a backup,
 /// a mirror) is kept. Refused unless `origin` is that repo already (in any spelling: case,
-/// `.git`, a user name), so another remote is never rewritten.
+/// `.git`, a user name) or its name before an assignment rename (`previous`, which GitHub
+/// redirects; it is then rewritten to the current name), so another remote is never
+/// rewritten.
 pub async fn set_remote(
     clone: &Path,
     owner: &str,
     repo: &str,
+    previous: Option<&str>,
     protocol: GitProtocol,
 ) -> Result<()> {
     let is_repo = |url: &str| {
-        crate::discovery::parse_github_remote(url)
-            .is_some_and(|(o, r)| o.eq_ignore_ascii_case(owner) && r.eq_ignore_ascii_case(repo))
+        crate::discovery::parse_github_remote(url).is_some_and(|(o, r)| {
+            o.eq_ignore_ascii_case(owner)
+                && (r.eq_ignore_ascii_case(repo)
+                    || previous.is_some_and(|old| r.eq_ignore_ascii_case(old)))
+        })
     };
     let same = crate::discovery::origin_url(clone).is_some_and(|url| is_repo(&url));
     if !same || !is_plain_name(owner) || !is_plain_name(repo) {
@@ -275,7 +281,7 @@ mod tests {
             "origin",
             "https://github.com/Acme-CS/lab-2-alex",
         ]);
-        set_remote(&root, "acme-cs", "lab-2-alex", GitProtocol::Ssh)
+        set_remote(&root, "acme-cs", "lab-2-alex", None, GitProtocol::Ssh)
             .await
             .unwrap();
         assert_eq!(
@@ -299,7 +305,7 @@ mod tests {
             "origin",
             "git@github.com:acme-cs/lab-2-alex.git",
         ]);
-        set_remote(&root, "acme-cs", "lab-2-alex", GitProtocol::Https)
+        set_remote(&root, "acme-cs", "lab-2-alex", None, GitProtocol::Https)
             .await
             .unwrap();
         assert_eq!(
@@ -327,7 +333,7 @@ mod tests {
             "origin",
             "https://alice@github.com/Acme-CS/lab-2-alex",
         ]);
-        set_remote(&root, "acme-cs", "lab-2-alex", GitProtocol::Ssh)
+        set_remote(&root, "acme-cs", "lab-2-alex", None, GitProtocol::Ssh)
             .await
             .unwrap();
         assert_eq!(
@@ -348,12 +354,50 @@ mod tests {
             "https://github.com/acme-cs/lab-2-alex.git",
         ]);
         assert!(matches!(
-            set_remote(&root, "acme-cs", "other", GitProtocol::Ssh).await,
+            set_remote(
+                &root,
+                "acme-cs",
+                "other",
+                Some("lab-3-alex"),
+                GitProtocol::Ssh
+            )
+            .await,
             Err(Error::Unsupported(_))
         ));
         assert_eq!(
             git(&["remote", "get-url", "origin"]),
             "https://github.com/acme-cs/lab-2-alex.git"
+        );
+        // A clone made before an assignment rename still names the old repo, and so does
+        // its push URL: both move to the current name.
+        git(&[
+            "remote",
+            "set-url",
+            "--add",
+            "--push",
+            "origin",
+            "https://github.com/acme-cs/lab-2-alex.git",
+        ]);
+        assert!(matches!(
+            set_remote(&root, "acme-cs", "lab-two-alex", None, GitProtocol::Ssh).await,
+            Err(Error::Unsupported(_))
+        ));
+        set_remote(
+            &root,
+            "acme-cs",
+            "lab-two-alex",
+            Some("lab-2-alex"),
+            GitProtocol::Ssh,
+        )
+        .await
+        .unwrap();
+        assert_eq!(
+            git(&["remote", "get-url", "origin"]),
+            "git@github.com:acme-cs/lab-two-alex.git"
+        );
+        assert_eq!(
+            git(&["remote", "get-url", "--push", "origin"]),
+            "git@github.com:acme-cs/lab-two-alex.git"
         );
         std::fs::remove_dir_all(&root).unwrap();
     }
