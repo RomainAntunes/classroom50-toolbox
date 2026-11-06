@@ -92,6 +92,10 @@ pub struct AuthStatus {
     /// gh is using a token from this environment variable. gh can't store, switch or
     /// widen a login then, so the app doesn't offer to.
     pub env_token: Option<String>,
+    /// The token may add SSH keys to the account (`write:public_key` or
+    /// `admin:public_key`), which `gh ssh-key add` needs; `gh auth refresh` grants it
+    /// (`login::ExtraScope::WritePublicKey`).
+    pub can_add_ssh_keys: bool,
 }
 
 pub async fn status(tool: Tool) -> ToolStatus {
@@ -610,6 +614,7 @@ pub async fn auth_status() -> AuthStatus {
         login: None,
         missing_scopes: Vec::new(),
         env_token: env_token.clone(),
+        can_add_ssh_keys: false,
     };
     match process::run("gh", ["api", "--include", "user"], None).await {
         Ok(out) => {
@@ -617,8 +622,9 @@ pub async fn auth_status() -> AuthStatus {
             AuthStatus {
                 logged_in: login.is_some(),
                 login,
-                missing_scopes: granted.map(|g| missing_scopes(&g)).unwrap_or_default(),
+                missing_scopes: granted.as_deref().map(missing_scopes).unwrap_or_default(),
                 env_token,
+                can_add_ssh_keys: granted.as_deref().is_some_and(can_add_ssh_keys),
             }
         }
         Err(Error::NotInstalled { .. }) => signed_out,
@@ -636,6 +642,7 @@ pub async fn auth_status() -> AuthStatus {
                 login: active_login().await,
                 missing_scopes: Vec::new(),
                 env_token,
+                can_add_ssh_keys: false,
             }
         }
     }
@@ -689,6 +696,13 @@ fn missing_scopes(granted: &[String]) -> Vec<String> {
         .collect()
 }
 
+/// Whether `granted` lets `gh ssh-key add` add a key (`admin:public_key` covers write).
+fn can_add_ssh_keys(granted: &[String]) -> bool {
+    granted
+        .iter()
+        .any(|g| g == "write:public_key" || g == "admin:public_key")
+}
+
 /// The account gh uses for github.com, read from its local config (no network). Lets a
 /// sync notice `gh auth switch` before asking GitHub anything.
 pub async fn active_login() -> Option<String> {
@@ -700,7 +714,7 @@ pub async fn active_login() -> Option<String> {
 }
 
 /// How gh clones github.com repos (`git_protocol`).
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[cfg_attr(test, derive(specta::Type))]
 #[serde(rename_all = "lowercase")]
 pub enum GitProtocol {
@@ -718,6 +732,35 @@ pub async fn git_protocol() -> GitProtocol {
     )
     .await
     .map_or(GitProtocol::Https, |out| parse_git_protocol(&out.stdout))
+}
+
+impl GitProtocol {
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::Https => "https",
+            Self::Ssh => "ssh",
+        }
+    }
+}
+
+/// Sets gh's `git_protocol` for github.com (`gh config set`, gh's own config file): every
+/// gh account on github.com and `gh repo clone` in a terminal follow it. Returns what gh
+/// reads back.
+pub async fn set_git_protocol(protocol: GitProtocol) -> Result<GitProtocol> {
+    process::run(
+        "gh",
+        [
+            "config",
+            "set",
+            "git_protocol",
+            protocol.as_str(),
+            "--host",
+            "github.com",
+        ],
+        None,
+    )
+    .await?;
+    Ok(git_protocol().await)
 }
 
 /// `ssh` -> `Ssh`; anything else is gh's default, HTTPS.
@@ -771,6 +814,19 @@ fn parse_extension_version(stdout: &str, repo: &str) -> Option<String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn protocols_read_back_as_gh_writes_them() {
+        for protocol in [GitProtocol::Https, GitProtocol::Ssh] {
+            assert_eq!(parse_git_protocol(protocol.as_str()), protocol);
+            let json = serde_json::to_string(&protocol).unwrap();
+            assert_eq!(json, format!("\"{}\"", protocol.as_str()));
+            assert_eq!(
+                serde_json::from_str::<GitProtocol>(&json).unwrap(),
+                protocol
+            );
+        }
+    }
 
     #[test]
     fn reads_gh_git_protocol() {
@@ -921,6 +977,14 @@ mod tests {
         let scopes = scopes.unwrap();
         assert_eq!(scopes, ["admin:org", "gist", "repo", "workflow"]);
         assert!(missing_scopes(&scopes).is_empty());
+        assert!(!can_add_ssh_keys(&scopes));
+        let (_, scopes) = parse_user_response(
+            "HTTP/2.0 200 OK\nX-Oauth-Scopes: admin:org, repo, workflow, write:public_key\n\n{}",
+        );
+        assert!(can_add_ssh_keys(&scopes.unwrap()));
+        // What gh's interactive SSH sign-in asks for.
+        assert!(can_add_ssh_keys(&["admin:public_key".to_owned()]));
+        assert!(!can_add_ssh_keys(&["read:public_key".to_owned()]));
 
         // gh's own defaults: what a student who ran `gh auth login` before has.
         let stdout = "HTTP/2.0 200 OK\nX-Oauth-Scopes: gist, read:org, repo\n\n{\"login\":\"bob\"}";
@@ -1004,6 +1068,15 @@ mod tests {
             ])),
             GitProtocol::Https
         );
+        // Setting it succeeds (and, outside the suite, remembers nothing).
+        fake_gh(&[
+            "config",
+            "set",
+            "git_protocol",
+            GitProtocol::Ssh.as_str(),
+            "--host",
+            "github.com",
+        ]);
         assert!(!fake_gh(&["auth", "token", "--hostname", "github.com"]).is_empty());
         // The dry run says "already up to date" on stderr: no update to offer.
         assert_eq!(

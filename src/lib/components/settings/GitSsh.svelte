@@ -1,0 +1,359 @@
+<script lang="ts">
+  import { CheckMenuItem, Menu } from "@tauri-apps/api/menu";
+  import { ask, message } from "@tauri-apps/plugin-dialog";
+  import { openUrl } from "@tauri-apps/plugin-opener";
+  import {
+    api,
+    errorMessage,
+    withDialog,
+    GIT_PROTOCOLS,
+    type GitProtocol,
+    type SshStatus,
+  } from "#lib/api.js";
+  import { t } from "#lib/i18n/index.js";
+  import { announce } from "#lib/announce.svelte.js";
+  import { atLeast } from "#lib/busy.js";
+  import { popupMenu } from "#lib/keyboard.js";
+  import { rememberProtocol } from "#lib/links.js";
+  import { cancelLogin, copyAndOpen, grant, login } from "#lib/login.svelte.js";
+  import { scrollBehavior } from "#lib/motion.js";
+  import { page } from "$app/state";
+  import { session } from "#lib/session.svelte.js";
+  import {
+    SSH_GUIDE,
+    SSH_KEYS,
+    confirmHostKey,
+    probe,
+    protocolName,
+    setUpKey,
+    statusText,
+  } from "#lib/ssh.js";
+  import Spinner from "#lib/components/Spinner.svelte";
+
+  /** How git reaches GitHub (gh's `git_protocol`, which gh in a terminal follows too) and
+   *  whether SSH works, with the fix when there is one. Probed on its own only when SSH is in
+   *  use (gh set to it, or a clone's origin); otherwise on a click. No timer. */
+  let protocol = $state<GitProtocol | null>(null);
+  let status = $state<SshStatus | null>(null);
+  let checking = $state(false);
+  let switching = $state(false);
+  let acting = $state(false);
+
+  const ready = $derived(
+    session.tools.some((s) => s.tool === "gh" && s.installed) && !!session.auth?.loggedIn,
+  );
+  const usesSsh = $derived(
+    protocol === "ssh" || !!session.snapshot?.projects.some((p) => p.local?.origin === "ssh"),
+  );
+  // SSH's status, fix and links: while SSH is in use, or once asked for on HTTPS.
+  const showSsh = $derived(usesSsh || checking || !!status);
+  const sshLine = $derived(
+    checking
+      ? t("login.protocol.checking")
+      : status
+        ? statusText(status)
+        : t("settings.ssh.unchecked"),
+  );
+
+  // Read again for another account (a switch or a sign-in while Settings shows).
+  let loaded: string | null = null;
+  $effect(() => {
+    const account = session.auth?.login ?? null;
+    if (!ready || loaded === account) return;
+    loaded = account;
+    status = null;
+    void api.gitProtocol().then(
+      (value) => {
+        protocol = value;
+        rememberProtocol(value);
+        if (usesSsh) void check(false);
+      },
+      () => (protocol = "https"),
+    );
+  });
+
+  /** Probes SSH and announces the result, after `lead` when given (what led to the check),
+   *  so one announcement doesn't replace the other. */
+  async function check(fresh: boolean, lead: string | null = null) {
+    if (checking) {
+      if (lead) announce(lead);
+      return;
+    }
+    checking = true;
+    try {
+      status = await atLeast(probe(fresh));
+      announce([lead, statusText(status)].filter((line) => line !== null).join("\n"));
+    } finally {
+      checking = false;
+    }
+  }
+
+  async function chooseProtocol(anchor: HTMLElement) {
+    const items = await Promise.all(
+      GIT_PROTOCOLS.map((choice) =>
+        CheckMenuItem.new({
+          text: protocolName(choice),
+          checked: choice === protocol,
+          action: () => void pickProtocol(choice),
+        }),
+      ),
+    );
+    await popupMenu(await Menu.new({ items }), anchor);
+  }
+
+  async function pickProtocol(next: GitProtocol) {
+    if (next === protocol || switching) return;
+    const name = protocolName(next);
+    const lines = [t("settings.ssh.confirm", { protocol: name })];
+    // Known not to work yet: said before, not after.
+    if (next === "ssh" && status && status.state !== "ready") lines.push(statusText(status));
+    const go = await withDialog(() =>
+      ask(lines.join("\n\n"), {
+        kind: "info",
+        okLabel: t("settings.ssh.use", { protocol: name }),
+        cancelLabel: t("setup.cancel"),
+      }),
+    );
+    if (!go) return;
+    switching = true;
+    let done: string | null = null;
+    try {
+      protocol = await atLeast(api.setGitProtocol(next));
+      rememberProtocol(protocol);
+      done = t("a11y.protocolSet", { protocol: protocolName(protocol) });
+    } catch (err) {
+      await withDialog(() =>
+        message(t("settings.ssh.failed", { error: errorMessage(err) }), { kind: "error" }),
+      );
+    } finally {
+      switching = false;
+    }
+    if (protocol === "ssh" && !status) void check(false, done);
+    else if (done) announce(done);
+  }
+
+  async function act(run: () => Promise<SshStatus | null>) {
+    if (acting) return;
+    acting = true;
+    try {
+      status = (await atLeast(run())) ?? status;
+    } finally {
+      acting = false;
+    }
+  }
+
+  const fix = $derived(
+    status?.state === "hostKeyUnknown"
+      ? { label: t("ssh.trust"), run: () => confirmHostKey(false) }
+      : status?.state === "hostKeyChanged"
+        ? { label: t("ssh.replace"), run: () => confirmHostKey(true) }
+        : status?.state === "noKey"
+          ? { label: t("ssh.setUp"), run: () => setUpKey(grantScope) }
+          : null,
+  );
+
+  // Set up SSH's grant: its code and any error show here (`from`), not only in the footer.
+  const grantScope = () => grant(["writePublicKey"], undefined, "settings");
+  const mine = $derived(login.from === "settings");
+  const error = $derived(login.error?.from === "settings" ? login.error.text : null);
+
+  // "SSH settings…" from a dialog lands here (`/settings#ssh`).
+  let element: HTMLElement | undefined = $state();
+  $effect(() => {
+    if (!element || page.url.hash !== "#ssh") return;
+    element.scrollIntoView({ block: "start", behavior: scrollBehavior() });
+    element.focus({ preventScroll: true });
+  });
+
+  /** A link the OS couldn't open (no browser): spelled out instead. */
+  let unopened = $state<string | null>(null);
+  function open(url: string) {
+    openUrl(url).catch(() => (unopened = url));
+  }
+</script>
+
+{#if ready && protocol}
+  <div class="ssh" id="ssh" tabindex="-1" bind:this={element}>
+    <div class="row">
+      <span
+        class="dot"
+        class:ok={showSsh ? status?.state === "ready" : true}
+        class:unknown={showSsh && (checking || !status)}
+        aria-hidden="true"
+      ></span>
+      <span class="name">{t("settings.ssh.cloneWith")}</span>
+      <button
+        aria-haspopup="menu"
+        aria-label={`${t("settings.ssh.cloneWith")}: ${protocolName(protocol)}`}
+        disabled={switching}
+        aria-busy={switching}
+        onclick={(event) => chooseProtocol(event.currentTarget)}
+        >{#if switching}<Spinner />{/if}{protocolName(protocol)}</button
+      >
+    </div>
+    <div class="body">
+      {#if showSsh}
+        <!-- On HTTPS, SSH is a clone's: said by name. -->
+        <p class="status">
+          {#if protocol === "ssh"}{sshLine}{:else}{t("settings.ssh.statusFor", {
+              status: sshLine,
+            })}{/if}
+        </p>
+      {/if}
+      <p class="sub">
+        {t("settings.ssh.cloneWithHint")}
+        {#if !showSsh}
+          <button class="link" disabled={checking} onclick={() => check(true)}
+            >{t("settings.ssh.check")}</button
+          >
+        {/if}
+      </p>
+      {#if showSsh && status?.state !== "ready" && !checking}
+        <div class="actions">
+          {#if fix}
+            <button
+              class="primary"
+              disabled={acting}
+              aria-busy={acting}
+              onclick={() => act(fix.run)}
+              >{#if acting}<Spinner />{/if}{fix.label}</button
+            >
+          {/if}
+          <!-- Fixed outside the app (a key added on GitHub, ssh-add): checked again from here. -->
+          <button disabled={acting} onclick={() => check(true)}
+            >{t(status ? "setup.recheck" : "settings.ssh.check")}</button
+          >
+        </div>
+      {/if}
+      {#if login.device && mine}
+        <!-- Set up SSH asked GitHub for the key scope: its code, here as in the footer. -->
+        <div class="device">
+          <span>{t("auth.waiting")}</span>
+          <code dir="ltr">{login.device.code}</code>
+          <div class="actions">
+            <button class="primary" onclick={copyAndOpen}>{t("auth.copyAndOpen")}</button>
+            <button onclick={cancelLogin}>{t("auth.cancel")}</button>
+          </div>
+          <p class="sub" class:error={login.openFailed}>
+            {t(login.openFailed ? "auth.openFailed" : "auth.openAt", { url: login.device.url })}
+          </p>
+        </div>
+      {:else if error}
+        <p class="error" role="alert">{error}</p>
+      {/if}
+      {#if showSsh}
+        <p class="sub links">
+          <button class="link" onclick={() => open(SSH_GUIDE)}>{t("settings.ssh.guide")}</button>
+          <span aria-hidden="true">·</span>
+          <button class="link" onclick={() => open(SSH_KEYS)}>{t("settings.ssh.keys")}</button>
+        </p>
+      {/if}
+      {#if unopened}
+        <p class="sub url" dir="ltr">{unopened}</p>
+      {/if}
+    </div>
+  </div>
+{/if}
+
+<style>
+  @import "./row.css";
+
+  .name {
+    flex: 1;
+  }
+
+  .dot {
+    width: 8px;
+    height: 8px;
+    flex-shrink: 0;
+    border-radius: 50%;
+    background: var(--warning);
+  }
+
+  .dot.ok {
+    background: var(--success);
+  }
+
+  .dot.unknown {
+    background: var(--fg-muted);
+  }
+
+  /* Under the name, past the dot. */
+  .body {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    margin-block-start: -4px;
+    padding-block: 0 10px;
+    padding-inline: calc(12px + 8px + var(--space)) 12px;
+  }
+
+  .body p {
+    margin: 0;
+  }
+
+  .sub,
+  .status {
+    font-size: 0.85em;
+  }
+
+  .sub {
+    color: var(--fg-muted);
+  }
+
+  /* Set apart from the sentences above. */
+  .links,
+  .body > .actions,
+  .device {
+    margin-block-start: 6px;
+  }
+
+  .links {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+
+  .device {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+
+  code {
+    font-family: var(--font-mono);
+    font-size: 1.6em;
+    letter-spacing: 0.08em;
+    -webkit-user-select: all;
+    user-select: all;
+  }
+
+  .actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space);
+  }
+
+  .error {
+    color: var(--danger);
+  }
+
+  .url {
+    -webkit-user-select: text;
+    user-select: text;
+  }
+
+  .ssh:focus {
+    outline: none;
+  }
+
+  .link {
+    padding: 0;
+    border: none;
+    border-radius: 0;
+    background: none;
+    color: var(--accent-text);
+    font: inherit;
+    cursor: pointer;
+  }
+</style>

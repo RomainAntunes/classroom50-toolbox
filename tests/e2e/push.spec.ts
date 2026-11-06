@@ -233,3 +233,100 @@ test("Commit and Commit & push are not offered while commitActions is none", asy
   expect(texts).not.toContain("Commit…");
   expect(texts).not.toContain("Commit & push…");
 });
+
+// An SSH clone whose SSH stopped working: HTTPS for this clone, then the push alone again
+// (the commit is already made).
+const sshLab = { ...lab, local: { ...lab.local!, origin: "ssh" as const } };
+const sshFailure = fail("ssh", "Permission denied (publickey).", { problem: "keyRejected" });
+
+test("a push over SSH that fails offers HTTPS, then pushes the commit again", async ({
+  app,
+  page,
+}) => {
+  await open(
+    app,
+    { commit_check: [ok(check())], commit_push: [sshFailure, ok({ commit: "abc" })] },
+    "Commit & push…",
+    sshLab,
+  );
+  await app.prompt.getByRole("textbox").fill("Fix the loop");
+  await app.prompt.getByRole("button", { name: "Commit & push" }).click();
+  const dialog = await app.expectDialog(
+    [
+      /GitHub didn't accept an SSH key from this computer/,
+      "This clone reaches GitHub over SSH. Switch it to HTTPS and try again?",
+    ],
+    "ok",
+  );
+  expect(dialog.labels.ok).toBe("Use HTTPS for this clone");
+  const calls = await app.waitForCall("commit_push", 2);
+  expect(calls.map((c) => c.args)).toEqual([
+    { id: lab.id, message: "Fix the loop" },
+    { id: lab.id, message: null },
+  ]);
+  expect((await app.calls("set_clone_remote"))[0].args).toEqual({ id: lab.id, protocol: "https" });
+  expect(await app.writes()).toEqual(["commit_push", "set_clone_remote", "commit_push"]);
+  await expect(page.getByRole("status")).toHaveText("Pushed to GitHub: Lab 1");
+});
+
+test("a push over SSH that fails, HTTPS declined: nothing more is written", async ({ app }) => {
+  await open(
+    app,
+    { commit_check: [ok(check())], commit_push: [sshFailure] },
+    "Commit & push…",
+    sshLab,
+  );
+  await app.prompt.getByRole("textbox").fill("Fix the loop");
+  await app.prompt.getByRole("button", { name: "Commit & push" }).click();
+  await app.expectDialog(["Switch it to HTTPS and try again?"], "cancel");
+  expect(await app.writes()).toEqual(["commit_push"]);
+  expect(await app.pendingDialogs()).toEqual([]);
+});
+
+test("a push over HTTPS that fails again isn't offered HTTPS twice", async ({ app }) => {
+  await open(
+    app,
+    { commit_check: [ok(check())], commit_push: [sshFailure] },
+    "Commit & push…",
+    sshLab,
+  );
+  await app.prompt.getByRole("textbox").fill("Fix the loop");
+  await app.prompt.getByRole("button", { name: "Commit & push" }).click();
+  await app.expectDialog(["Switch it to HTTPS and try again?"], "ok");
+  const failed = await app.expectDialog(["GitHub didn't accept an SSH key"], null);
+  expect(failed.message).not.toContain("Switch it to HTTPS");
+  expect(await app.writes()).toEqual(["commit_push", "set_clone_remote", "commit_push"]);
+  expect(await app.calls("set_clone_remote")).toHaveLength(1);
+});
+
+test("GitHub's host key unknown at push: Trust GitHub, then the push alone again", async ({
+  app,
+  page,
+}) => {
+  const hostKey = fail("ssh", "Host key verification failed.", { problem: "hostKeyUnknown" });
+  await open(
+    app,
+    { commit_check: [ok(check())], commit_push: [hostKey, ok({ commit: "abc" })] },
+    "Commit & push…",
+    sshLab,
+  );
+  await app.prompt.getByRole("textbox").fill("Fix the loop");
+  await app.prompt.getByRole("button", { name: "Commit & push" }).click();
+  const dialog = await app.expectDialog(
+    [
+      /doesn't know GitHub's SSH host key yet/,
+      "~/.ssh/known_hosts",
+      "or use HTTPS for this clone?",
+    ],
+    "Trust GitHub",
+  );
+  expect(dialog.labels).toEqual({
+    yes: "Trust GitHub",
+    no: "Use HTTPS for this clone",
+    cancel: "Cancel",
+  });
+  const calls = await app.waitForCall("commit_push", 2);
+  expect(calls[1].args).toEqual({ id: lab.id, message: null });
+  expect(await app.writes()).toEqual(["commit_push", "trust_github_host", "commit_push"]);
+  await expect(page.getByRole("status")).toHaveText("Pushed to GitHub: Lab 1");
+});

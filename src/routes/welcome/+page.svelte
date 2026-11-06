@@ -14,15 +14,23 @@
   import Section from "#lib/components/Section.svelte";
   import Toggle from "#lib/components/Toggle.svelte";
   import ToolRow from "#lib/components/ToolRow.svelte";
+  import GitLogin from "#lib/components/settings/GitLogin.svelte";
+  import GitSsh from "#lib/components/settings/GitSsh.svelte";
 
-  // First run: what the app does, then the three things it needs. Every step can be
-  // skipped; Settings has all of it later.
-  const STEPS = ["welcome", "tools", "account", "folders"] as const;
+  // First run: what the app does, then the three things it needs, and git outside the app
+  // (optional). Every step can be skipped; Settings has all of it later.
+  const STEPS = ["welcome", "tools", "account", "git", "folders"] as const;
   let step = $state(0);
   let primary = $state<HTMLButtonElement | null>(null);
   const current = $derived(settings.current);
   const editor = $derived(current ? defaultEditor() : null);
   const ghInstalled = $derived(session.tools.some((tool) => tool.tool === "gh" && tool.installed));
+  // The git rows need git, gh and a sign-in; until then the step only says so.
+  const gitReady = $derived(
+    session.tools.some((tool) => tool.tool === "git" && tool.installed) &&
+      ghInstalled &&
+      !!session.auth?.loggedIn,
+  );
   const missing = $derived(session.tools.filter((tool) => !tool.installed || tool.outdated).length);
 
   function replaceTool(next: ToolStatus) {
@@ -110,6 +118,14 @@
         <LoginStatus auth={session.auth} {ghInstalled} onchange={signedIn} />
       </div>
     </Section>
+  {:else if STEPS[step] === "git"}
+    <p class="hint">{t(gitReady ? "welcome.git.hint" : "welcome.git.needsAccount")}</p>
+    {#if gitReady}
+      <Section title={t("welcome.git.title")}>
+        <GitLogin />
+        <GitSsh />
+      </Section>
+    {/if}
   {:else if current}
     <Section title={t("welcome.folders.title")}>
       <div class="row">

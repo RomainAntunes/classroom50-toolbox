@@ -24,7 +24,7 @@ const list = snapshot({
 
 async function openCalendar(app: App, over: Partial<Scenario> = {}) {
   await app.start(scenario({ snapshot: list, ...over }));
-  await app.openSettings();
+  await app.openSettings("Assignments");
   const section = app.page
     .locator("section")
     .filter({ has: app.page.getByRole("heading", { name: "Calendar", exact: true }) });

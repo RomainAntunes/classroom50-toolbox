@@ -1,6 +1,7 @@
 // A mock GitHub for the WebDriver suite: answers the app's GraphQL queries (told apart by
 // their shape, as `projects/remote.rs`, `status.rs` and `groups.rs` build them), the REST profile,
-// avatars, the Pages manifests and the `result.json` assets, from a `world.js` fixture.
+// `/meta`'s SSH host keys, avatars, an account's SSH keys, the Pages manifests and the
+// `result.json` assets, from a `world.js` fixture.
 // The app reaches it through the `C50_TEST_GITHUB` hook (`src-tauri/src/testenv.rs`). Node's
 // standard library only, so `pnpm test` can check it without the suite's dependencies.
 
@@ -11,6 +12,24 @@ const PNG = Buffer.from(
   "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=",
   "base64",
 );
+
+/** GitHub's published SSH host keys (`api.github.com/meta`), which `ssh::trust_github`
+ *  appends to `known_hosts`: the real ones, since they are public. */
+const SSH_HOST_KEYS = [
+  "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIOMqqnkVzrm0SdG6UOoqKLsabgH5C9okWi0dh2l9GKJl",
+  "ecdsa-sha2-nistp256 AAAAE2VjZHNhLXNoYTItbmlzdHAyNTYAAAAIbmlzdHAyNTYAAABBBEmKSENjQEezOmxkZMy7opKgwFB9nkt5YRrYMjNuG5N87uRgg6CLrbo5wAdT/y6v0mKV0U2w0WZ2YB/++Tpockg=",
+  "ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABgQCj7ndNxQowgcQnjshcLrqPEiiphnt+VTTvDP6mHBL9j1aNUkY4Ue1gvwnGLVlOhGeYrnZaMgRK6+PKCUXaDbC7qtbW8gIkhL7aGCsOr/C56SJMy/BCZfxd1nWzAOxSDPgVsmerOBYfNqltV9/hWCqBywINIR+5dIg6JTJ72pcEpEjcYgXkE2YEFXV1JHnsKgbLWNlhScqb2UmyRkQyytRLtL+38TGxkxCflmO+5Z8CSSNY7GidjMIZ7Q4zMjA2n1nGrlTDkzwDCsw+wqFPGQA179cnfGWOWRVruj16z6XyvxvjJwbz0wQZ75XK5tKSb7FNyeIEs4TT4jk+S4dhPeAUC5y+bDYirYgM4GC7uEnztnZyaVWQ7B381AK4Qdrwt51ZqExKbQpTUNn+EjqoTwvqNj4kqx5QUCI0ThS/YkOxJCXmPUWZbhjpCg56i+2aB6CmK2JGhn57K5mj0MNdBXA4/WnwH6XoPWJzK5Nyu2zB3nAZp+S5hpQs+p1vN1/wsjk=",
+];
+
+/** The part of `GET /meta` the app reads. */
+export const meta = () => ({
+  ssh_keys: SSH_HOST_KEYS,
+  ssh_key_fingerprints: {
+    SHA256_ECDSA: "p2QAMXNIC1TJYWeIOttrVc98/R1BUFWu3/LiyKgUfQM",
+    SHA256_ED25519: "+DiY3wvvV6TuJJhbpZisF/zLDA0zPMSvHdkr4UvCOqU",
+    SHA256_RSA: "uNiVztksCsDhcc0u9e8BujQXVUpKZIDTMczCvj3tD2s",
+  },
+});
 
 /** Which of the app's queries `query` is; `null` for one the mock doesn't know. */
 export function queryKind(query) {
@@ -233,6 +252,13 @@ export function respond(world, base, req) {
 
   let match = path.match(/^\/users\/([A-Za-z0-9-]+)$/);
   if (match) return json({ login: match[1], email: null }, RATE_LIMIT);
+
+  if (path === "/meta") return json(meta(), RATE_LIMIT);
+
+  // An account's public SSH keys (`github.com/<login>.keys`): the student has none.
+  if (/^\/web\/[A-Za-z0-9-]+\.keys$/.test(path)) {
+    return { status: 200, headers: { "content-type": "text/plain; charset=utf-8" }, body: "" };
+  }
 
   if (/^\/web\/[A-Za-z0-9-]+\.png$/.test(path)) {
     return { status: 200, headers: { "content-type": "image/png" }, body: PNG };

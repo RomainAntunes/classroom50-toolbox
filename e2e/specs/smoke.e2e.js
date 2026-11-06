@@ -1,6 +1,6 @@
-// Smoke tests of the real app against the mock GitHub (`mock/world.js`) and the fake gh
-// (`bin/gh`). One file, so one app runs for all of them, in this order: the last one edits
-// the fixture clone.
+// Smoke tests of the real app against the mock GitHub (`mock/world.js`), the fake gh
+// (`bin/gh`) and the fake ssh (`bin/ssh`). One file, so one app runs for all of them, in this
+// order: the last one edits the fixture clone.
 
 import { appendFileSync, existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
@@ -16,12 +16,30 @@ function t(key, params = {}) {
 const HELLO_ID = "c50-e2e-school/algo-hello-ada-e2e";
 const clone = process.env.C50_E2E_CLONE ?? "";
 const ghLog = process.env.C50_E2E_GH_LOG ?? "";
+const sshLog = process.env.C50_E2E_SSH_LOG ?? "";
+const home = process.env.C50_E2E_HOME ?? "";
 const mockUrl = process.env.C50_E2E_MOCK ?? "";
 
 /** A row of the list (the `<li>`), by the assignment name its button shows. */
 const item = (name) => $(`//li[@data-item][.//button[@data-row][contains(., "${name}")]]`);
 const text = async (name) => (await item(name)).getText();
 const ghCalls = () => (existsSync(ghLog) ? readFileSync(ghLog, "utf8").split("\n") : []);
+const sshCalls = () => (existsSync(sshLog) ? readFileSync(sshLog, "utf8").split("\n") : []);
+
+/** Invokes `cmd` as the UI does. No `error` key in the result: wdio takes a response whose
+ *  value has one for a failed command. */
+const invoke = (cmd, args = {}) =>
+  browser.execute(
+    async (cmd, args) => {
+      try {
+        return { value: await window.__TAURI_INTERNALS__.invoke(cmd, args) };
+      } catch (refused) {
+        return { refused };
+      }
+    },
+    cmd,
+    args,
+  );
 
 describe("Classroom 50 Toolbox", () => {
   before(async () => {
@@ -85,11 +103,13 @@ describe("Classroom 50 Toolbox", () => {
 
   it("shows the fake gh's versions in Settings", async () => {
     await $(`button[aria-label="${t("app.settings")}"]`).click();
-    const main = $("main");
-    await browser.waitUntil(async () => (await main.getText()).includes("2.100.0"), {
+    // The tools are on their own tab; a hidden panel's text isn't read.
+    await $("#tab-tools").click();
+    const tools = $("#panel-tools");
+    await browser.waitUntil(async () => (await tools.getText()).includes("2.100.0"), {
       timeoutMsg: "gh's version never showed",
     });
-    expect(await main.getText()).toContain("v1.58.1");
+    expect(await tools.getText()).toContain("v1.58.1");
     await $(`button[aria-label="${t("app.back")}"]`).click();
     await item("Hello, World").waitForDisplayed();
   });
@@ -128,6 +148,26 @@ describe("Classroom 50 Toolbox", () => {
     expect(ghCalls().filter((call) => call.startsWith("student"))).toEqual([]);
     // gh itself was used all along (the fake one, through the PATH hook).
     expect(ghCalls()).toContain("auth token --hostname github.com");
+  });
+
+  it("checks SSH and switches gh's protocol, and adds no key in a development build", async () => {
+    // The probe runs the fake ssh as it would run OpenSSH, through the PATH hook.
+    expect((await invoke("ssh_status", { fresh: true })).value).toEqual({
+      state: "ready",
+      login: "ada-e2e",
+    });
+    expect(sshCalls()).toContain("-T -o BatchMode=yes -o ConnectTimeout=8 git@github.com");
+    // gh's own setting, read back.
+    expect((await invoke("set_git_protocol", { protocol: "ssh" })).value).toBe("ssh");
+    expect((await invoke("git_protocol")).value).toBe("ssh");
+    expect((await invoke("set_git_protocol", { protocol: "https" })).value).toBe("https");
+    expect(ghCalls()).toContain("config set git_protocol ssh --host github.com");
+    // Adding a key writes to GitHub: refused before a key is made or gh runs.
+    const { refused } = await invoke("set_up_ssh_key");
+    expect(refused.kind).toBe("blockedInDev");
+    expect(refused.params.command).toMatch(/^gh ssh-key add /);
+    expect(ghCalls().filter((call) => call.startsWith("ssh-key"))).toEqual([]);
+    expect(existsSync(join(home, ".ssh"))).toBe(false);
   });
 
   it("shows uncommitted changes after a refresh", async () => {

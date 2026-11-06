@@ -32,6 +32,7 @@ pub mod push;
 pub mod settings;
 mod shortcut;
 mod simulate;
+pub mod ssh;
 pub mod status;
 pub mod student;
 mod sync_progress;
@@ -107,7 +108,13 @@ macro_rules! ipc_commands {
             crate::commands::teammate_jobs,
             crate::commands::dismiss_teammate_job,
             crate::commands::clone_project,
+            crate::commands::set_clone_remote,
             crate::commands::git_protocol,
+            crate::commands::set_git_protocol,
+            crate::commands::ssh_status,
+            crate::commands::trust_github_host,
+            crate::commands::replace_github_host_key,
+            crate::commands::set_up_ssh_key,
             crate::commands::git_credentials,
             crate::commands::set_up_git_credentials,
             crate::commands::accept_assignment,
@@ -171,6 +178,7 @@ pub fn run() {
         .manage(student::FoundedGroups::default())
         .manage(teammates::TeammateJobs::default())
         .manage(login::LoginState::default())
+        .manage(ssh::SshState::default())
         .manage(tools::ToolJobs::default())
         .manage(tools::ToolChecks::default())
         .manage(watch::FolderWatcher::default())

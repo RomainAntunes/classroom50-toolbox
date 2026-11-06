@@ -10,6 +10,7 @@ import {
   type Group,
   type Project,
   type TeammateEntry,
+  type TeammateJob,
 } from "#lib/api.js";
 import { groupFull } from "#lib/group.js";
 import { formatList, t } from "#lib/i18n/index.js";
@@ -60,14 +61,49 @@ export interface Target {
   assignment: string;
   /** Joins the group rather than inviting. */
   team: boolean;
+  /** How many more the group takes, or null with no limit (or not a group). */
+  room?: number | null;
+}
+
+/** How many more fit under `max`: the members plus the classmates already queued (each
+ *  once, the user included), as Rust counts them (`teammates::Cap`). Null without a limit. */
+export function roomLeft(
+  max: number | null,
+  members: string[],
+  queued: string[] = [],
+): number | null {
+  if (max === null) return null;
+  const taken = new Set([...members, ...queued].map((login) => login.toLowerCase()));
+  return Math.max(0, max - taken.size);
+}
+
+/** The lines under the usernames field: how to type several and the room left, then who
+ *  the answer adds; a warning when they don't fit. */
+export function usernamesHint(
+  value: string,
+  team: boolean,
+  room: number | null,
+): { text: string; warning: string | null } {
+  const names = parseUsernames(value);
+  const full = room === 0 ? t("teammate.noRoom") : null;
+  if (names.length === 0) {
+    const fits = room === null || full ? null : t("teammate.room", { count: room });
+    const text = [t("teammate.separate"), fits].filter((line) => line !== null).join("\n");
+    return { text, warning: full };
+  }
+  const text = t(team ? "teammate.preview.adds" : "teammate.preview.invites", {
+    users: formatList(names),
+  });
+  if (room === null || names.length <= room) return { text, warning: null };
+  return { text, warning: full ?? t("teammate.tooMany", { count: room }) };
 }
 
 /** "Add to my group…" / "Invite a classmate…" from a row's menu. A full group says so
  *  before asking for anyone (Rust refuses past the limit too, `GroupFull`). */
 export async function addTeammate(project: Project, name: string): Promise<void> {
   const team = joinsGroup(project);
+  const max = team ? (project.assignment?.maxGroupSize ?? null) : null;
   if (team) {
-    const max = project.assignment?.maxGroupSize ?? null;
     const reason =
       max !== null && groupFull(project.group, max)
         ? t("teammate.groupFull", { count: max })
@@ -81,29 +117,69 @@ export async function addTeammate(project: Project, name: string): Promise<void>
       return;
     }
   }
+  const members = project.group?.members.map((m) => m.login) ?? [];
   await addTeammates({
     id: project.id,
     repo: `${project.owner}/${project.repo}`,
     assignment: name,
     team,
+    room: roomLeft(max, members.length ? members : [session.snapshot?.login ?? ""]),
   });
 }
 
-/** Right after founding a group: offers to add teammates before anything else. */
-export function addToNewGroup(id: string, repo: string, assignment: string): Promise<void> {
-  return addTeammates({ id, repo, assignment, team: true });
+/** Right after founding `group`: says so and asks for teammates in one prompt, "Later"
+ *  leaving it for the menu. The founder is the group's only member yet. */
+export function addToNewGroup(
+  id: string,
+  repo: string,
+  assignment: string,
+  group: string,
+  max: number | null,
+): Promise<void> {
+  const room = roomLeft(max, [session.snapshot?.login ?? ""]);
+  return addTeammates(
+    { id, repo, assignment, team: true, room },
+    { message: t("accept.groupCreated", { group, assignment }), cancelLabel: t("accept.later") },
+  );
+}
+
+/** The row's "Add another": the same prompt, its room counting the classmates the queue
+ *  holds (all but those that failed). */
+export function addMore(job: TeammateJob): Promise<void> {
+  const snapshot = session.snapshot;
+  const project = snapshot?.projects.find((p) => p.id === job.project || p.id === job.id);
+  const item = project ? null : snapshot?.unaccepted.find((u) => u.id === job.id);
+  const max = job.team ? ((project ?? item)?.assignment?.maxGroupSize ?? null) : null;
+  const members = project?.group?.members.map((m) => m.login) ?? [];
+  const queued = job.entries.filter((e) => e.state !== "failed").map((e) => e.username);
+  return addTeammates({
+    id: job.id,
+    repo: job.repo,
+    assignment: job.assignment,
+    team: job.team,
+    room: roomLeft(max, members.length ? members : [snapshot?.login ?? ""], queued),
+  });
 }
 
 /** Asks for usernames and queues them; Rust adds them in the background, the row shows
- *  how each one goes. Also the row's "Add another", which joins a queue still running. */
-export async function addTeammates(target: Target): Promise<void> {
+ *  how each one goes. Also the row's "Add another", which joins a queue still running.
+ *  `words` replaces the prompt's text and Cancel's label. */
+export async function addTeammates(
+  target: Target,
+  words: { message?: string; cancelLabel?: string } = {},
+): Promise<void> {
   const { team, repo, assignment } = target;
+  const room = target.room ?? null;
   const title = t(team ? "teammate.teamTitle" : "teammate.inviteTitle");
   const text = await askText({
     title,
-    message: t(team ? "teammate.teamHint" : "teammate.inviteHint", { assignment, repo }),
+    message:
+      words.message ?? t(team ? "teammate.teamHint" : "teammate.inviteHint", { assignment, repo }),
+    fieldLabel: t("teammate.usernamesLabel"),
     placeholder: t("teammate.placeholder"),
+    hint: (value) => usernamesHint(value, team, room),
     okLabel: t(team ? "teammate.teamOk" : "teammate.inviteOk"),
+    cancelLabel: words.cancelLabel,
   });
   const usernames = text ? parseUsernames(text) : [];
   if (usernames.length === 0) return;

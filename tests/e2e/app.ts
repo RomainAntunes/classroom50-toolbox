@@ -21,6 +21,11 @@ export const WRITES = [
   "set_phases",
   "set_git_identity",
   "set_up_git_credentials",
+  "set_git_protocol",
+  "set_clone_remote",
+  "trust_github_host",
+  "replace_github_host_key",
+  "set_up_ssh_key",
   "install_tool",
   "upgrade_tool",
   "install_update",
@@ -145,10 +150,18 @@ export class App {
   }
 
   /** Goes to Settings from the main page's gear, and waits for it. */
-  async openSettings(): Promise<void> {
+  /** Opens Settings from the list, on `tab` when given (General shows first). */
+  async openSettings(tab?: SettingsTab): Promise<void> {
     await this.page.locator(".titlebar .icon").last().click();
     await expect(this.page).toHaveURL(/\/settings$/);
-    await expect(this.page.locator("main section").first()).toBeVisible();
+    if (tab) {
+      await this.page.getByRole("tab", { name: tab }).click();
+      await expect(this.page.getByRole("tab", { name: tab })).toHaveAttribute(
+        "aria-selected",
+        "true",
+      );
+    }
+    await expect(this.page.locator("main section:visible").first()).toBeVisible();
   }
 
   /** The in-popover text prompt. */
@@ -156,6 +169,9 @@ export class App {
     return this.page.getByRole("dialog");
   }
 }
+
+/** Settings' tabs, by their English names. */
+export type SettingsTab = "General" | "Assignments" | "Tools" | "About";
 
 /** Texts of a menu's items, nested ones included. */
 export function menuTexts(menu: MenuNode): string[] {

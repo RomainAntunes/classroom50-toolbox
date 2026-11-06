@@ -13,9 +13,12 @@ use crate::projects::{self, Project, ProjectsState};
 use crate::pull;
 use crate::push;
 use crate::settings::{CommitActions, SettingsStore};
+use crate::ssh::{SshState, Who};
+use crate::tools::{self, GitProtocol};
 
-/// Clones a project that has no local copy into `parent/<repo>`, registers the clone and
-/// rescans the disk. Returns the new folder; `projects-updated` follows.
+/// Clones a project that has no local copy into `parent/<repo>` over `protocol` (`None`:
+/// gh's `git_protocol`), registers the clone and rescans the disk. Returns the new folder;
+/// `projects-updated` follows. An SSH failure is the `ssh` error kind.
 #[tauri::command]
 #[cfg_attr(test, specta::specta)]
 pub async fn clone_project(
@@ -23,6 +26,7 @@ pub async fn clone_project(
     state: State<'_, ProjectsState>,
     id: String,
     parent: PathBuf,
+    protocol: Option<GitProtocol>,
 ) -> Result<PathBuf> {
     let project = state
         .snapshot()
@@ -36,10 +40,47 @@ pub async fn clone_project(
     if let Some(path) = project.path {
         return Err(Error::PathExists(path));
     }
-    let path = clones::clone(&owner, &repo, &parent).await?;
+    let protocol = match protocol {
+        Some(protocol) => protocol,
+        None => tools::git_protocol().await,
+    };
+    let path = clones::clone(&owner, &repo, &parent, protocol, &Who::live(&app)).await?;
     app.state::<CloneStore>().add(path.clone())?;
     projects::refresh_local(&app, false).await;
     Ok(path)
+}
+
+/// Points project `id`'s clone's `origin` at its GitHub repo over `protocol` (its push URL
+/// too, when one is set), only when `origin` already is that repo or its name before an
+/// assignment rename (`projects::previous_id`), which becomes the current name. Then
+/// rescans the disk.
+#[tauri::command]
+#[cfg_attr(test, specta::specta)]
+pub async fn set_clone_remote(
+    app: AppHandle,
+    state: State<'_, ProjectsState>,
+    ssh: State<'_, SshState>,
+    id: String,
+    protocol: GitProtocol,
+) -> Result<()> {
+    let project = state
+        .snapshot()
+        .projects
+        .into_iter()
+        .find(|p| p.id == id)
+        .ok_or_else(|| Error::Unsupported(format!("unknown project {id}")))?;
+    let previous = projects::previous_id(&project)
+        .and_then(|old| old.split_once('/').map(|(_, name)| name.to_owned()));
+    let path = project
+        .path
+        .ok_or_else(|| Error::Unsupported(format!("{id} has no local clone")))?;
+    let (Some(owner), Some(repo)) = (project.owner, project.repo) else {
+        return Err(Error::Unsupported(format!("{id} has no GitHub repository")));
+    };
+    clones::set_remote(&path, &owner, &repo, previous.as_deref(), protocol).await?;
+    ssh.clear();
+    projects::refresh_local(&app, false).await;
+    Ok(())
 }
 
 /// Fast-forwards project `id`'s clone to GitHub's default branch (`pull.rs` says when it
@@ -64,7 +105,7 @@ pub async fn pull_project(
         .remote
         .and_then(|r| r.default_branch)
         .ok_or_else(|| Error::Unsupported(format!("{id} has no default branch on GitHub")))?;
-    pull::pull(&path, &branch).await?;
+    pull::pull(&path, &branch, &Who::live(&app)).await?;
     projects::refresh_local(&app, false).await;
     Ok(())
 }
@@ -189,7 +230,14 @@ pub async fn commit_push(
 ) -> Result<push::Pushed> {
     allow_commit(settings.get().commit_actions, true)?;
     let (path, branch, head) = pushable(&state, &id)?;
-    let pushed = push::commit_and_push(&path, &branch, head.as_deref(), message.as_deref()).await?;
+    let pushed = push::commit_and_push(
+        &path,
+        &branch,
+        head.as_deref(),
+        message.as_deref(),
+        &Who::live(&app),
+    )
+    .await?;
     projects::refresh_local(&app, false).await;
     tauri::async_runtime::spawn(async move {
         projects::refresh_after_push(&app).await;

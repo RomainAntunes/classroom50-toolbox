@@ -9,7 +9,6 @@ import {
   type Accepted,
   type Unaccepted,
 } from "#lib/api.js";
-import { cloneProject } from "#lib/clone.js";
 import { formatDate, t } from "#lib/i18n/index.js";
 import { groupName } from "#lib/group.js";
 import { announce } from "#lib/announce.svelte.js";
@@ -50,7 +49,7 @@ function repoPoint(item: Unaccepted, login: string | null): string {
 }
 
 /** What accepting does, one point per line: the repo, who sees and owns it, the Feedback
- *  PR, how submitting works, the due date, groups, and the clone offer that follows. */
+ *  PR, how submitting works, the due date and groups. */
 export function notes(item: Unaccepted, login: string | null): string {
   const a = item.assignment;
   const points = [repoPoint(item, login)];
@@ -63,7 +62,6 @@ export function notes(item: Unaccepted, login: string | null): string {
     else if (a.teamFormation === "teacher") points.push(t("accept.teamTeacher"));
     else points.push(t("accept.teamStudent"));
   }
-  points.push(t("accept.thenClone"));
   const intro = t("accept.confirm", { classroom: item.classroom.name ?? item.classroom.slug });
   return [intro, ...points.map((point) => `• ${point}`)].join("\n");
 }
@@ -108,24 +106,11 @@ async function run(
   return named ? run(item, named) : null;
 }
 
-/** Asks, accepts, then offers to clone the new repo. The row shows it meanwhile. With
+/** Asks, then accepts; the row shows it meanwhile and its Clone button follows. With
  *  `newGroup` ("Create a group…") the group's name is the only question (its prompt names
- *  the repo), then it offers to add teammates. */
+ *  the repo). A group just founded is offered teammates at once. */
 export function acceptAssignment(item: Unaccepted, newGroup = false): Promise<void> {
   return busy("accepting", item.id, () => accept(item, newGroup));
-}
-
-/** Right after founding a group: says how to add teammates, and offers to now. */
-async function offerTeammates(group: string, id: string, repo: string, name: string) {
-  const now = await withDialog(() =>
-    ask(t("accept.groupCreated", { group }), {
-      title: name,
-      kind: "info",
-      okLabel: t("accept.addTeammates"),
-      cancelLabel: t("accept.later"),
-    }),
-  );
-  if (now) await addToNewGroup(id, repo, name);
 }
 
 async function accept(item: Unaccepted, newGroup: boolean): Promise<void> {
@@ -160,20 +145,9 @@ async function accept(item: Unaccepted, newGroup: boolean): Promise<void> {
   if (!result) return;
   announce(t("a11y.accepted", { name }));
   const { repo, projectId } = result.accepted;
-  if (result.group) await offerTeammates(result.group, projectId ?? item.id, repo, name);
-  if (!projectId) {
-    await withDialog(() => message(t("accept.done", { repo }), { title: name }));
-    return;
+  if (result.group) {
+    const max = item.assignment.maxGroupSize ?? null;
+    await addToNewGroup(projectId ?? item.id, repo, name, result.group, max);
   }
-  await cloneProject(
-    projectId,
-    "ask",
-    {
-      title: name,
-      message: (folder) =>
-        folder ? t("accept.cloneNowTo", { repo, folder }) : t("accept.cloneNow", { repo }),
-      cancelLabel: t("accept.later"),
-    },
-    repo.split("/").pop(),
-  );
+  if (!projectId) await withDialog(() => message(t("accept.done", { repo }), { title: name }));
 }

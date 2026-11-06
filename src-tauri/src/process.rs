@@ -500,7 +500,8 @@ where
 }
 
 /// Development builds run against the developer's real classes, so they never write to
-/// GitHub: submitting, accepting, inviting, joining a team and `git push` are refused.
+/// GitHub: submitting, accepting, inviting, joining a team, adding or deleting an SSH key
+/// on the account and `git push` are refused.
 /// Fails with `Error::BlockedInDev` when running `program args` would be refused, so a
 /// write can stop before its local steps (a commit before the push) leave anything behind.
 pub fn ensure_allowed<I, S>(program: &str, args: I) -> Result<()>
@@ -540,6 +541,7 @@ pub(crate) fn writes_to_github(program: &str, args: &[OsString]) -> bool {
     match (name.as_deref(), words.as_slice()) {
         (Some("gh"), ["student", "submit" | "accept" | "invite", ..]) => true,
         (Some("gh"), ["student", "team", "add", ..]) => true,
+        (Some("gh"), ["ssh-key", "add" | "delete", ..]) => true,
         (Some("git"), words) => words.contains(&"push"),
         _ => false,
     }
@@ -638,6 +640,23 @@ mod tests {
             &["student", "team", "add", "x"]
         ));
         assert!(writes("git", &["-C", "/x", "push", "origin", "main"]));
+        assert!(writes(
+            "gh",
+            &[
+                "ssh-key",
+                "add",
+                "/h/.ssh/id_ed25519.pub",
+                "--title",
+                "Classroom 50 Toolbox"
+            ]
+        ));
+        assert!(writes("gh", &["ssh-key", "delete", "123", "--yes"]));
+        assert!(!writes("gh", &["ssh-key", "list"]));
+        assert!(!writes("gh", &["config", "set", "git_protocol", "ssh"]));
+        assert!(!writes(
+            "git",
+            &["clone", "--", "git@github.com:o/r.git", "/x/r"]
+        ));
         assert!(!writes("gh", &["student", "whoami"]));
         assert!(!writes("gh", &["student", "team", "list"]));
         assert!(!writes("git", &["--no-optional-locks", "status"]));

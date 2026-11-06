@@ -16,7 +16,10 @@ export const commands = {
 	 *  copy. Reads only what the app already has; nothing is sent anywhere.
 	 */
 	diagnosticsReport: (ui: UiFacts) => __TAURI_INVOKE<Report>("diagnostics_report", { ui }),
-	/**  Keeps the popover open while the UI shows a native dialog. */
+	/**
+	 *  Keeps the popover open while the UI shows a native dialog: each `true` is matched by a
+	 *  `false`, and nested ones (a menu item opening a confirm) count.
+	 */
 	setPopoverPinned: (pinned: boolean) => __TAURI_INVOKE<void>("set_popover_pinned", { pinned }),
 	/**  Hides the popover, as a click outside it would (Escape with nothing else to close). */
 	hidePopover: () => __TAURI_INVOKE<void>("hide_popover"),
@@ -176,15 +179,17 @@ export const commands = {
 	updateSettings: (next: Settings) => __TAURI_INVOKE<Settings>("update_settings", { next }),
 	/**
 	 *  Runs gh's device flow; the code arrives through the `login-device-code` event. The new
-	 *  account is gh's active one afterwards, so its projects are synced right away.
+	 *  account is gh's active one afterwards, so its projects are synced right away. `protocol`
+	 *  sets gh's `git_protocol` for github.com (`None` keeps it); `ssh_key` also asks for the
+	 *  scope `set_up_ssh_key` needs.
 	 */
-	login: () => __TAURI_INVOKE<AuthStatus>("login"),
+	login: (protocol: "https" | "ssh" | null, sshKey: boolean) => __TAURI_INVOKE<AuthStatus>("login", { protocol, sshKey }),
 	cancelLogin: () => __TAURI_INVOKE<void>("cancel_login"),
 	/**
-	 *  Adds gh-student's missing scopes to the active account (`gh auth refresh`), through the
-	 *  same device flow as `login`.
+	 *  Adds gh-student's missing scopes, and `extra`, to the active account (`gh auth refresh`,
+	 *  which keeps the token's other scopes), through the same device flow as `login`.
 	 */
-	grantScopes: () => __TAURI_INVOKE<AuthStatus>("grant_scopes"),
+	grantScopes: (extra: ExtraScope[]) => __TAURI_INVOKE<AuthStatus>("grant_scopes", { extra }),
 	/**  Signs `login` out of gh, then syncs whichever account is left (or clears the list). */
 	signOut: (login: string) => __TAURI_INVOKE<AuthStatus>("sign_out", { login }),
 	openTerminal: (path: string) => __TAURI_INVOKE<null>("open_terminal", { path }),
@@ -209,12 +214,46 @@ export const commands = {
 	/**  Done: drops the results the row of `id` shows (usernames still queued stay). */
 	dismissTeammateJob: (id: string) => __TAURI_INVOKE<void>("dismiss_teammate_job", { id }),
 	/**
-	 *  Clones a project that has no local copy into `parent/<repo>`, registers the clone and
-	 *  rescans the disk. Returns the new folder; `projects-updated` follows.
+	 *  Clones a project that has no local copy into `parent/<repo>` over `protocol` (`None`:
+	 *  gh's `git_protocol`), registers the clone and rescans the disk. Returns the new folder;
+	 *  `projects-updated` follows. An SSH failure is the `ssh` error kind.
 	 */
-	cloneProject: (id: string, parent: string) => __TAURI_INVOKE<string>("clone_project", { id, parent }),
+	cloneProject: (id: string, parent: string, protocol: "https" | "ssh" | null) => __TAURI_INVOKE<string>("clone_project", { id, parent, protocol }),
+	/**
+	 *  Points project `id`'s clone's `origin` at its GitHub repo over `protocol` (its push URL
+	 *  too, when one is set), only when `origin` already is that repo or its name before an
+	 *  assignment rename (`projects::previous_id`), which becomes the current name. Then
+	 *  rescans the disk.
+	 */
+	setCloneRemote: (id: string, protocol: GitProtocol) => __TAURI_INVOKE<null>("set_clone_remote", { id, protocol }),
 	/**  How gh clones github.com repos, so the row's clone URLs lead with the one it uses. */
 	gitProtocol: () => __TAURI_INVOKE<GitProtocol>("git_protocol"),
+	/**
+	 *  Sets gh's `git_protocol` for github.com (every gh account, and `gh repo clone` in a
+	 *  terminal, follow it) and returns what gh reads back.
+	 */
+	setGitProtocol: (protocol: GitProtocol) => __TAURI_INVOKE<GitProtocol>("set_git_protocol", { protocol }),
+	/**
+	 *  Whether git reaches GitHub over SSH with the active account, and if not why. Each probe
+	 *  connects to GitHub, so the last answer is reused for a minute unless `fresh`.
+	 */
+	sshStatus: (fresh: boolean) => __TAURI_INVOKE<SshStatus>("ssh_status", { fresh }),
+	/**
+	 *  Adds GitHub's published SSH host keys `known_hosts` lacks, from a click the UI
+	 *  confirmed, then probes again.
+	 */
+	trustGithubHost: () => __TAURI_INVOKE<SshStatus>("trust_github_host"),
+	/**
+	 *  Replaces the GitHub lines of `known_hosts` (an old or wrong host key) with GitHub's
+	 *  published keys, from a click the UI confirmed, then probes again.
+	 */
+	replaceGithubHostKey: () => __TAURI_INVOKE<SshStatus>("replace_github_host_key"),
+	/**
+	 *  Puts a key of this computer on the active account (`gh ssh-key add`, making
+	 *  `~/.ssh/id_ed25519` first when there's none), then probes again. Needs the token's
+	 *  `write:public_key` (`AuthStatus.canAddSshKeys`, `grant_scopes(["writePublicKey"])`).
+	 */
+	setUpSshKey: () => __TAURI_INVOKE<SshStatus>("set_up_ssh_key"),
 	/**  Whether git signs in to github.com with gh's account outside the app. */
 	gitCredentials: () => __TAURI_INVOKE<GitCredentials>("git_credentials"),
 	/**
@@ -552,6 +591,12 @@ export type AuthStatus = {
 	 *  widen a login then, so the app doesn't offer to.
 	 */
 	envToken: string | null,
+	/**
+	 *  The token may add SSH keys to the account (`write:public_key` or
+	 *  `admin:public_key`), which `gh ssh-key add` needs; `gh auth refresh` grants it
+	 *  (`login::ExtraScope::WritePublicKey`).
+	 */
+	canAddSshKeys: boolean,
 };
 
 export type Block = { kind: "paragraph"; content: Inline[] } | 
@@ -698,7 +743,7 @@ export type EditorInfo = {
 	name: string,
 };
 
-export type ErrorKind = "notInstalled" | "commandFailed" | "timedOut" | "unsupported" | "manualInstall" | "blockedInDev" | "cancelled" | "busy" | "pathExists" | "schemaMismatch" | "student" | "needsTeam" | "submissionsClosed" | "unknownAssignment" | "ghStudentOutdated" | "staleMarker" | "groupFull" | "invalidUsername" | "invalidTeamName" | "invalidPhase" | "noTerminal" | "localChanges" | "otherBranch" | "diverged" | "remoteAhead" | "gitInProgress" | "nothingToPush" | "nothingToCommit" | "noIdentity" | "fileTooLarge" | "pushRejected" | "notSignedIn" | "tokenFromEnv" | "rateLimited" | "github" | "offline" | "noSelfUpdate" | "calendarAccess" | "calendarUnavailable" | "invalidShortcut" | "shortcutTaken" | "shortcutUnsupported" | "repoConfig" | "io" | "http" | "tauri" | "updater" | "autostart";
+export type ErrorKind = "notInstalled" | "commandFailed" | "timedOut" | "unsupported" | "manualInstall" | "blockedInDev" | "cancelled" | "busy" | "pathExists" | "schemaMismatch" | "student" | "needsTeam" | "submissionsClosed" | "unknownAssignment" | "ghStudentOutdated" | "staleMarker" | "groupFull" | "invalidUsername" | "invalidTeamName" | "invalidPhase" | "noTerminal" | "localChanges" | "otherBranch" | "diverged" | "remoteAhead" | "gitInProgress" | "nothingToPush" | "nothingToCommit" | "noIdentity" | "fileTooLarge" | "pushRejected" | "notSignedIn" | "ssh" | "tokenFromEnv" | "rateLimited" | "github" | "offline" | "noSelfUpdate" | "calendarAccess" | "calendarUnavailable" | "invalidShortcut" | "shortcutTaken" | "shortcutUnsupported" | "repoConfig" | "io" | "http" | "tauri" | "updater" | "autostart";
 
 /**  The payload of each event, by name: `Events` in `src/lib/bindings.ts`. */
 export type Events = Events_Serialize | Events_Deserialize;
@@ -794,6 +839,11 @@ export type Events_Serialize = {
 	/**  The OS's 12- or 24-hour clock changed (`system_hour_cycle` gives the first reading). */
 	"hour-cycle": HourCycle | null,
 };
+
+/**  A scope beyond gh-student's, asked for one feature: the UI can only ask for these. */
+export type ExtraScope = 
+/**  `write:public_key`: `gh ssh-key add` puts a key on the account. */
+"writePublicKey";
 
 /**  An error as the UI shows it (`errorMessage`): `error.<kind>`, else the message. */
 export type Failure = {
@@ -1013,6 +1063,11 @@ export type LocalState = {
 	notGradedFiles: number,
 	/**  The first `MAX_CHANGED_PATHS` of them, in path order. */
 	notGradedPaths: string[],
+	/**
+	 *  How `origin` reaches GitHub (HTTPS or SSH), read from the clone's git config;
+	 *  `None` for another remote.
+	 */
+	origin: GitProtocol | null,
 };
 
 export type Member = {
@@ -1417,6 +1472,35 @@ export type Snapshot_Serialize = {
 	/**  The GitHub account the data belongs to. */
 	login: string | null,
 };
+
+/**  Where SSH to GitHub stands for the active account. */
+export type SshStatus = 
+/**
+ *  GitHub accepts a key of this computer as `login` (`None` when the probe went through
+ *  a custom ssh command, which doesn't show who).
+ */
+{ state: "ready"; login: string | null } | 
+/**
+ *  GitHub accepts a key, but as `login`, not gh's active account `active`, or as a
+ *  deploy key (`owner/repo`): it reaches only that account's repositories.
+ */
+{ state: "otherAccount"; login: string; active: string | null } | 
+/**
+ *  No key of this computer is on the active account. `localKey` is a public key there
+ *  is to add (`~/.ssh/id_ed25519.pub`), `None` when one must be made first.
+ */
+{ state: "noKey"; localKey: string | null } | 
+/**
+ *  A key of this computer is on the account, but ssh didn't sign in with it: it has a
+ *  passphrase and no agent holds it, or ssh's config names another key.
+ */
+{ state: "keyNotOffered"; localKey: string } | 
+/**  `known_hosts` has no key for GitHub: ssh refuses to connect without asking. */
+{ state: "hostKeyUnknown" } | 
+/**  `known_hosts` holds another key for GitHub, usually its RSA key from before 2023. */
+{ state: "hostKeyChanged" } | 
+/**  No connection: port 22 blocked, no network, no DNS. */
+{ state: "unreachable"; message: string } | { state: "notInstalled" } | { state: "failed"; message: string };
 
 /**  The newest `submit/*` tag (names sort chronologically). */
 export type Submission = {

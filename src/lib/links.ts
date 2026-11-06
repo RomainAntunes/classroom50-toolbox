@@ -35,13 +35,20 @@ export function cloneUrls(
 let protocol: GitProtocol | null = null;
 
 /** gh's `git_protocol`, read once, then refreshed in the background so a menu opens at once
- *  and follows `gh config set` the time after. HTTPS when gh can't say. */
-export async function gitProtocol(): Promise<GitProtocol> {
+ *  and follows `gh config set` the time after; `fresh` waits for the read (a decision).
+ *  HTTPS when gh can't say. */
+export async function gitProtocol(fresh = false): Promise<GitProtocol> {
   const read = api.gitProtocol().then(
     (value) => (protocol = value),
     () => protocol ?? "https",
   );
-  return protocol ?? read;
+  return fresh ? read : (protocol ?? read);
+}
+
+/** gh's `git_protocol` just changed (Settings, or a sign-in that set it): the next menu
+ *  follows at once. */
+export function rememberProtocol(value: GitProtocol): void {
+  protocol = value;
 }
 
 export function copyLink(link: string): Promise<void> {

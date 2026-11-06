@@ -6,7 +6,7 @@
 
 import { readFileSync, writeFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
-import { graphql, queryKind, respond, start } from "./github.js";
+import { graphql, meta, queryKind, respond, start } from "./github.js";
 import { buildWorld } from "./world.js";
 
 const root = new URL("../../", import.meta.url);
@@ -101,6 +101,7 @@ describe("the mock GitHub", () => {
       "manifest-algo": world.manifests["c50-e2e-school/algo"],
       "manifest-web": world.manifests["c50-e2e-lab/web"],
       "result-hello": world.repos[0].releases[0].result,
+      meta: meta(),
     };
     for (const [name, answer] of Object.entries(answers)) {
       const file = new URL(`golden/${name}.json`, import.meta.url);
@@ -159,6 +160,14 @@ describe("the mock GitHub", () => {
       const avatar = await fetch(`${mock.url}/web/ada-e2e.png?size=64`);
       expect(avatar.headers.get("content-type")).toBe("image/png");
       expect((await fetch(`${mock.url}/users/ada-e2e`)).status).toBe(200);
+      const hostKeys = (await (await fetch(`${mock.url}/meta`)).json()).ssh_keys;
+      expect(hostKeys.map((key) => key.split(" ")[0])).toEqual([
+        "ssh-ed25519",
+        "ecdsa-sha2-nistp256",
+        "ssh-rsa",
+      ]);
+      const keys = await fetch(`${mock.url}/web/ada-e2e.keys`);
+      expect([keys.status, await keys.text()]).toEqual([200, ""]);
       expect((await fetch(`${mock.url}/nothing`)).status).toBe(404);
       const asked = await (await fetch(`${mock.url}/__requests`)).json();
       expect(asked.map((r) => r.kind ?? r.path)).toEqual([
@@ -166,6 +175,8 @@ describe("the mock GitHub", () => {
         "list",
         "/web/ada-e2e.png",
         "/users/ada-e2e",
+        "/meta",
+        "/web/ada-e2e.keys",
         "/nothing",
       ]);
     } finally {

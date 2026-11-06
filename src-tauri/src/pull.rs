@@ -4,9 +4,15 @@
 //! mid-merge with conflicts the student has to solve in a terminal.
 
 use std::path::Path;
+use std::time::Duration;
 
 use crate::error::{Error, Result};
 use crate::process;
+use crate::ssh::{self, Who};
+
+/// A pull of a student repo is small. The limit catches an ssh that waits on a prompt
+/// nobody sees (a passphrase on a terminal the app doesn't show).
+const PULL_TIMEOUT: Duration = Duration::from_secs(5 * 60);
 
 /// gh's credentials for github.com, as `gh auth setup-git` would configure them, so a
 /// private repo pulls without any git setup. Scoped to the command line; nothing is saved.
@@ -17,8 +23,9 @@ pub(crate) const GH_CREDENTIALS: [&str; 4] = [
     "credential.https://github.com.helper=!gh auth git-credential",
 ];
 
-/// Fast-forwards `default_branch` in the clone at `path` from `origin`.
-pub async fn pull(path: &Path, default_branch: &str) -> Result<()> {
+/// Fast-forwards `default_branch` in the clone at `path` from `origin`. `who` tells an SSH
+/// key of another account from a repo the account can't reach (`ssh::failure`).
+pub async fn pull(path: &Path, default_branch: &str, who: &Who<'_>) -> Result<()> {
     let branch = git(path, &["rev-parse", "--abbrev-ref", "HEAD"]).await?;
     if branch.trim() != default_branch {
         return Err(Error::OtherBranch(default_branch.to_owned()));
@@ -44,9 +51,9 @@ pub async fn pull(path: &Path, default_branch: &str) -> Result<()> {
         "origin",
         default_branch,
     ]);
-    match process::run("git", args, Some(path)).await {
+    match process::run_with_timeout("git", args, Some(path), PULL_TIMEOUT).await {
         Ok(_) => Ok(()),
-        Err(Error::CommandFailed { stderr, .. }) => Err(failure(&stderr)),
+        Err(Error::CommandFailed { stderr, .. }) => Err(failure(&stderr, who).await),
         Err(err) => Err(err),
     }
 }
@@ -56,10 +63,17 @@ async fn git(path: &Path, args: &[&str]) -> Result<String> {
 }
 
 /// Both sides have new commits: fast-forwarding is impossible and merging is left to the
-/// student. Anything else keeps git's own last line.
-fn failure(stderr: &str) -> Error {
+/// student. An SSH failure is `Error::Ssh`; anything else keeps GitHub's own refusal, else
+/// git's last line.
+async fn failure(stderr: &str, who: &Who<'_>) -> Error {
+    if let Some(err) = ssh::failure(stderr, who).await {
+        return err;
+    }
     if stderr.contains("Not possible to fast-forward") || stderr.contains("diverging branches") {
         return Error::Diverged;
+    }
+    if let Some(message) = ssh::github_error(stderr) {
+        return Error::Unsupported(message);
     }
     let line = stderr
         .lines()
@@ -73,15 +87,41 @@ fn failure(stderr: &str) -> Error {
 mod tests {
     use super::*;
 
-    #[test]
-    fn explains_failed_pulls() {
+    fn alice() -> Who<'static> {
+        Who::Known {
+            active: Some("alice".into()),
+            probe: ssh::SshStatus::Ready {
+                login: Some("alice".into()),
+            },
+        }
+    }
+
+    #[tokio::test]
+    async fn explains_failed_pulls() {
+        let failure = async |stderr: &str| failure(stderr, &alice()).await;
         let stderr = "hint: Diverging branches can't be fast-forwarded, you need to either:\n\
             hint: ...\nfatal: Not possible to fast-forward, aborting.\n";
-        assert!(matches!(failure(stderr), Error::Diverged));
+        assert!(matches!(failure(stderr).await, Error::Diverged));
         let stderr = "fatal: unable to access 'https://github.com/o/r/': Could not resolve host\n";
         assert!(matches!(
-            failure(stderr),
+            failure(stderr).await,
             Error::Unsupported(m) if m == "unable to access 'https://github.com/o/r/': Could not resolve host"
+        ));
+        let stderr = "git@github.com: Permission denied (publickey).\r\n\
+            fatal: Could not read from remote repository.\r\n";
+        assert!(matches!(
+            failure(stderr).await,
+            Error::Ssh {
+                problem: crate::ssh::SshProblem::KeyRejected,
+                ..
+            }
+        ));
+        // The key is the account's: GitHub's own words, not an SSH problem.
+        let stderr =
+            "ERROR: Repository not found.\nfatal: Could not read from remote repository.\n";
+        assert!(matches!(
+            failure(stderr).await,
+            Error::Unsupported(m) if m == "Repository not found."
         ));
     }
 
@@ -122,21 +162,26 @@ mod tests {
         std::fs::write(clone.join("a.txt"), "x").unwrap();
         sh(&clone, &["add", "a.txt"]);
         assert!(matches!(
-            pull(&clone, "main").await,
+            pull(&clone, "main", &alice()).await,
             Err(Error::LocalChanges)
         ));
         sh(&clone, &["rm", "-q", "--cached", "a.txt"]);
 
         sh(&clone, &["switch", "-q", "-c", "work"]);
-        assert!(matches!(pull(&clone, "main").await, Err(Error::OtherBranch(b)) if b == "main"));
+        assert!(
+            matches!(pull(&clone, "main", &alice()).await, Err(Error::OtherBranch(b)) if b == "main")
+        );
         sh(&clone, &["switch", "-q", "main"]);
 
         // An untracked file doesn't block the pull.
-        pull(&clone, "main").await.unwrap();
+        pull(&clone, "main", &alice()).await.unwrap();
 
         sh(&origin, &["commit", "-q", "--allow-empty", "-m", "three"]);
         sh(&clone, &["commit", "-q", "--allow-empty", "-m", "mine"]);
-        assert!(matches!(pull(&clone, "main").await, Err(Error::Diverged)));
+        assert!(matches!(
+            pull(&clone, "main", &alice()).await,
+            Err(Error::Diverged)
+        ));
         let _ = std::fs::remove_dir_all(&root);
     }
 }

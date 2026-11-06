@@ -166,6 +166,10 @@ pub struct LocalState {
     /// The first `MAX_CHANGED_PATHS` of them, in path order.
     #[serde(default)]
     pub not_graded_paths: Vec<String>,
+    /// How `origin` reaches GitHub (HTTPS or SSH), read from the clone's git config;
+    /// `None` for another remote.
+    #[serde(default)]
+    pub origin: Option<crate::tools::GitProtocol>,
 }
 
 /// The most pressing reason the graded state lags behind the student's work.

@@ -146,6 +146,14 @@ pub enum Error {
     #[error("not signed in to GitHub")]
     NotSignedIn,
 
+    /// git or ssh couldn't reach GitHub over SSH (`ssh::classify`); `login` is the account
+    /// GitHub named for `otherAccount`, when it did.
+    #[error("{problem}")]
+    Ssh {
+        problem: crate::ssh::SshProblem,
+        login: Option<String>,
+    },
+
     /// gh takes its token from this environment variable, so it can't store a sign-in.
     #[error("the GitHub CLI is using the {0} environment variable; unset it to sign in here")]
     TokenFromEnv(String),
@@ -260,6 +268,7 @@ error_kinds! {
     FileTooLarge = "fileTooLarge",
     PushRejected = "pushRejected",
     NotSignedIn = "notSignedIn",
+    Ssh = "ssh",
     TokenFromEnv = "tokenFromEnv",
     RateLimited = "rateLimited",
     GitHub = "github",
@@ -367,6 +376,11 @@ impl Error {
             Error::InvalidUsername(name) => vec![("username", name.clone())],
             Error::GroupFull { max } => vec![("max", max.to_string())],
             Error::ManualInstall { reason, .. } => vec![("reason", reason.code().to_owned())],
+            Error::Ssh { problem, login } => {
+                std::iter::once(("problem", problem.code().to_owned()))
+                    .chain(login.clone().map(|login| ("login", login)))
+                    .collect()
+            }
             Error::GhStudentOutdated { version } => {
                 vec![("version", version.clone()), ("min", min_gh_student())]
             }
@@ -423,6 +437,7 @@ impl Error {
             Error::FileTooLarge(_) => ErrorKind::FileTooLarge,
             Error::PushRejected => ErrorKind::PushRejected,
             Error::NotSignedIn => ErrorKind::NotSignedIn,
+            Error::Ssh { .. } => ErrorKind::Ssh,
             Error::TokenFromEnv(_) => ErrorKind::TokenFromEnv,
             Error::RateLimited { .. } => ErrorKind::RateLimited,
             Error::GitHub(_) => ErrorKind::GitHub,
@@ -539,6 +554,23 @@ mod tests {
         for reason in ManualReason::ALL {
             let key = format!("setup.manualReason.{}", reason.code());
             assert_eq!(en.get(&key), Some(&reason.to_string()), "{key}");
+        }
+        // `ssh` is worded by its problem (`ssh.problem.<code>`), which is what it displays.
+        for problem in crate::ssh::SshProblem::ALL {
+            let key = format!("ssh.problem.{}", problem.code());
+            assert_eq!(en.get(&key), Some(&problem.to_string()), "{key}");
+            let err = Error::Ssh {
+                problem,
+                login: Some("bob".into()),
+            };
+            assert_eq!(err.to_string(), problem.to_string());
+            assert_eq!(
+                err.params(),
+                [
+                    ("problem", problem.code().to_owned()),
+                    ("login", "bob".into())
+                ]
+            );
         }
     }
 

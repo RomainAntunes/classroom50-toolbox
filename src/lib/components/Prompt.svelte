@@ -7,6 +7,7 @@
   // A read-only preview (`showText`) has no input; its main action is always available.
   const preview = $derived(prompt.current?.text !== undefined);
   const ready = $derived(preview || value.trim() !== "");
+  const hint = $derived(prompt.current?.hint?.(value) ?? null);
 
   // A prompt that replaces another keeps the shell (and the focus), with an empty field.
   $effect(() => {
@@ -41,9 +42,12 @@
           dir="ltr"
           data-autofocus>{current.text}</pre>
       {:else}
+        {#if current.fieldLabel}<label for="prompt-input">{current.fieldLabel}</label>{/if}
         <input
+          id="prompt-input"
           bind:value
-          aria-label={current.label ?? current.title}
+          aria-label={current.fieldLabel ? undefined : (current.label ?? current.title)}
+          aria-describedby={hint ? "prompt-hint" : undefined}
           placeholder={current.placeholder}
           maxlength={current.maxLength}
           autocomplete="off"
@@ -51,9 +55,16 @@
           spellcheck="false"
           data-autofocus
         />
+        {#if hint}
+          <p id="prompt-hint" class="hint">
+            {hint.text}{#if hint.warning}<br /><span class="warning">{hint.warning}</span>{/if}
+          </p>
+        {/if}
       {/if}
       <div class="buttons">
-        <button type="button" onclick={() => close(null)}>{t("prompt.cancel")}</button>
+        <button type="button" onclick={() => close(null)}
+          >{current.cancelLabel ?? t("prompt.cancel")}</button
+        >
         {#if current.altLabel}
           <button type="button" disabled={!value.trim()} onclick={() => close(value, true)}
             >{current.altLabel}</button
@@ -83,6 +94,21 @@
     color: var(--fg-muted);
     white-space: pre-line;
     overflow-wrap: anywhere;
+  }
+
+  /* The label sits right on its field, the hint right under it. */
+  label {
+    margin-block-end: calc(var(--space) / -2);
+    font-weight: 500;
+  }
+
+  .hint {
+    margin-block-start: calc(var(--space) / -2);
+    font-size: 0.85em;
+  }
+
+  .hint .warning {
+    color: var(--warning);
   }
 
   input {

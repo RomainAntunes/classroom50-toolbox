@@ -7,8 +7,14 @@ import { announce } from "#lib/announce.svelte.js";
 
 const REASONS = ["localChanges", "otherBranch", "diverged"];
 
-/** Pulls and reports a refusal or failure. Returns true when the clone was updated. */
-export async function pullProject(project: Project, name: string): Promise<boolean> {
+/** Pulls and reports a refusal or failure. Returns true when the clone was updated. A
+ *  clone whose SSH failed is offered HTTPS (or GitHub's host key fixed), then pulled once
+ *  more (`retried`). */
+export async function pullProject(
+  project: Project,
+  name: string,
+  retried = false,
+): Promise<boolean> {
   try {
     await api.pullProject(project.id);
     announce(t("a11y.pulled", { name }));
@@ -18,6 +24,10 @@ export async function pullProject(project: Project, name: string): Promise<boole
     const text = REASONS.includes(kind)
       ? t(`pull.${kind}`, { branch: project.remote?.defaultBranch ?? "main" })
       : t("pull.failed", { error: errorMessage(err) });
+    if (kind === "ssh" && !retried && project.local?.origin === "ssh") {
+      const { recoverSsh } = await import("#lib/ssh.js");
+      return (await recoverSsh(project, name, text, err)) && pullProject(project, name, true);
+    }
     await withDialog(() => message(text, { title: name, kind: "warning" }));
     return false;
   }

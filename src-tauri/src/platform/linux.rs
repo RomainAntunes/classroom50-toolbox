@@ -175,6 +175,10 @@ pub fn open_terminal(dir: &Path) -> Result<()> {
     Err(Error::NoTerminal)
 }
 
+pub fn git_ssh_program() -> Option<PathBuf> {
+    None
+}
+
 pub fn global_shortcuts_supported() -> bool {
     let var = |name: &str| std::env::var(name).ok();
     !super::is_wayland(

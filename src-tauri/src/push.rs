@@ -17,6 +17,7 @@ use crate::error::{Error, Result};
 use crate::noise;
 use crate::process;
 use crate::pull::GH_CREDENTIALS;
+use crate::ssh::{self, Who};
 
 /// Hooks or a signing agent may take a moment.
 const COMMIT_TIMEOUT: Duration = Duration::from_secs(120);
@@ -418,12 +419,14 @@ async fn head(path: &Path) -> Option<String> {
 }
 
 /// Commits every change with `message` (when there are changes) and pushes `branch` to
-/// `origin`, after the same checks as `check`. Returns the pushed commit.
+/// `origin`, after the same checks as `check`. Returns the pushed commit. `who` tells an SSH
+/// key of another account from a repo the account can't push to (`ssh::failure`).
 pub async fn commit_and_push(
     path: &Path,
     branch: &str,
     github_head: Option<&str>,
     message: Option<&str>,
+    who: &Who<'_>,
 ) -> Result<Pushed> {
     let state = check(path, branch, github_head).await?;
     let push = push_args(branch);
@@ -434,7 +437,7 @@ pub async fn commit_and_push(
     }
     match process::run_with_timeout("git", &push, Some(path), PUSH_TIMEOUT).await {
         Ok(_) => {}
-        Err(err) => return Err(push_failure(err)),
+        Err(err) => return Err(push_failure(err, who).await),
     }
     let commit = git(path, &["rev-parse", "HEAD"]).await?.trim().to_owned();
     Ok(Pushed { commit })
@@ -607,7 +610,8 @@ fn sizes(path: &Path, files: &[String]) -> (Vec<String>, Vec<String>) {
     (large, too_large)
 }
 
-/// A hook or signing failure keeps git's last line.
+/// A hook or signing failure keeps git's last line. Never an SSH failure: a commit doesn't
+/// reach GitHub, whatever a hook or SSH signing prints.
 fn git_failure(err: Error) -> Error {
     match err {
         Error::CommandFailed { stderr, .. } => Error::Unsupported(last_line(&stderr)),
@@ -615,18 +619,22 @@ fn git_failure(err: Error) -> Error {
     }
 }
 
-/// GitHub moved on since the check: a typed refusal. Anything else keeps git's last line.
-fn push_failure(err: Error) -> Error {
+/// GitHub moved on since the check: a typed refusal. Anything else keeps GitHub's own
+/// refusal, else git's last line.
+async fn push_failure(err: Error, who: &Who<'_>) -> Error {
     let Error::CommandFailed { stderr, .. } = err else {
         return err;
     };
+    if let Some(err) = ssh::failure(&stderr, who).await {
+        return err;
+    }
     if stderr.contains("[rejected]")
         || stderr.contains("non-fast-forward")
         || stderr.contains("fetch first")
     {
         return Error::PushRejected;
     }
-    Error::Unsupported(last_line(&stderr))
+    Error::Unsupported(ssh::github_error(&stderr).unwrap_or_else(|| last_line(&stderr)))
 }
 
 fn last_line(stderr: &str) -> String {
@@ -712,18 +720,66 @@ mod tests {
         assert_eq!(tree.skipped, [".idea/", "src/.DS_Store", "target/"]);
     }
 
-    #[test]
-    fn explains_failed_pushes() {
+    fn alice() -> Who<'static> {
+        Who::Known {
+            active: Some("alice".into()),
+            probe: ssh::SshStatus::Ready {
+                login: Some("alice".into()),
+            },
+        }
+    }
+
+    #[tokio::test]
+    async fn explains_failed_pushes() {
+        let push_failure = async |err: Error| push_failure(err, &alice()).await;
         let stderr = "To https://github.com/o/r\n ! [rejected]        main -> main (fetch first)\n\
             error: failed to push some refs to 'https://github.com/o/r'\nhint: Updates were rejected\n";
-        assert!(matches!(push_failure(failed(stderr)), Error::PushRejected));
+        assert!(matches!(
+            push_failure(failed(stderr)).await,
+            Error::PushRejected
+        ));
         let stderr = "remote: Permission to o/r.git denied to ada.\n\
             fatal: unable to access 'https://github.com/o/r/': The requested URL returned error: 403\n";
         assert!(matches!(
-            push_failure(failed(stderr)),
+            push_failure(failed(stderr)).await,
             Error::Unsupported(m) if m == "unable to access 'https://github.com/o/r/': The requested URL returned error: 403"
         ));
-        assert!(matches!(push_failure(Error::Offline), Error::Offline));
+        assert!(matches!(push_failure(Error::Offline).await, Error::Offline));
+        let stderr = "ERROR: Permission to acme-cs/lab-2-alex.git denied to bob-other.\n\
+            fatal: Could not read from remote repository.\n";
+        assert!(matches!(
+            push_failure(failed(stderr)).await,
+            Error::Ssh { problem: crate::ssh::SshProblem::OtherAccount, login: Some(l) } if l == "bob-other"
+        ));
+        // The student's own account can't push (Close submission made the repo read-only):
+        // GitHub's words, not an SSH problem.
+        let stderr = "ERROR: Permission to acme-cs/lab-2-alex.git denied to Alice.\n\
+            fatal: Could not read from remote repository.\n";
+        assert!(matches!(
+            push_failure(failed(stderr)).await,
+            Error::Unsupported(m) if m == "Permission to acme-cs/lab-2-alex.git denied to Alice."
+        ));
+        let stderr = "ERROR: This repository was archived so it is read-only.\n\
+            fatal: Could not read from remote repository.\n";
+        assert!(matches!(
+            push_failure(failed(stderr)).await,
+            Error::Unsupported(m) if m == "This repository was archived so it is read-only."
+        ));
+    }
+
+    /// A commit never reaches GitHub: SSH signing or a hook printing ssh's words is no SSH
+    /// failure.
+    #[test]
+    fn a_failed_commit_is_never_an_ssh_failure() {
+        for stderr in [
+            "error: cannot run ssh-keygen: No such file or directory\nfatal: failed to write commit object\n",
+            "git@github.com: Permission denied (publickey).\nhook failed\n",
+        ] {
+            assert!(
+                matches!(git_failure(failed(stderr)), Error::Unsupported(_)),
+                "{stderr}"
+            );
+        }
     }
 
     fn sh(dir: &Path, args: &[&str]) -> String {
@@ -810,7 +866,8 @@ mod tests {
 
         // The guard fires before anything is written.
         if cfg!(debug_assertions) {
-            let result = commit_and_push(&clone, "main", Some(&head), Some("Add a")).await;
+            let result =
+                commit_and_push(&clone, "main", Some(&head), Some("Add a"), &alice()).await;
             assert!(matches!(result, Err(Error::BlockedInDev(_))));
             assert_eq!(sh(&clone, &["rev-parse", "HEAD"]), head);
         }

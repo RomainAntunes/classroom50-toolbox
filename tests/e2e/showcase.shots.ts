@@ -74,7 +74,7 @@ const avatar = (letter: string, from: string, to: string) =>
 function showcase(over: Partial<Scenario> = {}): Scenario {
   const base = scenario({
     settings: settings({ commitActions: "push", defaultEditor: "vscode" }),
-    auth: { loggedIn: true, login: LOGIN, missingScopes: [], envToken: null },
+    auth: { loggedIn: true, login: LOGIN, missingScopes: [], envToken: null, canAddSshKeys: false },
     accounts: [{ login: LOGIN, active: true }],
     snapshot: snapshot({
       login: LOGIN,

@@ -1397,6 +1397,7 @@ mod tests {
                 login: Some("Alice".into()),
                 missing_scopes: vec!["workflow".into()],
                 env_token: None,
+                can_add_ssh_keys: false,
             },
             accounts: Some(vec![Account {
                 login: "alice-alt".into(),

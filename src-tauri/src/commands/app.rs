@@ -37,7 +37,8 @@ pub async fn app_info(app: AppHandle) -> AppInfo {
     }
 }
 
-/// Keeps the popover open while the UI shows a native dialog.
+/// Keeps the popover open while the UI shows a native dialog: each `true` is matched by a
+/// `false`, and nested ones (a menu item opening a confirm) count.
 #[tauri::command]
 #[cfg_attr(test, specta::specta)]
 pub fn set_popover_pinned(state: State<'_, PopoverState>, pinned: bool) {

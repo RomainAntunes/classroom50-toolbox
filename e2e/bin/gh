@@ -2,7 +2,8 @@
 # A stand-in for the GitHub CLI, for the WebDriver suite: answers what the app asks gh at
 # startup, in a sync and in Settings, as gh 2.100 prints it, for one signed-in student.
 # It never touches GitHub. Every call is appended to $C50_FAKE_GH_LOG when set, so a spec
-# can check what reached gh (a write the dev guard stops never does). Writes fail anyway.
+# can check what reached gh (a write the dev guard stops never does). Writes to GitHub fail
+# anyway; `config set git_protocol` is kept in $C50_FAKE_GH_STATE (a file) when set.
 
 login="${C50_FAKE_GH_LOGIN:-ada-e2e}"
 
@@ -35,13 +36,27 @@ case "$*" in
   echo "$login"
   ;;
 "config get git_protocol --host github.com")
-  echo "https"
+  # What `config set` saved, when the suite gave it a file ($C50_FAKE_GH_STATE).
+  if [ -n "$C50_FAKE_GH_STATE" ] && [ -s "$C50_FAKE_GH_STATE" ]; then
+    cat "$C50_FAKE_GH_STATE"
+  else
+    echo "https"
+  fi
+  ;;
+"config set git_protocol https --host github.com" | "config set git_protocol ssh --host github.com")
+  if [ -n "$C50_FAKE_GH_STATE" ]; then
+    printf '%s\n' "$4" >"$C50_FAKE_GH_STATE"
+  fi
   ;;
 "extension list")
   printf 'gh student\tfoundation50/gh-student\tv1.58.1\n'
   ;;
 "extension upgrade gh-student --dry-run")
   echo "[student]: already up to date" >&2
+  ;;
+ssh-key\ *)
+  echo "fake gh: the WebDriver suite's fake gh refuses '$*'" >&2
+  exit 1
   ;;
 student\ *)
   echo "gh-student: the WebDriver suite's fake gh refuses '$*'" >&2

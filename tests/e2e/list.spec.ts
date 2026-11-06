@@ -378,7 +378,7 @@ test("the details list each milestone tag, pushed or not yet", async ({ app }) =
 
 test("Clear cache spins until the list is rebuilt", async ({ app, page }) => {
   await app.start(scenario({ responses: { clear_cache: [hold()] } }));
-  await app.openSettings();
+  await app.openSettings("Tools");
   const clear = page.getByRole("button", { name: "Clear cache" });
   await clear.click();
   await expect(clear).toHaveAttribute("aria-busy", "true");

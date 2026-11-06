@@ -1,30 +1,15 @@
 <script lang="ts">
-  import { onMount } from "svelte";
   import { CheckMenuItem, Menu, MenuItem, PredefinedMenuItem } from "@tauri-apps/api/menu";
-  import { openUrl } from "@tauri-apps/plugin-opener";
   import { ask } from "@tauri-apps/plugin-dialog";
-  import {
-    isPermissionGranted,
-    requestPermission,
-    sendNotification,
-  } from "@tauri-apps/plugin-notification";
-  import {
-    api,
-    onEvent,
-    DEVICE_CODE_EVENT,
-    LOGIN_ENDED_EVENT,
-    errorKind,
-    errorMessage,
-    withDialog,
-    type AuthStatus,
-    type DeviceCode,
-  } from "#lib/api.js";
-  import { announce } from "#lib/announce.svelte.js";
+  import { api, withDialog, type AuthStatus } from "#lib/api.js";
+  import { cancelLogin, copyAndOpen, grant, login, loginError, signIn } from "#lib/login.svelte.js";
   import { popupMenu } from "#lib/keyboard.js";
   import { session } from "#lib/session.svelte.js";
   import { t } from "#lib/i18n/index.js";
   import Spinner from "./Spinner.svelte";
 
+  // The sign-in itself lives in `login.svelte.ts` (it outlives this view: the browser hides
+  // the popover, and Settings runs a grant too); this renders it and the account menu.
   let {
     auth,
     ghInstalled,
@@ -32,53 +17,13 @@
   }: { auth: AuthStatus | null; ghInstalled: boolean; onchange: (a: AuthStatus) => void } =
     $props();
 
-  let pending = $state(false);
-  let device = $state<DeviceCode | null>(null);
-  let error = $state<string | null>(null);
-  /** The browser couldn't be opened (Linux without `xdg-open`): the URL is spelled out. */
-  let openFailed = $state(false);
+  const pending = $derived(login.pending);
+  const device = $derived(login.device);
+  // Settings' Set up SSH shows its own error there.
+  const error = $derived(login.error?.from === "footer" ? login.error.text : null);
 
-  /** Signs in, or with `grant` adds gh-student's missing scopes to the active account. */
-  async function signIn(grant = false) {
-    if (!ghInstalled) return;
-    pending = true;
-    error = null;
-    device = null;
-    openFailed = false;
-    try {
-      const status = await (grant ? api.grantScopes() : api.login());
-      onchange(status);
-      await notifySignedIn(status);
-    } catch (err) {
-      if (errorKind(err) !== "cancelled") error = loginError(err);
-    } finally {
-      pending = false;
-      device = null;
-    }
-  }
-
-  function loginError(err: unknown): string {
-    switch (errorKind(err)) {
-      case "tokenFromEnv":
-        return t("auth.envToken", { var: auth?.envToken ?? "GH_TOKEN" });
-      case "timedOut":
-        return t("auth.expired");
-      default:
-        return errorMessage(err);
-    }
-  }
-
-  // The browser takes focus during the device flow, which hides the popover, so the result
-  // is reported through a system notification.
-  async function notifySignedIn(status: AuthStatus) {
-    if (!status.loggedIn) return;
-    const granted = (await isPermissionGranted()) || (await requestPermission()) === "granted";
-    if (granted) {
-      sendNotification({
-        title: t("auth.notification.title"),
-        body: t("auth.notification.body", { login: status.login ?? "" }),
-      });
-    }
+  function startSignIn() {
+    if (ghInstalled) void signIn(onchange);
   }
 
   // gh-student can't accept or submit without these; a token from the environment can't
@@ -108,11 +53,11 @@
     hadGh = installed;
   });
 
-  const login = $derived(auth?.loggedIn ? auth.login : null);
-  const avatar = $derived(login ? session.avatars[login] : undefined);
+  const account = $derived(auth?.loggedIn ? auth.login : null);
+  const avatar = $derived(account ? session.avatars[account] : undefined);
 
   $effect(() => {
-    const current = login;
+    const current = account;
     if (current && !session.avatars[current]) {
       api
         .accountAvatar(current)
@@ -135,25 +80,25 @@
       envToken
         ? [MenuItem.new({ text: t("auth.envTokenMenu", { var: envToken }), enabled: false })]
         : [
-            ...accounts.map((account) =>
+            ...accounts.map((other) =>
               CheckMenuItem.new({
-                text: account.login,
-                checked: account.active,
-                action: () => void switchTo(account.login, account.active),
+                text: other.login,
+                checked: other.active,
+                action: () => void switchTo(other.login, other.active),
               }),
             ),
             PredefinedMenuItem.new({ item: "Separator" }),
-            // Adding an account runs gh's device flow too.
+            // Adding an account runs gh's device flow too, after the same question.
             MenuItem.new({
               text: t(ghInstalled ? "auth.addAccount" : "auth.addAccountNeedsGh"),
-              enabled: ghInstalled,
-              action: () => void signIn(),
+              enabled: ghInstalled && !pending,
+              action: startSignIn,
             }),
-            ...(login
+            ...(account
               ? [
                   MenuItem.new({
-                    text: t("auth.signOut", { login }),
-                    action: () => void signOut(login),
+                    text: t("auth.signOut", { login: account }),
+                    action: () => void signOut(account),
                   }),
                 ]
               : []),
@@ -165,19 +110,19 @@
 
   async function switchTo(next: string, active: boolean) {
     if (active) return;
-    error = null;
+    login.error = null;
     try {
       onchange(await api.switchAccount(next));
     } catch (err) {
-      error = errorMessage(err);
+      login.error = { text: loginError(err), from: "footer" };
     }
   }
 
   /** gh's sign-in is global: the terminal is signed out too, so it is confirmed first. */
-  async function signOut(account: string) {
-    error = null;
+  async function signOut(name: string) {
+    login.error = null;
     const confirmed = await withDialog(() =>
-      ask(t("auth.signOutConfirm", { login: account }), {
+      ask(t("auth.signOutConfirm", { login: name }), {
         title: t("auth.signOutTitle"),
         kind: "warning",
         okLabel: t("auth.signOutTitle"),
@@ -186,46 +131,11 @@
     );
     if (!confirmed) return;
     try {
-      onchange(await api.signOut(account));
+      onchange(await api.signOut(name));
     } catch (err) {
-      error = loginError(err);
+      login.error = { text: loginError(err), from: "footer" };
     }
   }
-
-  /** Without a TTY gh never opens the browser itself, so the app does. */
-  async function copyAndOpen() {
-    if (!device) return;
-    await navigator.clipboard.writeText(device.code).catch(() => {});
-    try {
-      await openUrl(device.url);
-    } catch {
-      openFailed = true;
-    }
-  }
-
-  /** Hides the code at once; Rust kills gh and `login-ended` follows. */
-  function cancel() {
-    device = null;
-    pending = false;
-    void api.cancelLogin();
-  }
-
-  onMount(() => {
-    const unlisteners = [
-      onEvent(DEVICE_CODE_EVENT, (code) => {
-        device = code;
-        announce(`${t("auth.waiting")} ${code.code}`);
-      }),
-      // Also resets a view that didn't start the sign-in (e.g. after a reload).
-      onEvent(LOGIN_ENDED_EVENT, () => {
-        device = null;
-        pending = false;
-      }),
-    ];
-    return () => {
-      for (const unlisten of unlisteners) void unlisten.then((stop) => stop());
-    };
-  });
 </script>
 
 {#if device}
@@ -234,10 +144,10 @@
     <code dir="ltr">{device.code}</code>
     <div class="actions">
       <button class="primary" onclick={copyAndOpen}>{t("auth.copyAndOpen")}</button>
-      <button onclick={cancel}>{t("auth.cancel")}</button>
+      <button onclick={cancelLogin}>{t("auth.cancel")}</button>
     </div>
-    <p class="url" class:error={openFailed}>
-      {t(openFailed ? "auth.openFailed" : "auth.openAt", { url: device.url })}
+    <p class="url" class:error={login.openFailed}>
+      {t(login.openFailed ? "auth.openFailed" : "auth.openAt", { url: device.url })}
     </p>
   </div>
 {:else if auth?.loggedIn}
@@ -245,7 +155,12 @@
     {#if needsScopes}
       <div class="row grant">
         <span>{t("auth.needsScopes")}</span>
-        <button class="primary" disabled={pending} aria-busy={pending} onclick={() => signIn(true)}>
+        <button
+          class="primary"
+          disabled={pending}
+          aria-busy={pending}
+          onclick={() => grant([], onchange)}
+        >
           {#if pending}<Spinner />{/if}{t("auth.grant")}
         </button>
       </div>
@@ -266,6 +181,9 @@
       <span class="login">{auth.login}</span>
       <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6" /></svg>
     </button>
+    {#if login.step}
+      <p class="url">{t(`login.protocol.${login.step}`)}</p>
+    {/if}
     {#if error}
       <p class="error" role="alert">{error}</p>
     {/if}
@@ -277,11 +195,14 @@
       class="primary"
       disabled={!ghInstalled || pending}
       aria-busy={pending}
-      onclick={() => signIn()}
+      onclick={startSignIn}
     >
       {#if pending}<Spinner />{/if}{t("auth.signIn")}
     </button>
   </div>
+  {#if login.step}
+    <p class="url">{t(`login.protocol.${login.step}`)}</p>
+  {/if}
   {#if error}
     <p class="error" role="alert">{error}</p>
   {/if}

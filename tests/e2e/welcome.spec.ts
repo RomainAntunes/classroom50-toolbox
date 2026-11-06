@@ -23,7 +23,7 @@ test("a first run opens the guide, and Skip ends it for good", async ({ app, pag
   expect(await app.writes()).toEqual([]);
 });
 
-test("the guide walks through tools, account and folders", async ({ app, page }) => {
+test("the guide walks through tools, account, git and folders", async ({ app, page }) => {
   await app.start(firstRun());
   const next = page.locator("footer .nav .primary");
   await expect(next).toHaveText("Get started");
@@ -37,6 +37,12 @@ test("the guide walks through tools, account and folders", async ({ app, page })
   await next.click();
   await expect(page.getByText("GitHub account", { exact: true })).toBeVisible();
   await expect(page.locator(".login .account")).toContainText("student");
+
+  // Optional: git outside the app, the rows Settings > Tools has.
+  await next.click();
+  await expect(page.getByText(/^Optional\. How git in a terminal/)).toBeVisible();
+  await expect(page.getByText("Git with your GitHub account")).toBeVisible();
+  await expect(page.getByRole("button", { name: "Clone and push with: HTTPS" })).toBeVisible();
 
   await next.click();
   await expect(page.getByText("Not chosen yet")).toBeVisible();
@@ -57,6 +63,19 @@ test("the guide walks through tools, account and folders", async ({ app, page })
   expect((await app.settings()).onboarded).toBe(true);
   // Nothing was installed: the guide only offered it.
   expect(await app.writes()).toEqual([]);
+});
+
+test("the git step waits for a sign-in, and asks nothing", async ({ app, page }) => {
+  const run = firstRun();
+  await app.start({ ...run, auth: { ...run.auth, loggedIn: false, login: null } });
+  const next = page.locator("footer .nav .primary");
+  for (let i = 0; i < 3; i += 1) await next.click();
+  await expect(page.getByText(/needs git, the GitHub CLI and a sign-in first/)).toBeVisible();
+  await expect(page.getByText("Git with your GitHub account")).toHaveCount(0);
+  expect(await app.calls("git_credentials")).toEqual([]);
+  expect(await app.calls("git_protocol")).toEqual([]);
+  await next.click();
+  await expect(page.getByText("Not chosen yet")).toBeVisible();
 });
 
 test("an onboarded student never sees the guide", async ({ app, page }) => {

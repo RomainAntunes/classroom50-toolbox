@@ -97,7 +97,7 @@ test("Settings > About shows the same update, with What's new instead of Later",
   page,
 }) => {
   await app.start(scenario({ update: updateStatus({ state: ready }) }));
-  await app.openSettings();
+  await app.openSettings("About");
   const about = page.locator(".banner.compact");
   await expect(about).toContainText("Version 9.9.0 is ready");
   await expect(about.getByRole("button", { name: "Later" })).toHaveCount(0);
@@ -112,7 +112,7 @@ test("Settings > About shows the same update, with What's new instead of Later",
 
 test("Check for updates says when it's up to date", async ({ app, page }) => {
   await app.start(scenario());
-  await app.openSettings();
+  await app.openSettings("About");
   await page.getByRole("button", { name: "Check for updates" }).click();
   await app.waitForCall("check_update");
   await expect(page.getByRole("button", { name: "You're up to date" })).toBeVisible();
@@ -120,7 +120,7 @@ test("Check for updates says when it's up to date", async ({ app, page }) => {
 
 test("Check for updates spins while it asks", async ({ app, page }) => {
   await app.start(scenario({ responses: { check_update: [hold()] } }));
-  await app.openSettings();
+  await app.openSettings("About");
   const check = page.getByRole("button", { name: "Check for updates" });
   await check.click();
   await expect(check).toHaveAttribute("aria-busy", "true");
@@ -133,7 +133,7 @@ test("Check for updates spins while it asks", async ({ app, page }) => {
 
 test("a failed check is worded by its kind", async ({ app, page }) => {
   await app.start(scenario({ responses: { check_update: [fail("offline")] } }));
-  await app.openSettings();
+  await app.openSettings("About");
   await page.getByRole("button", { name: "Check for updates" }).click();
   await app.expectDialog(["can't reach GitHub"], "ok");
 });
@@ -146,13 +146,13 @@ test("a check that broke in the background shows under Updates", async ({ app, p
       }),
     }),
   );
-  await app.openSettings();
+  await app.openSettings("About");
   await expect(page.locator(".sub.issue")).toHaveText("can't reach GitHub");
 });
 
 test("a copy that can't update itself says so and offers no check", async ({ app, page }) => {
   await app.start(scenario({ update: updateStatus({ canUpdate: false, bundle: "unbundled" }) }));
-  await app.openSettings();
+  await app.openSettings("About");
   await expect(page.getByText("this copy of the toolbox can't update itself")).toBeVisible();
   await expect(page.getByRole("button", { name: "Check for updates" })).toBeDisabled();
 });

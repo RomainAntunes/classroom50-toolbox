@@ -45,7 +45,8 @@ async function listening(port, timeout = 30_000) {
   throw new Error(`nothing listens on port ${port} after ${timeout} ms`);
 }
 
-/** Keeps what explains a failure: the app's log, the requests the mock saw, gh's calls. */
+/** Keeps what explains a failure: the app's log, the requests the mock saw, gh's and ssh's
+ *  calls. */
 function saveArtifacts() {
   if (!fixture) return;
   mkdirSync(artifacts, { recursive: true });
@@ -53,8 +54,10 @@ function saveArtifacts() {
   if (existsSync(logs)) cpSync(logs, join(artifacts, "app-logs"), { recursive: true });
   if (mock)
     writeFileSync(join(artifacts, "mock-requests.json"), JSON.stringify(mock.requests, null, 2));
-  const ghLog = join(fixture.root, "gh-calls.log");
-  if (existsSync(ghLog)) cpSync(ghLog, join(artifacts, "gh-calls.log"));
+  for (const name of ["gh-calls.log", "ssh-calls.log"]) {
+    const log = join(fixture.root, name);
+    if (existsSync(log)) cpSync(log, join(artifacts, name));
+  }
 }
 
 export const config = {
@@ -89,9 +92,12 @@ export const config = {
     fixture = prepare();
     mock = await start(buildWorld({ heads: fixture.heads }));
     const ghLog = join(fixture.root, "gh-calls.log");
+    const sshLog = join(fixture.root, "ssh-calls.log");
     // Read by the specs, which run in worker processes started after this.
     process.env.C50_E2E_CLONE = fixture.clone;
     process.env.C50_E2E_GH_LOG = ghLog;
+    process.env.C50_E2E_SSH_LOG = sshLog;
+    process.env.C50_E2E_HOME = fixture.env.HOME;
     process.env.C50_E2E_MOCK = mock.url;
 
     const env = { ...process.env, ...fixture.env };
@@ -103,6 +109,9 @@ export const config = {
       C50_TEST_BIN: join(here, "bin"),
       C50_TEST_OPEN: "1",
       C50_FAKE_GH_LOG: ghLog,
+      // `gh config set git_protocol` lands here instead of nowhere.
+      C50_FAKE_GH_STATE: join(fixture.root, "gh-git-protocol"),
+      C50_FAKE_SSH_LOG: sshLog,
       // WebKitGTK under Xvfb: no GPU, no DMA-BUF renderer.
       WEBKIT_DISABLE_DMABUF_RENDERER: "1",
       LIBGL_ALWAYS_SOFTWARE: "1",
