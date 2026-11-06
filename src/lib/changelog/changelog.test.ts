@@ -14,6 +14,7 @@ import {
   pendingVersions,
   previousTag,
   releaseBody,
+  supersededPrereleases,
   type Changelog,
 } from "./versions.js";
 
@@ -165,6 +166,19 @@ describe("what's new", () => {
       "0.11.0-beta.1",
     ]);
     expect(pendingVersions(available, "0.11.0", "0.11.0-beta.2")).toEqual(["0.11.0"]);
+  });
+
+  it("lets a stable version drop the pre-releases before it", () => {
+    const files = ["0.10.0-beta.1", "0.10.0", "0.11.0-beta.1", "0.11.1-beta.2", "0.12.0-beta.1"];
+    expect(supersededPrereleases(files, "0.12.0")).toEqual([
+      "0.10.0-beta.1",
+      "0.11.0-beta.1",
+      "0.11.1-beta.2",
+      "0.12.0-beta.1",
+    ]);
+    expect(supersededPrereleases(files, "0.11.0")).toEqual(["0.10.0-beta.1", "0.11.0-beta.1"]);
+    expect(supersededPrereleases(files, "0.12.0-beta.2")).toEqual([]);
+    expect(supersededPrereleases(files, "next")).toEqual([]);
   });
 
   it("shows only the running version for settings from before the page", () => {

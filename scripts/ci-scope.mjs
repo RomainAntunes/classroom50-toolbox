@@ -1,5 +1,6 @@
 // Tells ci.yml how much a change needs checking. A version bump (`pnpm bump`: the version
-// in package.json, Cargo.toml and Cargo.lock, plus its changelog file) or a changelog edit
+// in package.json, Cargo.toml and Cargo.lock, plus its changelog file and, for a stable
+// version, the pre-releases' changelogs it deletes) or a changelog edit
 // leaves the code as the commit before had it, already checked, so it is `bump`: only the
 // versions and changelogs are checked. Anything else is `full`.
 // Usage (ci.yml): node scripts/ci-scope.mjs <base sha>, which prints `bump` or `full`;
@@ -9,6 +10,7 @@ import { readFileSync } from "node:fs";
 import { pathToFileURL } from "node:url";
 
 const CHANGELOG = /^src\/lib\/changelog\/[^/]+\.json$/;
+const PRERELEASE_CHANGELOG = /^src\/lib\/changelog\/\d+\.\d+\.\d+-beta\.\d+\.json$/;
 const CARGO_VERSION = /^version = "[^"]*"$/m;
 const LOCK_VERSION = /^name = "classroom50-toolbox"\nversion = "[^"]*"$/m;
 
@@ -35,15 +37,15 @@ function versionOnly(path, before, after) {
 }
 
 /**
- * `bump` when every changed file is a changelog (added or edited) or one of the version's
- * homes changed in its version only, else `full`. A side is null when the file is absent.
+ * `bump` when every changed file is a changelog (added or edited), a pre-release's changelog
+ * deleted, or one of the version's homes changed in its version only, else `full`. A side is null when the file is absent.
  * @param {{ path: string, before: string | null, after: string | null }[]} changes
  * @returns {"bump" | "full"}
  */
 export function ciScope(changes) {
   if (changes.length === 0) return "full";
   const light = changes.every(({ path, before, after }) => {
-    if (after === null) return false;
+    if (after === null) return PRERELEASE_CHANGELOG.test(path);
     if (CHANGELOG.test(path)) return true;
     if (!["package.json", "src-tauri/Cargo.toml", "src-tauri/Cargo.lock"].includes(path)) {
       return false;

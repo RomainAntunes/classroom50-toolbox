@@ -232,3 +232,19 @@ export function pendingVersions(available, current, lastSeen) {
     )
     .sort((a, b) => compareVersions(b, a));
 }
+
+/**
+ * The pre-releases a stable `version` makes redundant: every one before it, since a stable
+ * version's notes include the pre-releases since the previous stable one, and earlier ones
+ * were in an earlier stable version's. None for a pre-release. `pnpm bump` deletes their
+ * files, which keeps the bundle from carrying each note twice.
+ * @param {readonly string[]} available
+ * @param {string} version
+ * @returns {string[]}
+ */
+export function supersededPrereleases(available, version) {
+  if (!parseVersion(version) || isPrerelease(version)) return [];
+  return available.filter(
+    (other) => parseVersion(other) && isPrerelease(other) && compareVersions(other, version) < 0,
+  );
+}
