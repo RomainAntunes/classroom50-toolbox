@@ -347,13 +347,17 @@ const protocolButton = (app: App) =>
 test("protocol: HTTPS by default, SSH unchecked until asked", async ({ app }) => {
   await openTools(app);
   await expect(protocolButton(app)).toHaveText("HTTPS");
-  await expect(sshRow(app)).toContainText("Not checked yet");
+  // Nothing about SSH but the way to check it: no status, no links.
+  await expect(sshRow(app)).not.toContainText("Ready");
+  await expect(sshRow(app).getByRole("button", { name: "GitHub's SSH guide" })).toHaveCount(0);
   expect(await app.calls("ssh_status")).toEqual([]);
   await sshRow(app).getByRole("button", { name: "Check SSH" }).click();
   const [probe] = await app.waitForCall("ssh_status");
   expect(probe.args).toEqual({ fresh: true });
-  await expect(sshRow(app)).toContainText("Ready as student");
+  // On HTTPS, the status says it is SSH's.
+  await expect(sshRow(app)).toContainText("SSH: Ready as student");
   await expect(sshRow(app).getByRole("button", { name: /Check/ })).toHaveCount(0);
+  await expect(sshRow(app).getByRole("button", { name: "GitHub's SSH guide" })).toBeVisible();
 });
 
 test("protocol: the menu switches to SSH after a confirm", async ({ app, page }) => {
@@ -544,7 +548,7 @@ test("Set up SSH: a refusal is worded", async ({ app }) => {
 });
 
 test("SSH links open GitHub's guide and the keys page", async ({ app }) => {
-  await openTools(app);
+  await openTools(app, { gitProtocol: "ssh" });
   await sshRow(app).getByRole("button", { name: "GitHub's SSH guide" }).click();
   await sshRow(app).getByRole("button", { name: "Your SSH keys on GitHub" }).click();
   const opened = await app.waitForCall("plugin:opener|open_url", 2);
@@ -661,6 +665,7 @@ test("a failed account switch shows in the footer, not in Settings", async ({ ap
 
 test("an SSH link the OS can't open is spelled out", async ({ app }) => {
   await openTools(app, {
+    gitProtocol: "ssh",
     responses: { "plugin:opener|open_url": [failPlugin("no xdg-open")] },
   });
   await sshRow(app).getByRole("button", { name: "Your SSH keys on GitHub" }).click();

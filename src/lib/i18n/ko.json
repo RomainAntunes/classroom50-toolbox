@@ -738,6 +738,7 @@
   "settings.ssh.title": "SSH",
   "settings.ssh.check": "SSH 확인",
   "settings.ssh.unchecked": "아직 확인하지 않음",
+  "settings.ssh.statusFor": "SSH: {status}",
   "settings.ssh.guide": "GitHub의 SSH 가이드",
   "settings.ssh.keys": "GitHub의 내 SSH 키",
   "clone.with": "복제 방식",

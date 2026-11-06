@@ -759,6 +759,7 @@
   "settings.ssh.title": "SSH",
   "settings.ssh.check": "SSH'yi denetle",
   "settings.ssh.unchecked": "Henüz denetlenmedi",
+  "settings.ssh.statusFor": "SSH: {status}",
   "settings.ssh.guide": "GitHub'ın SSH kılavuzu",
   "settings.ssh.keys": "GitHub'daki SSH anahtarlarınız",
   "clone.with": "Şununla klonla",

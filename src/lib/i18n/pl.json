@@ -801,6 +801,7 @@
   "settings.ssh.title": "SSH",
   "settings.ssh.check": "Sprawdź SSH",
   "settings.ssh.unchecked": "Jeszcze nie sprawdzono",
+  "settings.ssh.statusFor": "SSH: {status}",
   "settings.ssh.guide": "Przewodnik SSH GitHuba",
   "settings.ssh.keys": "Twoje klucze SSH na GitHubie",
   "clone.with": "Sklonuj przez",

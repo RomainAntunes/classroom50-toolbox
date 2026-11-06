@@ -843,6 +843,7 @@
   "settings.ssh.title": "SSH",
   "settings.ssh.check": "فحص SSH",
   "settings.ssh.unchecked": "لم يُفحص بعد",
+  "settings.ssh.statusFor": "SSH: {status}",
   "settings.ssh.guide": "دليل SSH من GitHub",
   "settings.ssh.keys": "مفاتيح SSH على GitHub",
   "clone.with": "الاستنساخ عبر",

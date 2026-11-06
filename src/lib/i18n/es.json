@@ -780,6 +780,7 @@
   "settings.ssh.title": "SSH",
   "settings.ssh.check": "Comprobar SSH",
   "settings.ssh.unchecked": "Aún no comprobado",
+  "settings.ssh.statusFor": "SSH: {status}",
   "settings.ssh.guide": "Guía de SSH de GitHub",
   "settings.ssh.keys": "Tus claves SSH en GitHub",
   "clone.with": "Clonar con",

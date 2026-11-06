@@ -738,6 +738,7 @@
   "settings.ssh.title": "SSH",
   "settings.ssh.check": "检查SSH",
   "settings.ssh.unchecked": "尚未检查",
+  "settings.ssh.statusFor": "SSH：{status}",
   "settings.ssh.guide": "GitHub的SSH指南",
   "settings.ssh.keys": "你在GitHub上的SSH密钥",
   "clone.with": "克隆方式",
