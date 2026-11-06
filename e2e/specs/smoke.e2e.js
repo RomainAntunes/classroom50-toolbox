@@ -103,11 +103,13 @@ describe("Classroom 50 Toolbox", () => {
 
   it("shows the fake gh's versions in Settings", async () => {
     await $(`button[aria-label="${t("app.settings")}"]`).click();
-    const main = $("main");
-    await browser.waitUntil(async () => (await main.getText()).includes("2.100.0"), {
+    // The tools are on their own tab; a hidden panel's text isn't read.
+    await $("#tab-tools").click();
+    const tools = $("#panel-tools");
+    await browser.waitUntil(async () => (await tools.getText()).includes("2.100.0"), {
       timeoutMsg: "gh's version never showed",
     });
-    expect(await main.getText()).toContain("v1.58.1");
+    expect(await tools.getText()).toContain("v1.58.1");
     await $(`button[aria-label="${t("app.back")}"]`).click();
     await item("Hello, World").waitForDisplayed();
   });
