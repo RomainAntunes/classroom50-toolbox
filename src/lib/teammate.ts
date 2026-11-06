@@ -127,9 +127,20 @@ export async function addTeammate(project: Project, name: string): Promise<void>
   });
 }
 
-/** Right after founding a group: offers to add teammates before anything else. */
-export function addToNewGroup(id: string, repo: string, assignment: string): Promise<void> {
-  return addTeammates({ id, repo, assignment, team: true });
+/** Right after founding `group`: says so and asks for teammates in one prompt, "Later"
+ *  leaving it for the menu. The founder is the group's only member yet. */
+export function addToNewGroup(
+  id: string,
+  repo: string,
+  assignment: string,
+  group: string,
+  max: number | null,
+): Promise<void> {
+  const room = roomLeft(max, [session.snapshot?.login ?? ""]);
+  return addTeammates(
+    { id, repo, assignment, team: true, room },
+    { message: t("accept.groupCreated", { group, assignment }), cancelLabel: t("accept.later") },
+  );
 }
 
 /** The row's "Add another": the same prompt, its room counting the classmates the queue
@@ -151,18 +162,24 @@ export function addMore(job: TeammateJob): Promise<void> {
 }
 
 /** Asks for usernames and queues them; Rust adds them in the background, the row shows
- *  how each one goes. Also the row's "Add another", which joins a queue still running. */
-export async function addTeammates(target: Target): Promise<void> {
+ *  how each one goes. Also the row's "Add another", which joins a queue still running.
+ *  `words` replaces the prompt's text and Cancel's label. */
+export async function addTeammates(
+  target: Target,
+  words: { message?: string; cancelLabel?: string } = {},
+): Promise<void> {
   const { team, repo, assignment } = target;
   const room = target.room ?? null;
   const title = t(team ? "teammate.teamTitle" : "teammate.inviteTitle");
   const text = await askText({
     title,
-    message: t(team ? "teammate.teamHint" : "teammate.inviteHint", { assignment, repo }),
+    message:
+      words.message ?? t(team ? "teammate.teamHint" : "teammate.inviteHint", { assignment, repo }),
     fieldLabel: t("teammate.usernamesLabel"),
     placeholder: t("teammate.placeholder"),
     hint: (value) => usernamesHint(value, team, room),
     okLabel: t(team ? "teammate.teamOk" : "teammate.inviteOk"),
+    cancelLabel: words.cancelLabel,
   });
   const usernames = text ? parseUsernames(text) : [];
   if (usernames.length === 0) return;
