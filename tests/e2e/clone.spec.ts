@@ -2,16 +2,36 @@
 // Choose another folder… and Cancel. With no clone folder yet the picker comes first and the
 // folder is only remembered on Clone; "Clone to…" picks another one directly. Cancelling
 // anywhere clones nothing and saves nothing.
-import { expect, test, type App } from "./app";
-import { HOME, fail, hold, ok, project, scenario, settings, snapshot } from "./fixtures";
+import { expect, menuTexts, test, type App } from "./app";
+import {
+  HOME,
+  fail,
+  hold,
+  ok,
+  project,
+  scenario,
+  settings,
+  snapshot,
+  type Scenario,
+} from "./fixtures";
 import type { Settings } from "../../src/lib/api";
 
 const lab = project({ slug: "lab1", name: "Lab 1", local: null });
 const REPO = "cs101-lab1-student";
 
-async function start(app: App, over: Partial<Settings> = {}, responses = {}) {
+async function start(
+  app: App,
+  over: Partial<Settings> = {},
+  responses = {},
+  extra: Partial<Scenario> = {},
+) {
   await app.start(
-    scenario({ snapshot: snapshot({ projects: [lab] }), settings: settings(over), responses }),
+    scenario({
+      snapshot: snapshot({ projects: [lab] }),
+      settings: settings(over),
+      responses,
+      ...extra,
+    }),
   );
   await expect(app.row("Lab 1")).toContainText("Not cloned");
 }
@@ -186,4 +206,179 @@ test("a clone already on disk offers no Clone", async ({ app }) => {
   const menu = await app.rowMenu("Lab 1");
   expect(menu.items.find((i) => i.text === "Clone")?.enabled).toBe(false);
   expect(menu.items.find((i) => i.text === "Clone to…")?.enabled).toBe(false);
+});
+
+// HTTPS or SSH: gh's `git_protocol` decides, "Clone with" overrides it, and an SSH clone
+// checks SSH first so a key or a network that won't work falls back to HTTPS.
+
+test("gh on HTTPS: no SSH check", async ({ app }) => {
+  await start(app, {}, { clone_project: [ok(`${HOME}/Classroom/${REPO}`)] });
+  await cloneButton(app).click();
+  await app.answer("yes");
+  await app.waitForCall("clone_project");
+  expect(await app.calls("ssh_status")).toEqual([]);
+});
+
+test("gh on SSH that works: cloned the way gh says", async ({ app }) => {
+  await start(
+    app,
+    {},
+    { clone_project: [ok(`${HOME}/Classroom/${REPO}`)] },
+    { gitProtocol: "ssh" },
+  );
+  await cloneButton(app).click();
+  await app.answer("yes");
+  const [call] = await app.waitForCall("clone_project");
+  expect(call.args).toEqual({ id: lab.id, parent: `${HOME}/Classroom`, protocol: null });
+  const [probe] = await app.calls("ssh_status");
+  expect(probe.args).toEqual({ fresh: false });
+});
+
+test("SSH not ready: the reason, then Clone with HTTPS", async ({ app }) => {
+  await start(
+    app,
+    {},
+    { clone_project: [ok(`${HOME}/Classroom/${REPO}`)] },
+    { gitProtocol: "ssh", ssh: { state: "keyNotOffered", localKey: "~/.ssh/id_ed25519.pub" } },
+  );
+  await cloneButton(app).click();
+  await app.answer("yes");
+  const dialog = await app.expectDialog(
+    [/^Your key ~\/\.ssh\/id_ed25519\.pub is on GitHub, but ssh didn't use it\./, /ssh-add/],
+    "Clone with HTTPS",
+  );
+  expect(dialog.title).toBe(REPO);
+  expect(dialog.labels).toEqual({ yes: "Clone with HTTPS", no: "SSH settings…", cancel: "Cancel" });
+  const [call] = await app.waitForCall("clone_project");
+  expect(call.args).toEqual({ id: lab.id, parent: `${HOME}/Classroom`, protocol: "https" });
+});
+
+test("SSH not ready: SSH settings… opens Settings and clones nothing", async ({ app, page }) => {
+  await start(app, {}, {}, { gitProtocol: "ssh", ssh: { state: "noKey", localKey: null } });
+  await cloneButton(app).click();
+  await app.answer("yes");
+  await app.expectDialog(["No SSH key of this computer is on your GitHub account."], "no");
+  await expect(page).toHaveURL(/\/settings$/);
+  expect(await app.writes()).toEqual([]);
+});
+
+test("SSH not ready: Cancel clones nothing", async ({ app }) => {
+  await start(app, {}, {}, { gitProtocol: "ssh", ssh: { state: "unreachable", message: "x" } });
+  await cloneButton(app).click();
+  await app.answer("yes");
+  await app.expectDialog(["Can't reach GitHub over SSH"], "cancel");
+  expect(await app.writes()).toEqual([]);
+  await expect(app.row("Lab 1")).toContainText("Not cloned");
+});
+
+test("an unknown GitHub host key is trusted from the question, then SSH clones", async ({
+  app,
+}) => {
+  await start(
+    app,
+    {},
+    { clone_project: [ok(`${HOME}/Classroom/${REPO}`)] },
+    { gitProtocol: "ssh", ssh: { state: "hostKeyUnknown" } },
+  );
+  await cloneButton(app).click();
+  await app.answer("yes");
+  await app.expectDialog(["doesn't know GitHub's SSH host key yet"], "Trust GitHub");
+  const [call] = await app.waitForCall("clone_project");
+  expect(call.args.protocol).toBeNull();
+  expect(await app.writes()).toEqual(["trust_github_host", "clone_project"]);
+});
+
+test("Clone with in the menu overrides gh's protocol", async ({ app }) => {
+  await start(
+    app,
+    {},
+    { clone_project: [ok(`${HOME}/Classroom/${REPO}`)] },
+    { gitProtocol: "ssh" },
+  );
+  const menu = await app.rowMenu("Lab 1");
+  const submenu = menu.items.find((i) => i.text === "Clone with");
+  expect(submenu?.enabled).toBe(true);
+  expect(menuTexts(submenu!)).toEqual(["HTTPS", "SSH"]);
+  await app.pickMenu("HTTPS");
+  await app.answer("yes");
+  const [call] = await app.waitForCall("clone_project");
+  expect(call.args.protocol).toBe("https");
+  // HTTPS needs no SSH check.
+  expect(await app.calls("ssh_status")).toEqual([]);
+});
+
+test("Clone with SSH checks SSH, then clones with SSH", async ({ app }) => {
+  await start(app, {}, { clone_project: [ok(`${HOME}/Classroom/${REPO}`)] });
+  await app.rowMenu("Lab 1");
+  await app.pickMenu("SSH");
+  await app.answer("yes");
+  const [call] = await app.waitForCall("clone_project");
+  expect(call.args.protocol).toBe("ssh");
+  await app.waitForCall("ssh_status");
+});
+
+test("an SSH failure offers Clone with HTTPS, once", async ({ app }) => {
+  await start(
+    app,
+    {},
+    {
+      clone_project: [
+        fail("ssh", "GitHub didn't accept an SSH key", { problem: "keyRejected" }),
+        ok(`${HOME}/Classroom/${REPO}`),
+      ],
+    },
+    { gitProtocol: "ssh" },
+  );
+  await cloneButton(app).click();
+  await app.answer("yes");
+  const dialog = await app.expectDialog(
+    [
+      "The clone failed: GitHub didn't accept an SSH key from this computer",
+      "Try again with HTTPS?",
+    ],
+    "ok",
+  );
+  expect(dialog.labels).toEqual({ ok: "Clone with HTTPS", cancel: "Cancel" });
+  const calls = await app.waitForCall("clone_project", 2);
+  expect(calls.map((c) => c.args.protocol)).toEqual([null, "https"]);
+  await app.waitForCall("open_in_editor");
+});
+
+test("an SSH failure, HTTPS declined: one clone only", async ({ app }) => {
+  await start(
+    app,
+    {},
+    { clone_project: [fail("ssh", "x", { problem: "unreachable" })] },
+    { gitProtocol: "ssh" },
+  );
+  await cloneButton(app).click();
+  await app.answer("yes");
+  await app.expectDialog(["can't reach GitHub over SSH"], "cancel");
+  expect(await app.calls("clone_project")).toHaveLength(1);
+  expect(await app.pendingDialogs()).toEqual([]);
+});
+
+test("a clone's menu switches its origin the other way", async ({ app, page }) => {
+  const cloned = project({ slug: "lab1", name: "Lab 1" });
+  await app.start(scenario({ snapshot: snapshot({ projects: [cloned] }) }));
+  let menu = await app.rowMenu("Lab 1");
+  expect(menuTexts(menu)).toContain("Use SSH for this clone");
+  expect(menuTexts(menu)).not.toContain("Use HTTPS for this clone");
+  await app.pickMenu("Use SSH for this clone");
+  const [call] = await app.waitForCall("set_clone_remote");
+  expect(call.args).toEqual({ id: cloned.id, protocol: "ssh" });
+  await expect(page.getByRole("status")).toHaveText("Lab 1 now uses SSH");
+  menu = await app.rowMenu("Lab 1");
+  expect(menuTexts(menu)).toContain("Use HTTPS for this clone");
+});
+
+test("no clone, or an origin elsewhere: no switch in the menu", async ({ app }) => {
+  const elsewhere = project({ slug: "lab2", name: "Lab 2" });
+  elsewhere.local = { ...elsewhere.local!, origin: null };
+  await app.start(scenario({ snapshot: snapshot({ projects: [lab, elsewhere] }) }));
+  for (const name of ["Lab 1", "Lab 2"]) {
+    const texts = menuTexts(await app.rowMenu(name));
+    expect(texts.some((text) => text.endsWith("for this clone"))).toBe(false);
+    await app.page.keyboard.press("Escape");
+  }
 });

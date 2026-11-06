@@ -233,3 +233,52 @@ test("Commit and Commit & push are not offered while commitActions is none", asy
   expect(texts).not.toContain("Commit…");
   expect(texts).not.toContain("Commit & push…");
 });
+
+// An SSH clone whose SSH stopped working: HTTPS for this clone, then the push alone again
+// (the commit is already made).
+const sshLab = { ...lab, local: { ...lab.local!, origin: "ssh" as const } };
+const sshFailure = fail("ssh", "Host key verification failed.", { problem: "hostKeyUnknown" });
+
+test("a push over SSH that fails offers HTTPS, then pushes the commit again", async ({
+  app,
+  page,
+}) => {
+  await open(
+    app,
+    { commit_check: [ok(check())], commit_push: [sshFailure, ok({ commit: "abc" })] },
+    "Commit & push…",
+    sshLab,
+  );
+  await app.prompt.getByRole("textbox").fill("Fix the loop");
+  await app.prompt.getByRole("button", { name: "Commit & push" }).click();
+  const dialog = await app.expectDialog(
+    [
+      /this computer doesn't know GitHub's SSH host key yet/,
+      "This clone reaches GitHub over SSH. Switch it to HTTPS and try again?",
+    ],
+    "ok",
+  );
+  expect(dialog.labels.ok).toBe("Use HTTPS for this clone");
+  const calls = await app.waitForCall("commit_push", 2);
+  expect(calls.map((c) => c.args)).toEqual([
+    { id: lab.id, message: "Fix the loop" },
+    { id: lab.id, message: null },
+  ]);
+  expect((await app.calls("set_clone_remote"))[0].args).toEqual({ id: lab.id, protocol: "https" });
+  expect(await app.writes()).toEqual(["commit_push", "set_clone_remote", "commit_push"]);
+  await expect(page.getByRole("status")).toHaveText("Pushed to GitHub: Lab 1");
+});
+
+test("a push over SSH that fails, HTTPS declined: nothing more is written", async ({ app }) => {
+  await open(
+    app,
+    { commit_check: [ok(check())], commit_push: [sshFailure] },
+    "Commit & push…",
+    sshLab,
+  );
+  await app.prompt.getByRole("textbox").fill("Fix the loop");
+  await app.prompt.getByRole("button", { name: "Commit & push" }).click();
+  await app.expectDialog(["Switch it to HTTPS and try again?"], "cancel");
+  expect(await app.writes()).toEqual(["commit_push"]);
+  expect(await app.pendingDialogs()).toEqual([]);
+});

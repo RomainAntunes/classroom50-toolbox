@@ -111,3 +111,41 @@ test("any other failure shows Rust's words", async ({ app }) => {
   await pullButton(app).click();
   await app.expectDialog(["The pull failed: fatal: unable to access GitHub"], "ok");
 });
+
+// An SSH clone whose SSH stopped working: HTTPS for this clone, then one more pull.
+const sshFailure = fail("ssh", "Permission denied (publickey)", { problem: "keyRejected" });
+
+test("an SSH failure offers HTTPS for this clone, then pulls again", async ({ app, page }) => {
+  const behind = lab({ behind: 2, origin: "ssh" });
+  await start(app, behind, { pull_project: [sshFailure, ok()] });
+  await pullButton(app).click();
+  const dialog = await app.expectDialog(
+    [
+      "The pull failed: GitHub didn't accept an SSH key from this computer",
+      "This clone reaches GitHub over SSH. Switch it to HTTPS and try again?",
+    ],
+    "ok",
+  );
+  expect(dialog.labels).toEqual({ ok: "Use HTTPS for this clone", cancel: "Cancel" });
+  const [remote] = await app.waitForCall("set_clone_remote");
+  expect(remote.args).toEqual({ id: behind.id, protocol: "https" });
+  await app.waitForCall("pull_project", 2);
+  await expect(page.getByRole("status")).toHaveText("Pulled: Lab 1 is up to date with GitHub");
+  expect(await app.writes()).toEqual(["pull_project", "set_clone_remote", "pull_project"]);
+});
+
+test("an SSH failure, HTTPS declined: nothing more is written", async ({ app }) => {
+  await start(app, lab({ behind: 2, origin: "ssh" }), { pull_project: [sshFailure] });
+  await pullButton(app).click();
+  await app.expectDialog(["Switch it to HTTPS and try again?"], "cancel");
+  expect(await app.writes()).toEqual(["pull_project"]);
+  expect(await app.pendingDialogs()).toEqual([]);
+});
+
+test("an SSH failure on an HTTPS clone offers no switch", async ({ app }) => {
+  await start(app, lab(), { pull_project: [sshFailure] });
+  await pullButton(app).click();
+  const dialog = await app.expectDialog(["The pull failed: GitHub didn't accept"], "ok");
+  expect(dialog.message).not.toContain("Switch it to HTTPS");
+  expect(await app.writes()).toEqual(["pull_project"]);
+});
