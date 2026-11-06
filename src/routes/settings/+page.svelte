@@ -269,9 +269,6 @@
        right to left), so that margin is 2px plus the track and matches the start one
        whether or not the page scrolls. */
     overflow-y: scroll;
-    display: flex;
-    flex-direction: column;
-    gap: calc(var(--space) * 2);
     padding-block: 0 14px;
     padding-inline: 12px 2px;
   }
