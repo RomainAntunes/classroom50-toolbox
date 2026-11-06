@@ -26,6 +26,8 @@ pub async fn list_accounts() -> Result<Vec<crate::accounts::Account>> {
 #[cfg_attr(test, specta::specta)]
 pub async fn switch_account(app: AppHandle, login: String) -> Result<AuthStatus> {
     crate::accounts::switch(&login).await?;
+    // SSH's status names the active account.
+    app.state::<SshState>().clear();
     let status = tools::auth_status().await;
     tauri::async_runtime::spawn(async move {
         projects::refresh(&app).await;
@@ -103,6 +105,7 @@ fn signed_in(app: AppHandle, result: Result<AuthStatus>) -> Result<AuthStatus> {
 #[cfg_attr(test, specta::specta)]
 pub async fn sign_out(app: AppHandle, login: String) -> Result<AuthStatus> {
     crate::accounts::sign_out(&login).await?;
+    app.state::<SshState>().clear();
     let status = tools::auth_status().await;
     tauri::async_runtime::spawn(async move {
         projects::refresh(&app).await;

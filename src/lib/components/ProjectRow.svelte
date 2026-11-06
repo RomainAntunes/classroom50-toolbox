@@ -1,7 +1,7 @@
 <script lang="ts">
   import { Menu, MenuItem, PredefinedMenuItem, Submenu } from "@tauri-apps/api/menu";
   import { openUrl, revealItemInDir } from "@tauri-apps/plugin-opener";
-  import { api, type Milestone, type Project } from "#lib/api.js";
+  import { api, GIT_PROTOCOLS, type GitProtocol, type Milestone, type Project } from "#lib/api.js";
   import { cloneProject, type CloneMode } from "#lib/clone.js";
   import { editorFor, editors, openInEditor } from "#lib/editor.svelte.js";
   import { pullProject } from "#lib/pull.js";
@@ -24,7 +24,9 @@
   import { atLeast } from "#lib/busy.js";
   import { jobFor } from "#lib/teammateJobs.svelte.js";
   import Details from "./Details.svelte";
-  import TeammateProgress from "./TeammateProgress.svelte";
+  // Its own chunk, loaded the first time classmates are being added, so its styles stay
+  // out of the startup bundle.
+  const teammatePanel = () => import("./TeammateProgress.svelte");
   import Spinner from "./Spinner.svelte";
 
   let {
@@ -268,9 +270,18 @@
   }
 
   const cloning = $derived(session.cloning.includes(project.id));
-  function clone(mode: CloneMode = "ask") {
-    void cloneProject(project.id, mode);
+  function clone(mode: CloneMode = "ask", protocol?: GitProtocol) {
+    void cloneProject(project.id, mode, undefined, undefined, protocol);
   }
+
+  /** Points the clone's origin at GitHub the other way (the menu's "Use … for this clone"),
+   *  to SSH only once SSH works. */
+  async function switchRemote(protocol: GitProtocol) {
+    const { setRemote } = await import("#lib/ssh.js");
+    await setRemote(project, name, protocol);
+  }
+  // How the clone reaches GitHub now; null (no clone, or an origin elsewhere) offers no switch.
+  const origin = $derived(project.local?.origin ?? null);
 
   let open = $state(false);
 
@@ -447,6 +458,30 @@
         enabled: cloneable && !cloning,
         action: () => clone("choose"),
       }),
+      Submenu.new({
+        text: t("clone.with"),
+        enabled: cloneable && !cloning,
+        items: await Promise.all(
+          GIT_PROTOCOLS.map((protocol) =>
+            MenuItem.new({
+              text: t(`login.protocol.${protocol}`),
+              action: () => clone("ask", protocol),
+            }),
+          ),
+        ),
+      }),
+      ...(origin
+        ? [
+            MenuItem.new({
+              text: t("clone.useFor", {
+                protocol: t(`login.protocol.${origin === "ssh" ? "https" : "ssh"}`),
+              }),
+              // Not while git runs in the clone: a push mid-way would change remotes.
+              enabled: !busy && !pulling && !submitting,
+              action: () => void switchRemote(origin === "ssh" ? "https" : "ssh"),
+            }),
+          ]
+        : []),
       MenuItem.new({
         text: editor ? t("editor.open", { editor: editor.name }) : t("editor.none"),
         enabled: Boolean(path && editor),
@@ -495,114 +530,120 @@
 <li class="item" class:linked={linked !== null} data-item bind:this={element}>
   <!-- A right click anywhere on the row opens its menu; the keyboard opens it from the
        row's button (Menu key or Shift+F10). -->
-  <!-- svelte-ignore a11y_no_static_element_interactions -->
-  <div class="row" oncontextmenu={onContextMenu(() => showMenu())}>
-    <button
-      class="toggle"
-      data-row
-      aria-expanded={open}
-      aria-labelledby="{uid}-name"
-      aria-describedby={grade || notGraded || grading?.state === "running"
-        ? `${uid}-meta ${uid}-grade`
-        : `${uid}-meta`}
-      onclick={() => (open = !open)}
-      onkeydown={menuKey((anchor) => showMenu(anchor))}
-    >
-      <span class="text">
-        <span class="name" id="{uid}-name" title={project.repo ?? path ?? undefined}>
-          {#if unseen}<span class="dot" aria-hidden="true"></span>{/if}<bdi>{name}</bdi
-          >{#if unseen}<span class="sr-only">, {t("projects.new")}</span>{/if}
+  <!-- The classmates being added sit under the row and light up with it. -->
+  <div class="head">
+    <!-- svelte-ignore a11y_no_static_element_interactions -->
+    <div class="row" oncontextmenu={onContextMenu(() => showMenu())}>
+      <button
+        class="toggle"
+        data-row
+        aria-expanded={open}
+        aria-labelledby="{uid}-name"
+        aria-describedby={grade || notGraded || grading?.state === "running"
+          ? `${uid}-meta ${uid}-grade`
+          : `${uid}-meta`}
+        onclick={() => (open = !open)}
+        onkeydown={menuKey((anchor) => showMenu(anchor))}
+      >
+        <span class="text">
+          <span class="name" id="{uid}-name" title={project.repo ?? path ?? undefined}>
+            {#if unseen}<span class="dot" aria-hidden="true"></span>{/if}<bdi>{name}</bdi
+            >{#if unseen}<span class="sr-only">, {t("projects.new")}</span>{/if}
+          </span>
+          <span class="meta" id="{uid}-meta">
+            {#if hidden}
+              <span class="hidden-tag">{t("projects.hidden")}</span> ·
+            {/if}
+            {#if submitting}
+              <span class="status">{t("projects.submitting")}</span> ·
+            {:else if pushing}
+              <span class="status">{t("push.pushing")}</span> ·
+            {:else if committing}
+              <span class="status">{t("commit.committing")}</span> ·
+            {:else if pulling}
+              <span class="status">{t("projects.pulling")}</span> ·
+            {:else if status}
+              <span class="status" class:warn={status.warn} title={status.hint}>{status.label}</span
+              > ·
+            {/if}
+            {#if feedback && feedback.comments > 0}
+              <span class="feedback">{t("projects.comments", { count: feedback.comments })}</span> ·
+            {/if}
+            {#if dueLabel && due}
+              <span class:soon={dueSoon} title={formatDate(due)}>{dueLabel}</span> ·
+            {:else if phaseLabel && phaseDue}
+              <span class:soon={phaseSoon} title={formatDate(phaseDue)}>{phaseLabel}</span> ·
+            {/if}
+            {#if project.lateSeconds}
+              <span class="late" title={t("projects.lateHint")}
+                >{t("projects.late", { duration: durationLabel(project.lateSeconds) })}</span
+              > ·
+            {/if}
+            {#if path}<bdi>{project.repo ?? project.config.assignment}</bdi>{:else}{t(
+                cloning ? "projects.cloning" : "projects.notCloned",
+              )}{/if}
+          </span>
         </span>
-        <span class="meta" id="{uid}-meta">
-          {#if hidden}
-            <span class="hidden-tag">{t("projects.hidden")}</span> ·
-          {/if}
-          {#if submitting}
-            <span class="status">{t("projects.submitting")}</span> ·
-          {:else if pushing}
-            <span class="status">{t("push.pushing")}</span> ·
-          {:else if committing}
-            <span class="status">{t("commit.committing")}</span> ·
-          {:else if pulling}
-            <span class="status">{t("projects.pulling")}</span> ·
-          {:else if status}
-            <span class="status" class:warn={status.warn} title={status.hint}>{status.label}</span> ·
-          {/if}
-          {#if feedback && feedback.comments > 0}
-            <span class="feedback">{t("projects.comments", { count: feedback.comments })}</span> ·
-          {/if}
-          {#if dueLabel && due}
-            <span class:soon={dueSoon} title={formatDate(due)}>{dueLabel}</span> ·
-          {:else if phaseLabel && phaseDue}
-            <span class:soon={phaseSoon} title={formatDate(phaseDue)}>{phaseLabel}</span> ·
-          {/if}
-          {#if project.lateSeconds}
-            <span class="late" title={t("projects.lateHint")}
-              >{t("projects.late", { duration: durationLabel(project.lateSeconds) })}</span
-            > ·
-          {/if}
-          {#if path}<bdi>{project.repo ?? project.config.assignment}</bdi>{:else}{t(
-              cloning ? "projects.cloning" : "projects.notCloned",
-            )}{/if}
-        </span>
-      </span>
-      {#if grading?.state === "running"}
-        <span class="grade grading" id="{uid}-grade" title={t("projects.gradingHint")}
-          >{t("projects.grading")}</span
-        >
-      {:else if grade}
-        {@const tests = t("projects.gradeTests", {
-          passed: grade.testsPassed,
-          count: grade.testsTotal,
-        })}
-        <!-- The passing bar's verdict is in words for screen readers and the hover title;
+        {#if grading?.state === "running"}
+          <span class="grade grading" id="{uid}-grade" title={t("projects.gradingHint")}
+            >{t("projects.grading")}</span
+          >
+        {:else if grade}
+          {@const tests = t("projects.gradeTests", {
+            passed: grade.testsPassed,
+            count: grade.testsTotal,
+          })}
+          <!-- The passing bar's verdict is in words for screen readers and the hover title;
              the color only repeats it. -->
-        <span
-          class="grade"
-          class:full={grade.score === grade.maxScore}
-          class:below={pass === false}
-          id="{uid}-grade"
-          title={passText ? `${tests} · ${passText}` : tests}
-          ><span aria-hidden="true">{grade.score}/{grade.maxScore}</span><span class="sr-only"
-            >{t("projects.gradeSr", { score: grade.score, max: grade.maxScore })}{#if passText}, {passText}{/if}</span
-          ></span
-        >
-      {:else if notGraded}
-        <span class="grade ungraded" id="{uid}-grade" title={t("projects.notGradedHint")}
-          >{t("projects.notGraded")}</span
+          <span
+            class="grade"
+            class:full={grade.score === grade.maxScore}
+            class:below={pass === false}
+            id="{uid}-grade"
+            title={passText ? `${tests} · ${passText}` : tests}
+            ><span aria-hidden="true">{grade.score}/{grade.maxScore}</span><span class="sr-only"
+              >{t("projects.gradeSr", { score: grade.score, max: grade.maxScore })}{#if passText}, {passText}{/if}</span
+            ></span
+          >
+        {:else if notGraded}
+          <span class="grade ungraded" id="{uid}-grade" title={t("projects.notGradedHint")}
+            >{t("projects.notGraded")}</span
+          >
+        {/if}
+      </button>
+      {#if pullable}
+        <button title={t("projects.pullHint")} disabled={pulling} aria-busy={pulling} onclick={pull}
+          >{#if pulling}<Spinner />{/if}{t("projects.pullAction")}</button
         >
       {/if}
-    </button>
-    {#if pullable}
-      <button title={t("projects.pullHint")} disabled={pulling} aria-busy={pulling} onclick={pull}
-        >{#if pulling}<Spinner />{/if}{t("projects.pullAction")}</button
-      >
-    {/if}
-    {#if ready && !everyPush}
-      <button class="primary" disabled={submitting} aria-busy={submitWorking} onclick={submit}
-        >{#if submitWorking}<Spinner />{/if}{t("submit.ok")}</button
-      >
-    {/if}
-    {#if cloneable}
-      <button
-        title={t("projects.clone")}
-        aria-label={t("projects.clone")}
-        disabled={cloning}
-        aria-busy={cloning}
-        onclick={() => clone()}
-        >{#if cloning}<Spinner alone />{:else}<span aria-hidden="true">⤓</span>{/if}</button
-      >
-    {/if}
-    {#if openTarget}
-      {@const openLabel = t(project.webUrl ? "projects.openClassroom50" : "projects.openGitHub")}
-      <button title={openLabel} aria-label={openLabel} onclick={() => openUrl(openTarget)}
-        ><span class="mirror-rtl" aria-hidden="true">↗</span></button
-      >
+      {#if ready && !everyPush}
+        <button class="primary" disabled={submitting} aria-busy={submitWorking} onclick={submit}
+          >{#if submitWorking}<Spinner />{/if}{t("submit.ok")}</button
+        >
+      {/if}
+      {#if cloneable}
+        <button
+          title={t("projects.clone")}
+          aria-label={t("projects.clone")}
+          disabled={cloning}
+          aria-busy={cloning}
+          onclick={() => clone()}
+          >{#if cloning}<Spinner alone />{:else}<span aria-hidden="true">⤓</span>{/if}</button
+        >
+      {/if}
+      {#if openTarget}
+        {@const openLabel = t(project.webUrl ? "projects.openClassroom50" : "projects.openGitHub")}
+        <button title={openLabel} aria-label={openLabel} onclick={() => openUrl(openTarget)}
+          ><span class="mirror-rtl" aria-hidden="true">↗</span></button
+        >
+      {/if}
+    </div>
+    {#if teammates}
+      {#await teammatePanel() then { default: TeammateProgress }}
+        <TeammateProgress job={teammates} />
+      {/await}
     {/if}
   </div>
-  {#if teammates}
-    <TeammateProgress job={teammates} />
-  {/if}
   {#if open}
     <Details
       description={project.assignment?.description ?? null}
@@ -638,10 +679,13 @@
     align-items: center;
     gap: calc(var(--space) / 2);
     padding-inline-end: 12px;
+  }
+
+  .head {
     transition: background-color 0.12s;
   }
 
-  .row:hover {
+  .head:hover {
     background: var(--bg-control);
   }
 

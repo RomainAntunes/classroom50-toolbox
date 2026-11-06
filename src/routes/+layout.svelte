@@ -24,6 +24,7 @@
   import { currentDirection, currentLocale, setHourCycle, setLocale, t } from "#lib/i18n/index.js";
   import { showNotice } from "#lib/notices.js";
   import { watchTeammateJobs } from "#lib/teammateJobs.svelte.js";
+  import { watchLogin } from "#lib/login.svelte.js";
   import { editors, loadEditors } from "#lib/editor.svelte.js";
   import { initTheme } from "#lib/theme/preview.svelte.js";
   import Prompt from "#lib/components/Prompt.svelte";
@@ -201,6 +202,8 @@
     void api.updateStatus().then(setUpdate);
     // Here so a queue that ends on another page is still announced.
     watchTeammateJobs();
+    // Here so the sign-in code shows whichever page started it (Settings runs a grant).
+    watchLogin();
     const unlisteners = [
       onEvent(NOTIFY_EVENT, (notice) => void localeLoaded.then(() => showNotice(notice))),
       onEvent(UNSEEN_EVENT, (ids) => {

@@ -44,7 +44,13 @@ for (const os of SKINS) {
     expect(await overflow(page), "overflow on the main page").toEqual([]);
 
     await app.openSettings();
-    expect(await untranslated(page), "raw keys in Settings").toEqual([]);
-    expect(await overflow(page), "overflow in Settings").toEqual([]);
+    // Every tab: only the one shown is laid out.
+    const tabs = page.getByRole("tab");
+    for (let i = 0; i < (await tabs.count()); i += 1) {
+      await tabs.nth(i).click();
+      await expect(tabs.nth(i)).toHaveAttribute("aria-selected", "true");
+      expect(await untranslated(page), `raw keys in Settings tab ${i + 1}`).toEqual([]);
+      expect(await overflow(page), `overflow in Settings tab ${i + 1}`).toEqual([]);
+    }
   });
 }

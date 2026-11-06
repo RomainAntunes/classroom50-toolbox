@@ -40,7 +40,7 @@ describe("notes", () => {
     expect(text).toContain("HEIGVD-POO/26-poo-c-labo-3-me, private");
     expect(text).toContain("Every push to the default branch");
     expect(text).not.toContain("Feedback");
-    expect(text).toContain("offers to clone");
+    expect(text).not.toContain("clone");
     expect(text).not.toMatch(/[{}]/);
   });
 

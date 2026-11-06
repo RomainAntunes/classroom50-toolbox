@@ -113,7 +113,7 @@ test("Settings > About shows this version's notes again, and goes back there", a
 }) => {
   test.skip(!NOTES.includes(VERSION), `no notes for ${VERSION}`);
   await app.start(scenario());
-  await app.openSettings();
+  await app.openSettings("About");
   await page.getByRole("button", { name: "Show", exact: true }).click();
   await expect(page).toHaveURL(/\/whats-new\?from=settings$/);
   await expect(page.getByRole("heading", { level: 1 })).toHaveText(`What's new in ${VERSION}`);
@@ -179,7 +179,7 @@ test("from Settings > About, the notes spin while they load, then show", async (
   test.skip(!NOTES.includes(VERSION), `no notes for ${VERSION}`);
   const held = await holdChangelogs(page);
   await app.start(scenario());
-  await app.openSettings();
+  await app.openSettings("About");
   await page.getByRole("button", { name: "Show", exact: true }).click();
   await expect(page).toHaveURL(/\/whats-new\?from=settings$/);
   await expect(loadingNotes(page)).toBeVisible();

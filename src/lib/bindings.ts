@@ -16,7 +16,10 @@ export const commands = {
 	 *  copy. Reads only what the app already has; nothing is sent anywhere.
 	 */
 	diagnosticsReport: (ui: UiFacts) => __TAURI_INVOKE<Report>("diagnostics_report", { ui }),
-	/**  Keeps the popover open while the UI shows a native dialog. */
+	/**
+	 *  Keeps the popover open while the UI shows a native dialog: each `true` is matched by a
+	 *  `false`, and nested ones (a menu item opening a confirm) count.
+	 */
 	setPopoverPinned: (pinned: boolean) => __TAURI_INVOKE<void>("set_popover_pinned", { pinned }),
 	/**  Hides the popover, as a click outside it would (Escape with nothing else to close). */
 	hidePopover: () => __TAURI_INVOKE<void>("hide_popover"),
@@ -218,7 +221,9 @@ export const commands = {
 	cloneProject: (id: string, parent: string, protocol: "https" | "ssh" | null) => __TAURI_INVOKE<string>("clone_project", { id, parent, protocol }),
 	/**
 	 *  Points project `id`'s clone's `origin` at its GitHub repo over `protocol` (its push URL
-	 *  too, when one is set), only when `origin` already is that repo. Then rescans the disk.
+	 *  too, when one is set), only when `origin` already is that repo or its name before an
+	 *  assignment rename (`projects::previous_id`), which becomes the current name. Then
+	 *  rescans the disk.
 	 */
 	setCloneRemote: (id: string, protocol: GitProtocol) => __TAURI_INVOKE<null>("set_clone_remote", { id, protocol }),
 	/**  How gh clones github.com repos, so the row's clone URLs lead with the one it uses. */

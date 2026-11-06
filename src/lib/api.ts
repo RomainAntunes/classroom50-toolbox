@@ -138,6 +138,7 @@ function every<T extends string>() {
 export const APPEARANCES = every<Appearance>()(["system", "light", "dark"]);
 export const COMMIT_ACTIONS = every<CommitActions>()(["none", "commit", "push"]);
 export const UPDATE_CHANNELS = every<UpdateChannel>()(["stable", "beta"]);
+export const GIT_PROTOCOLS = every<GitProtocol>()(["https", "ssh"]);
 export const CALENDAR_STORES = every<CalendarStore>()(["gnome", "kde"]);
 export const SIMULATED_NETWORKS = every<SimulatedNetwork>()(["normal", "githubDown", "noInternet"]);
 
@@ -200,9 +201,14 @@ export function errorKind(err: unknown): ErrorKind | null {
 export function errorMessage(err: unknown): string {
   if (typeof err === "object" && err !== null && "message" in err) {
     const { kind, message, params } = err as CommandError;
-    // An SSH failure is worded by its problem (`ssh.problem.<code>`).
-    const key =
-      kind === "ssh" && params?.problem ? `ssh.problem.${params.problem}` : `error.${kind}`;
+    // An SSH failure is worded by its problem (`ssh.problem.<code>`), naming the account
+    // GitHub answered for when there is one.
+    const problem = kind === "ssh" ? params?.problem : null;
+    const key = !problem
+      ? `error.${kind}`
+      : problem === "otherAccount" && params?.login
+        ? "ssh.otherAccountAs"
+        : `ssh.problem.${problem}`;
     if (!hasKey(key)) return String(message);
     // A param missing (a sync issue saved by an older version): Rust's words are complete.
     const text = t(key, params ?? {});

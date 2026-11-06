@@ -1,7 +1,14 @@
 import { describe, expect, it } from "vitest";
 import type { Assignment, Group, Project } from "#lib/api.js";
 import { askText, prompt } from "#lib/prompt.svelte.js";
-import { joinsGroup, notFounderReason, parseUsernames, resultsText } from "#lib/teammate.js";
+import {
+  joinsGroup,
+  notFounderReason,
+  parseUsernames,
+  resultsText,
+  roomLeft,
+  usernamesHint,
+} from "#lib/teammate.js";
 
 describe("joinsGroup", () => {
   const project = (mode: Assignment["mode"] | null, group: Group | null = null) =>
@@ -89,5 +96,50 @@ describe("resultsText", () => {
       "alice is in your group now. They should accept Lab next.",
       "Couldn't add x--y: \"x--y\" isn't a GitHub username",
     ]);
+  });
+});
+
+describe("roomLeft", () => {
+  it("counts members and queued classmates once each, whatever their case", () => {
+    expect(roomLeft(3, ["me"])).toBe(2);
+    expect(roomLeft(3, ["me", "Bob"], ["bob", "carol"])).toBe(0);
+    expect(roomLeft(2, ["me", "bob", "carol"])).toBe(0);
+  });
+
+  it("is null without a limit", () => {
+    expect(roomLeft(null, ["me"])).toBeNull();
+  });
+});
+
+describe("usernamesHint", () => {
+  it("says how to type several, and the room left, before anything is typed", () => {
+    expect(usernamesHint("", true, null)).toEqual({
+      text: "Separate several usernames with commas or spaces.",
+      warning: null,
+    });
+    expect(usernamesHint(" , ", true, 2)).toEqual({
+      text: "Separate several usernames with commas or spaces.\nYour group has room for 2 more.",
+      warning: null,
+    });
+    expect(usernamesHint("", true, 0)).toEqual({
+      text: "Separate several usernames with commas or spaces.",
+      warning: "Your group is full.",
+    });
+  });
+
+  it("names who the answer adds or invites", () => {
+    expect(usernamesHint("@bob carol", true, 2)).toEqual({
+      text: "Adds bob and carol.",
+      warning: null,
+    });
+    expect(usernamesHint("bob", false, null).text).toBe("Invites bob.");
+  });
+
+  it("warns when more are typed than fit", () => {
+    expect(usernamesHint("bob carol dave", true, 1)).toEqual({
+      text: "Adds bob, carol, and dave.",
+      warning: "Only 1 more fits in your group.",
+    });
+    expect(usernamesHint("bob", true, 0).warning).toBe("Your group is full.");
   });
 });
