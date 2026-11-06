@@ -1,6 +1,7 @@
-// Accept: `gh student accept` never asks, so the app summarizes first, names a group when
-// one is needed, then offers to clone.
-import { expect, test } from "./app";
+// Accept: `gh student accept` never asks, so the app summarizes first and names a group when
+// one is needed, then offers to add teammates to a group just founded. Cloning stays the
+// row's own button: nothing asks about it.
+import { expect, test, type App } from "./app";
 import { fail, ok, scenario, snapshot, unaccepted } from "./fixtures";
 import type { Unaccepted } from "../../src/lib/api";
 
@@ -17,14 +18,20 @@ test("Cancel at the summary accepts nothing", async ({ app }) => {
   );
   expect(dialog.message).toContain("cs50-school/cs101-lab3-student, private");
   expect(dialog.message).toContain("A Feedback pull request is opened");
-  expect(dialog.message).toContain("Then the app offers to clone it.");
+  // Cloning is the row's own button now: the summary promises no question about it.
+  expect(dialog.message).not.toContain("clone");
   expect(dialog.labels).toEqual({ ok: "Accept", cancel: "Cancel" });
   await app.answer("cancel");
   await expect(app.row("Lab 3")).toContainText("Not accepted");
   expect(await app.writes()).toEqual([]);
 });
 
-test("accepting runs gh student accept, then offers to clone; Later clones nothing", async ({
+/** Waits for the accept to be announced, which comes after every question it asks. */
+async function accepted(app: App, name: string) {
+  await expect(app.page.getByRole("status")).toHaveText(`Accepted: ${name}`);
+}
+
+test("accepting runs gh student accept and asks nothing after, not even to clone", async ({
   app,
 }) => {
   await app.start(
@@ -43,19 +50,13 @@ test("accepting runs gh student accept, then offers to clone; Later clones nothi
     id: lab3.id,
     teamName: null,
   });
-
-  const clone = await app.dialog();
-  expect(clone.message).toBe(
-    "cs50-school/cs101-lab3-student is ready. Clone it now into ~/Classroom/cs101-lab3-student?",
-  );
-  expect(clone.labels).toEqual({ yes: "Clone", no: "Choose another folder…", cancel: "Later" });
-  await app.answer("cancel");
+  await accepted(app, "Lab 3");
+  expect(await app.pendingDialogs()).toEqual([]);
+  await expect(app.prompt).toHaveCount(0);
   expect(await app.writes()).toEqual(["accept_assignment"]);
 });
 
-test("a team assignment asks the group's name with the summary, founds it, then clones", async ({
-  app,
-}) => {
+test("founding a group goes straight to adding teammates, Later adds nobody", async ({ app }) => {
   await app.start(
     scenario({
       snapshot: snapshot({ unaccepted: [team] }),
@@ -63,7 +64,6 @@ test("a team assignment asks the group's name with the summary, founds it, then 
         accept_assignment: [
           ok({ repo: "cs50-school/cs101-proj-group-4", projectId: "p-proj", joinedGroup: false }),
         ],
-        clone_project: [ok("/Users/student/Classroom/cs101-proj-group-4")],
       },
     }),
   );
@@ -85,27 +85,16 @@ test("a team assignment asks the group's name with the summary, founds it, then 
   const accepts = await app.waitForCall("accept_assignment");
   expect(accepts.map((call) => call.args)).toEqual([{ id: team.id, teamName: "The Sharks" }]);
 
-  // Founded: adding teammates is offered first; Later keeps it for the menu.
-  const founded = await app.expectDialog(
-    [/^The Sharks is created and you're its founder\./],
-    "cancel",
+  // Founded: the teammates prompt says so itself, with no dialog before it.
+  await expect(app.prompt.getByRole("heading")).toHaveText("Add to my group");
+  await expect(app.prompt).toContainText(
+    "The Sharks is created and you're its founder. Classmates you add join it and can push to Project.",
   );
-  expect(founded.labels).toEqual({ ok: "Add teammates", cancel: "Later" });
-
-  await app.expectDialog([/Clone it now into ~\/Classroom\/cs101-proj-group-4\?/], "yes");
-  const clone = await app.waitForCall("clone_project");
-  expect(clone[0].args).toEqual({
-    id: "p-proj",
-    parent: "/Users/student/Classroom",
-    protocol: null,
-  });
-  // The new clone opens in the default editor.
-  const opened = await app.waitForCall("open_in_editor");
-  expect(opened[0].args).toEqual({
-    path: "/Users/student/Classroom/cs101-proj-group-4",
-    editor: "vscode",
-  });
-  expect(await app.writes()).toEqual(["accept_assignment", "clone_project"]);
+  expect(await app.pendingDialogs()).toEqual([]);
+  await app.prompt.getByRole("button", { name: "Later" }).click();
+  await accepted(app, "Project");
+  expect(await app.pendingDialogs()).toEqual([]);
+  expect(await app.writes()).toEqual(["accept_assignment"]);
 });
 
 test("adding teammates right after founding queues them, and the accept flow goes on at once", async ({
@@ -113,7 +102,9 @@ test("adding teammates right after founding queues them, and the accept flow goe
 }) => {
   await app.start(
     scenario({
-      snapshot: snapshot({ unaccepted: [team] }),
+      snapshot: snapshot({
+        unaccepted: [{ ...team, assignment: { ...team.assignment, maxGroupSize: 3 } }],
+      }),
       responses: {
         accept_assignment: [
           ok({ repo: "cs50-school/cs101-proj-group-4", projectId: null, joinedGroup: false }),
@@ -124,16 +115,19 @@ test("adding teammates right after founding queues them, and the accept flow goe
   await app.row("Project").getByRole("button", { name: "Accept" }).click();
   await app.prompt.getByRole("textbox", { name: "Name your group" }).fill("The Sharks");
   await app.prompt.getByRole("button", { name: "Accept" }).click();
-  await app.expectDialog([/^The Sharks is created/], "ok");
 
   await expect(app.prompt.getByRole("heading")).toHaveText("Add to my group");
-  await app.prompt.getByRole("textbox").fill("bob carol");
+  // The founder alone so far: two more fit in a group of 3.
+  const field = app.prompt.getByRole("textbox", { name: "GitHub usernames" });
+  await expect(field).toHaveAttribute("placeholder", "alice, bob");
+  await expect(app.prompt).toContainText("Your group has room for 2 more.");
+  await field.fill("bob carol");
+  await expect(app.prompt).toContainText("Adds bob and carol.");
   await app.prompt.getByRole("button", { name: "Add" }).click();
   const added = await app.waitForCall("add_teammates");
   // Queued on the accepted assignment: no sync has listed the group's repo yet.
   expect(added[0].args).toEqual({ id: team.id, usernames: ["bob", "carol"] });
-  // No wait for gh, no results dialog: what comes after the accept is next (the repo isn't
-  // listed yet, so no clone offer).
+  // No wait for gh, no results dialog: the repo isn't listed yet, which the last note says.
   await app.expectDialog([/cs50-school\/cs101-proj-group-4/], "ok");
   expect(await app.writes()).toEqual(["accept_assignment", "add_teammates"]);
 });
@@ -162,8 +156,10 @@ test("a teammate's group joined since the last sync founds nothing", async ({ ap
   await app.prompt.getByRole("textbox").fill("The Sharks");
   await app.prompt.getByRole("button", { name: "Accept" }).click();
 
-  // gh-student accepted the existing group's repo: no "created" note, straight to the clone.
-  await app.expectDialog([/Clone it now into ~\/Classroom\/cs101-proj-group-2\?/], "cancel");
+  // gh-student accepted the existing group's repo: no "created" note, no teammates prompt.
+  await accepted(app, "Project");
+  await expect(app.prompt).toHaveCount(0);
+  expect(await app.pendingDialogs()).toEqual([]);
   expect(await app.writes()).toEqual(["accept_assignment"]);
 });
 
@@ -206,7 +202,9 @@ test("a group the last sync listed but gone asks for a new name on needsTeam", a
     { id: listed.id, teamName: null },
     { id: listed.id, teamName: "The Sharks" },
   ]);
-  await app.expectDialog([/^The Sharks is created and you're its founder\./], "cancel");
+  await expect(app.prompt.getByRole("heading")).toHaveText("Add to my group");
+  await expect(app.prompt).toContainText("The Sharks is created and you're its founder.");
+  await app.prompt.getByRole("button", { name: "Later" }).click();
 });
 
 test("a failed accept shows gh-student's own words", async ({ app }) => {

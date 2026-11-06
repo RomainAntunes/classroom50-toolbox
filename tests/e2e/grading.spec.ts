@@ -204,7 +204,11 @@ test("Rust's refusal past the limit is worded on the row", async ({ app }) => {
       ],
     },
   ]);
-  await expect(app.row("Project")).toContainText(
-    "Couldn't add bob: your group is full (maximum: 2)",
-  );
+  const panel = app.page.getByRole("region", { name: "Add to my group" });
+  await panel.getByRole("button", { expanded: false }).click();
+  const lines = panel.getByRole("listitem");
+  await expect(lines).toHaveText([
+    "ada In your group",
+    "bob Couldn't add · your group is full (maximum: 2)",
+  ]);
 });

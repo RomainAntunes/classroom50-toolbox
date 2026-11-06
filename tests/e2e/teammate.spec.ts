@@ -75,12 +75,21 @@ async function startOn(app: App, row: Project) {
 const progress = (app: App, label = "Invite a classmate") =>
   app.page.getByRole("region", { name: label });
 
+/** Unfolds the progress list, which starts folded to its counts. */
+const unfold = (list: ReturnType<typeof progress>) =>
+  list.getByRole("button", { expanded: false }).click();
+
 test("the usernames are queued at once and the row shows how each one goes", async ({ app }) => {
   await open(app, solo, "Invite a classmate…");
   await expect(app.prompt.getByRole("heading")).toHaveText("Invite a classmate");
-  await expect(app.prompt).toContainText(`They get a GitHub invitation to push to ${REPO}.`);
-  await expect(app.prompt.getByRole("textbox")).toHaveAttribute("placeholder", "GitHub usernames");
-  await app.prompt.getByRole("textbox").fill("@alice, bob  carol;@Alice");
+  await expect(app.prompt).toContainText(
+    `Each classmate gets a GitHub invitation to push to ${REPO}.`,
+  );
+  const field = app.prompt.getByRole("textbox", { name: "GitHub usernames" });
+  await expect(field).toHaveAttribute("placeholder", "alice, bob");
+  await expect(app.prompt).toContainText("Separate several usernames with commas or spaces.");
+  await field.fill("@alice, bob  carol;@Alice");
+  await expect(app.prompt).toContainText("Invites alice, bob, and carol.");
   await app.prompt.getByRole("button", { name: "Invite" }).click();
 
   const calls = await app.waitForCall("add_teammates");
@@ -94,10 +103,11 @@ test("the usernames are queued at once and the row shows how each one goes", asy
     job(solo, [entry("alice", "adding"), entry("bob", "waiting"), entry("carol", "waiting")]),
   ]);
   const list = progress(app);
+  await unfold(list);
   await expect(list.getByRole("listitem")).toHaveText([
-    "Inviting alice…",
-    "bob: waiting",
-    "carol: waiting",
+    "alice Inviting…",
+    "bob Waiting",
+    "carol Waiting",
   ]);
   await expect(list).toHaveAttribute("aria-busy", "true");
   await expect(list.getByRole("button", { name: "Add another" })).toBeVisible();
@@ -111,9 +121,9 @@ test("the usernames are queued at once and the row shows how each one goes", asy
     ]),
   ]);
   await expect(list.getByRole("listitem")).toHaveText([
-    "alice got an invitation",
-    "Couldn't add bob: bob isn't a GitHub user",
-    "carol got an invitation",
+    "alice Invited",
+    "bob Couldn't add · bob isn't a GitHub user",
+    "carol Invited",
   ]);
   // No dialog says how it went: screen readers hear it.
   await expect(app.page.getByRole("status")).toHaveText(
@@ -135,6 +145,7 @@ test("the usernames are queued at once and the row shows how each one goes", asy
 test("Add another queues more while the first ones are still being added", async ({ app }) => {
   await startOn(app, solo);
   await app.emit("teammate-jobs", [job(solo, [entry("alice", "adding")])]);
+  await unfold(progress(app));
   await progress(app).getByRole("button", { name: "Add another" }).click();
 
   // A fresh prompt, without waiting for alice.
@@ -145,6 +156,45 @@ test("Add another queues more while the first ones are still being added", async
   const calls = await app.waitForCall("add_teammates");
   expect(calls.map((c) => c.args)).toEqual([{ id: solo.id, usernames: ["dave"] }]);
   await expect(app.prompt).toHaveCount(0);
+});
+
+test("the progress starts folded to counts, every classmate named on hover", async ({ app }) => {
+  await startOn(app, solo);
+  await app.emit("teammate-jobs", [
+    job(solo, [
+      entry("alice", "added"),
+      entry("bob", "failed", "bob isn't a GitHub user"),
+      entry("carol", "adding"),
+      entry("dave", "waiting"),
+    ]),
+  ]);
+  const list = progress(app);
+  const fold = list.getByRole("button", { name: /^Invite a classmate/ });
+  await expect(fold).toHaveAttribute("aria-expanded", "false");
+  await expect(list.getByRole("listitem")).toHaveCount(0);
+  await expect(list.getByRole("button", { name: "Add another" })).toHaveCount(0);
+  await expect(fold).toHaveText("Invite a classmate 1 Invited 1 Couldn't add 2 Inviting…");
+  await expect(fold).toHaveAttribute("title", "alice, bob, carol, dave");
+
+  // Still folded as the queue moves on.
+  await app.emit("teammate-jobs", [
+    job(solo, [
+      entry("alice", "added"),
+      entry("bob", "failed", "bob isn't a GitHub user"),
+      entry("carol", "added"),
+      entry("dave", "added"),
+    ]),
+  ]);
+  await expect(fold).toHaveText("Invite a classmate 3 Invited 1 Couldn't add");
+
+  await fold.click();
+  await expect(fold).toHaveAttribute("aria-expanded", "true");
+  await expect(fold).not.toHaveAttribute("title");
+  await expect(list.getByRole("listitem")).toHaveCount(4);
+  await expect(list.getByRole("button", { name: "Done" })).toBeVisible();
+  await fold.click();
+  await expect(list.getByRole("listitem")).toHaveCount(0);
+  expect(await app.calls("dismiss_teammate_job")).toEqual([]);
 });
 
 test("a call Rust refuses (nothing queued) is an error for everyone", async ({ app }) => {
@@ -213,7 +263,9 @@ test("the group's founder adds members to the group", async ({ app }) => {
   const row = teamProject([LOGIN]);
   await open(app, row, "Add to my group…");
   await expect(app.prompt.getByRole("heading")).toHaveText("Add to my group");
-  await expect(app.prompt).toContainText("They get push access to Project through your group.");
+  await expect(app.prompt).toContainText(
+    "Classmates you add join your group and can push to Project.",
+  );
   await app.prompt.getByRole("textbox").fill("bob");
   await app.prompt.getByRole("button", { name: "Add" }).click();
   expect((await app.waitForCall("add_teammates"))[0].args).toEqual({
@@ -222,9 +274,10 @@ test("the group's founder adds members to the group", async ({ app }) => {
   });
   await app.emit("teammate-jobs", [job(row, [entry("bob", "adding")], { team: true })]);
   const list = progress(app, "Add to my group");
-  await expect(list.getByRole("listitem")).toHaveText(["Adding bob…"]);
+  await unfold(list);
+  await expect(list.getByRole("listitem")).toHaveText(["bob Adding…"]);
   await app.emit("teammate-jobs", [job(row, [entry("bob", "added")], { team: true })]);
-  await expect(list.getByRole("listitem")).toHaveText(["bob is in your group"]);
+  await expect(list.getByRole("listitem")).toHaveText(["bob In your group"]);
   await expect(list).toContainText("Once added, each teammate accepts Project too.");
   await expect(app.page.getByRole("status")).toHaveText(
     "bob is in your group now. They should accept Project next.",
@@ -240,7 +293,8 @@ test("a group just founded: its queue moves to the repo's row once a sync lists 
   await app.emit("teammate-jobs", [
     job(row, [entry("bob", "waiting")], { id: "cs50-school/cs101/proj", team: true }),
   ]);
-  await expect(progress(app, "Add to my group").getByRole("listitem")).toHaveText(["bob: waiting"]);
+  await unfold(progress(app, "Add to my group"));
+  await expect(progress(app, "Add to my group").getByRole("listitem")).toHaveText(["bob Waiting"]);
 });
 
 for (const [why, row, words] of [
