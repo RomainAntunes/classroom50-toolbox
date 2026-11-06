@@ -145,7 +145,26 @@ async function commitWork(
     }
     return true;
   } catch (err) {
+    if (pushing && errorKind(err) === "ssh" && project.local?.origin === "ssh") {
+      return overHttps(err, project, name, branch);
+    }
     await refused(err, name, branch, pushing);
+    return false;
+  }
+}
+
+/** The push over SSH failed: offers to switch the clone to HTTPS, then pushes once more
+ *  (the commit, if any, is already made). Declining writes nothing. */
+async function overHttps(err: unknown, project: Project, name: string, branch: string) {
+  const { switchToHttps } = await import("#lib/ssh.js");
+  const text = t("push.failed", { error: errorMessage(err) });
+  if (!(await switchToHttps(project, name, text))) return false;
+  try {
+    await api.commitPush(project.id, null);
+    announce(t("a11y.pushed", { name }));
+    return true;
+  } catch (again) {
+    await refused(again, name, branch, true);
     return false;
   }
 }
