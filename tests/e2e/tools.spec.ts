@@ -8,7 +8,7 @@ import type { ToolStatus } from "../../src/lib/api";
 
 async function openTools(app: App, over: Partial<Scenario> = {}) {
   await app.start(scenario(over));
-  await app.openSettings();
+  await app.openSettings("Tools");
   const section = app.page
     .locator("section")
     .filter({ has: app.page.getByRole("heading", { name: "Tools", exact: true }) });
@@ -669,7 +669,7 @@ test("a failed account switch shows in the footer, not in Settings", async ({ ap
   await page.getByRole("button", { name: "Signed in as student" }).click();
   await app.pickMenu("second");
   await expect(page.locator("footer").getByRole("alert")).toHaveText("gh: no such account");
-  await app.openSettings();
+  await app.openSettings("Tools");
   await expect(sshRow(app)).toBeVisible();
   await expect(sshRow(app).getByRole("alert")).toHaveCount(0);
 });

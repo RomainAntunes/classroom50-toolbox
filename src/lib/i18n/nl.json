@@ -88,6 +88,8 @@
   "settings.folders.watched": "Andere mappen",
   "settings.folders.remove": "Verwijderen",
   "settings.general.title": "Algemeen",
+  "settings.tabs": "Onderdelen van de instellingen",
+  "settings.tab.assignments": "Opdrachten",
   "settings.launchAtLogin": "Openen bij inloggen",
   "settings.launchAtLoginHint": "Start op de achtergrond als je inlogt op je computer, zodat herinneringen en nieuwe cijfers je blijven bereiken.",
   "settings.gradingInfo": "Tonen hoe opdrachten worden beoordeeld",

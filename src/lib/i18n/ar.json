@@ -88,6 +88,8 @@
   "settings.folders.watched": "مجلدات أخرى",
   "settings.folders.remove": "إزالة",
   "settings.general.title": "عام",
+  "settings.tabs": "أقسام الإعدادات",
+  "settings.tab.assignments": "الواجبات",
   "settings.launchAtLogin": "الفتح عند تسجيل الدخول",
   "settings.launchAtLoginHint": "يبدأ في الخلفية عند تسجيل الدخول إلى الحاسوب، لتستمر التذكيرات والدرجات الجديدة في الوصول.",
   "settings.gradingInfo": "عرض طريقة تقييم الواجبات",

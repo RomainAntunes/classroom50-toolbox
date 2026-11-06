@@ -88,6 +88,8 @@
   "settings.folders.watched": "기타 폴더",
   "settings.folders.remove": "제거",
   "settings.general.title": "일반",
+  "settings.tabs": "설정 섹션",
+  "settings.tab.assignments": "과제",
   "settings.launchAtLogin": "로그인 시 열기",
   "settings.launchAtLoginHint": "컴퓨터에 로그인하면 백그라운드에서 시작돼서 알림과 새 성적을 계속 받을 수 있어요.",
   "settings.gradingInfo": "과제 채점 방식 표시",

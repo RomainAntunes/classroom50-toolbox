@@ -88,6 +88,8 @@
   "settings.folders.watched": "Outras pastas",
   "settings.folders.remove": "Remover",
   "settings.general.title": "Geral",
+  "settings.tabs": "Seções das configurações",
+  "settings.tab.assignments": "Tarefas",
   "settings.launchAtLogin": "Abrir ao fazer login",
   "settings.launchAtLoginHint": "Inicia em segundo plano quando você faz login no computador, para que os lembretes e as notas novas continuem chegando.",
   "settings.gradingInfo": "Mostrar como as tarefas são avaliadas",

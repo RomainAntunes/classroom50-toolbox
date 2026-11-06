@@ -88,6 +88,8 @@
   "settings.folders.watched": "其他文件夹",
   "settings.folders.remove": "移除",
   "settings.general.title": "通用",
+  "settings.tabs": "设置分区",
+  "settings.tab.assignments": "作业",
   "settings.launchAtLogin": "登录时打开",
   "settings.launchAtLoginHint": "登录电脑时在后台启动，让你继续收到提醒和新成绩。",
   "settings.gradingInfo": "显示作业的评分方式",

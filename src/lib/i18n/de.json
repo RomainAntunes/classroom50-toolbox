@@ -88,6 +88,8 @@
   "settings.folders.watched": "Weitere Ordner",
   "settings.folders.remove": "Entfernen",
   "settings.general.title": "Allgemein",
+  "settings.tabs": "Bereiche der Einstellungen",
+  "settings.tab.assignments": "Aufgaben",
   "settings.launchAtLogin": "Bei der Anmeldung öffnen",
   "settings.launchAtLoginHint": "Startet im Hintergrund, wenn du dich an deinem Computer anmeldest, damit dich Erinnerungen und neue Noten weiter erreichen.",
   "settings.gradingInfo": "Zeigen, wie Aufgaben bewertet werden",

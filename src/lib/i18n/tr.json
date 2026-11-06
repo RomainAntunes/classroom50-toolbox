@@ -88,6 +88,8 @@
   "settings.folders.watched": "Diğer klasörler",
   "settings.folders.remove": "Kaldır",
   "settings.general.title": "Genel",
+  "settings.tabs": "Ayar bölümleri",
+  "settings.tab.assignments": "Ödevler",
   "settings.launchAtLogin": "Oturum açılınca başlat",
   "settings.launchAtLoginHint": "Bilgisayarınızda oturum açtığınızda arka planda başlar, böylece hatırlatıcılar ve yeni notlar size ulaşmaya devam eder.",
   "settings.gradingInfo": "Ödevlerin nasıl notlandırıldığını göster",

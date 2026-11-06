@@ -88,6 +88,8 @@
   "settings.folders.watched": "Otras carpetas",
   "settings.folders.remove": "Quitar",
   "settings.general.title": "General",
+  "settings.tabs": "Secciones de ajustes",
+  "settings.tab.assignments": "Tareas",
   "settings.launchAtLogin": "Abrir al iniciar sesión",
   "settings.launchAtLoginHint": "Se inicia en segundo plano al iniciar sesión en tu equipo, para que te sigan llegando los recordatorios y las calificaciones nuevas.",
   "settings.gradingInfo": "Mostrar cómo se califican las tareas",

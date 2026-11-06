@@ -57,8 +57,16 @@ for (const locale of LOCALES) {
       await page.locator(".titlebar .icon").last().click();
       await expect(page).toHaveURL(/\/settings$/);
       await expect(page.locator("main section").first()).toBeVisible();
-      expect(await untranslated(page), "raw keys in Settings").toEqual([]);
-      expect(await overflow(page), "overflow in Settings").toEqual([]);
+      // Every tab: only the one shown is laid out. General last, for the switch below.
+      const tabs = page.getByRole("tab");
+      const count = await tabs.count();
+      for (let i = 1; i <= count; i += 1) {
+        const tab = tabs.nth(i % count);
+        await tab.click();
+        await expect(tab).toHaveAttribute("aria-selected", "true");
+        expect(await untranslated(page), `raw keys in Settings tab ${(i % count) + 1}`).toEqual([]);
+        expect(await overflow(page), `overflow in Settings tab ${(i % count) + 1}`).toEqual([]);
+      }
 
       // And the list with how assignments are graded hidden (the group's details stay open).
       const catalog = JSON.parse(

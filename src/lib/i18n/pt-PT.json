@@ -88,6 +88,8 @@
   "settings.folders.watched": "Outras pastas",
   "settings.folders.remove": "Remover",
   "settings.general.title": "Geral",
+  "settings.tabs": "Secções das definições",
+  "settings.tab.assignments": "Trabalhos",
   "settings.launchAtLogin": "Abrir ao iniciar sessão",
   "settings.launchAtLoginHint": "Inicia em segundo plano quando inicias sessão no computador, para que os lembretes e as novas notas continuem a chegar-te.",
   "settings.gradingInfo": "Mostrar como os trabalhos são avaliados",

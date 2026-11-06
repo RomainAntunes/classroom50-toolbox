@@ -88,6 +88,8 @@
   "settings.folders.watched": "その他のフォルダー",
   "settings.folders.remove": "削除",
   "settings.general.title": "一般",
+  "settings.tabs": "設定のセクション",
+  "settings.tab.assignments": "課題",
   "settings.launchAtLogin": "ログイン時に開く",
   "settings.launchAtLoginHint": "コンピューターにログインするとバックグラウンドで起動し、リマインダーや新しい成績が届き続けます。",
   "settings.gradingInfo": "課題の採点方法を表示",

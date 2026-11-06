@@ -88,6 +88,8 @@
   "settings.folders.watched": "Other folders",
   "settings.folders.remove": "Remove",
   "settings.general.title": "General",
+  "settings.tabs": "Settings sections",
+  "settings.tab.assignments": "Assignments",
   "settings.launchAtLogin": "Open at login",
   "settings.launchAtLoginHint": "Starts in the background when you log in to your computer, so reminders and new grades still reach you.",
   "settings.gradingInfo": "Show how assignments are graded",

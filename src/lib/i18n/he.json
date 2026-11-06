@@ -88,6 +88,8 @@
   "settings.folders.watched": "תיקיות נוספות",
   "settings.folders.remove": "הסרה",
   "settings.general.title": "כללי",
+  "settings.tabs": "חלקי ההגדרות",
+  "settings.tab.assignments": "מטלות",
   "settings.launchAtLogin": "פתיחה בכניסה למערכת",
   "settings.launchAtLoginHint": "מופעל ברקע בכניסה למחשב, כדי שתזכורות וציונים חדשים ימשיכו להגיע.",
   "settings.gradingInfo": "הצגת אופן הבדיקה של המטלות",

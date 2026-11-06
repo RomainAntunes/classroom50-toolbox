@@ -88,6 +88,8 @@
   "settings.folders.watched": "Inne foldery",
   "settings.folders.remove": "Usuń",
   "settings.general.title": "Ogólne",
+  "settings.tabs": "Sekcje ustawień",
+  "settings.tab.assignments": "Zadania",
   "settings.launchAtLogin": "Otwieraj po zalogowaniu",
   "settings.launchAtLoginHint": "Uruchamia się w tle po zalogowaniu do komputera, aby przypomnienia i nowe oceny nadal do ciebie docierały.",
   "settings.gradingInfo": "Pokazuj, jak oceniane są zadania",

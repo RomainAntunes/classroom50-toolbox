@@ -426,6 +426,8 @@ test("a key set up that SSH still doesn't use is said, not announced as done", a
   await app.expectDialog(["No SSH key"], "Sign in and set up SSH");
   await app.expectDialog(["is on GitHub, but ssh didn't use it", "ssh-add"], "SSH settings…");
   await expect(page).toHaveURL(/\/settings#ssh$/);
+  // On the tab that holds the row.
+  await expect(page.getByRole("tab", { name: "Tools" })).toHaveAttribute("aria-selected", "true");
   await expect(page.locator("#ssh")).toBeFocused();
   await expect(page.locator(".sr-only[role=status]")).not.toContainText("SSH is set up");
 });

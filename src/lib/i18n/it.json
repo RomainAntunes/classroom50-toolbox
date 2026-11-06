@@ -88,6 +88,8 @@
   "settings.folders.watched": "Altre cartelle",
   "settings.folders.remove": "Rimuovi",
   "settings.general.title": "Generali",
+  "settings.tabs": "Sezioni delle impostazioni",
+  "settings.tab.assignments": "Compiti",
   "settings.launchAtLogin": "Apri al login",
   "settings.launchAtLoginHint": "Si avvia in background quando accedi al computer, così promemoria e nuovi voti continuano ad arrivarti.",
   "settings.gradingInfo": "Mostra come vengono valutati i compiti",
