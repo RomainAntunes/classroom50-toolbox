@@ -1114,12 +1114,21 @@ async fn set_up_key_in(
 }
 
 /// `ssh-keygen -t ed25519` at `private`, never over a key: an existing `.pub` would have
-/// been reused, a lone private key is `PrivateKeyOnly`. Returns the `.pub`.
+/// been reused (one that can't be is refused, with the error reading it when there is
+/// one), a lone private key is `PrivateKeyOnly`. Returns the `.pub`.
 async fn generate(keygen: &str, private: &Path) -> Result<PathBuf> {
     let mut public = private.as_os_str().to_owned();
     public.push(".pub");
     let public = PathBuf::from(public);
-    if private.exists() || public.exists() {
+    // A `.pub` here was no key `preferred` takes: unreadable, or not a public key.
+    if public.exists() {
+        std::fs::read_to_string(&public)?;
+        return Err(Error::Unsupported(format!(
+            "{} isn't a public key the app can add",
+            public.display()
+        )));
+    }
+    if private.exists() {
         return Err(Error::Ssh {
             problem: SshProblem::PrivateKeyOnly,
             login: None,
@@ -1962,6 +1971,30 @@ mod tests {
                 ..
             })
         ));
+        assert_eq!(std::fs::read_to_string(&private).unwrap(), "secret");
+        // A `.pub` that isn't a key is no lone private key, and neither file is touched.
+        let public = root.join(".ssh").join("id_ed25519.pub");
+        std::fs::write(&public, "garbage").unwrap();
+        let refused = generate("ssh-keygen", &private).await;
+        assert!(
+            matches!(&refused, Err(Error::Unsupported(m)) if m.contains("id_ed25519.pub")),
+            "{refused:?}"
+        );
+        #[cfg(unix)]
+        {
+            // Unreadable: the error reading it.
+            use std::os::unix::fs::PermissionsExt;
+            std::fs::set_permissions(&public, std::fs::Permissions::from_mode(0o000)).unwrap();
+            if std::fs::read(&public).is_err() {
+                assert!(matches!(
+                    generate("ssh-keygen", &private).await,
+                    Err(Error::Io(_))
+                ));
+            }
+            std::fs::set_permissions(&public, std::fs::Permissions::from_mode(0o644)).unwrap();
+        }
+        assert_eq!(std::fs::read_to_string(&public).unwrap(), "garbage");
+        std::fs::remove_file(&public).unwrap();
         assert_eq!(std::fs::read_to_string(&private).unwrap(), "secret");
         std::fs::remove_file(&private).unwrap();
         if process::find_in_path("ssh-keygen").is_some() {
