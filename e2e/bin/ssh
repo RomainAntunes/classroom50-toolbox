@@ -1,0 +1,46 @@
+#!/bin/sh
+# A stand-in for OpenSSH, for the WebDriver suite: the app's SSH probe and `ssh -G` get the
+# answers GitHub and OpenSSH 10 give, so the suite never connects to github.com. Its state
+# is $C50_FAKE_SSH: `ready` (the default, GitHub greets the student), `denied` (no key on the
+# account) or `hostkey` (GitHub's host key unknown). Every call is appended to
+# $C50_FAKE_SSH_LOG when set. Anything else, git's own connections included, is refused.
+
+login="${C50_FAKE_GH_LOGIN:-ada-e2e}"
+
+if [ -n "$C50_FAKE_SSH_LOG" ]; then
+  printf '%s\n' "$*" >>"$C50_FAKE_SSH_LOG"
+fi
+
+case "$*" in
+"-G github.com")
+  echo "user ada"
+  echo "hostname github.com"
+  echo "port 22"
+  echo "batchmode no"
+  echo "identityfile ~/.ssh/id_rsa"
+  echo "identityfile ~/.ssh/id_ecdsa"
+  echo "identityfile ~/.ssh/id_ed25519"
+  echo "globalknownhostsfile /etc/ssh/ssh_known_hosts /etc/ssh/ssh_known_hosts2"
+  echo "userknownhostsfile $HOME/.ssh/known_hosts $HOME/.ssh/known_hosts2"
+  ;;
+"-T -o BatchMode=yes -o ConnectTimeout=8 git@github.com")
+  case "${C50_FAKE_SSH:-ready}" in
+  denied)
+    echo "git@github.com: Permission denied (publickey)." >&2
+    exit 255
+    ;;
+  hostkey)
+    echo "Host key verification failed." >&2
+    exit 255
+    ;;
+  *)
+    echo "Hi $login! You've successfully authenticated, but GitHub does not provide shell access." >&2
+    exit 1
+    ;;
+  esac
+  ;;
+*)
+  echo "fake ssh: the WebDriver suite's fake ssh refuses '$*'" >&2
+  exit 255
+  ;;
+esac
