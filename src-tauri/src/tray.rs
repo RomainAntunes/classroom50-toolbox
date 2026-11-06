@@ -304,7 +304,9 @@ fn on_click(app: &AppHandle, id: &str) {
         }
         Some(Click::Recent(id)) => emit(Action::Open { id: id.into() }),
         Some(Click::Update) => emit(Action::InstallUpdate),
-        None => log::warn!("tray menu: unknown item {id:?}"),
+        // The tray's handler gets every menu click of the app, so the UI's own menus (a
+        // row's, Settings' buttons) land here too, with ids Tauri numbered: theirs, not ours.
+        None => {}
     }
 }
 
