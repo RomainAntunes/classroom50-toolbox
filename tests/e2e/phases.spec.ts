@@ -167,8 +167,9 @@ test("a teacher's due date stays on the row; the phases are in the details", asy
   await expect(row.locator(".meta")).not.toContainText("Queries");
   await row.locator("[data-row]").click();
   const details = plain(await row.locator("dl").textContent());
-  expect(details).toContain("Schema · Tue, Oct 27 at 11:59 PM · done");
-  expect(details).toContain("Queries · Thu, Oct 29 at 06:00 PM");
+  // WebKit on macOS joins the date and time with "at", WebKitGTK with a comma.
+  expect(details).toMatch(/Schema · Tue, Oct 27(,| at) 11:59 PM · done/);
+  expect(details).toMatch(/Queries · Thu, Oct 29(,| at) 06:00 PM/);
 });
 
 test("open phases are tray deadlines that open their row", async ({ app }) => {
