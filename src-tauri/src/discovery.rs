@@ -8,6 +8,7 @@ use serde::Serialize;
 use walkdir::WalkDir;
 
 use crate::classroom50::{REPO_CONFIG_FILE, RepoConfig};
+use crate::tools::GitProtocol;
 
 /// Deep enough for `~/code/<course>/<assignment>`, shallow enough to stay fast on a home dir.
 pub const DEFAULT_MAX_DEPTH: usize = 4;
@@ -42,7 +43,9 @@ pub fn scan(root: &Path, max_depth: usize) -> Vec<LocalProject> {
         }
         walker.skip_current_dir();
         let config = RepoConfig::read(dir).ok().flatten();
-        let (owner, repo) = origin_of(dir).unzip();
+        let (owner, repo) = origin_url(dir)
+            .and_then(|url| parse_github_remote(&url))
+            .unzip();
         if config.is_some() || owner.is_some() {
             projects.push(LocalProject {
                 path: dir.to_path_buf(),
@@ -60,9 +63,9 @@ fn is_skipped(name: &std::ffi::OsStr) -> bool {
     name.starts_with('.') || SKIPPED_DIRS.contains(&name.as_ref())
 }
 
-/// `owner/repo` of the `origin` remote, read straight from the repo's git config (no git
-/// process).
-fn origin_of(repo_dir: &Path) -> Option<(String, String)> {
+/// The `origin` remote's URL, read straight from the repo's git config (no git process).
+/// `url.<base>.insteadOf` rewrites aren't applied.
+pub fn origin_url(repo_dir: &Path) -> Option<String> {
     let config = std::fs::read_to_string(git_dir(repo_dir)?.join("config")).ok()?;
     let mut in_origin = false;
     for line in config.lines().map(str::trim) {
@@ -72,10 +75,23 @@ fn origin_of(repo_dir: &Path) -> Option<(String, String)> {
             && let Some((name, value)) = line.split_once('=')
             && name.trim().eq_ignore_ascii_case("url")
         {
-            return parse_github_remote(value.trim().trim_matches('"'));
+            return Some(value.trim().trim_matches('"').to_owned());
         }
     }
     None
+}
+
+/// Whether git reaches a GitHub remote over HTTPS or SSH: `https://` (and `http://`), or
+/// `ssh://` and the scp-like `git@github.com:o/r`. `None` for another host or `git://`.
+pub fn remote_protocol(url: &str) -> Option<GitProtocol> {
+    parse_github_remote(url)?;
+    match url.split_once("://") {
+        Some((scheme, _)) if scheme.eq_ignore_ascii_case("https") => Some(GitProtocol::Https),
+        Some((scheme, _)) if scheme.eq_ignore_ascii_case("http") => Some(GitProtocol::Https),
+        Some((scheme, _)) if scheme.eq_ignore_ascii_case("ssh") => Some(GitProtocol::Ssh),
+        Some(_) => None,
+        None => Some(GitProtocol::Ssh),
+    }
 }
 
 /// The directory holding the repo's `config`: `.git` itself, or for a linked worktree or a
@@ -194,11 +210,31 @@ mod tests {
         )
         .unwrap();
 
-        let expected = Some(("cs50".to_owned(), "fall-hello-alice".to_owned()));
-        let (from_main, from_worktree) = (origin_of(&main), origin_of(&worktree));
+        let expected = Some("https://alice@github.com/cs50/fall-hello-alice.git".to_owned());
+        let (from_main, from_worktree) = (origin_url(&main), origin_url(&worktree));
         std::fs::remove_dir_all(&root).unwrap();
         assert_eq!(from_main, expected);
         assert_eq!(from_worktree, expected);
+    }
+
+    #[test]
+    fn tells_https_remotes_from_ssh_ones() {
+        let https = Some(GitProtocol::Https);
+        let ssh = Some(GitProtocol::Ssh);
+        for (url, protocol) in [
+            ("https://github.com/cs50/hello.git", https),
+            ("https://alice@github.com/cs50/hello", https),
+            ("http://github.com/cs50/hello", https),
+            ("git@github.com:cs50/hello.git", ssh),
+            ("org-123@github.com:cs50/hello.git", ssh),
+            ("ssh://git@github.com:22/cs50/hello.git", ssh),
+            ("SSH://git@github.com/cs50/hello", ssh),
+            ("git://github.com/cs50/hello.git", None),
+            ("git@gitlab.com:cs50/hello.git", None),
+            ("/home/alice/hello.git", None),
+        ] {
+            assert_eq!(remote_protocol(url), protocol, "{url}");
+        }
     }
 
     #[test]

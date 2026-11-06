@@ -610,7 +610,9 @@ fn sizes(path: &Path, files: &[String]) -> (Vec<String>, Vec<String>) {
 /// A hook or signing failure keeps git's last line.
 fn git_failure(err: Error) -> Error {
     match err {
-        Error::CommandFailed { stderr, .. } => Error::Unsupported(last_line(&stderr)),
+        Error::CommandFailed { stderr, .. } => {
+            crate::ssh::failure(&stderr).unwrap_or_else(|| Error::Unsupported(last_line(&stderr)))
+        }
         err => err,
     }
 }
@@ -620,6 +622,9 @@ fn push_failure(err: Error) -> Error {
     let Error::CommandFailed { stderr, .. } = err else {
         return err;
     };
+    if let Some(err) = crate::ssh::failure(&stderr) {
+        return err;
+    }
     if stderr.contains("[rejected]")
         || stderr.contains("non-fast-forward")
         || stderr.contains("fetch first")
@@ -724,6 +729,12 @@ mod tests {
             Error::Unsupported(m) if m == "unable to access 'https://github.com/o/r/': The requested URL returned error: 403"
         ));
         assert!(matches!(push_failure(Error::Offline), Error::Offline));
+        let stderr = "ERROR: Permission to acme-cs/lab-2-alex.git denied to bob-other.\n\
+            fatal: Could not read from remote repository.\n";
+        assert!(matches!(
+            push_failure(failed(stderr)),
+            Error::Ssh { problem: crate::ssh::SshProblem::OtherAccount, login: Some(l) } if l == "bob-other"
+        ));
     }
 
     fn sh(dir: &Path, args: &[&str]) -> String {

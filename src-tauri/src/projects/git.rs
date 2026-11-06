@@ -132,6 +132,9 @@ async fn local_state(path: &Path) -> Option<LocalState> {
         noise::is_noise(entry, &tree) || entry.ends_with('/') && !real_folders.contains(entry)
     });
     state.active_at = last_activity(path).map(DateTime::<Utc>::from);
+    state.origin = crate::discovery::origin_url(path)
+        .as_deref()
+        .and_then(crate::discovery::remote_protocol);
     Some(state)
 }
 

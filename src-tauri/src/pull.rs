@@ -4,9 +4,14 @@
 //! mid-merge with conflicts the student has to solve in a terminal.
 
 use std::path::Path;
+use std::time::Duration;
 
 use crate::error::{Error, Result};
 use crate::process;
+
+/// A pull of a student repo is small. The limit catches an ssh that waits on a prompt
+/// nobody sees (a passphrase on a terminal the app doesn't show).
+const PULL_TIMEOUT: Duration = Duration::from_secs(5 * 60);
 
 /// gh's credentials for github.com, as `gh auth setup-git` would configure them, so a
 /// private repo pulls without any git setup. Scoped to the command line; nothing is saved.
@@ -44,7 +49,7 @@ pub async fn pull(path: &Path, default_branch: &str) -> Result<()> {
         "origin",
         default_branch,
     ]);
-    match process::run("git", args, Some(path)).await {
+    match process::run_with_timeout("git", args, Some(path), PULL_TIMEOUT).await {
         Ok(_) => Ok(()),
         Err(Error::CommandFailed { stderr, .. }) => Err(failure(&stderr)),
         Err(err) => Err(err),
@@ -56,8 +61,11 @@ async fn git(path: &Path, args: &[&str]) -> Result<String> {
 }
 
 /// Both sides have new commits: fast-forwarding is impossible and merging is left to the
-/// student. Anything else keeps git's own last line.
+/// student. An SSH failure is `Error::Ssh`; anything else keeps git's own last line.
 fn failure(stderr: &str) -> Error {
+    if let Some(err) = crate::ssh::failure(stderr) {
+        return err;
+    }
     if stderr.contains("Not possible to fast-forward") || stderr.contains("diverging branches") {
         return Error::Diverged;
     }
@@ -82,6 +90,15 @@ mod tests {
         assert!(matches!(
             failure(stderr),
             Error::Unsupported(m) if m == "unable to access 'https://github.com/o/r/': Could not resolve host"
+        ));
+        let stderr = "git@github.com: Permission denied (publickey).\r\n\
+            fatal: Could not read from remote repository.\r\n";
+        assert!(matches!(
+            failure(stderr),
+            Error::Ssh {
+                problem: crate::ssh::SshProblem::KeyRejected,
+                ..
+            }
         ));
     }
 
