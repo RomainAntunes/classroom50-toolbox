@@ -173,7 +173,7 @@
     width: 30%;
     border-radius: 2px;
     background: var(--accent);
-    animation: slide 1.2s ease-in-out infinite;
+    animation: bar-slide 1.2s ease-in-out infinite;
   }
 
   .bar.known > div {
@@ -189,26 +189,7 @@
     }
   }
 
-  @keyframes slide {
-    from {
-      transform: translateX(-100%);
-    }
-    to {
-      transform: translateX(340%);
-    }
-  }
-
   :global(:root[dir="rtl"]) .bar:not(.known) > div {
-    animation-name: slide-rtl;
-  }
-
-  /* Right to left the bar starts at the right edge and slides leftward. */
-  @keyframes slide-rtl {
-    from {
-      transform: translateX(100%);
-    }
-    to {
-      transform: translateX(-340%);
-    }
+    animation-name: bar-slide-rtl;
   }
 </style>

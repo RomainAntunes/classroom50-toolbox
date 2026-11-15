@@ -289,3 +289,24 @@ button.icon svg {
     scroll-behavior: auto !important;
   }
 }
+
+/* The indeterminate progress bars' slide (the sync bar, a tool install, an update download),
+   defined once for all of them; right to left the bar starts at the right edge and slides
+   leftward. */
+@keyframes bar-slide {
+  from {
+    transform: translateX(-100%);
+  }
+  to {
+    transform: translateX(340%);
+  }
+}
+
+@keyframes bar-slide-rtl {
+  from {
+    transform: translateX(100%);
+  }
+  to {
+    transform: translateX(-340%);
+  }
+}

@@ -2,7 +2,6 @@
 // row shows where each username stands after the popover was hidden or the page changed.
 import { api, onEvent, TEAMMATE_JOBS_EVENT, type TeammateJob } from "#lib/api.js";
 import { announce } from "#lib/announce.svelte.js";
-import { resultsText } from "#lib/teammate.js";
 
 export const teammateJobs = $state<{ jobs: TeammateJob[] }>({ jobs: [] });
 
@@ -15,7 +14,11 @@ function apply(jobs: TeammateJob[]) {
     const before = teammateJobs.jobs.find((other) => other.id === job.id);
     if (before?.running && !job.running) {
       const settled = job.entries.filter((e) => e.state === "added" || e.state === "failed");
-      if (settled.length) announce(resultsText(settled, job));
+      // teammate.ts is loaded by the click that started the queue.
+      if (settled.length)
+        void import("#lib/teammate.js").then(({ resultsText }) =>
+          announce(resultsText(settled, job)),
+        );
     }
   }
   teammateJobs.jobs = jobs;

@@ -1,7 +1,6 @@
 <script lang="ts">
   import { api, errorMessage, type TeammateEntry, type TeammateJob } from "#lib/api.js";
   import { t } from "#lib/i18n/index.js";
-  import { addMore } from "#lib/teammate.js";
   import Spinner from "./Spinner.svelte";
 
   type State = TeammateEntry["state"];
@@ -103,7 +102,11 @@
       <p class="hint">{t("teammate.acceptNext", { assignment: job.assignment })}</p>
     {/if}
     <div class="actions">
-      <button class="link" onclick={() => void addMore(job)}>{t("teammate.again")}</button>
+      <button
+        class="link"
+        onclick={() => void import("#lib/teammate.js").then(({ addMore }) => addMore(job))}
+        >{t("teammate.again")}</button
+      >
       {#if !job.running}
         <button class="link" onclick={() => void api.dismissTeammateJob(job.id)}
           >{t("teammate.done")}</button

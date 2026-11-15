@@ -2,12 +2,10 @@
   import { Menu, MenuItem, PredefinedMenuItem, Submenu } from "@tauri-apps/api/menu";
   import { openUrl, revealItemInDir } from "@tauri-apps/plugin-opener";
   import { api, GIT_PROTOCOLS, type GitProtocol, type Milestone, type Project } from "#lib/api.js";
-  import { cloneProject, type CloneMode } from "#lib/clone.js";
+  import type { CloneMode } from "#lib/clone.js";
   import { editorFor, editors, openInEditor } from "#lib/editor.svelte.js";
-  import { pullProject } from "#lib/pull.js";
-  import { commitLocal, commitPush, gradedOnPush } from "#lib/push.js";
-  import { submitProject } from "#lib/submit.js";
-  import { addTeammate, joinsGroup } from "#lib/teammate.js";
+  // The flows load on the first click (`import()`), out of the startup bundle.
+  import { gradedOnPush, joinsGroup } from "#lib/rowRules.js";
   import { isHidden, setHidden } from "#lib/hidden.js";
   import { nextPhase } from "#lib/phases.js";
   import { editPhases } from "#lib/phasesEditor.svelte.js";
@@ -23,10 +21,11 @@
   import { changedLines } from "#lib/files.js";
   import { atLeast } from "#lib/busy.js";
   import { jobFor } from "#lib/teammateJobs.svelte.js";
-  import Details from "./Details.svelte";
   // Its own chunk, loaded the first time classmates are being added, so its styles stay
   // out of the startup bundle.
   const teammatePanel = () => import("./TeammateProgress.svelte");
+  // The details (with the Markdown renderer) load the first time a row opens.
+  const detailsPanel = () => import("./Details.svelte");
   import Spinner from "./Spinner.svelte";
 
   let {
@@ -230,6 +229,7 @@
   async function pull() {
     pulling = true;
     try {
+      const { pullProject } = await import("#lib/pull.js");
       await atLeast(pullProject(project, name));
     } finally {
       pulling = false;
@@ -240,9 +240,11 @@
   let pushing = $state(false);
   let committing = $state(false);
   let busy = $state(false);
-  async function runCommit(run: typeof commitPush) {
+  async function runCommit(withPush: boolean) {
     busy = true;
     try {
+      const { commitLocal, commitPush } = await import("#lib/push.js");
+      const run = withPush ? commitPush : commitLocal;
       await run(project, name, (push) => {
         pushing = push;
         committing = !push;
@@ -251,8 +253,8 @@
       busy = pushing = committing = false;
     }
   }
-  const push = () => runCommit(commitPush);
-  const commit = () => runCommit(commitLocal);
+  const push = () => runCommit(true);
+  const commit = () => runCommit(false);
 
   // A local commit works on any clone with changes, whatever the branch or submission mode.
   const committable = $derived(Boolean(path) && (project.local?.changedFiles ?? 0) > 0);
@@ -263,6 +265,7 @@
   async function submit() {
     submitting = true;
     try {
+      const { submitProject } = await import("#lib/submit.js");
       await submitProject(project, name, (on) => (submitWorking = on));
     } finally {
       submitting = submitWorking = false;
@@ -271,7 +274,9 @@
 
   const cloning = $derived(session.cloning.includes(project.id));
   function clone(mode: CloneMode = "ask", protocol?: GitProtocol) {
-    void cloneProject(project.id, mode, undefined, undefined, protocol);
+    void import("#lib/clone.js").then(({ cloneProject }) =>
+      cloneProject(project.id, mode, undefined, undefined, protocol),
+    );
   }
 
   /** Points the clone's origin at GitHub the other way (the menu's "Use … for this clone"),
@@ -446,7 +451,7 @@
       MenuItem.new({
         text: t(joinsGroup(project) ? "teammate.teamMenu" : "teammate.inviteMenu"),
         enabled: Boolean(project.owner && project.repo) && !closed,
-        action: () => addTeammate(project, name),
+        action: () => void import("#lib/teammate.js").then((m) => m.addTeammate(project, name)),
       }),
       MenuItem.new({
         text: t("projects.clone"),
@@ -645,15 +650,17 @@
     {/if}
   </div>
   {#if open}
-    <Details
-      description={project.assignment?.description ?? null}
-      doc={project.assignment?.descriptionDoc ?? null}
-      items={details}
-      {milestones}
-      failed={failedTests}
-      notes={grading?.state === "running" ? null : (grade?.releaseNotes ?? null)}
-      gradeUrl={grade?.url ?? null}
-    />
+    {#await detailsPanel() then { default: Details }}
+      <Details
+        description={project.assignment?.description ?? null}
+        doc={project.assignment?.descriptionDoc ?? null}
+        items={details}
+        {milestones}
+        failed={failedTests}
+        notes={grading?.state === "running" ? null : (grade?.releaseNotes ?? null)}
+        gradeUrl={grade?.url ?? null}
+      />
+    {/await}
   {/if}
 </li>
 

@@ -147,7 +147,7 @@ test("a check that broke in the background shows under Updates", async ({ app, p
     }),
   );
   await app.openSettings("About");
-  await expect(page.locator(".sub.issue")).toHaveText("can't reach GitHub");
+  await expect(page.locator(".set-sub.issue")).toHaveText("can't reach GitHub");
 });
 
 test("GitHub not serving the feed is worded, in the UI's language", async ({ app, page }) => {
@@ -167,7 +167,7 @@ test("GitHub not serving the feed is worded, in the UI's language", async ({ app
   );
   await app.openSettings();
   await page.getByRole("tab", { name: "À propos" }).click();
-  await expect(page.locator(".sub.issue")).toHaveText(
+  await expect(page.locator(".set-sub.issue")).toHaveText(
     "GitHub ne fournit pas la mise à jour pour l'instant ; réessayez plus tard",
   );
 });

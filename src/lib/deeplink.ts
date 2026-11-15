@@ -5,8 +5,8 @@ import { tick } from "svelte";
 import { goto } from "$app/navigation";
 import { ask, message } from "@tauri-apps/plugin-dialog";
 import { api, errorMessage, withDialog, type DeepLink, type DeepLinkTarget } from "#lib/api.js";
-import { acceptAssignment, acceptBlocked } from "#lib/accept.js";
-import { cloneProject } from "#lib/clone.js";
+// Accept and clone load when a link needs them (`import()`), out of the startup bundle.
+import { acceptBlocked } from "#lib/rowRules.js";
 import { t } from "#lib/i18n/index.js";
 import { loadSnapshot, session } from "#lib/session.svelte.js";
 import { loadSettings } from "#lib/settings.svelte.js";
@@ -98,6 +98,7 @@ async function act(target: DeepLinkTarget): Promise<void> {
       const project = session.snapshot?.projects.find((p) => p.id === target.id);
       if (!project || project.path || !project.owner || !project.repo) return;
       const repo = `${project.owner}/${project.repo}`;
+      const { cloneProject } = await import("#lib/clone.js");
       await cloneProject(project.id, "ask", {
         title: project.assignment?.name ?? repo,
         message: (folder) =>
@@ -116,6 +117,7 @@ async function act(target: DeepLinkTarget): Promise<void> {
         return;
       }
       // Asks first, like the row's button.
+      const { acceptAssignment } = await import("#lib/accept.js");
       await acceptAssignment(item);
     }
   }

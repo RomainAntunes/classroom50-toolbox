@@ -1,4 +1,5 @@
 <script lang="ts">
+  import "#lib/components/guide.css";
   import logo from "#lib/assets/logo.png";
   import { onMount, tick } from "svelte";
   import { goto } from "$app/navigation";
@@ -103,15 +104,15 @@
       <button bind:this={retry} onclick={load}>{t("whatsNew.retry")}</button>
     </div>
   {:else if shown}
-    <section class="hero">
-      <img class="hero-logo" src={logo} alt="" />
-      <h1 class="hero-title" tabindex="-1" bind:this={heading}>
+    <section class="guide-hero">
+      <img class="guide-logo" src={logo} alt="" />
+      <h1 class="guide-title" tabindex="-1" bind:this={heading}>
         {shown.length === 1
           ? t("whatsNew.titleVersion", { version: shown[0] })
           : t("whatsNew.title")}
       </h1>
       {#if !from}
-        <p class="lead">{many ? t("whatsNew.leadMany") : t("whatsNew.lead")}</p>
+        <p class="guide-lead">{many ? t("whatsNew.leadMany") : t("whatsNew.lead")}</p>
       {/if}
       {#if shown.length === 1 && released(shown[0])}
         <p class="date">{released(shown[0])}</p>
@@ -134,7 +135,7 @@
           {/if}
           <!-- An explicit role: WebKit drops the list semantics of a list without bullets. -->
           <!-- svelte-ignore a11y_no_redundant_roles -->
-          <ul class="points" role="list">
+          <ul class="guide-points" role="list">
             {#each group.entries as entry, i (i)}
               <li>
                 <svg viewBox="0 0 24 24" aria-hidden="true">
@@ -159,7 +160,7 @@
         {/each}
       </section>
     {:else}
-      <p class="lead empty">{t("whatsNew.empty")}</p>
+      <p class="guide-lead empty">{t("whatsNew.empty")}</p>
     {/each}
   {/if}
 </main>
@@ -183,34 +184,14 @@
     margin: 0;
   }
 
-  .hero {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: 6px;
-    padding: 8px 12px 0;
-    text-align: center;
-  }
-
-  .hero-logo {
-    width: 64px;
-    height: 64px;
-    margin-bottom: 4px;
-  }
-
-  .hero-title {
+  .guide-title {
     font-size: 1.2em;
     font-weight: 600;
   }
 
   /* Focused from script so screen readers start here; it isn't a control. */
-  .hero-title:focus {
+  .guide-title:focus {
     outline: none;
-  }
-
-  .lead {
-    margin: 0;
-    color: var(--fg-muted);
   }
 
   .empty {
@@ -266,36 +247,6 @@
     font-size: 0.85em;
     font-weight: 600;
     color: var(--fg-muted);
-  }
-
-  .points {
-    margin: 0;
-    padding: 4px 0;
-    list-style: none;
-    display: flex;
-    flex-direction: column;
-    background: var(--bg-card);
-    border: 1px solid var(--border);
-    border-radius: var(--radius-card);
-  }
-
-  .points li {
-    display: flex;
-    align-items: flex-start;
-    gap: 10px;
-    padding: 8px 12px;
-  }
-
-  .points svg {
-    flex-shrink: 0;
-    width: 18px;
-    height: 18px;
-    margin-top: 1px;
-    fill: none;
-    stroke: var(--accent);
-    stroke-width: 2;
-    stroke-linecap: round;
-    stroke-linejoin: round;
   }
 
   footer {

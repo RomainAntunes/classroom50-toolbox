@@ -1,4 +1,5 @@
 <script lang="ts">
+  import "./shared.css";
   import { CheckMenuItem, Menu } from "@tauri-apps/api/menu";
   import { ask, message } from "@tauri-apps/plugin-dialog";
   import { openUrl } from "@tauri-apps/plugin-opener";
@@ -174,7 +175,7 @@
 
 {#if ready && protocol}
   <div class="ssh" id="ssh" tabindex="-1" bind:this={element}>
-    <div class="row">
+    <div class="set-row">
       <span
         class="dot"
         class:ok={showSsh ? status?.state === "ready" : true}
@@ -256,8 +257,6 @@
 {/if}
 
 <style>
-  @import "./row.css";
-
   .name {
     flex: 1;
   }

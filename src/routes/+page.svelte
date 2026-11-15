@@ -3,13 +3,13 @@
   import logo from "#lib/assets/logo.png";
   import { onMount } from "svelte";
   import { goto } from "$app/navigation";
-  import { getCurrentWindow } from "@tauri-apps/api/window";
   import { Menu, MenuItem } from "@tauri-apps/api/menu";
   import {
     api,
     onEvent,
     errorMessage,
     POPOVER_HIDDEN_EVENT,
+    popoverVisible,
     POPOVER_SHORTCUT_EVENT,
     POPOVER_SHOWN_EVENT,
     SYNC_PROGRESS_EVENT,
@@ -301,11 +301,9 @@
   onMount(() => {
     load();
     // This page also mounts hidden: at startup, and when the popover hides on Settings.
-    void getCurrentWindow()
-      .isVisible()
-      .then((visible) => {
-        if (visible) startTick();
-      });
+    void popoverVisible().then((visible) => {
+      if (visible) startTick();
+    });
     const unlisteners = [
       onEvent(POPOVER_SHOWN_EVENT, () => {
         now = new Date();
@@ -519,7 +517,7 @@
 
   .progress.indeterminate > div {
     width: 30%;
-    animation: slide 1.2s ease-in-out infinite;
+    animation: bar-slide 1.2s ease-in-out infinite;
   }
 
   /* No sliding: a still, faded bar says it is working without moving. */
@@ -531,28 +529,9 @@
     }
   }
 
-  @keyframes slide {
-    from {
-      transform: translateX(-100%);
-    }
-    to {
-      transform: translateX(340%);
-    }
-  }
-
   :global(:root[dir="rtl"]) .progress.indeterminate > div,
   :global(:root[dir="rtl"]) .first-bar.indeterminate > div {
-    animation-name: slide-rtl;
-  }
-
-  /* Right to left the bar starts at the right edge and slides leftward. */
-  @keyframes slide-rtl {
-    from {
-      transform: translateX(100%);
-    }
-    to {
-      transform: translateX(-340%);
-    }
+    animation-name: bar-slide-rtl;
   }
 
   /* A segmented control, like the native ones: a track with the chosen segment raised. */
@@ -702,7 +681,7 @@
   .first-bar.indeterminate > div {
     position: absolute;
     width: 30%;
-    animation: slide 1.2s ease-in-out infinite;
+    animation: bar-slide 1.2s ease-in-out infinite;
   }
 
   .empty {
