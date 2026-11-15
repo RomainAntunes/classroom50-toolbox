@@ -302,12 +302,12 @@ export const commands = {
 	/**  Sets project `id`'s clone's own `user.name` and `user.email` (not the global config). */
 	setGitIdentity: (id: string, name: string, email: string) => __TAURI_INVOKE<null>("set_git_identity", { id, name, email }),
 	/**  Where self-update stands; `update-state` follows every change. */
-	updateStatus: () => __TAURI_INVOKE<UpdateStatus>("update_status"),
+	updateStatus: () => __TAURI_INVOKE<UpdateStatus_Serialize>("update_status"),
 	/**
 	 *  Settings > About: checks now and starts the download when there is a newer version.
 	 *  Unlike background checks, a failure rejects.
 	 */
-	checkUpdate: () => __TAURI_INVOKE<UpdateStatus>("check_update"),
+	checkUpdate: () => __TAURI_INVOKE<UpdateStatus_Serialize>("check_update"),
 	/**  "Restart now": installs the downloaded update and relaunches. */
 	installUpdate: () => __TAURI_INVOKE<null>("install_update"),
 	/**  "Later": keeps the banner without the question. */
@@ -743,7 +743,7 @@ export type EditorInfo = {
 	name: string,
 };
 
-export type ErrorKind = "notInstalled" | "commandFailed" | "timedOut" | "unsupported" | "manualInstall" | "blockedInDev" | "cancelled" | "busy" | "pathExists" | "schemaMismatch" | "student" | "needsTeam" | "submissionsClosed" | "unknownAssignment" | "ghStudentOutdated" | "staleMarker" | "groupFull" | "invalidUsername" | "invalidTeamName" | "invalidPhase" | "noTerminal" | "localChanges" | "otherBranch" | "diverged" | "remoteAhead" | "gitInProgress" | "nothingToPush" | "nothingToCommit" | "noIdentity" | "fileTooLarge" | "pushRejected" | "notSignedIn" | "ssh" | "tokenFromEnv" | "rateLimited" | "github" | "offline" | "noSelfUpdate" | "calendarAccess" | "calendarUnavailable" | "invalidShortcut" | "shortcutTaken" | "shortcutUnsupported" | "repoConfig" | "io" | "http" | "tauri" | "updater" | "autostart";
+export type ErrorKind = "notInstalled" | "commandFailed" | "timedOut" | "unsupported" | "manualInstall" | "blockedInDev" | "cancelled" | "busy" | "pathExists" | "schemaMismatch" | "student" | "needsTeam" | "submissionsClosed" | "unknownAssignment" | "ghStudentOutdated" | "staleMarker" | "groupFull" | "invalidUsername" | "invalidTeamName" | "invalidPhase" | "noTerminal" | "localChanges" | "otherBranch" | "diverged" | "remoteAhead" | "gitInProgress" | "nothingToPush" | "nothingToCommit" | "noIdentity" | "fileTooLarge" | "pushRejected" | "notSignedIn" | "ssh" | "tokenFromEnv" | "rateLimited" | "github" | "offline" | "noSelfUpdate" | "updateUnavailable" | "calendarAccess" | "calendarUnavailable" | "invalidShortcut" | "shortcutTaken" | "shortcutUnsupported" | "repoConfig" | "io" | "http" | "tauri" | "updater" | "autostart";
 
 /**  The payload of each event, by name: `Events` in `src/lib/bindings.ts`. */
 export type Events = Events_Serialize | Events_Deserialize;
@@ -759,7 +759,7 @@ export type Events_Deserialize = {
 	/**  Every row's queue of classmates being added, sent when one is queued, starts or ends. */
 	"teammate-jobs": TeammateJob_Deserialize[],
 	/**  Self-update changed state. */
-	"update-state": UpdateStatus,
+	"update-state": UpdateStatus_Deserialize,
 	/**  Something worth a notification; the UI words it and sends it. */
 	notify: Notice,
 	/**  Ids of projects and unaccepted assignments with unseen news. */
@@ -805,7 +805,7 @@ export type Events_Serialize = {
 	/**  Every row's queue of classmates being added, sent when one is queued, starts or ends. */
 	"teammate-jobs": TeammateJob_Serialize[],
 	/**  Self-update changed state. */
-	"update-state": UpdateStatus,
+	"update-state": UpdateStatus_Serialize,
 	/**  Something worth a notification; the UI words it and sends it. */
 	notify: Notice,
 	/**  Ids of projects and unaccepted assignments with unseen news. */
@@ -846,9 +846,22 @@ export type ExtraScope =
 "writePublicKey";
 
 /**  An error as the UI shows it (`errorMessage`): `error.<kind>`, else the message. */
-export type Failure = {
+export type Failure = Failure_Serialize | Failure_Deserialize;
+
+/**  An error as the UI shows it (`errorMessage`): `error.<kind>`, else the message. */
+export type Failure_Deserialize = {
 	kind: ErrorKind,
 	message: string,
+	/**  What the UI's wording of this kind (`error.<kind>`) fills in. */
+	params: { [key in string]: string },
+};
+
+/**  An error as the UI shows it (`errorMessage`): `error.<kind>`, else the message. */
+export type Failure_Serialize = {
+	kind: ErrorKind,
+	message: string,
+	/**  What the UI's wording of this kind (`error.<kind>`) fills in. */
+	params?: { [key in string]: string },
 };
 
 /**  Teacher activity on the Feedback PR: comments and reviews not written by the student. */
@@ -1834,15 +1847,43 @@ export type Unaccepted_Serialize = {
 /**  Releases the app updates to: published stable ones, or also pre-releases. */
 export type UpdateChannel = "stable" | "beta";
 
-export type UpdateState = { phase: "idle" } | { phase: "checking" } | { phase: "downloading"; version: string; downloaded: number; 
+export type UpdateState = UpdateState_Serialize | UpdateState_Deserialize;
+
+export type UpdateState_Deserialize = ({ phase: "idle" }) & { downloaded?: never; error?: never; notes?: never; total?: never; version?: never } | ({ phase: "checking" }) & { downloaded?: never; error?: never; notes?: never; total?: never; version?: never } | ({ phase: "downloading"; version: string; downloaded: number; 
 /**  `None` when the server sent no length: the bar is indeterminate. */
-total: number | null } | { phase: "ready"; version: string; notes: string | null } | 
+total: number | null }) & { error?: never; notes?: never } | ({ phase: "ready"; version: string; notes: string | null }) & { downloaded?: never; error?: never; total?: never } | 
 /**  The last check the user started, or the last download, failed. */
-{ phase: "error"; error: Failure };
+({ phase: "error"; error: Failure_Deserialize }) & { downloaded?: never; notes?: never; total?: never; version?: never };
+
+export type UpdateState_Serialize = ({ phase: "idle" }) & { downloaded?: never; error?: never; notes?: never; total?: never; version?: never } | ({ phase: "checking" }) & { downloaded?: never; error?: never; notes?: never; total?: never; version?: never } | ({ phase: "downloading"; version: string; downloaded: number; 
+/**  `None` when the server sent no length: the bar is indeterminate. */
+total: number | null }) & { error?: never; notes?: never } | ({ phase: "ready"; version: string; notes: string | null }) & { downloaded?: never; error?: never; total?: never } | 
+/**  The last check the user started, or the last download, failed. */
+({ phase: "error"; error: Failure_Serialize }) & { downloaded?: never; notes?: never; total?: never; version?: never };
 
 /**  What `update-state` carries and `update_status` returns. */
-export type UpdateStatus = {
-	state: UpdateState,
+export type UpdateStatus = UpdateStatus_Serialize | UpdateStatus_Deserialize;
+
+/**  What `update-state` carries and `update_status` returns. */
+export type UpdateStatus_Deserialize = {
+	state: UpdateState_Deserialize,
+	/**  "Later" was chosen: the banner stays, without the question. */
+	deferred: boolean,
+	/**  "Restart now" is running. */
+	installing: boolean,
+	/**  The dev build's fake update (`simulate_update`): Restart only logs. */
+	simulated: boolean,
+	lastCheck: string | null,
+	bundle: Bundle,
+	canUpdate: boolean,
+	installOnQuit: boolean,
+	asksPassword: boolean,
+	hasBeta: boolean,
+};
+
+/**  What `update-state` carries and `update_status` returns. */
+export type UpdateStatus_Serialize = {
+	state: UpdateState_Serialize,
 	/**  "Later" was chosen: the banner stays, without the question. */
 	deferred: boolean,
 	/**  "Restart now" is running. */

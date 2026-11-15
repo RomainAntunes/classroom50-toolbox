@@ -71,6 +71,7 @@ pub struct Facts {
     pub stats: SyncStats,
     pub settings: Settings,
     pub editors: Vec<String>,
+    pub updates: crate::updater::UpdateFacts,
     /// The end of the log file, `None` when there is none.
     pub log: Option<String>,
     pub home: Option<String>,
@@ -234,6 +235,31 @@ fn render(facts: &Facts) -> String {
             .collect();
         line(format!("- Phases ({mode}): {}", costs.join(", ")));
     }
+
+    line(String::new());
+    line("#### Updates".into());
+    let updates = &facts.updates;
+    line(format!(
+        "- Channel: {} ({} {})",
+        format!("{:?}", updates.channel).to_lowercase(),
+        updates.feeds,
+        if updates.feeds == 1 { "feed" } else { "feeds" }
+    ));
+    line(format!(
+        "- Bundle: {} (self-update: {})",
+        format!("{:?}", updates.bundle).to_lowercase(),
+        yes_no(updates.bundle.can_update())
+    ));
+    line(format!("- Last check: {}", time(updates.last_check)));
+    line(format!(
+        "- Last failure: {}",
+        updates.failed_at.map_or("none".to_owned(), |at| format!(
+            "{} ({})",
+            time(Some(at)),
+            updates.failed_kind.as_deref().unwrap_or("unknown")
+        ))
+    ));
+    line(format!("- State: {}", updates.state));
 
     line(String::new());
     line("#### Counts".into());
@@ -1424,6 +1450,15 @@ mod tests {
             stats: SyncStats::default(),
             settings: Settings::default(),
             editors: vec!["IntelliJ IDEA".into()],
+            updates: crate::updater::UpdateFacts {
+                channel: crate::settings::UpdateChannel::Beta,
+                bundle: crate::updater::Bundle::App,
+                feeds: 2,
+                last_check: None,
+                failed_at: Some(Utc::now()),
+                failed_kind: Some("updateUnavailable".into()),
+                state: "idle".into(),
+            },
             log: Some(format!(
                 "[INFO] cloned CS-School/cs50-hello-alice to /Users/alice/IdeaProjects/hello-clone\n\
                  [WARN] Alice Doe <carol@uni.edu> carol99 pushed; token {token}\n\
@@ -1461,6 +1496,9 @@ mod tests {
         assert!(report.text.contains("- Signed in: yes as user-1"));
         assert!(report.text.contains("- gh: 2.81.0"));
         assert!(report.text.contains("- Missing scopes: workflow"));
+        assert!(report.text.contains("- Channel: beta (2 feeds)"));
+        assert!(report.text.contains("- Bundle: app (self-update: yes)"));
+        assert!(report.text.contains("(updateUnavailable)"));
         assert!(
             report
                 .text

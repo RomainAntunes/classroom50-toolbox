@@ -24,7 +24,8 @@ use crate::settings::{SettingsStore, UpdateChannel};
 const STABLE_URL: &str =
     "https://github.com/RomainAntunes/classroom50-toolbox/releases/latest/download/latest.json";
 /// Rewritten by `beta-channel.yml` whenever a release is published: the newest of the newest
-/// pre-release and the newest stable, so beta users also get the stable that follows.
+/// pre-release and the newest stable. It lags a publish by the workflow's run, so the Beta
+/// channel also reads `STABLE_URL` (`feeds`).
 const BETA_URL: &str = "https://github.com/RomainAntunes/classroom50-toolbox/releases/download/beta-channel/latest.json";
 
 const MEMORY_FILE: &str = "update-check.json";
@@ -100,11 +101,47 @@ impl Bundle {
     }
 }
 
-/// The `latest.json` a channel reads, given how the app was installed.
-pub fn endpoint(channel: UpdateChannel, bundle: Bundle) -> &'static str {
+/// The `latest.json` files a channel reads, given how the app was installed. The Beta
+/// channel reads both: its own feed is a copy `beta-channel.yml` makes after a release is
+/// published, so a new stable is on the stable feed first, and either feed can fail alone.
+pub fn feeds(channel: UpdateChannel, bundle: Bundle) -> &'static [&'static str] {
     match channel {
-        UpdateChannel::Beta if bundle.has_beta() => BETA_URL,
-        _ => STABLE_URL,
+        UpdateChannel::Beta if bundle.has_beta() => &[BETA_URL, STABLE_URL],
+        _ => &[STABLE_URL],
+    }
+}
+
+/// What the feeds answered, in `feeds` order, made one answer: the highest version any of
+/// them offers (`version` reads it; one it can't read ranks lowest), else up to date when
+/// one of them answered, else the first feed's error.
+fn newest<T, E>(
+    answers: Vec<std::result::Result<Option<T>, E>>,
+    version: impl Fn(&T) -> Option<semver::Version>,
+) -> std::result::Result<Option<T>, E> {
+    let mut best: Option<(Option<semver::Version>, T)> = None;
+    let mut answered = false;
+    let mut first_error = None;
+    for answer in answers {
+        match answer {
+            Ok(Some(found)) => {
+                answered = true;
+                let rank = version(&found);
+                if best.as_ref().is_none_or(|(top, _)| rank > *top) {
+                    best = Some((rank, found));
+                }
+            }
+            Ok(None) => answered = true,
+            Err(err) => {
+                if first_error.is_none() {
+                    first_error = Some(err);
+                }
+            }
+        }
+    }
+    match (best, first_error) {
+        (Some((_, found)), _) => Ok(Some(found)),
+        (None, Some(err)) if !answered => Err(err),
+        _ => Ok(None),
     }
 }
 
@@ -115,6 +152,9 @@ pub fn endpoint(channel: UpdateChannel, bundle: Bundle) -> &'static str {
 pub struct Failure {
     kind: ErrorKind,
     message: String,
+    /// What the UI's wording of this kind (`error.<kind>`) fills in.
+    #[serde(skip_serializing_if = "std::collections::BTreeMap::is_empty")]
+    params: std::collections::BTreeMap<&'static str, String>,
 }
 
 impl From<&Error> for Failure {
@@ -122,6 +162,7 @@ impl From<&Error> for Failure {
         Self {
             kind: err.error_kind(),
             message: err.to_string(),
+            params: err.params().into_iter().collect(),
         }
     }
 }
@@ -321,9 +362,16 @@ struct Memory {
     channel: Option<UpdateChannel>,
     /// The last check that failed, which delays the next background one.
     failed_at: Option<DateTime<Utc>>,
+    /// Its error kind (`ErrorKind::as_str`), for the diagnostics report.
+    failed_kind: Option<String>,
 }
 
 impl Memory {
+    fn failed(&mut self, err: &Error) {
+        self.failed_at = Some(Utc::now());
+        self.failed_kind = Some(err.error_kind().as_str().to_owned());
+    }
+
     fn load(path: &Path) -> Self {
         std::fs::read(path)
             .ok()
@@ -402,6 +450,21 @@ impl std::fmt::Debug for Pending {
     }
 }
 
+/// The updater as the diagnostics report shows it (`UpdaterState::facts`).
+#[derive(Debug, Clone)]
+pub struct UpdateFacts {
+    pub channel: UpdateChannel,
+    pub bundle: Bundle,
+    /// How many feeds the channel reads (`feeds`).
+    pub feeds: usize,
+    pub last_check: Option<DateTime<Utc>>,
+    pub failed_at: Option<DateTime<Utc>>,
+    /// `ErrorKind::as_str` of that failure.
+    pub failed_kind: Option<String>,
+    /// The state machine's phase in words.
+    pub state: String,
+}
+
 /// The downloaded update lives in memory until installed: the plugin checks its signature
 /// on these very bytes, so nothing on disk could be swapped between the check and the
 /// install, and a release is about 10 MB. A restart drops it; the next check downloads
@@ -447,6 +510,27 @@ impl UpdaterState {
         }
     }
 
+    /// What the diagnostics report says about updates.
+    pub fn facts(&self, channel: UpdateChannel) -> UpdateFacts {
+        let memory = self.memory.lock().map(|m| m.clone()).unwrap_or_default();
+        let state = match self.with(|machine| machine.state.clone()) {
+            UpdateState::Idle => "idle".to_owned(),
+            UpdateState::Checking => "checking".to_owned(),
+            UpdateState::Downloading { version, .. } => format!("downloading {version}"),
+            UpdateState::Ready { version, .. } => format!("{version} ready to install"),
+            UpdateState::Error { error } => format!("error ({})", error.kind.as_str()),
+        };
+        UpdateFacts {
+            channel,
+            bundle: self.bundle,
+            feeds: feeds(channel, self.bundle).len(),
+            last_check: memory.checked_at,
+            failed_at: memory.failed_at,
+            failed_kind: memory.failed_kind,
+            state,
+        }
+    }
+
     fn with<T>(&self, f: impl FnOnce(&mut Machine<Pending>) -> T) -> T {
         let mut machine = self.machine.lock().unwrap_or_else(|e| e.into_inner());
         f(&mut machine)
@@ -464,6 +548,7 @@ impl UpdaterState {
             memory.version = Some(version);
             memory.channel = Some(channel);
             memory.failed_at = None;
+            memory.failed_kind = None;
         });
     }
 }
@@ -479,14 +564,46 @@ fn channel(app: &AppHandle) -> UpdateChannel {
     app.state::<SettingsStore>().get().update_channel
 }
 
-/// A request that never got an answer means offline, as for GitHub's API.
+/// A request that never got an answer means offline, as for GitHub's API. An answer with an
+/// error status is temporary: the plugin reports a feed that did (a 5xx from GitHub's
+/// download servers) as `ReleaseNotFound`, without the status, and a download that did as
+/// `Network`.
 fn classify(err: tauri_plugin_updater::Error) -> Error {
+    use tauri_plugin_updater::Error as Plugin;
     match err {
-        tauri_plugin_updater::Error::Reqwest(err) if err.is_connect() || err.is_timeout() => {
-            Error::Offline
-        }
+        Plugin::Reqwest(err) if err.is_connect() || err.is_timeout() => Error::Offline,
+        Plugin::Reqwest(err) if err.is_status() => Error::UpdateUnavailable,
+        Plugin::ReleaseNotFound | Plugin::Network(_) => Error::UpdateUnavailable,
         other => Error::Updater(other),
     }
+}
+
+/// Asks one feed whether there is a newer version than the running one.
+async fn check_feed(app: &AppHandle, url: &'static str, running: &str) -> Result<Option<Update>> {
+    let parsed = url
+        .parse()
+        .map_err(|_| Error::Unsupported("bad update URL".into()))?;
+    let feed = if url == STABLE_URL { "stable" } else { "beta" };
+    let running = running.to_owned();
+    let found = app
+        .updater_builder()
+        .endpoints(vec![parsed])?
+        // The plugin's own rule, plus a line saying what the feed held.
+        .version_comparator(move |current, remote| {
+            log::info!(
+                "update feed ({feed}) says {}, running {running}",
+                remote.version
+            );
+            remote.version > current
+        })
+        .build()?
+        .check()
+        .await
+        .map_err(classify);
+    if let Err(err) = &found {
+        log::warn!("update feed ({feed}) failed: {err}");
+    }
+    found
 }
 
 /// Background checks: one shortly after every start, then whenever one is due. Release builds
@@ -618,27 +735,15 @@ pub async fn check(app: &AppHandle, quiet: bool) -> Result<UpdateStatus> {
         return Ok(state.status());
     };
     emit(app);
-    let found = async {
-        let url = endpoint(channel, state.bundle)
-            .parse()
-            .map_err(|_| Error::Unsupported("bad update URL".into()))?;
-        let running = version.clone();
-        app.updater_builder()
-            .endpoints(vec![url])?
-            // The plugin's own rule, plus a line saying what the feed held.
-            .version_comparator(move |current, remote| {
-                log::info!(
-                    "update feed ({channel:?}) says {}, running {running}",
-                    remote.version
-                );
-                remote.version > current
-            })
-            .build()?
-            .check()
-            .await
-            .map_err(classify)
-    }
+    let answers = futures_util::future::join_all(
+        feeds(channel, state.bundle)
+            .iter()
+            .map(|url| check_feed(app, url, &version)),
+    )
     .await;
+    let found = newest(answers, |update: &Update| {
+        semver::Version::parse(&update.version).ok()
+    });
 
     match found {
         Ok(None) => {
@@ -662,7 +767,7 @@ pub async fn check(app: &AppHandle, quiet: bool) -> Result<UpdateStatus> {
             Ok(state.status())
         }
         Err(err) => {
-            state.remember(|memory| memory.failed_at = Some(Utc::now()));
+            state.remember(|memory| memory.failed(&err));
             if state.with(|machine| machine.failed(generation, Failure::from(&err), quiet)) {
                 emit(app);
             }
@@ -713,7 +818,7 @@ async fn download(
         Err(err) => {
             let err = classify(err);
             log::warn!("update download failed: {err}");
-            state.remember(|memory| memory.failed_at = Some(Utc::now()));
+            state.remember(|memory| memory.failed(&err));
             if state.with(|machine| machine.failed(generation, Failure::from(&err), false)) {
                 emit(&app);
             }
@@ -915,6 +1020,7 @@ mod tests {
             version: Some("0.10.0".into()),
             channel: Some(UpdateChannel::Stable),
             failed_at: None,
+            failed_kind: None,
         }
     }
 
@@ -1110,13 +1216,83 @@ mod tests {
     }
 
     #[test]
-    fn picks_the_channel_file() {
-        assert_eq!(endpoint(UpdateChannel::Stable, Bundle::Nsis), STABLE_URL);
-        assert_eq!(endpoint(UpdateChannel::Beta, Bundle::Nsis), BETA_URL);
-        assert_eq!(endpoint(UpdateChannel::Beta, Bundle::App), BETA_URL);
-        assert_eq!(endpoint(UpdateChannel::Beta, Bundle::AppImage), BETA_URL);
+    fn picks_the_channel_files() {
+        let both: &[&str] = &[BETA_URL, STABLE_URL];
+        assert_eq!(feeds(UpdateChannel::Stable, Bundle::Nsis), &[STABLE_URL]);
+        assert_eq!(feeds(UpdateChannel::Beta, Bundle::Nsis), both);
+        assert_eq!(feeds(UpdateChannel::Beta, Bundle::App), both);
+        assert_eq!(feeds(UpdateChannel::Beta, Bundle::AppImage), both);
         // No MSI pre-releases: an MSI install stays on stable.
-        assert_eq!(endpoint(UpdateChannel::Beta, Bundle::Msi), STABLE_URL);
+        assert_eq!(feeds(UpdateChannel::Beta, Bundle::Msi), &[STABLE_URL]);
+    }
+
+    /// `newest` over plain version strings: what each feed found, or why it failed.
+    fn pick(
+        answers: Vec<std::result::Result<Option<&str>, &str>>,
+    ) -> std::result::Result<Option<String>, String> {
+        newest(answers, |v: &&str| semver::Version::parse(v).ok())
+            .map(|found| found.map(str::to_owned))
+            .map_err(str::to_owned)
+    }
+
+    #[test]
+    fn the_beta_channel_takes_the_newest_feed() {
+        // 0.15.0 is out while the beta feed still says nothing newer (#175).
+        assert_eq!(
+            pick(vec![Ok(None), Ok(Some("0.15.0"))]),
+            Ok(Some("0.15.0".into()))
+        );
+        // A beta after it beats it, and the higher of two wins either way round.
+        assert_eq!(
+            pick(vec![Ok(Some("0.16.0-beta.1")), Ok(Some("0.15.0"))]),
+            Ok(Some("0.16.0-beta.1".into()))
+        );
+        assert_eq!(
+            pick(vec![Ok(Some("0.15.0")), Ok(Some("0.15.0-beta.2"))]),
+            Ok(Some("0.15.0".into()))
+        );
+        assert_eq!(pick(vec![Ok(None), Ok(None)]), Ok(None));
+    }
+
+    #[test]
+    fn one_failing_feed_falls_back_on_the_other() {
+        assert_eq!(
+            pick(vec![Err("beta"), Ok(Some("0.15.0"))]),
+            Ok(Some("0.15.0".into()))
+        );
+        assert_eq!(
+            pick(vec![Ok(Some("0.16.0-beta.1")), Err("stable")]),
+            Ok(Some("0.16.0-beta.1".into()))
+        );
+        assert_eq!(pick(vec![Err("beta"), Ok(None)]), Ok(None));
+        // Only both failing fails, with the first feed's error.
+        assert_eq!(pick(vec![Err("beta"), Err("stable")]), Err("beta".into()));
+        assert_eq!(pick(vec![Err("stable")]), Err("stable".into()));
+        // A version that doesn't parse still counts, below any that does.
+        assert_eq!(
+            pick(vec![Ok(Some("weird")), Ok(Some("0.15.0"))]),
+            Ok(Some("0.15.0".into()))
+        );
+        assert_eq!(pick(vec![Ok(Some("weird"))]), Ok(Some("weird".into())));
+    }
+
+    #[test]
+    fn an_error_status_from_github_is_temporary() {
+        use tauri_plugin_updater::Error as Plugin;
+        assert!(matches!(
+            classify(Plugin::ReleaseNotFound),
+            Error::UpdateUnavailable
+        ));
+        assert!(matches!(
+            classify(Plugin::Network(
+                "Download request failed with status: 504".into()
+            )),
+            Error::UpdateUnavailable
+        ));
+        assert!(matches!(
+            classify(Plugin::EmptyEndpoints),
+            Error::Updater(_)
+        ));
     }
 
     #[test]

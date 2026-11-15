@@ -737,6 +737,8 @@
   "error.calendarAccess": "l'accès au calendrier n'est pas autorisé",
   "error.calendarUnavailable": "le service de calendrier ne répond pas",
   "error.noSelfUpdate": "cette copie de la toolbox ne peut pas se mettre à jour seule ; téléchargez les nouvelles versions sur GitHub",
+  "error.updateUnavailable": "GitHub ne fournit pas la mise à jour pour l'instant ; réessayez plus tard",
+  "error.updater": "la mise à jour a échoué : {detail}",
   "error.invalidShortcut": "un raccourci demande une touche et une touche de modification autre que Maj",
   "error.shortcutTaken": "une autre app ou le système utilise déjà ce raccourci",
   "error.shortcutUnsupported": "les raccourcis globaux ne sont pas disponibles sur ce système",

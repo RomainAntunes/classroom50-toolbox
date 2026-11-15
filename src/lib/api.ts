@@ -120,11 +120,11 @@ export type RateLimit = B.RateLimit;
 /** What the sync engine did lately (Settings). */
 export type SyncDetails = B.SyncDetails_Serialize;
 /** Where self-update stands (`updater.rs`). */
-export type UpdateState = B.UpdateState;
+export type UpdateState = B.UpdateState_Serialize;
 /** How the app was installed, which decides what updating can do. */
 export type Bundle = B.Bundle;
 /** Payload of `update-state` and `update_status`. */
-export type UpdateStatus = B.UpdateStatus;
+export type UpdateStatus = B.UpdateStatus_Serialize;
 export type ErrorKind = B.ErrorKind;
 /** Shape of every error a command rejects with (`CommandError` in src-tauri/src/error.rs). */
 export type CommandError = B.CommandError_Serialize;

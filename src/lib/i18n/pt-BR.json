@@ -737,6 +737,8 @@
   "error.calendarAccess": "o acesso ao calendário não é permitido",
   "error.calendarUnavailable": "o serviço de calendário não está respondendo",
   "error.noSelfUpdate": "esta cópia do app não consegue se atualizar sozinha; baixe as novas versões no GitHub",
+  "error.updateUnavailable": "o GitHub não está disponibilizando a atualização agora; tente de novo mais tarde",
+  "error.updater": "a atualização falhou: {detail}",
   "error.invalidShortcut": "um atalho precisa de uma tecla e de uma tecla modificadora além do Shift",
   "error.shortcutTaken": "outro app ou o sistema já usa este atalho",
   "error.shortcutUnsupported": "atalhos globais não estão disponíveis neste sistema",

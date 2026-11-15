@@ -806,6 +806,8 @@
   "error.calendarAccess": "الوصول إلى التقويم غير مسموح",
   "error.calendarUnavailable": "خدمة التقويم لا تستجيب",
   "error.noSelfUpdate": "لا تستطيع هذه النسخة من التطبيق تحديث نفسها؛ يمكن تنزيل الإصدارات الجديدة من GitHub",
+  "error.updateUnavailable": "لا يوفّر GitHub التحديث حاليًا؛ تُرجى المحاولة لاحقًا",
+  "error.updater": "تعذّر التحديث: {detail}",
   "error.invalidShortcut": "يحتاج الاختصار إلى مفتاح واحد ومفتاح تعديل غير Shift",
   "error.shortcutTaken": "يستخدم تطبيق آخر أو النظام هذا الاختصار بالفعل",
   "error.shortcutUnsupported": "الاختصارات على مستوى النظام غير متاحة على هذا النظام",

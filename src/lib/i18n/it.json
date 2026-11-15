@@ -737,6 +737,8 @@
   "error.calendarAccess": "l'accesso al calendario non è consentito",
   "error.calendarUnavailable": "il servizio di calendario non risponde",
   "error.noSelfUpdate": "questa copia dell'app non può aggiornarsi da sola; scarica le nuove versioni da GitHub",
+  "error.updateUnavailable": "GitHub non sta fornendo l'aggiornamento in questo momento; riprova più tardi",
+  "error.updater": "l'aggiornamento non è riuscito: {detail}",
   "error.invalidShortcut": "una scorciatoia richiede un tasto e un modificatore diverso da Maiusc",
   "error.shortcutTaken": "un'altra app o il sistema usa già questa scorciatoia",
   "error.shortcutUnsupported": "le scorciatoie globali non sono disponibili su questo sistema",

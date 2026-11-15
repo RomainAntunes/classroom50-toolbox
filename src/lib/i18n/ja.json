@@ -691,6 +691,8 @@
   "error.calendarAccess": "カレンダーへのアクセスが許可されていません",
   "error.calendarUnavailable": "カレンダーサービスが応答していません",
   "error.noSelfUpdate": "このツールボックスは自分でアップデートできません。新しいバージョンはGitHubからダウンロードしてください",
+  "error.updateUnavailable": "GitHubが現在アップデートを提供できません。しばらくしてからもう一度お試しください",
+  "error.updater": "アップデートに失敗しました：{detail}",
   "error.invalidShortcut": "ショートカットには、キー1つとShift以外の修飾キーが必要です",
   "error.shortcutTaken": "このショートカットは別のアプリかシステムがすでに使っています",
   "error.shortcutUnsupported": "このシステムではシステム全体のショートカットを使えません",

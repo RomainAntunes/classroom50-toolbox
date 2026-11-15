@@ -691,6 +691,8 @@
   "error.calendarAccess": "不允许访问日历",
   "error.calendarUnavailable": "日历服务没有响应",
   "error.noSelfUpdate": "这份工具箱无法自行更新，请从GitHub下载新版本",
+  "error.updateUnavailable": "GitHub暂时无法提供更新，请稍后再试",
+  "error.updater": "更新失败：{detail}",
   "error.invalidShortcut": "快捷键需要一个按键加上Shift以外的修饰键",
   "error.shortcutTaken": "其他应用或系统已在使用此快捷键",
   "error.shortcutUnsupported": "此系统不支持全局快捷键",

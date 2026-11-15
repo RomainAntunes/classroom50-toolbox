@@ -714,6 +714,8 @@
   "error.calendarAccess": "toegang tot de agenda is niet toegestaan",
   "error.calendarUnavailable": "de agendaservice reageert niet",
   "error.noSelfUpdate": "deze kopie van de toolbox kan zichzelf niet bijwerken; download nieuwe versies van GitHub",
+  "error.updateUnavailable": "GitHub levert de update nu niet; probeer het later opnieuw",
+  "error.updater": "de update is mislukt: {detail}",
   "error.invalidShortcut": "een sneltoets heeft één toets en een modificatietoets anders dan Shift nodig",
   "error.shortcutTaken": "een andere app of het systeem gebruikt deze sneltoets al",
   "error.shortcutUnsupported": "systeembrede sneltoetsen zijn niet beschikbaar op dit systeem",

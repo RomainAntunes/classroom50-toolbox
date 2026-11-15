@@ -691,6 +691,8 @@
   "error.calendarAccess": "캘린더 액세스가 허용되지 않았어요",
   "error.calendarUnavailable": "캘린더 서비스가 응답하지 않아요",
   "error.noSelfUpdate": "이 도구 상자는 스스로 업데이트할 수 없어요. 새 버전은 GitHub에서 다운로드하세요",
+  "error.updateUnavailable": "지금은 GitHub에서 업데이트를 받을 수 없어요. 잠시 후 다시 시도하세요",
+  "error.updater": "업데이트에 실패했어요: {detail}",
   "error.invalidShortcut": "단축키에는 키 하나와 Shift가 아닌 보조 키가 필요해요",
   "error.shortcutTaken": "다른 앱이나 시스템이 이미 이 단축키를 쓰고 있어요",
   "error.shortcutUnsupported": "이 시스템에서는 전역 단축키를 쓸 수 없어요",
