@@ -5,17 +5,18 @@
   import { menuKey, onContextMenu, popupMenu } from "#lib/keyboard.js";
   import { scrollBehavior } from "#lib/motion.js";
   import { isHidden, setHidden } from "#lib/hidden.js";
-  import { acceptAssignment, acceptBlocked, canFoundGroup } from "#lib/accept.js";
+  import { acceptBlocked, canFoundGroup } from "#lib/rowRules.js";
   import { session } from "#lib/session.svelte.js";
   import { acceptLink, copyLink } from "#lib/links.js";
   import { groupDetails, groupName } from "#lib/group.js";
   import { gradingDetail } from "#lib/grading.js";
   import { formatDate, relativeAt, t } from "#lib/i18n/index.js";
   import { jobFor } from "#lib/teammateJobs.svelte.js";
-  import Details from "./Details.svelte";
   // Its own chunk, loaded the first time classmates are being added, so its styles stay
   // out of the startup bundle.
   const teammatePanel = () => import("./TeammateProgress.svelte");
+  // The details (with the Markdown renderer) load the first time a row opens.
+  const detailsPanel = () => import("./Details.svelte");
 
   let {
     item,
@@ -48,7 +49,7 @@
 
   const accepting = $derived(session.accepting.includes(item.id));
   function accept(newGroup = false) {
-    void acceptAssignment(item, newGroup);
+    void import("#lib/accept.js").then(({ acceptAssignment }) => acceptAssignment(item, newGroup));
   }
 
   const hidden = $derived(isHidden(item.id));
@@ -178,11 +179,13 @@
     {/if}
   </div>
   {#if open}
-    <Details
-      description={item.assignment.description}
-      doc={item.assignment.descriptionDoc}
-      items={details}
-    />
+    {#await detailsPanel() then { default: Details }}
+      <Details
+        description={item.assignment.description}
+        doc={item.assignment.descriptionDoc}
+        items={details}
+      />
+    {/await}
   {/if}
 </li>
 

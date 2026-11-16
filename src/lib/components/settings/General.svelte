@@ -1,4 +1,5 @@
 <script lang="ts">
+  import "./shared.css";
   import {
     APPEARANCES,
     COMMIT_ACTIONS,
@@ -108,10 +109,10 @@
 </script>
 
 <Section title={t("settings.general.title")}>
-  <div class="row">
-    <span class="text">
+  <div class="set-row">
+    <span class="set-text">
       <span>{t("settings.editor.label")}</span>
-      <span class="sub"
+      <span class="set-sub"
         >{t(editors.installed.length ? "settings.editor.hint" : "settings.editor.none")}</span
       >
     </span>
@@ -123,10 +124,10 @@
       >
     {/if}
   </div>
-  <div class="row">
-    <span class="text">
+  <div class="set-row">
+    <span class="set-text">
       <span>{t("settings.commitActions")}</span>
-      <span class="sub">{t(`settings.commitActions.${current.commitActions}Hint`)}</span>
+      <span class="set-sub">{t(`settings.commitActions.${current.commitActions}Hint`)}</span>
     </span>
     <button
       aria-haspopup="menu"
@@ -142,10 +143,10 @@
     onchange={(on) => save({ showGradingInfo: on })}
   />
   {#if current.hidden.length || current.hiddenClasses.length}
-    <div class="row">
-      <span class="text">
+    <div class="set-row">
+      <span class="set-text">
         <span>{t("settings.hidden.label")}</span>
-        <span class="sub"
+        <span class="set-sub"
           >{t("settings.hidden.hint", {
             count: current.hidden.length,
             classes: current.hiddenClasses.length,
@@ -157,9 +158,9 @@
       >
     </div>
   {/if}
-  <div class="row">
+  <div class="set-row">
     <span id="appearance-label">{t("settings.appearance")}</span>
-    <div class="segmented" role="group" aria-labelledby="appearance-label">
+    <div class="set-segmented" role="group" aria-labelledby="appearance-label">
       {#each APPEARANCES as choice (choice)}
         <button
           aria-pressed={current.appearance === choice}
@@ -168,7 +169,7 @@
       {/each}
     </div>
   </div>
-  <div class="row">
+  <div class="set-row">
     <span>{t("settings.language")}</span>
     <button
       aria-haspopup="menu"
@@ -194,10 +195,10 @@
     checked={current.launchAtLogin}
     onchange={(on) => save({ launchAtLogin: on })}
   />
-  <div class="row">
-    <span class="text">
+  <div class="set-row">
+    <span class="set-text">
       <span>{t("settings.updates.channel")}</span>
-      <span class="sub"
+      <span class="set-sub"
         >{update?.hasBeta === false
           ? t("settings.updates.msiHint")
           : t(`settings.updates.${channel}Hint`)}</span
@@ -214,7 +215,4 @@
 </Section>
 
 <style>
-  @import "./row.css";
-  @import "./label.css";
-  @import "./segmented.css";
 </style>

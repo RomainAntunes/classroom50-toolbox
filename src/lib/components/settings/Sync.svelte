@@ -1,4 +1,5 @@
 <script lang="ts">
+  import "./shared.css";
   import { api, errorMessage, type LastRun, type SyncDetails } from "#lib/api.js";
   import { formatDate, formatNumber, fromNow, t } from "#lib/i18n/index.js";
   import Section from "#lib/components/Section.svelte";
@@ -40,7 +41,7 @@
         >{#if clearing}<Spinner />{/if}{t("settings.sync.clear")}</button
       >
     {/snippet}
-    <button class="disclosure" aria-expanded={showSync} onclick={() => (showSync = !showSync)}>
+    <button class="set-disclosure" aria-expanded={showSync} onclick={() => (showSync = !showSync)}>
       <svg class="mirror-rtl" viewBox="0 0 24 24" aria-hidden="true"><path d="m9 18 6-6-6-6" /></svg
       >
       {t(showSync ? "settings.sync.hide" : "settings.sync.show")}
@@ -92,8 +93,6 @@
 {/if}
 
 <style>
-  @import "./disclosure.css";
-
   .sync {
     display: grid;
     grid-template-columns: max-content 1fr;

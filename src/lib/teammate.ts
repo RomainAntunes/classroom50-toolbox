@@ -16,11 +16,8 @@ import { groupFull } from "#lib/group.js";
 import { formatList, t } from "#lib/i18n/index.js";
 import { askText } from "#lib/prompt.svelte.js";
 import { session } from "#lib/session.svelte.js";
-
-/** Whether adding goes through the group (team assignments) rather than an invitation. */
-export function joinsGroup(project: Project): boolean {
-  return Boolean(project.group) || project.assignment?.mode === "team";
-}
+import { joinsGroup } from "#lib/rowRules.js";
+export { joinsGroup };
 
 /** The usernames typed in the prompt: separated by commas, semicolons or spaces, a leading
  *  `@` dropped, each once. Rust checks each is a GitHub login. */

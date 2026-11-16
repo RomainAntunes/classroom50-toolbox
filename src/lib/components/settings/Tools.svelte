@@ -1,4 +1,5 @@
 <script lang="ts">
+  import "./shared.css";
   import { type ToolStatus } from "#lib/api.js";
   import { t } from "#lib/i18n/index.js";
   import Section from "#lib/components/Section.svelte";
@@ -28,9 +29,9 @@
     >
   {/snippet}
   <div class="intro">
-    <p class="hint">{t("settings.tools.hint")}</p>
+    <p class="set-hint">{t("settings.tools.hint")}</p>
     <button
-      class="disclosure"
+      class="set-disclosure"
       aria-expanded={showInstalls}
       aria-controls="tool-installs"
       onclick={() => (showInstalls = !showInstalls)}
@@ -39,7 +40,7 @@
       >
       {t("settings.tools.howInstalls")}
     </button>
-    <p class="hint installs" id="tool-installs" hidden={!showInstalls}>
+    <p class="set-hint installs" id="tool-installs" hidden={!showInstalls}>
       {t("settings.tools.installs")}
     </p>
   </div>
@@ -56,19 +57,16 @@
 </Section>
 
 <style>
-  @import "./hint.css";
-  @import "./disclosure.css";
-
   .intro {
     padding-block: 10px 4px;
   }
 
-  .intro .hint {
+  .intro .set-hint {
     padding-block: 0;
     font-size: 0.85em;
   }
 
-  .intro .disclosure {
+  .intro .set-disclosure {
     padding-block: 6px;
     font-size: 0.85em;
   }

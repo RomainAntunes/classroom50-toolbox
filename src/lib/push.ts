@@ -8,6 +8,8 @@ import { t } from "#lib/i18n/index.js";
 import { announce } from "#lib/announce.svelte.js";
 import { askTextAction } from "#lib/prompt.svelte.js";
 import { fileList } from "#lib/files.js";
+import { gradedOnPush } from "#lib/rowRules.js";
+export { gradedOnPush };
 
 const REASONS = [
   "otherBranch",
@@ -17,11 +19,6 @@ const REASONS = [
   "noIdentity",
   "pushRejected",
 ];
-
-/** Only every-push assignments; tag-mode ones are graded through Submit. */
-export function gradedOnPush(project: Project): boolean {
-  return Boolean(project.assignment) && project.assignment?.submissionMode !== "tag";
-}
 
 async function show(text: string, title: string, kind: "info" | "warning" | "error") {
   await withDialog(() => message(text, { title, kind }));

@@ -15,16 +15,11 @@ import { announce } from "#lib/announce.svelte.js";
 import { busy, session } from "#lib/session.svelte.js";
 import { askText } from "#lib/prompt.svelte.js";
 import { addToNewGroup } from "#lib/teammate.js";
+import { acceptBlocked, canFoundGroup } from "#lib/rowRules.js";
+export { acceptBlocked, canFoundGroup };
 
 /** The longest group name, as `student::MAX_TEAM_NAME` (upstream's web app) allows. */
 export const MAX_GROUP_NAME = 80;
-
-/** Why `item` can't be accepted from the app now (locked, or not open yet), else null. */
-export function acceptBlocked(item: Unaccepted, now: Date): string | null {
-  if (item.assignment.locked) return t("projects.lockedHint");
-  const opens = item.assignment.availableFrom ? new Date(item.assignment.availableFrom) : null;
-  return opens !== null && opens > now ? t("projects.upcomingHint") : null;
-}
 
 function confirm(text: string, title: string, okLabel: string): Promise<boolean> {
   return withDialog(() =>
@@ -76,13 +71,6 @@ export function askGroupName(message: string): Promise<string | null> {
     okLabel: t("accept.newTeam"),
     maxLength: MAX_GROUP_NAME,
   });
-}
-
-/** Whether the student can found a group for `item` ("Create a group…"): a team assignment
- *  whose groups students form, and no group yet. */
-export function canFoundGroup(item: Unaccepted): boolean {
-  const a = item.assignment;
-  return a.mode === "team" && a.teamFormation !== "teacher" && !item.group;
 }
 
 /** Runs the accept, founding `group` when named, else asking for a new group's name on

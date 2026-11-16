@@ -1,0 +1,94 @@
+/* The styles the Settings sections share, loaded once by the Settings page (global, so each
+   section no longer carries its own copy). Prefixed `set-`, since `Toggle`, `ToolRow` and
+   `ShortcutRecorder` keep their own `.row`, `.text`, `.sub` and `.hint`. */
+
+/* A settings row: its label at the start, its control at the end. */
+.set-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space);
+  padding: 8px 12px;
+}
+
+/* A row's label with a muted line under it. */
+.set-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.set-sub {
+  font-size: 0.85em;
+  color: var(--fg-muted);
+}
+
+/* A path cut short at its start (`direction: rtl` puts the ellipsis there), the path
+   itself kept left to right by its `<bdi dir="ltr">` so its leading `/` stays put. */
+.set-path {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  direction: rtl;
+  text-align: left;
+}
+
+/* `direction: rtl` above only puts the ellipsis at the path's start; the text still lines
+   up with the UI's start edge. */
+:root[dir="rtl"] .set-path {
+  text-align: right;
+}
+
+.set-disclosure {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  padding: 8px 12px;
+  border-radius: 0;
+  background: transparent;
+  text-align: start;
+  color: var(--fg-muted);
+}
+
+.set-disclosure svg {
+  width: 14px;
+  height: 14px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  transition: transform 0.15s;
+}
+
+.set-disclosure[aria-expanded="true"] svg {
+  transform: rotate(90deg);
+}
+
+.set-segmented {
+  display: flex;
+  gap: 2px;
+  padding: 2px;
+  border-radius: var(--radius-control);
+  background: var(--bg-control);
+}
+
+.set-segmented button {
+  padding: 2px 8px;
+  background: transparent;
+  font-size: 0.9em;
+}
+
+.set-segmented button[aria-pressed="true"] {
+  background: var(--bg-card);
+  box-shadow: 0 0 0 1px var(--border);
+}
+
+.set-hint {
+  margin: 0;
+  padding: 12px;
+  color: var(--fg-muted);
+}

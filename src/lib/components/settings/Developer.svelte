@@ -1,4 +1,5 @@
 <script lang="ts">
+  import "./shared.css";
   import { goto } from "$app/navigation";
   import { api, SIMULATED_NETWORKS, type SimulatedNetwork } from "#lib/api.js";
   import { t } from "#lib/i18n/index.js";
@@ -36,9 +37,9 @@
 </script>
 
 <Section title={t("settings.dev.title")}>
-  <div class="row">
+  <div class="set-row">
     <span id="skin-label" title={t("settings.dev.skinHint")}>{t("settings.dev.skin")}</span>
-    <div class="segmented" role="group" aria-labelledby="skin-label">
+    <div class="set-segmented" role="group" aria-labelledby="skin-label">
       {#each OS_CHOICES as os (os)}
         <button aria-pressed={preview.os === os} onclick={() => setPreviewOs(os)}
           >{t(`settings.dev.os.${os}`)}</button
@@ -52,10 +53,10 @@
     checked={locale.rtlPreview}
     onchange={setPreviewRtl}
   />
-  <div class="row">
+  <div class="set-row">
     <span id="network-label" title={t("settings.dev.networkHint")}>{t("settings.dev.network")}</span
     >
-    <div class="segmented" role="group" aria-labelledby="network-label">
+    <div class="set-segmented" role="group" aria-labelledby="network-label">
       {#each SIMULATED_NETWORKS as choice (choice)}
         <button aria-pressed={network === choice} onclick={() => simulateNetwork(choice)}
           >{t(`settings.dev.network.${choice}`)}</button
@@ -64,7 +65,7 @@
     </div>
   </div>
   <form
-    class="row"
+    class="set-row"
     onsubmit={(event) => {
       event.preventDefault();
       void openDevLink();
@@ -82,29 +83,29 @@
     />
     <button type="submit" disabled={!devLink.trim()}>{t("settings.dev.linkOpen")}</button>
   </form>
-  <div class="row">
+  <div class="set-row">
     <span title={t("settings.dev.updateHint")}>{t("settings.dev.update")}</span>
     <button onclick={() => api.simulateUpdate()}>{t("settings.dev.updateRun")}</button>
   </div>
-  <div class="row">
+  <div class="set-row">
     <span title={t("settings.dev.whatsNewHint")}>{t("settings.dev.whatsNew")}</span>
     <button onclick={() => goto("/whats-new?from=settings&all")}
       >{t("settings.dev.whatsNewShow")}</button
     >
   </div>
-  <button class="disclosure" aria-expanded={showDev} onclick={() => (showDev = !showDev)}>
+  <button class="set-disclosure" aria-expanded={showDev} onclick={() => (showDev = !showDev)}>
     <svg class="mirror-rtl" viewBox="0 0 24 24" aria-hidden="true"><path d="m9 18 6-6-6-6" /></svg>
     {t("settings.dev.notifications")}
   </button>
   {#if showDev}
-    <p class="hint">{t("settings.dev.hint")}</p>
+    <p class="set-hint">{t("settings.dev.hint")}</p>
     {#each sampleNotices() as notice (notice.kind)}
-      <div class="row">
+      <div class="set-row">
         <span>{t(`settings.dev.kind.${notice.kind}`)}</span>
         <button onclick={() => showNotice(notice)}>{t("settings.dev.send")}</button>
       </div>
     {/each}
-    <div class="row">
+    <div class="set-row">
       <span title={t("settings.dev.badgeHint")}>{t("settings.dev.badge")}</span>
       <button disabled={badgeQueued} onclick={previewBadge}>
         {t(badgeQueued ? "settings.dev.badgeQueued" : "settings.dev.badgeShow")}
@@ -114,11 +115,6 @@
 </Section>
 
 <style>
-  @import "./row.css";
-  @import "./hint.css";
-  @import "./segmented.css";
-  @import "./disclosure.css";
-
   .dev-link {
     flex: 1;
     min-width: 0;

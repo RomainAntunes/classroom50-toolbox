@@ -1,4 +1,5 @@
 <script lang="ts">
+  import "#lib/components/guide.css";
   import logo from "#lib/assets/logo.png";
   import { onMount } from "svelte";
   import { goto } from "$app/navigation";
@@ -16,6 +17,7 @@
   import ToolRow from "#lib/components/ToolRow.svelte";
   import GitLogin from "#lib/components/settings/GitLogin.svelte";
   import GitSsh from "#lib/components/settings/GitSsh.svelte";
+  import "#lib/components/settings/shared.css";
 
   // First run: what the app does, then the three things it needs, and git outside the app
   // (optional). Every step can be skipped; Settings has all of it later.
@@ -75,12 +77,12 @@
 
 <main>
   {#if STEPS[step] === "welcome"}
-    <section class="hero">
-      <img class="hero-logo" src={logo} alt="" />
-      <h1 class="hero-title">{t("welcome.title")}</h1>
-      <p class="lead">{t("welcome.lead")}</p>
+    <section class="guide-hero">
+      <img class="guide-logo" src={logo} alt="" />
+      <h1 class="guide-title">{t("welcome.title")}</h1>
+      <p class="guide-lead">{t("welcome.lead")}</p>
     </section>
-    <ul class="points">
+    <ul class="guide-points">
       <li>
         <svg class="mirror-rtl" viewBox="0 0 24 24" aria-hidden="true"
           ><path d="M8 6h13M8 12h13M8 18h13M3.5 6h.01M3.5 12h.01M3.5 18h.01" /></svg
@@ -128,10 +130,10 @@
     {/if}
   {:else if current}
     <Section title={t("welcome.folders.title")}>
-      <div class="row">
-        <span class="text">
+      <div class="set-row">
+        <span class="set-text">
           <span>{t("settings.folders.cloneInto")}</span>
-          <span class="sub path" title={current.cloneFolder ?? undefined}
+          <span class="set-sub set-path" title={current.cloneFolder ?? undefined}
             >{#if current.cloneFolder}<bdi dir="ltr">{current.cloneFolder}</bdi>{:else}<bdi
                 >{t("welcome.folders.cloneUnset")}</bdi
               >{/if}</span
@@ -141,10 +143,10 @@
           {t(current.cloneFolder ? "settings.folders.change" : "welcome.folders.choose")}
         </button>
       </div>
-      <div class="row">
-        <span class="text">
+      <div class="set-row">
+        <span class="set-text">
           <span>{t("settings.editor.label")}</span>
-          <span class="sub"
+          <span class="set-sub"
             >{t(editors.installed.length ? "settings.editor.hint" : "settings.editor.none")}</span
           >
         </span>
@@ -202,6 +204,10 @@
     font-weight: 600;
   }
 
+  .guide-title {
+    font-size: 1.2em;
+  }
+
   .skip {
     background: transparent;
     color: var(--fg-muted);
@@ -216,60 +222,6 @@
     padding: var(--space) 12px;
   }
 
-  .hero {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: 6px;
-    padding: 8px 12px 0;
-    text-align: center;
-  }
-
-  .hero-logo {
-    width: 64px;
-    height: 64px;
-    margin-bottom: 4px;
-  }
-
-  .hero-title {
-    font-size: 1.2em;
-  }
-
-  .lead {
-    margin: 0;
-    color: var(--fg-muted);
-  }
-
-  .points {
-    margin: 0;
-    padding: 4px 0;
-    list-style: none;
-    display: flex;
-    flex-direction: column;
-    background: var(--bg-card);
-    border: 1px solid var(--border);
-    border-radius: var(--radius-card);
-  }
-
-  .points li {
-    display: flex;
-    align-items: flex-start;
-    gap: 10px;
-    padding: 8px 12px;
-  }
-
-  .points svg {
-    flex-shrink: 0;
-    width: 18px;
-    height: 18px;
-    margin-top: 1px;
-    fill: none;
-    stroke: var(--accent);
-    stroke-width: 2;
-    stroke-linecap: round;
-    stroke-linejoin: round;
-  }
-
   .hint {
     margin: 0 4px calc(var(--space) * -1);
     color: var(--fg-muted);
@@ -281,41 +233,11 @@
     padding: 10px 12px;
   }
 
-  .row {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: var(--space);
-    padding: 8px 12px;
-  }
-
-  .text {
-    display: flex;
-    flex-direction: column;
-    gap: 2px;
-    min-width: 0;
-  }
-
-  .sub {
-    font-size: 0.85em;
-    color: var(--fg-muted);
-  }
-
   /* A path cut short at its start (`direction: rtl` puts the ellipsis there), the path
      itself kept left to right by its `<bdi dir="ltr">` so its leading `/` stays put. */
-  .path {
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-    direction: rtl;
-    text-align: left;
-  }
 
   /* `direction: rtl` above only puts the ellipsis at the path's start; the text still lines
      up with the UI's start edge. */
-  :global(:root[dir="rtl"]) .path {
-    text-align: right;
-  }
 
   footer {
     display: flex;

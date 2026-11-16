@@ -1,4 +1,5 @@
 <script lang="ts">
+  import "./shared.css";
   import { message, save as saveDialog } from "@tauri-apps/plugin-dialog";
   import {
     api,
@@ -134,10 +135,10 @@
 
 <Section title={t("settings.calendar.title")}>
   {#if info?.nativeCalendar}
-    <div class="row">
-      <span class="text">
+    <div class="set-row">
+      <span class="set-text">
         <span>{t("settings.calendar.app")}</span>
-        <span class="sub"
+        <span class="set-sub"
           >{current.nativeCalendar
             ? t("settings.calendar.syncing", {
                 calendar: chosenCalendar
@@ -157,16 +158,16 @@
       >
     </div>
     {#if denied && current.nativeCalendar}
-      <div class="row">
-        <span class="text denied">{t("settings.calendar.denied")}</span>
+      <div class="set-row">
+        <span class="set-text denied">{t("settings.calendar.denied")}</span>
         <button onclick={openPrivacy}>{t("settings.calendar.openPrivacy")}</button>
       </div>
     {/if}
   {/if}
-  <div class="row">
-    <span class="text">
+  <div class="set-row">
+    <span class="set-text">
       <span>{t("settings.calendar.label")}</span>
-      <span class="sub"
+      <span class="set-sub"
         >{exported === null
           ? t("settings.calendar.hint")
           : t("settings.calendar.done", { count: exported })}</span
@@ -175,19 +176,19 @@
     <button onclick={exportCalendar}>{t("settings.calendar.export")}</button>
   </div>
   {#if info && !info.nativeCalendar}
-    <div class="row">
-      <span class="text">
+    <div class="set-row">
+      <span class="set-text">
         <span>{t("settings.calendar.openLabel")}</span>
-        <span class="sub">{t("settings.calendar.openHint")}</span>
+        <span class="set-sub">{t("settings.calendar.openHint")}</span>
       </span>
       <button onclick={openInCalendar}>{t("settings.calendar.open")}</button>
     </div>
   {/if}
   {#if current.calendarFile}
-    <div class="row">
-      <span class="text">
+    <div class="set-row">
+      <span class="set-text">
         <span>{t("settings.calendar.kept")}</span>
-        <span class="sub path" title={current.calendarFile}
+        <span class="set-sub set-path" title={current.calendarFile}
           ><bdi dir="ltr">{current.calendarFile}</bdi></span
         >
       </span>
@@ -197,10 +198,6 @@
 </Section>
 
 <style>
-  @import "./row.css";
-  @import "./label.css";
-  @import "./path.css";
-
   .denied {
     color: var(--warning);
   }

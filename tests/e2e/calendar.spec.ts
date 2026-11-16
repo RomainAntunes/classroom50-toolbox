@@ -53,7 +53,7 @@ test("Export asks where, writes the file and keeps it updated", async ({ app }) 
   await expect(section).toContainText("Exported 3 due dates. Open the file to add them");
   // Settings are read again: the file is now kept up to date, and Stop ends that.
   await expect(section).toContainText("Kept up to date after each sync");
-  await expect(section.locator(".path")).toHaveText(FILE);
+  await expect(section.locator(".set-path")).toHaveText(FILE);
   await section.getByRole("button", { name: "Stop", exact: true }).click();
   await expect(section).not.toContainText("Kept up to date after each sync");
   expect((await app.settings()).calendarFile).toBeNull();

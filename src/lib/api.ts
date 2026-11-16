@@ -5,6 +5,7 @@
 // Use only the aliases below (built on the `_Serialize` halves, what Rust sends): never import
 // an un-suffixed split type such as `B.Snapshot` or a `_Deserialize` half from bindings.ts,
 // since specta renders the field aliases Rust accepts when reading with the wrong precedence.
+import { invoke } from "@tauri-apps/api/core";
 import { listen, type UnlistenFn } from "@tauri-apps/api/event";
 import { commands } from "#lib/bindings.js";
 import type * as B from "#lib/bindings.js";
@@ -228,4 +229,11 @@ export async function withDialog<T>(show: () => Promise<T>): Promise<T> {
   } finally {
     await api.setPopoverPinned(false);
   }
+}
+
+/** Whether the popover (window `main`) is shown. One direct call to the window plugin, the
+ * command `getCurrentWindow().isVisible()` sends, without loading `@tauri-apps/api/window`
+ * (about 11 kB) at startup for it. */
+export function popoverVisible(): Promise<boolean> {
+  return invoke<boolean>("plugin:window|is_visible", { label: "main" });
 }

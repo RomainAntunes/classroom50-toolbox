@@ -1,4 +1,5 @@
 <script lang="ts">
+  import "./shared.css";
   import { goto } from "$app/navigation";
   import { message } from "@tauri-apps/plugin-dialog";
   import { api, errorMessage, withDialog, type AppInfo } from "#lib/api.js";
@@ -84,21 +85,21 @@
 </script>
 
 <Section title={t("settings.about.title")}>
-  <div class="row">
+  <div class="set-row">
     <span>{t("settings.about.guide")}</span>
     <button onclick={() => goto("/welcome")}>{t("settings.about.openGuide")}</button>
   </div>
-  <div class="row">
+  <div class="set-row">
     <span>{t("settings.about.whatsNew")}</span>
     <button onclick={() => goto("/whats-new?from=settings")}
       >{t("settings.about.openWhatsNew")}</button
     >
   </div>
-  <div class="row">
-    <span class="text">
+  <div class="set-row">
+    <span class="set-text">
       <span>{t("settings.about.updates")}</span>
       {#if updateNote}
-        <span class="sub" class:issue={update?.state.phase === "error"}>{updateNote}</span>
+        <span class="set-sub" class:issue={update?.state.phase === "error"}>{updateNote}</span>
       {/if}
     </span>
     <button
@@ -114,10 +115,10 @@
   {#if update}
     <UpdateBanner status={update} compact />
   {/if}
-  <div class="row">
-    <span class="text">
+  <div class="set-row">
+    <span class="set-text">
       <span>{t("settings.diagnostics.label")}</span>
-      <span class="sub">{t("settings.diagnostics.hint")}</span>
+      <span class="set-sub">{t("settings.diagnostics.hint")}</span>
     </span>
     <button disabled={diagnosing} aria-busy={diagnosing} onclick={copyDiagnostics}>
       {#if diagnosing}<Spinner />{/if}{diagnosticsCopied
@@ -125,20 +126,17 @@
         : t("settings.diagnostics.action")}
     </button>
   </div>
-  <div class="row">
-    <span class="text">
+  <div class="set-row">
+    <span class="set-text">
       <span>{t("settings.quit.label")}</span>
-      <span class="sub">{t("settings.quit.hint")}</span>
+      <span class="set-sub">{t("settings.quit.hint")}</span>
     </span>
     <button onclick={() => api.quitApp()}>{t("settings.quit.action")}</button>
   </div>
 </Section>
 
 <style>
-  @import "./row.css";
-  @import "./label.css";
-
-  .sub.issue {
+  .set-sub.issue {
     color: var(--warning);
   }
 </style>
