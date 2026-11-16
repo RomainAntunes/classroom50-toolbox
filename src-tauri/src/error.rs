@@ -178,6 +178,11 @@ pub enum Error {
     #[error("this copy of the toolbox can't update itself; download new versions from GitHub")]
     NoSelfUpdate,
 
+    /// GitHub answered the update check or download with an error status (a 5xx from its
+    /// download servers): temporary, the next check tries again.
+    #[error("GitHub isn't serving the update right now; try again later")]
+    UpdateUnavailable,
+
     /// The calendar service didn't answer (Akonadi not running and not starting, no D-Bus).
     #[error("the calendar service isn't responding")]
     CalendarUnavailable,
@@ -206,7 +211,7 @@ pub enum Error {
     #[error(transparent)]
     Tauri(#[from] tauri::Error),
 
-    #[error(transparent)]
+    #[error("the update failed: {0}")]
     Updater(#[from] tauri_plugin_updater::Error),
 
     #[error(transparent)]
@@ -274,6 +279,7 @@ error_kinds! {
     GitHub = "github",
     Offline = "offline",
     NoSelfUpdate = "noSelfUpdate",
+    UpdateUnavailable = "updateUnavailable",
     CalendarAccess = "calendarAccess",
     CalendarUnavailable = "calendarUnavailable",
     InvalidShortcut = "invalidShortcut",
@@ -381,6 +387,7 @@ impl Error {
                     .chain(login.clone().map(|login| ("login", login)))
                     .collect()
             }
+            Error::Updater(err) => vec![("detail", err.to_string())],
             Error::GhStudentOutdated { version } => {
                 vec![("version", version.clone()), ("min", min_gh_student())]
             }
@@ -443,6 +450,7 @@ impl Error {
             Error::GitHub(_) => ErrorKind::GitHub,
             Error::Offline => ErrorKind::Offline,
             Error::NoSelfUpdate => ErrorKind::NoSelfUpdate,
+            Error::UpdateUnavailable => ErrorKind::UpdateUnavailable,
             Error::CalendarAccess => ErrorKind::CalendarAccess,
             Error::CalendarUnavailable => ErrorKind::CalendarUnavailable,
             Error::InvalidShortcut => ErrorKind::InvalidShortcut,
@@ -539,6 +547,8 @@ mod tests {
             Error::CalendarAccess,
             Error::CalendarUnavailable,
             Error::NoSelfUpdate,
+            Error::UpdateUnavailable,
+            Error::Updater(tauri_plugin_updater::Error::EmptyEndpoints),
             Error::InvalidShortcut,
             Error::ShortcutTaken,
             Error::ShortcutUnsupported,

@@ -54,6 +54,9 @@ pub async fn diagnostics_report(
         stats,
         settings: app.state::<SettingsStore>().get(),
         editors: editors.into_iter().map(|e| e.name.to_owned()).collect(),
+        updates: app
+            .state::<crate::updater::UpdaterState>()
+            .facts(app.state::<SettingsStore>().get().update_channel),
         log,
         home: platform::home_dir().map(|h| h.to_string_lossy().into_owned()),
     };

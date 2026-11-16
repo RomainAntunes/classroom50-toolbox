@@ -737,6 +737,8 @@
   "error.calendarAccess": "no se permite el acceso al calendario",
   "error.calendarUnavailable": "el servicio de calendario no responde",
   "error.noSelfUpdate": "esta copia de la toolbox no puede actualizarse sola; descarga las nuevas versiones desde GitHub",
+  "error.updateUnavailable": "GitHub no está entregando la actualización ahora mismo; inténtalo más tarde",
+  "error.updater": "la actualización falló: {detail}",
   "error.invalidShortcut": "un atajo necesita una tecla y una tecla modificadora distinta de Mayús",
   "error.shortcutTaken": "otra app o el sistema ya usa este atajo",
   "error.shortcutUnsupported": "los atajos globales no están disponibles en este sistema",

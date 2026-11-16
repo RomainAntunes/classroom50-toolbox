@@ -714,6 +714,8 @@
   "error.calendarAccess": "takvim erişimine izin verilmedi",
   "error.calendarUnavailable": "takvim hizmeti yanıt vermiyor",
   "error.noSelfUpdate": "Toolbox'ın bu kopyası kendini güncelleyemez; yeni sürümleri GitHub'dan indirin",
+  "error.updateUnavailable": "GitHub şu anda güncellemeyi sunmuyor; daha sonra tekrar deneyin",
+  "error.updater": "güncelleme başarısız oldu: {detail}",
   "error.invalidShortcut": "bir kısayol için bir tuş ve Shift dışında bir değiştirici tuş gerekir",
   "error.shortcutTaken": "bu kısayolu başka bir uygulama veya sistem zaten kullanıyor",
   "error.shortcutUnsupported": "sistem genelindeki kısayollar bu sistemde kullanılamaz",

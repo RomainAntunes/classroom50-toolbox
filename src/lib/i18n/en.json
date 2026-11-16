@@ -714,6 +714,8 @@
   "error.calendarAccess": "calendar access isn't allowed",
   "error.calendarUnavailable": "the calendar service isn't responding",
   "error.noSelfUpdate": "this copy of the toolbox can't update itself; download new versions from GitHub",
+  "error.updateUnavailable": "GitHub isn't serving the update right now; try again later",
+  "error.updater": "the update failed: {detail}",
   "error.invalidShortcut": "a shortcut needs one key and a modifier other than Shift",
   "error.shortcutTaken": "another app or the system already uses this shortcut",
   "error.shortcutUnsupported": "system-wide shortcuts aren't available on this system",

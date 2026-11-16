@@ -28,6 +28,7 @@ serde_norway = "0.9"
 thiserror = "2"
 tokio = { version = "1", features = ["process", "fs", "time", "macros", "sync", "rt", "net"] }
 futures-util = { version = "0.3", default-features = false }
+semver = "1"
 reqwest = { version = "0.13", features = ["json"] }
 chrono = { version = "0.4", features = ["serde"] }
 walkdir = "2"

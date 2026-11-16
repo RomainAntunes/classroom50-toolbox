@@ -760,6 +760,8 @@
   "error.calendarAccess": "brak zgody na dostęp do kalendarza",
   "error.calendarUnavailable": "usługa kalendarza nie odpowiada",
   "error.noSelfUpdate": "tej kopii aplikacji nie da się zaktualizować automatycznie; pobieraj nowe wersje z GitHuba",
+  "error.updateUnavailable": "GitHub nie udostępnia teraz aktualizacji; spróbuj ponownie później",
+  "error.updater": "aktualizacja nie powiodła się: {detail}",
   "error.invalidShortcut": "skrót wymaga jednego klawisza i klawisza modyfikującego innego niż Shift",
   "error.shortcutTaken": "inna aplikacja lub system już używa tego skrótu",
   "error.shortcutUnsupported": "skróty globalne nie są dostępne w tym systemie",

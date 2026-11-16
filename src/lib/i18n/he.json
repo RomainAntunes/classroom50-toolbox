@@ -737,6 +737,8 @@
   "error.calendarAccess": "אין הרשאת גישה ללוח השנה",
   "error.calendarUnavailable": "שירות לוח השנה לא מגיב",
   "error.noSelfUpdate": "העותק הזה של האפליקציה לא יכול לעדכן את עצמו; אפשר להוריד גרסאות חדשות מ-GitHub",
+  "error.updateUnavailable": "GitHub לא מספק את העדכון כרגע; כדאי לנסות שוב מאוחר יותר",
+  "error.updater": "העדכון נכשל: {detail}",
   "error.invalidShortcut": "קיצור צריך מקש אחד ומקש צירוף שאינו Shift",
   "error.shortcutTaken": "אפליקציה אחרת או המערכת כבר משתמשות בקיצור הזה",
   "error.shortcutUnsupported": "קיצורים כלל-מערכתיים לא זמינים במערכת הזו",

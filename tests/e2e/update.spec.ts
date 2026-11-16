@@ -150,6 +150,45 @@ test("a check that broke in the background shows under Updates", async ({ app, p
   await expect(page.locator(".sub.issue")).toHaveText("can't reach GitHub");
 });
 
+test("GitHub not serving the feed is worded, in the UI's language", async ({ app, page }) => {
+  await app.start(
+    scenario({
+      settings: settings({ language: "fr" }),
+      update: updateStatus({
+        state: {
+          phase: "error",
+          error: {
+            kind: "updateUnavailable",
+            message: "GitHub isn't serving the update right now; try again later",
+          },
+        },
+      }),
+    }),
+  );
+  await app.openSettings();
+  await page.getByRole("tab", { name: "À propos" }).click();
+  await expect(page.locator(".sub.issue")).toHaveText(
+    "GitHub ne fournit pas la mise à jour pour l'instant ; réessayez plus tard",
+  );
+});
+
+test("any other update failure is worded around the updater's own detail", async ({
+  app,
+  page,
+}) => {
+  const detail = "the platform `darwin-aarch64` was not found";
+  await app.start(
+    scenario({
+      responses: {
+        check_update: [fail("updater", `the update failed: ${detail}`, { detail })],
+      },
+    }),
+  );
+  await app.openSettings("About");
+  await page.getByRole("button", { name: "Check for updates" }).click();
+  await app.expectDialog([`the update failed: ${detail}`], "ok");
+});
+
 test("a copy that can't update itself says so and offers no check", async ({ app, page }) => {
   await app.start(scenario({ update: updateStatus({ canUpdate: false, bundle: "unbundled" }) }));
   await app.openSettings("About");
