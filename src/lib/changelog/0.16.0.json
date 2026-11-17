@@ -1,0 +1,335 @@
+{
+  "date": "2026-11-17",
+  "notes": {
+    "en": [
+      {
+        "kind": "improved",
+        "text": "The toolbox opens a little faster: a row's details and actions such as Commit and push or Submit now load the first time you use them."
+      },
+      {
+        "kind": "improved",
+        "text": "The diagnostics report now has an Updates section with your update channel, the last check and the last error, to help when updates go wrong."
+      },
+      {
+        "kind": "fixed",
+        "text": "On the Beta channel, the toolbox now also offers stable releases that come out after the latest beta, instead of missing them."
+      },
+      {
+        "kind": "fixed",
+        "text": "When an update can't be checked or downloaded, Settings > About now says why in your language, for example when GitHub isn't serving the update right now and you can try again later."
+      },
+      {
+        "kind": "fixed",
+        "text": "On Windows, dialogs inside the window, such as the commit message or adding teammates, are no longer see-through and are easy to read again, especially in dark mode."
+      }
+    ],
+    "fr": [
+      {
+        "kind": "improved",
+        "text": "La toolbox s'ouvre un peu plus vite : les détails d'une ligne et les actions comme Commit et push ou Rendre se chargent maintenant la première fois que vous les utilisez."
+      },
+      {
+        "kind": "improved",
+        "text": "Le rapport de diagnostic comporte maintenant une section Mises à jour, avec votre canal, la dernière vérification et la dernière erreur, pour aider quand les mises à jour posent problème."
+      },
+      {
+        "kind": "fixed",
+        "text": "Sur le canal Bêta, la toolbox propose maintenant aussi les versions stables publiées après la dernière bêta, au lieu de les manquer."
+      },
+      {
+        "kind": "fixed",
+        "text": "Quand une mise à jour ne peut pas être vérifiée ou téléchargée, Réglages > À propos explique maintenant pourquoi dans votre langue, par exemple quand GitHub ne fournit pas la mise à jour pour l'instant et qu'il faut réessayer plus tard."
+      },
+      {
+        "kind": "fixed",
+        "text": "Sur Windows, les boîtes de dialogue dans la fenêtre, comme le message de commit ou l'ajout de coéquipiers, ne sont plus transparentes et se lisent à nouveau bien, surtout en mode sombre."
+      }
+    ],
+    "es": [
+      {
+        "kind": "improved",
+        "text": "La toolbox se abre un poco más rápido: los detalles de una fila y acciones como Commit y push o Entregar ahora se cargan la primera vez que los usas."
+      },
+      {
+        "kind": "improved",
+        "text": "El informe de diagnóstico ahora tiene una sección Actualizaciones con tu canal, la última comprobación y el último error, para ayudar cuando las actualizaciones fallan."
+      },
+      {
+        "kind": "fixed",
+        "text": "En el canal Beta, la toolbox ahora también ofrece las versiones estables publicadas después de la última beta, en lugar de pasarlas por alto."
+      },
+      {
+        "kind": "fixed",
+        "text": "Cuando una actualización no se puede comprobar o descargar, Ajustes > Acerca de ahora explica por qué en tu idioma, por ejemplo cuando GitHub no está sirviendo la actualización en este momento y puedes volver a intentarlo más tarde."
+      },
+      {
+        "kind": "fixed",
+        "text": "En Windows, los cuadros de diálogo dentro de la ventana, como el mensaje de commit o añadir compañeros, ya no se ven transparentes y vuelven a leerse bien, sobre todo en modo oscuro."
+      }
+    ],
+    "de": [
+      {
+        "kind": "improved",
+        "text": "Die Toolbox startet etwas schneller: Die Details einer Zeile und Aktionen wie Commit und Push oder Abgeben werden jetzt erst geladen, wenn du sie zum ersten Mal nutzt."
+      },
+      {
+        "kind": "improved",
+        "text": "Der Diagnosebericht hat jetzt einen Abschnitt Updates mit deinem Kanal, der letzten Prüfung und dem letzten Fehler, damit sich Probleme mit Updates leichter klären lassen."
+      },
+      {
+        "kind": "fixed",
+        "text": "Im Beta-Kanal bietet die Toolbox jetzt auch stabile Versionen an, die nach der letzten Beta erscheinen, statt sie zu übersehen."
+      },
+      {
+        "kind": "fixed",
+        "text": "Lässt sich ein Update nicht prüfen oder herunterladen, erklärt Einstellungen > Über jetzt in deiner Sprache, warum, etwa wenn GitHub das Update gerade nicht bereitstellt und du es später noch einmal versuchen kannst."
+      },
+      {
+        "kind": "fixed",
+        "text": "Unter Windows sind Dialoge im Fenster, etwa die Commit-Nachricht oder das Hinzufügen deines Teams, nicht mehr durchsichtig und wieder gut lesbar, vor allem im dunklen Modus."
+      }
+    ],
+    "it": [
+      {
+        "kind": "improved",
+        "text": "L'app si apre un po' più in fretta: i dettagli di una riga e azioni come Commit e push o Consegna ora si caricano la prima volta che li usi."
+      },
+      {
+        "kind": "improved",
+        "text": "Il rapporto di diagnostica ora ha una sezione Aggiornamenti con il tuo canale, l'ultimo controllo e l'ultimo errore, per aiutare quando gli aggiornamenti non vanno a buon fine."
+      },
+      {
+        "kind": "fixed",
+        "text": "Sul canale Beta, l'app ora propone anche le versioni stabili uscite dopo l'ultima beta, invece di non vederle."
+      },
+      {
+        "kind": "fixed",
+        "text": "Quando un aggiornamento non si può controllare o scaricare, Impostazioni > Informazioni ora spiega il motivo nella tua lingua, per esempio quando GitHub al momento non fornisce l'aggiornamento e puoi riprovare più tardi."
+      },
+      {
+        "kind": "fixed",
+        "text": "Su Windows, le finestre di dialogo dentro l'app, come il messaggio di commit o l'aggiunta di compagni, non sono più trasparenti e tornano ben leggibili, soprattutto in modalità scura."
+      }
+    ],
+    "pt-BR": [
+      {
+        "kind": "improved",
+        "text": "O app abre um pouco mais rápido: os detalhes de uma linha e ações como Commit e push ou Entregar agora carregam na primeira vez que você os usa."
+      },
+      {
+        "kind": "improved",
+        "text": "O relatório de diagnóstico agora tem uma seção Atualizações com seu canal, a última verificação e o último erro, para ajudar quando as atualizações dão problema."
+      },
+      {
+        "kind": "fixed",
+        "text": "No canal Beta, o app agora também oferece as versões estáveis lançadas depois da última beta, em vez de deixá-las passar."
+      },
+      {
+        "kind": "fixed",
+        "text": "Quando uma atualização não pode ser verificada ou baixada, Configurações > Sobre agora explica o motivo no seu idioma, por exemplo quando o GitHub não está disponibilizando a atualização no momento e você pode tentar de novo mais tarde."
+      },
+      {
+        "kind": "fixed",
+        "text": "No Windows, as caixas de diálogo dentro da janela, como a mensagem de commit ou adicionar colegas, não ficam mais transparentes e voltam a ser fáceis de ler, principalmente no modo escuro."
+      }
+    ],
+    "pt-PT": [
+      {
+        "kind": "improved",
+        "text": "A app abre um pouco mais depressa: os detalhes de uma linha e ações como Commit e push ou Entregar passam a carregar só na primeira vez que os usas."
+      },
+      {
+        "kind": "improved",
+        "text": "O relatório de diagnóstico tem agora uma secção Atualizações com o teu canal, a última verificação e o último erro, para ajudar quando as atualizações falham."
+      },
+      {
+        "kind": "fixed",
+        "text": "No canal Beta, a app passa a propor também as versões estáveis publicadas depois da última beta, em vez de as ignorar."
+      },
+      {
+        "kind": "fixed",
+        "text": "Quando não é possível verificar ou transferir uma atualização, Definições > Sobre explica agora porquê no teu idioma, por exemplo quando o GitHub não está a disponibilizar a atualização de momento e podes tentar mais tarde."
+      },
+      {
+        "kind": "fixed",
+        "text": "No Windows, as caixas de diálogo dentro da janela, como a mensagem de commit ou adicionar colegas, já não ficam transparentes e voltam a ler-se bem, sobretudo no modo escuro."
+      }
+    ],
+    "nl": [
+      {
+        "kind": "improved",
+        "text": "De toolbox opent iets sneller: de details van een rij en acties zoals Commit en push of Inleveren worden nu pas geladen als je ze voor het eerst gebruikt."
+      },
+      {
+        "kind": "improved",
+        "text": "Het diagnoserapport heeft nu een sectie Updates met je kanaal, de laatste controle en de laatste fout, zodat problemen met updates makkelijker te achterhalen zijn."
+      },
+      {
+        "kind": "fixed",
+        "text": "Op het bètakanaal biedt de toolbox nu ook stabiele versies aan die na de laatste bèta verschijnen, in plaats van ze te missen."
+      },
+      {
+        "kind": "fixed",
+        "text": "Als een update niet kan worden gecontroleerd of gedownload, legt Instellingen > Over nu in jouw taal uit waarom, bijvoorbeeld als GitHub de update even niet levert en je het later opnieuw kunt proberen."
+      },
+      {
+        "kind": "fixed",
+        "text": "Op Windows zijn dialoogvensters in het venster, zoals het commitbericht of teamgenoten toevoegen, niet meer doorzichtig en weer goed leesbaar, vooral in de donkere modus."
+      }
+    ],
+    "pl": [
+      {
+        "kind": "improved",
+        "text": "Toolbox uruchamia się trochę szybciej: szczegóły wiersza i akcje takie jak Commit i push czy Oddaj wczytują się teraz dopiero przy pierwszym użyciu."
+      },
+      {
+        "kind": "improved",
+        "text": "Raport diagnostyczny ma teraz sekcję Aktualizacje z twoim kanałem, ostatnim sprawdzeniem i ostatnim błędem, co pomaga, gdy aktualizacje nie działają."
+      },
+      {
+        "kind": "fixed",
+        "text": "Na kanale Beta Toolbox proponuje teraz także stabilne wersje wydane po ostatniej becie, zamiast je pomijać."
+      },
+      {
+        "kind": "fixed",
+        "text": "Gdy nie da się sprawdzić ani pobrać aktualizacji, Ustawienia > Informacje wyjaśniają teraz w twoim języku dlaczego, na przykład gdy GitHub chwilowo nie udostępnia aktualizacji i warto spróbować później."
+      },
+      {
+        "kind": "fixed",
+        "text": "Na Windows okna dialogowe w oknie aplikacji, takie jak wiadomość commita czy dodawanie członków zespołu, nie są już przezroczyste i znów dobrze się je czyta, zwłaszcza w trybie ciemnym."
+      }
+    ],
+    "tr": [
+      {
+        "kind": "improved",
+        "text": "Toolbox biraz daha hızlı açılıyor: bir satırın ayrıntıları ile Commit ve push ya da Teslim et gibi işlemler artık ilk kullandığınızda yükleniyor."
+      },
+      {
+        "kind": "improved",
+        "text": "Tanılama raporunda artık kanalınızı, son denetimi ve son hatayı gösteren bir Güncellemeler bölümü var; güncellemeler sorun çıkardığında işe yarar."
+      },
+      {
+        "kind": "fixed",
+        "text": "Beta kanalında Toolbox artık son betadan sonra yayımlanan kararlı sürümleri de sunuyor, onları gözden kaçırmıyor."
+      },
+      {
+        "kind": "fixed",
+        "text": "Bir güncelleme denetlenemediğinde ya da indirilemediğinde Ayarlar > Hakkında artık nedenini sizin dilinizde açıklıyor; örneğin GitHub güncellemeyi şu anda sunmuyorsa daha sonra yeniden deneyebileceğinizi söylüyor."
+      },
+      {
+        "kind": "fixed",
+        "text": "Windows'ta pencere içindeki iletişim kutuları, örneğin commit mesajı ya da takım arkadaşı ekleme, artık saydam görünmüyor ve özellikle karanlık modda yeniden rahatça okunuyor."
+      }
+    ],
+    "ar": [
+      {
+        "kind": "improved",
+        "text": "أصبح التطبيق يفتح أسرع قليلًا: تُحمَّل تفاصيل السطر والإجراءات مثل Commit وpush أو تسليم عند أول استخدام لها فقط."
+      },
+      {
+        "kind": "improved",
+        "text": "أصبح تقرير التشخيص يضم قسم التحديثات، مع القناة وآخر فحص وآخر خطأ، للمساعدة عند تعثّر التحديثات."
+      },
+      {
+        "kind": "fixed",
+        "text": "على قناة Beta، يعرض التطبيق الآن أيضًا الإصدارات المستقرة التي تصدر بعد آخر إصدار تجريبي، بدلًا من تفويتها."
+      },
+      {
+        "kind": "fixed",
+        "text": "عند تعذّر التحقق من تحديث أو تنزيله، توضّح الإعدادات > حول الآن السبب باللغة المختارة، مثلًا عندما لا يوفّر GitHub التحديث حاليًا ويمكن إعادة المحاولة لاحقًا."
+      },
+      {
+        "kind": "fixed",
+        "text": "على Windows، لم تعد مربعات الحوار داخل النافذة، مثل رسالة commit أو إضافة أعضاء الفريق، تظهر شفافة، وصارت قراءتها سهلة من جديد، خاصة في الوضع الداكن."
+      }
+    ],
+    "he": [
+      {
+        "kind": "improved",
+        "text": "האפליקציה נפתחת קצת יותר מהר: פרטי השורה ופעולות כמו Commit ו-push או הגשה נטענים עכשיו רק בשימוש הראשון בהם."
+      },
+      {
+        "kind": "improved",
+        "text": "בדוח האבחון יש עכשיו חלק עדכונים, עם הערוץ, הבדיקה האחרונה והשגיאה האחרונה, כדי לעזור כשעדכונים לא עובדים."
+      },
+      {
+        "kind": "fixed",
+        "text": "בערוץ הבטא, האפליקציה מציעה עכשיו גם גרסאות יציבות שיוצאות אחרי הבטא האחרונה, במקום לפספס אותן."
+      },
+      {
+        "kind": "fixed",
+        "text": "כשאי אפשר לבדוק או להוריד עדכון, הגדרות > אודות מסבירות עכשיו למה, בשפה שנבחרה, למשל כש-GitHub לא מספק את העדכון כרגע ואפשר לנסות שוב מאוחר יותר."
+      },
+      {
+        "kind": "fixed",
+        "text": "ב-Windows, חלונות דו-שיח בתוך החלון, כמו הודעת ה-commit או הוספת חברי צוות, כבר לא שקופים וקל שוב לקרוא אותם, במיוחד במצב כהה."
+      }
+    ],
+    "zh-Hans": [
+      {
+        "kind": "improved",
+        "text": "工具箱打开得更快了一些：行的详情以及提交和推送、上交等操作现在会在你第一次使用时才加载。"
+      },
+      {
+        "kind": "improved",
+        "text": "诊断报告现在新增了更新部分，包含你的更新渠道、上次检查和上次出错的信息，方便排查更新问题。"
+      },
+      {
+        "kind": "fixed",
+        "text": "在Beta渠道上，工具箱现在也会提供在最新测试版之后发布的正式版，不会再错过它们。"
+      },
+      {
+        "kind": "fixed",
+        "text": "当无法检查或下载更新时，设置 > 关于现在会用你的语言说明原因，例如GitHub暂时无法提供更新，可以稍后再试。"
+      },
+      {
+        "kind": "fixed",
+        "text": "在Windows上，窗口内的对话框，例如提交信息或添加队友，不再呈透明状态，重新变得清晰易读，深色模式下尤其明显。"
+      }
+    ],
+    "ja": [
+      {
+        "kind": "improved",
+        "text": "ツールボックスの起動が少し速くなりました。行の詳細や、コミットとpush、提出などの操作は、初めて使うときに読み込まれるようになりました。"
+      },
+      {
+        "kind": "improved",
+        "text": "診断レポートに「アップデート」の項目が加わり、チャンネル、最後の確認、最後のエラーが記載されます。アップデートがうまくいかないときに役立ちます。"
+      },
+      {
+        "kind": "fixed",
+        "text": "ベータチャンネルで、最新のベータより後に公開された安定版も見逃さずに案内するようになりました。"
+      },
+      {
+        "kind": "fixed",
+        "text": "アップデートを確認またはダウンロードできないとき、設定の「情報」でその理由を設定した言語で表示するようになりました。たとえばGitHubが一時的にアップデートを提供していない場合は、あとで再試行するよう案内します。"
+      },
+      {
+        "kind": "fixed",
+        "text": "Windowsで、コミットメッセージやチームメイトの追加など、ウィンドウ内のダイアログが透けて見えなくなり、特にダークモードで読みやすくなりました。"
+      }
+    ],
+    "ko": [
+      {
+        "kind": "improved",
+        "text": "도구 상자가 조금 더 빨리 열려요. 행의 세부 정보와 커밋과 push, 제출 같은 작업은 이제 처음 쓸 때 불러와요."
+      },
+      {
+        "kind": "improved",
+        "text": "진단 보고서에 업데이트 항목이 생겼어요. 채널, 마지막 확인, 마지막 오류가 담겨 있어서 업데이트에 문제가 있을 때 도움이 돼요."
+      },
+      {
+        "kind": "fixed",
+        "text": "베타 채널에서도 이제 최신 베타 뒤에 나온 정식 버전을 놓치지 않고 알려 줘요."
+      },
+      {
+        "kind": "fixed",
+        "text": "업데이트를 확인하거나 다운로드할 수 없으면 이제 설정의 정보에서 그 이유를 설정한 언어로 알려 줘요. 예를 들어 GitHub가 지금 업데이트를 제공하지 않으면 나중에 다시 시도하라고 알려 줘요."
+      },
+      {
+        "kind": "fixed",
+        "text": "Windows에서 커밋 메시지나 팀원 추가처럼 창 안에 뜨는 대화 상자가 더 이상 투명하게 비치지 않아 다시 잘 읽혀요. 특히 다크 모드에서 그래요."
+      }
+    ]
+  }
+}
