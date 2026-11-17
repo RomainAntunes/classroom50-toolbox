@@ -1,12 +1,9 @@
 <div align="center">
 
-<img src="assets/icon.svg" alt="" width="96" height="96" />
-
-# Classroom 50 Toolbox
-
-**Your [Classroom 50](https://github.com/foundation50/classroom50) assignments, one click away.**<br />
-Due dates, grades and the tests that failed, in your menu bar or notification area.<br />
-Accept, clone, commit and submit with a button instead of a command.
+<picture>
+  <source srcset="site/screenshots/banner-dark.webp" media="(prefers-color-scheme: dark)" />
+  <img src="site/screenshots/banner-light.webp" width="100%" alt="Classroom 50 Toolbox. Never miss a deadline. See why a test failed. Hand in with one click. Free for macOS, Windows and Linux. Beside it, the app open with two classes, each assignment with its due date, grade, local changes or an Accept button." />
+</picture>
 
 [**Download**](https://romainantunes.github.io/classroom50-toolbox/) ·
 [Latest release](https://github.com/RomainAntunes/classroom50-toolbox/releases/latest) ·
@@ -16,14 +13,9 @@ Accept, clone, commit and submit with a button instead of a command.
 ![macOS, Windows, Linux](https://img.shields.io/badge/macOS%20%C2%B7%20Windows%20%C2%B7%20Linux-6e6e73)
 [![License: GPL-3.0](https://img.shields.io/badge/license-GPL--3.0-6e6e73)](LICENSE)
 
-<picture>
-  <source srcset="site/screenshots/list-macos-dark.webp" media="(prefers-color-scheme: dark)" />
-  <img src="site/screenshots/list-macos-light.webp" width="420" alt="The toolbox open under its menu bar icon: two classes, each assignment with its due date, grade, uncommitted work or an Accept button." />
-</picture>
-
 </div>
 
-A tray app for Classroom 50 students, in the spirit of JetBrains Toolbox. It installs what
+A tray app for [Classroom 50](https://github.com/foundation50/classroom50) students, in the spirit of JetBrains Toolbox. It installs what
 Classroom 50 needs, finds your assignments, and runs the `gh student`, `gh` and `git` commands
 for you when you click. Free, open source and not affiliated with the Fifty Foundation.
 
@@ -33,11 +25,19 @@ for you when you click. Free, open source and not affiliated with the Fifty Foun
   <tr>
     <td width="33%" valign="top">
       <picture>
-        <source srcset="site/screenshots/popover-details-dark.webp" media="(prefers-color-scheme: dark)" />
-        <img src="site/screenshots/popover-details-light.webp" alt="An assignment's details: a grade of 8 out of 10 and the output of the test that failed." />
+        <source srcset="site/screenshots/popover-brief-dark.webp" media="(prefers-color-scheme: dark)" />
+        <img src="site/screenshots/popover-brief-light.webp" alt="An assignment's details: the teacher's brief with a checklist and math, the student's phases and the milestone tags pushed so far." />
       </picture>
-      <p><b>See why a test failed.</b> The score, every test, and the autograder's output for
-      the ones that didn't pass.</p>
+      <p><b>The whole assignment in one place.</b> The teacher's brief with its checklists
+      and math, your own deadlines along the way, and the milestone tags you pushed.</p>
+    </td>
+    <td width="33%" valign="top">
+      <picture>
+        <source srcset="site/screenshots/popover-group-dark.webp" media="(prefers-color-scheme: dark)" />
+        <img src="site/screenshots/popover-group-light.webp" alt="A team assignment: two classmates being added to the group, then its name, members and size." />
+      </picture>
+      <p><b>Build your group.</b> Add classmates by their GitHub username and watch each one
+      join, with who is in the group and how much room is left.</p>
     </td>
     <td width="33%" valign="top">
       <picture>
@@ -46,14 +46,6 @@ for you when you click. Free, open source and not affiliated with the Fifty Foun
       </picture>
       <p><b>Commit and push from the list.</b> It names the files and leaves out
       <code>.DS_Store</code> and editor folders. Off until you turn it on.</p>
-    </td>
-    <td width="33%" valign="top">
-      <picture>
-        <source srcset="site/screenshots/popover-setup-dark.webp" media="(prefers-color-scheme: dark)" />
-        <img src="site/screenshots/popover-setup-light.webp" alt="The first-run guide installing the GitHub CLI." />
-      </picture>
-      <p><b>Ready in a minute.</b> The first launch installs git, the GitHub CLI and
-      <code>gh student</code>, then signs you in.</p>
     </td>
   </tr>
 </table>

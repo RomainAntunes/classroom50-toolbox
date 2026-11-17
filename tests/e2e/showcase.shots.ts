@@ -22,7 +22,7 @@ import {
   type ProjectOptions,
   type Scenario,
 } from "./fixtures";
-import type { Project } from "../../src/lib/api";
+import type { MarkdownInline as Inline, Project, TeammateJob } from "../../src/lib/api";
 
 const OUT = new URL("../../site/screenshots/", import.meta.url).pathname;
 const TMP = new URL("../../e2e-shots/showcase/", import.meta.url).pathname;
@@ -231,6 +231,124 @@ function showcase(over: Partial<Scenario> = {}): Scenario {
   return base;
 }
 
+const text = (value: string): Inline => ({ kind: "text", text: value });
+const code = (value: string): Inline => ({ kind: "code", text: value });
+const math = (source: string): Inline => ({ kind: "math", source });
+
+/** `showcase()` with `change` applied to the row of `slug`. */
+function withRow(slug: string, change: (row: Project) => Project): Scenario {
+  const data = showcase();
+  data.snapshot.projects = data.snapshot.projects.map((p) =>
+    p.assignment?.slug === slug ? change(p) : p,
+  );
+  return data;
+}
+
+/** Lab 4 with what its details hold beyond a grade: the teacher's brief (Markdown, the tree
+ *  Rust makes of it), milestone tags and the phases the student set. */
+function briefed(): Scenario {
+  return withRow("lab4", (lab) => ({
+    ...lab,
+    assignment: {
+      ...lab.assignment!,
+      description:
+        "## Goal\nWrite `fib` and `hanoi` recursively, with no loops.\n\n" +
+        "- [x] `fib.c`: $F_n = F_{n-1} + F_{n-2}$\n- [ ] `hanoi.c`: $n$ disks in $2^n - 1$ moves\n\n" +
+        "Tag `draft` once `fib` passes, `final` when you're done.",
+      descriptionDoc: [
+        { kind: "heading", level: 2, content: [text("Goal")] },
+        {
+          kind: "paragraph",
+          content: [
+            text("Write "),
+            code("fib"),
+            text(" and "),
+            code("hanoi"),
+            text(" recursively, with no loops."),
+          ],
+        },
+        {
+          kind: "list",
+          ordered: false,
+          start: 1,
+          items: [
+            {
+              task: true,
+              blocks: [
+                {
+                  kind: "paragraph",
+                  content: [code("fib.c"), text(": "), math("F_n = F_{n-1} + F_{n-2}")],
+                },
+              ],
+            },
+            {
+              task: false,
+              blocks: [
+                {
+                  kind: "paragraph",
+                  content: [
+                    code("hanoi.c"),
+                    text(": "),
+                    math("n"),
+                    text(" disks in "),
+                    math("2^n - 1"),
+                    text(" moves"),
+                  ],
+                },
+              ],
+            },
+          ],
+        },
+        {
+          kind: "paragraph",
+          content: [
+            text("Tag "),
+            code("draft"),
+            text(" once "),
+            code("fib"),
+            text(" passes, "),
+            code("final"),
+            text(" when you're done."),
+          ],
+        },
+      ],
+      submissionTags: ["draft", "final"],
+    },
+    remote: {
+      ...lab.remote!,
+      milestones: [
+        { pattern: "draft", tag: { name: "draft", commit: "b2c3d4e5f6a1", at: daysFromNow(-1) } },
+        { pattern: "final", tag: null },
+      ],
+    },
+    phases: [
+      { id: "p1", name: "Show fib to a TA", due: daysFromNow(-1), done: true },
+      { id: "p2", name: "Hanoi peer review", due: hoursFromNow(3), done: false },
+    ],
+  }));
+}
+
+/** The team assignment, with room for one more, and the classmates being added to the group. */
+function grouped(): Scenario {
+  return withRow("portfolio", (site) => ({
+    ...site,
+    assignment: { ...site.assignment!, maxGroupSize: 4 },
+  }));
+}
+
+const teammates = (site: Project): TeammateJob => ({
+  id: site.id,
+  project: site.id,
+  repo: `${site.owner}/${site.repo}`,
+  assignment: site.assignment!.name,
+  team: true,
+  running: true,
+  entries: [
+    { username: "sam-r", state: "added", error: null },
+    { username: "jules-p", state: "adding", error: null },
+  ],
+});
+
 /** The popover alone, transparent where the OS draws its material. */
 async function popover(page: Page): Promise<string> {
   const png = await page.screenshot({ omitBackground: true });
@@ -333,6 +451,17 @@ async function cutout(page: Page, scheme: Scheme, name: string): Promise<void> {
   ]);
 }
 
+/** Scrolls the list so the row named `name` starts at its top, its details below it. */
+async function top(app: App, name: string): Promise<void> {
+  // The list's own scroll box, never the page: the header and footer stay put.
+  await app.row(name).evaluate((row) => {
+    let box = row.parentElement;
+    while (box && !/auto|scroll/.test(getComputedStyle(box).overflowY)) box = box.parentElement;
+    if (box) box.scrollTop += row.getBoundingClientRect().top - box.getBoundingClientRect().top - 8;
+  });
+  await app.page.waitForTimeout(200);
+}
+
 async function boot(app: App, page: Page, os: Os, scheme: Scheme, data = showcase()) {
   await page.emulateMedia({ colorScheme: scheme, reducedMotion: "reduce" });
   data.appInfo.os = os;
@@ -394,6 +523,29 @@ for (const scheme of ["light", "dark"] as const) {
     await cutout(page, scheme, `commit-${scheme}`);
   });
 
+  test(`brief ${scheme}`, async ({ app, page }) => {
+    await boot(app, page, "macos", scheme, briefed());
+    await app.row("Lab 4").locator("[data-row]").click();
+    await expect(page.getByText("Hanoi peer review")).toBeVisible();
+    await top(app, "Lab 4");
+    await cutout(page, scheme, `brief-${scheme}`);
+  });
+
+  test(`group ${scheme}`, async ({ app, page }) => {
+    const data = grouped();
+    await boot(app, page, "macos", scheme, data);
+    await app.waitForCall("teammate_jobs");
+    const site = data.snapshot.projects.find((p) => p.assignment?.slug === "portfolio")!;
+    await app.emit("teammate-jobs", [teammates(site)]);
+    await app.row("Portfolio Site").locator("[data-row]").click();
+    const panel = page.locator("section.teammates");
+    await panel.getByRole("button", { expanded: false }).click();
+    await expect(panel.getByRole("listitem")).toHaveCount(2);
+    await top(app, "Portfolio Site");
+    await page.waitForTimeout(300);
+    await cutout(page, scheme, `group-${scheme}`);
+  });
+
   test(`setup ${scheme}`, async ({ app, page }) => {
     await page.emulateMedia({ colorScheme: scheme, reducedMotion: "reduce" });
     const first = showcase({
@@ -443,3 +595,51 @@ test("social card", async ({ app, page }) => {
     .screenshot({ path: `${OUT}social.jpg`, type: "jpeg", quality: 88, scale: "css" });
   await card.close();
 });
+
+// The README's banner, light and dark: the name, what it does for a student, and the app.
+for (const scheme of ["light", "dark"] as const) {
+  test(`banner ${scheme}`, async ({ app, page }) => {
+    await boot(app, page, "macos", scheme);
+    const shot = await popover(page);
+    const dark = scheme === "dark";
+    const icon = readFileSync(new URL("../../assets/icon.svg", import.meta.url), "utf8");
+    const banner = await page.context().newPage();
+    await banner.setViewportSize({ width: 1200, height: 480 });
+    await banner.setContent(`<!doctype html><html><head><style>
+      body { margin: 0; background: transparent; }
+      #banner { position: relative; width: 1200px; height: 480px; overflow: hidden; border-radius: 24px;
+        background: ${dark ? "linear-gradient(180deg, #2a2b30 0%, #1c1c1f 100%)" : "linear-gradient(180deg, #f7f7f9 0%, #e9eaee 100%)"};
+        font-family: -apple-system, "Segoe UI", sans-serif; color: ${dark ? "#f5f5f7" : "#1d1d1f"}; }
+      .text { position: absolute; left: 72px; top: 0; bottom: 0; width: 600px; display: flex; flex-direction: column; justify-content: center; }
+      .text svg { width: 96px; height: 96px; margin: 0 0 16px -11px; }
+      h1 { margin: 0; font-size: 54px; line-height: 1.05; letter-spacing: -0.03em; font-weight: 700; }
+      ul { margin: 22px 0 0; padding: 0; list-style: none; font-size: 26px; line-height: 1.45; font-weight: 500; }
+      p { margin: 18px 0 0; font-size: 19px; color: ${dark ? "#a1a1a6" : "#6e6e73"}; }
+      .window { position: absolute; left: 740px; top: 48px; width: 380px; height: 560px; border-radius: 12px; overflow: hidden;
+        background: ${dark ? "rgb(40 40 44)" : "rgb(244 244 246)"};
+        box-shadow: 0 0 0 0.5px ${dark ? "rgb(255 255 255 / 0.2)" : "rgb(0 0 0 / 0.16)"}, 0 30px 70px -10px rgb(0 0 0 / ${dark ? 0.6 : 0.25}); }
+      .window img { display: block; width: 380px; height: 560px; }
+    </style></head><body><div id="banner">
+      <div class="text">${icon}<h1>Classroom 50 Toolbox</h1>
+      <ul><li>Never miss a deadline.</li><li>See why a test failed.</li><li>Hand in with one click.</li></ul>
+      <p>Free for macOS, Windows and Linux.</p></div>
+      <div class="window"><img src="${shot}"></div>
+    </div></body></html>`);
+    await banner.locator("img").evaluate((img: HTMLImageElement) => img.decode());
+    const png = `${TMP}banner-${scheme}.png`;
+    await banner.locator("#banner").screenshot({ path: png, omitBackground: true });
+    await banner.close();
+    execFileSync("cwebp", [
+      "-quiet",
+      "-q",
+      "88",
+      "-alpha_q",
+      "100",
+      "-m",
+      "6",
+      png,
+      "-o",
+      `${OUT}banner-${scheme}.webp`,
+    ]);
+  });
+}

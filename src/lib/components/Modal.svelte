@@ -97,7 +97,7 @@
     padding: 14px;
     border: 1px solid var(--border);
     border-radius: var(--radius-card);
-    background: var(--bg-card);
+    background: var(--bg-modal, var(--bg-card));
     backdrop-filter: blur(30px) saturate(1.6);
     -webkit-backdrop-filter: blur(30px) saturate(1.6);
     box-shadow: 0 8px 30px rgb(0 0 0 / 0.25);

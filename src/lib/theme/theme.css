@@ -84,6 +84,10 @@
   --radius-card: 8px;
   --accent: #005fb8;
   --bg-card: rgb(255 255 255 / 0.78);
+  /* An in-popover dialog's card (else `--bg-card`): Fluent's solid flyout fill. Mica sits
+     behind the webview, where `backdrop-filter` can't see it, so a card as translucent as
+     the others would show the desktop through. */
+  --bg-modal: #f9f9f9;
   /* Fluent's caution and success text colors. */
   --warning: #9d5d00;
   --success: #0f7b0f;
@@ -102,6 +106,7 @@
     --accent: #60cdff;
     --accent-fg: #000;
     --bg-card: rgb(255 255 255 / 0.05);
+    --bg-modal: #2c2c2c;
     --warning: #ffb340;
     --success: #32d74b;
   }
