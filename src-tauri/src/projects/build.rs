@@ -66,16 +66,7 @@ pub(super) async fn build(
     state.http_cache.save();
 
     // Where each manual project lives on GitHub: its folder's origin, else the repo typed.
-    let manual_repos: Vec<Option<(String, String)>> = manual
-        .iter()
-        .map(|m| {
-            m.path
-                .as_deref()
-                .and_then(crate::discovery::origin_url)
-                .and_then(|url| crate::discovery::parse_github_remote(&url))
-                .or_else(|| crate::manual::parse_repo(m.repo.as_deref()?))
-        })
-        .collect();
+    let manual_repos: Vec<Option<(String, String)>> = manual.iter().map(manual_repo).collect();
     let wanted: HashSet<String> = manual_repos
         .iter()
         .flatten()
@@ -262,6 +253,75 @@ pub(super) async fn build(
 /// Adds each manual project (with the GitHub repo it lives in) to the Classroom 50 ones,
 /// with GitHub's data and the folder's state; one whose repo or folder already is a
 /// Classroom 50 project is left out, that one showing.
+/// Where a manual project lives on GitHub: its folder's origin, else the repo typed. Reads
+/// the folder's git config only, no process.
+fn manual_repo(entry: &ManualProject) -> Option<(String, String)> {
+    entry
+        .path
+        .as_deref()
+        .and_then(crate::discovery::origin_url)
+        .and_then(|url| crate::discovery::parse_github_remote(&url))
+        .or_else(|| crate::manual::parse_repo(entry.repo.as_deref()?))
+}
+
+/// Puts the stored manual projects on `projects` at once, without a rescan: a row whose
+/// project is gone leaves, an edited one takes its new name, class, due date, notes and
+/// Done box (and drops the folder's state and GitHub's data when its folder or repo
+/// changed, until the rescan reads them), a new one is added bare. What a save shows while
+/// `refresh_local` reads the folder, and what keeps a sync that read the store before a
+/// save from dropping its row.
+pub(super) fn with_manual(projects: &mut Vec<Project>, entries: &[ManualProject]) {
+    projects.retain(|p| !p.is_manual() || entries.iter().any(|e| e.id == p.id));
+    let listed_ids: HashSet<String> = projects
+        .iter()
+        .filter(|p| !p.is_manual())
+        .map(|p| p.id.clone())
+        .collect();
+    let listed_paths: HashSet<PathBuf> = projects
+        .iter()
+        .filter(|p| !p.is_manual())
+        .filter_map(|p| p.path.clone())
+        .collect();
+    for entry in entries {
+        let repo = manual_repo(entry);
+        let id = repo
+            .as_ref()
+            .map(|(owner, name)| key(&format!("{owner}/{name}")));
+        if id.as_ref().is_some_and(|id| listed_ids.contains(id))
+            || entry
+                .path
+                .as_ref()
+                .is_some_and(|p| listed_paths.contains(p))
+        {
+            projects.retain(|p| p.id != entry.id);
+            continue;
+        }
+        let Some(project) = projects.iter_mut().find(|p| p.id == entry.id) else {
+            let mut project = manual_project(entry.clone(), repo, None, None);
+            project.needs_work = crate::alerts::needs_work(&project);
+            projects.push(project);
+            continue;
+        };
+        let (owner, name) = repo.unzip();
+        if project.path != entry.path {
+            project.path = entry.path.clone();
+            project.local = None;
+            project.pending = None;
+            project.editor = None;
+            project.last_editor = None;
+        }
+        if project.owner != owner || project.repo != name {
+            project.owner = owner;
+            project.repo = name;
+            project.remote = None;
+        }
+        project.config.assignment = entry.name.clone();
+        project.config.classroom = entry.class.clone().unwrap_or_default();
+        project.manual = Some(ManualInfo::from(entry));
+        project.needs_work = crate::alerts::needs_work(project);
+    }
+}
+
 fn add_manual(
     projects: &mut Vec<Project>,
     manual: Vec<(ManualProject, Option<(String, String)>)>,
@@ -524,6 +584,50 @@ mod tests {
             path: None,
             repo: None,
         }
+    }
+
+    #[test]
+    fn a_save_shows_on_the_list_at_once() {
+        let mut essay = manual_entry("manual:1", "Essay");
+        essay.path = Some("/code/essay".into());
+        let mut projects = Vec::new();
+        add_manual(
+            &mut projects,
+            vec![
+                (essay.clone(), None),
+                (manual_entry("manual:2", "Gone"), None),
+            ],
+            HashMap::new(),
+            &HashMap::new(),
+        );
+        projects[0].local = Some(
+            serde_json::from_value(json!({
+                "branch": "main", "head": null, "ahead": null, "behind": null,
+                "changedFiles": 2, "changedPaths": [], "trackedChanges": 0, "unmerged": [],
+                "remoteAhead": false, "activeAt": null, "notGradedFiles": 0,
+                "notGradedPaths": [], "origin": null
+            }))
+            .unwrap(),
+        );
+
+        // Renamed and done, same folder: the folder's state stays until the rescan.
+        let mut edited = essay.clone();
+        edited.name = "Essay, final".into();
+        edited.done = true;
+        let added = manual_entry("manual:3", "Poster");
+        with_manual(&mut projects, &[edited.clone(), added]);
+        let ids: Vec<&str> = projects.iter().map(|p| p.id.as_str()).collect();
+        assert_eq!(ids, ["manual:1", "manual:3"]);
+        assert_eq!(projects[0].config.assignment, "Essay, final");
+        assert!(projects[0].local.is_some());
+        assert!(!projects[0].needs_work, "done");
+        assert!(projects[1].needs_work);
+
+        // Another folder: its state is read again.
+        edited.path = Some("/code/essay-2".into());
+        with_manual(&mut projects, &[edited]);
+        assert_eq!(projects.len(), 1);
+        assert!(projects[0].local.is_none());
     }
 
     #[test]

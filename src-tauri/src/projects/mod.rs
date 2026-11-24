@@ -46,7 +46,7 @@ pub use schedule::{refresh_if_stale, start_background_sync};
 pub use sync::{refresh, refresh_after_push, refresh_after_write, refresh_local, republish};
 
 // What the parts share, so each imports it from here.
-use build::{Sources, build};
+use build::{Sources, build, with_manual};
 use git::{check_clones, commit_emails, local_states};
 use identify::{Found, identify, identify_by, without_doubtful_templates};
 use merge::{late_seconds, merge, pending, sort_key};

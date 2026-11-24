@@ -131,12 +131,12 @@ export const commands = {
 	 */
 	setPhases: (id: string, phases: ProjectPhase[]) => __TAURI_INVOKE<ProjectPhase[]>("set_phases", { id, phases }),
 	/**
-	 *  Adds a manual project (no `id`) or changes the one `id` names, then rescans the disk so
-	 *  its row shows with the folder's state (no GitHub request). Refuses a folder or repo
-	 *  that already is a Classroom 50 project. Returns the project's id.
+	 *  Adds a manual project (no `id`) or changes the one `id` names and shows it at once; the
+	 *  folder's state follows from a rescan in the background (no GitHub request). Refuses a
+	 *  folder or repo that already is a Classroom 50 project. Returns the project's id.
 	 */
 	saveManualProject: (project: ManualDraft) => __TAURI_INVOKE<string>("save_manual_project", { project }),
-	/**  Forgets a manual project and its phases; its folder is never touched. */
+	/**  Forgets a manual project and its phases, at once; its folder is never touched. */
 	removeManualProject: (id: string) => __TAURI_INVOKE<null>("remove_manual_project", { id }),
 	/**  Dev builds only: pretends GitHub is down or the device is offline, until set back. */
 	simulateNetwork: (network: Network) => __TAURI_INVOKE<null>("simulate_network", { network }),

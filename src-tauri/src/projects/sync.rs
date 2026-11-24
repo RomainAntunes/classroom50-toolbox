@@ -9,7 +9,8 @@ use tauri::{AppHandle, Manager};
 
 use super::{
     LastRun, OnDisk, Progress, ProjectsState, Snapshot, annotate, commit_emails, full_snapshot,
-    local_snapshot, may_call_github, scan_local, sync_remote, watch_targets, with_phases,
+    local_snapshot, may_call_github, scan_local, sync_remote, watch_targets, with_manual,
+    with_phases,
 };
 use crate::clones::CloneStore;
 use crate::editor_choices::EditorChoices;
@@ -190,6 +191,7 @@ async fn publish(
     let mut snapshot = snapshot;
     // Under the lock, so phases saved meanwhile (`republish`) are on it either way.
     if let Ok(mut current) = state.snapshot.lock() {
+        with_manual(&mut snapshot.projects, &app.state::<ManualStore>().all());
         with_phases(&mut snapshot, &app.state::<PhaseStore>(), Utc::now());
         *current = snapshot.clone();
     }
@@ -203,13 +205,15 @@ async fn publish(
     snapshot
 }
 
-/// Shows a change only the app's own files hold (the student's phases) without a sync:
+/// Shows a change only the app's own files hold (the student's phases, the projects added
+/// by hand) without a sync:
 /// the last snapshot with it, broadcast, saved and passed on to alerts and calendar. A
 /// sync in flight puts the same change on its own result when it publishes.
 pub fn republish(app: &AppHandle) -> Snapshot {
     let state = app.state::<ProjectsState>();
     let snapshot = match state.snapshot.lock() {
         Ok(mut current) => {
+            with_manual(&mut current.projects, &app.state::<ManualStore>().all());
             with_phases(&mut current, &app.state::<PhaseStore>(), Utc::now());
             current.clone()
         }
