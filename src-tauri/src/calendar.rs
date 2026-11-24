@@ -90,7 +90,11 @@ fn notes(
     group: Option<&Group>,
     assignment: Option<&Assignment>,
 ) -> String {
-    let mut lines = vec![labels.class.replace("{name}", class)];
+    // A manual project may have no class.
+    let mut lines: Vec<String> = (!class.is_empty())
+        .then(|| labels.class.replace("{name}", class))
+        .into_iter()
+        .collect();
     if assignment.is_some_and(|a| a.grading_mode() == GradingMode::Off) {
         lines.push(labels.not_graded.clone());
     }
@@ -151,8 +155,7 @@ pub fn events(
     };
     let visible = || {
         snapshot.projects.iter().filter(|p| {
-            !hidden.contains(&p.id)
-                && !class_hidden(p.owner.as_deref().unwrap_or(""), &p.config.classroom)
+            !hidden.contains(&p.id) && !class_hidden(p.class_owner(), &p.config.classroom)
         })
     };
     let mut alarm_hours: Vec<u32> = reminder_hours.to_vec();
@@ -240,6 +243,42 @@ pub fn events(
             event
         })
     });
+    // A manual project's own due date; its notes follow the class and where it stands.
+    let manual = visible().filter_map(|p| {
+        let manual = p.manual.as_ref()?;
+        let due = manual.due?;
+        let status = if manual.done {
+            Status::Done
+        } else {
+            Status::Open
+        };
+        let mut text = notes(labels, &p.config.classroom, status, None, None);
+        if let Some(own) = manual.notes.as_deref() {
+            if !text.is_empty() {
+                text.push_str("\n\n");
+            }
+            text.push_str(own);
+        }
+        let mut event = CalendarEvent {
+            uid: p.id.clone(),
+            title: p.config.assignment.clone(),
+            notes: (!text.is_empty()).then_some(text),
+            url: match (&p.owner, &p.repo) {
+                (Some(owner), Some(repo)) => Some(format!("https://github.com/{owner}/{repo}")),
+                _ => None,
+            },
+            start: due - BLOCK,
+            due,
+            alarm_hours: if manual.done {
+                Vec::new()
+            } else {
+                alarm_hours.clone()
+            },
+            fingerprint: 0,
+        };
+        event.fingerprint = fingerprint(&event);
+        Some(event)
+    });
     projects
         .chain(unaccepted)
         .filter_map(|(uid, assignment, classroom, slug, url, status, group)| {
@@ -260,6 +299,7 @@ pub fn events(
             event.fingerprint = fingerprint(&event);
             Some(event)
         })
+        .chain(manual)
         .chain(phases)
         .collect()
 }
@@ -672,6 +712,76 @@ mod tests {
     }
 
     #[test]
+    fn writes_a_manual_project_with_its_notes() {
+        let due = DateTime::parse_from_rfc3339("2026-12-01T17:00:00Z")
+            .unwrap()
+            .to_utc();
+        let manual = |id: &str, class: &str, done: bool| crate::projects::Project {
+            id: id.into(),
+            owner: Some("alice".into()),
+            repo: Some("essay".into()),
+            config: crate::classroom50::RepoConfig {
+                classroom: class.into(),
+                assignment: "Essay".into(),
+                secret: None,
+            },
+            path: None,
+            local: None,
+            remote: None,
+            classroom: None,
+            assignment: None,
+            pending: None,
+            needs_work: !done,
+            web_url: None,
+            late_seconds: None,
+            phases: Vec::new(),
+            manual: Some(crate::manual::ManualInfo {
+                due: Some(due),
+                notes: Some("Two pages".into()),
+                done,
+                repo: None,
+            }),
+            editor: None,
+            last_editor: None,
+            group: None,
+        };
+        let snapshot = Snapshot {
+            projects: vec![
+                manual("manual:1", "Networks", false),
+                manual("manual:2", "", true),
+            ],
+            ..Snapshot::default()
+        };
+        let events = events(&snapshot, &[], &[], &[24], &Labels::default());
+        assert_eq!(events.len(), 2);
+        assert_eq!(events[0].uid, "manual:1");
+        assert_eq!(events[0].title, "Essay");
+        assert_eq!(events[0].due, due);
+        assert_eq!(
+            events[0].notes.as_deref(),
+            Some("Class: Networks\n\nTwo pages")
+        );
+        assert_eq!(
+            events[0].url.as_deref(),
+            Some("https://github.com/alice/essay")
+        );
+        assert_eq!(events[0].alarm_hours, [24, 1]);
+        // No class, done: the notes say so and the event stays silent.
+        assert_eq!(events[1].notes.as_deref(), Some("Done\n\nTwo pages"));
+        assert!(events[1].alarm_hours.is_empty());
+        // Hidden by its class, which has no owner.
+        let hidden = events_hidden(&snapshot, &["/networks".to_owned()]);
+        assert_eq!(hidden, ["manual:2"]);
+    }
+
+    fn events_hidden(snapshot: &Snapshot, classes: &[String]) -> Vec<String> {
+        events(snapshot, &[], classes, &[24], &Labels::default())
+            .into_iter()
+            .map(|e| e.uid)
+            .collect()
+    }
+
+    #[test]
     fn says_an_ungraded_assignment_is_not_graded() {
         let off = serde_json::json!({"mode": "off"});
         let mut lab1 = unaccepted("org/poo/lab1", "Lab 1", Some("2026-11-02T23:59:00+01:00"));
@@ -715,6 +825,7 @@ mod tests {
             web_url: None,
             late_seconds: None,
             phases: Vec::new(),
+            manual: None,
             editor: None,
             last_editor: None,
             group: None,

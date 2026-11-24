@@ -336,10 +336,9 @@ fn without_hidden(snapshot: &Snapshot, hidden: &[String], classes: &[String]) ->
         classes.contains(&key)
     };
     let mut visible = snapshot.clone();
-    visible.projects.retain(|p| {
-        !hidden.contains(&p.id)
-            && !class_hidden(p.owner.as_deref().unwrap_or(""), &p.config.classroom)
-    });
+    visible
+        .projects
+        .retain(|p| !hidden.contains(&p.id) && !class_hidden(p.class_owner(), &p.config.classroom));
     visible
         .unaccepted
         .retain(|u| !hidden.contains(&u.id) && !class_hidden(&u.classroom.org, &u.classroom.slug));
@@ -404,7 +403,7 @@ fn diff(
     }
     let mut catalog: BTreeMap<String, Vec<Listed>> = BTreeMap::new();
     for project in &snapshot.projects {
-        let Some(owner) = &project.owner else {
+        let Some(owner) = project.owner.as_ref().filter(|_| !project.is_manual()) else {
             continue;
         };
         let classroom = classroom_key(owner, &project.config.classroom);
@@ -542,10 +541,33 @@ fn diff(
             }
         }
 
+        let name = assignment_name(project);
+        // Before GitHub's data: a project with none (a manual one, a clone GitHub hasn't
+        // listed) still has its deadlines.
+        if let Some(due) = open_due(project)
+            && reached_reminder(memory, &project.id, due, hours_before, now)
+            && needs_work(project)
+        {
+            notices.push(Notice::Due {
+                assignment: name.clone(),
+                due,
+            });
+        }
+        // The Done box is what says a phase is handed in, not the clone's state.
+        for phase in open_phases(project) {
+            let id = format!("{}#{}", project.id, phase.id);
+            if reached_reminder(memory, &id, phase.due, hours_before, now) {
+                notices.push(Notice::PhaseDue {
+                    assignment: name.clone(),
+                    phase: phase.name.clone(),
+                    due: phase.due,
+                });
+            }
+        }
+
         let Some(remote) = &project.remote else {
             continue;
         };
-        let name = assignment_name(project);
 
         if let Some(head) = &remote.head {
             let previous = memory.heads.insert(project.id.clone(), head.oid.clone());
@@ -618,27 +640,6 @@ fn diff(
                 memory.unseen.insert(project.id.clone());
             }
         }
-
-        if let Some(due) = open_due(project)
-            && reached_reminder(memory, &project.id, due, hours_before, now)
-            && needs_work(project)
-        {
-            notices.push(Notice::Due {
-                assignment: name.clone(),
-                due,
-            });
-        }
-        // The Done box is what says a phase is handed in, not the clone's state.
-        for phase in open_phases(project) {
-            let id = format!("{}#{}", project.id, phase.id);
-            if reached_reminder(memory, &id, phase.due, hours_before, now) {
-                notices.push(Notice::PhaseDue {
-                    assignment: name.clone(),
-                    phase: phase.name.clone(),
-                    due: phase.due,
-                });
-            }
-        }
     }
 
     // Reminders for deadlines that have passed can go.
@@ -692,17 +693,16 @@ fn reached_reminder(
 
 /// The due date of an assignment that can still take work.
 pub(crate) fn open_due(project: &Project) -> Option<DateTime<Utc>> {
-    let assignment = project.assignment.as_ref()?;
-    let archived = project.remote.as_ref().is_some_and(|r| r.archived);
-    if assignment.closed || archived {
-        return None;
-    }
-    assignment.due.map(|due| due.with_timezone(&Utc))
+    project.open_due()
 }
 
 /// Whether the assignment may still need the student: anything pending, or no clone to
 /// tell (unless a tag-mode submission covers the remote head).
 pub(crate) fn needs_work(project: &Project) -> bool {
+    // The Done box says it, not the folder: a clean one may hold no work yet.
+    if let Some(manual) = &project.manual {
+        return !manual.done;
+    }
     if project.pending.is_some() {
         return true;
     }
@@ -784,6 +784,7 @@ mod tests {
             web_url: None,
             late_seconds: None,
             phases: Vec::new(),
+            manual: None,
             editor: None,
             last_editor: None,
             group: None,
@@ -1243,6 +1244,49 @@ mod tests {
         let notices = diff(&mut memory, &snap, &[24, 1], now);
         assert_eq!(notices.len(), 1);
         assert!(diff(&mut memory, &snap, &[24, 1], now).is_empty());
+    }
+
+    fn manual(due: Option<DateTime<Utc>>, done: bool) -> Project {
+        let mut project = project("essay", None);
+        project.id = "manual:1".into();
+        project.owner = Some("alice".into());
+        project.config.assignment = "Essay".into();
+        project.config.classroom = "Networks".into();
+        project.assignment = None;
+        project.remote = None;
+        project.path = Some("/tmp/essay".into());
+        project.manual = Some(crate::manual::ManualInfo {
+            due,
+            notes: None,
+            done,
+            repo: None,
+        });
+        project.needs_work = needs_work(&project);
+        project
+    }
+
+    #[test]
+    fn reminds_of_a_manual_project_until_it_is_done() {
+        let now = Utc::now();
+        let due = now + TimeDelta::minutes(30);
+        let mut memory = Memory::default();
+        // A baseline first: a manual project is never a newly published assignment.
+        assert!(diff(&mut memory, &snapshot(Vec::new()), &[24, 1], now).is_empty());
+        let essay = manual(Some(due), false);
+        assert!(essay.needs_work, "a clean folder still has work to do");
+        let notices = diff(&mut memory, &snapshot(vec![essay.clone()]), &[24, 1], now);
+        assert_eq!(
+            notices,
+            [Notice::Due {
+                assignment: "Essay".into(),
+                due,
+            }]
+        );
+        let mut memory = Memory::default();
+        diff(&mut memory, &snapshot(Vec::new()), &[24, 1], now);
+        let done = manual(Some(due), true);
+        assert!(!done.needs_work);
+        assert!(diff(&mut memory, &snapshot(vec![done]), &[24, 1], now).is_empty());
     }
 
     fn phase(id: &str, due: DateTime<Utc>, done: bool) -> crate::phases::Phase {

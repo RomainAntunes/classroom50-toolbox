@@ -130,6 +130,14 @@ export const commands = {
 	 *  once: `projects-updated` follows, reminders and calendar events with it, no GitHub call.
 	 */
 	setPhases: (id: string, phases: ProjectPhase[]) => __TAURI_INVOKE<ProjectPhase[]>("set_phases", { id, phases }),
+	/**
+	 *  Adds a manual project (no `id`) or changes the one `id` names, then rescans the disk so
+	 *  its row shows with the folder's state (no GitHub request). Refuses a folder or repo
+	 *  that already is a Classroom 50 project. Returns the project's id.
+	 */
+	saveManualProject: (project: ManualDraft) => __TAURI_INVOKE<string>("save_manual_project", { project }),
+	/**  Forgets a manual project and its phases; its folder is never touched. */
+	removeManualProject: (id: string) => __TAURI_INVOKE<null>("remove_manual_project", { id }),
 	/**  Dev builds only: pretends GitHub is down or the device is offline, until set back. */
 	simulateNetwork: (network: Network) => __TAURI_INVOKE<null>("simulate_network", { network }),
 	simulatedNetwork: () => __TAURI_INVOKE<Network>("simulated_network"),
@@ -743,7 +751,7 @@ export type EditorInfo = {
 	name: string,
 };
 
-export type ErrorKind = "notInstalled" | "commandFailed" | "timedOut" | "unsupported" | "manualInstall" | "blockedInDev" | "cancelled" | "busy" | "pathExists" | "schemaMismatch" | "student" | "needsTeam" | "submissionsClosed" | "unknownAssignment" | "ghStudentOutdated" | "staleMarker" | "groupFull" | "invalidUsername" | "invalidTeamName" | "invalidPhase" | "noTerminal" | "localChanges" | "otherBranch" | "diverged" | "remoteAhead" | "gitInProgress" | "nothingToPush" | "nothingToCommit" | "noIdentity" | "fileTooLarge" | "pushRejected" | "notSignedIn" | "ssh" | "tokenFromEnv" | "rateLimited" | "github" | "offline" | "noSelfUpdate" | "updateUnavailable" | "calendarAccess" | "calendarUnavailable" | "invalidShortcut" | "shortcutTaken" | "shortcutUnsupported" | "repoConfig" | "io" | "http" | "tauri" | "updater" | "autostart";
+export type ErrorKind = "notInstalled" | "commandFailed" | "timedOut" | "unsupported" | "manualInstall" | "blockedInDev" | "cancelled" | "busy" | "pathExists" | "schemaMismatch" | "student" | "needsTeam" | "submissionsClosed" | "unknownAssignment" | "ghStudentOutdated" | "staleMarker" | "groupFull" | "invalidUsername" | "invalidTeamName" | "invalidPhase" | "invalidManualProject" | "alreadyListed" | "noTerminal" | "localChanges" | "otherBranch" | "diverged" | "remoteAhead" | "gitInProgress" | "nothingToPush" | "nothingToCommit" | "noIdentity" | "fileTooLarge" | "pushRejected" | "notSignedIn" | "ssh" | "tokenFromEnv" | "rateLimited" | "github" | "offline" | "noSelfUpdate" | "updateUnavailable" | "calendarAccess" | "calendarUnavailable" | "invalidShortcut" | "shortcutTaken" | "shortcutUnsupported" | "repoConfig" | "io" | "http" | "tauri" | "updater" | "autostart";
 
 /**  The payload of each event, by name: `Events` in `src/lib/bindings.ts`. */
 export type Events = Events_Serialize | Events_Deserialize;
@@ -1083,6 +1091,31 @@ export type LocalState = {
 	origin: GitProtocol | null,
 };
 
+/**  What the form sends: a project without an id is a new one. */
+export type ManualDraft = {
+	id: string | null,
+	name: string,
+	class: string | null,
+	due: string | null,
+	notes: string | null,
+	done: boolean,
+	path: string | null,
+	/**  `owner/repo`, or a GitHub URL pasted as is. */
+	repo: string | null,
+};
+
+/**
+ *  What a row carries of its manual project, beside the name (`config.assignment`), the
+ *  class (`config.classroom`), the folder (`path`) and the repo (`owner`, `repo`).
+ */
+export type ManualInfo = {
+	due: string | null,
+	notes: string | null,
+	done: boolean,
+	/**  The repo the student typed, for the form; `owner`/`repo` say which one is used. */
+	repo: string | null,
+};
+
 export type Member = {
 	login: string,
 	name: string | null,
@@ -1244,6 +1277,8 @@ export type Project_Deserialize = {
 	group: Group | null,
 	/**  The phases the student set on it (`phases::PhaseStore`), by date. */
 	phases: ProjectPhase[],
+	/**  Set on a project the student added by hand (`manual`), never on a Classroom 50 one. */
+	manual: ManualInfo | null,
 };
 
 export type Project_Serialize = {
@@ -1285,6 +1320,8 @@ export type Project_Serialize = {
 	group: Group | null,
 	/**  The phases the student set on it (`phases::PhaseStore`), by date. */
 	phases: ProjectPhase[],
+	/**  Set on a project the student added by hand (`manual`), never on a Classroom 50 one. */
+	manual: ManualInfo | null,
 };
 
 /**  What Commit & push would do, for the prompt. */

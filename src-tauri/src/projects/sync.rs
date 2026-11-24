@@ -8,13 +8,14 @@ use chrono::Utc;
 use tauri::{AppHandle, Manager};
 
 use super::{
-    LastRun, Progress, ProjectsState, Snapshot, annotate, commit_emails, full_snapshot,
+    LastRun, OnDisk, Progress, ProjectsState, Snapshot, annotate, commit_emails, full_snapshot,
     local_snapshot, may_call_github, scan_local, sync_remote, watch_targets, with_phases,
 };
 use crate::clones::CloneStore;
 use crate::editor_choices::EditorChoices;
 use crate::events::{IpcEvent, ProjectsUpdated};
 use crate::github::{self, Http};
+use crate::manual::{ManualProject, ManualStore};
 use crate::phases::PhaseStore;
 use crate::settings::{Settings, SettingsStore};
 use crate::status::Grading;
@@ -163,7 +164,8 @@ async fn publish(
     let progress = Progress::start(app, mode, foreground);
     let started = std::time::Instant::now();
     let clones = app.state::<CloneStore>().list();
-    let (snapshot, targets) = sync(&state, http, &settings, clones, mode, &progress).await;
+    let manual = app.state::<ManualStore>().all();
+    let (snapshot, targets) = sync(&state, http, &settings, clones, manual, mode, &progress).await;
     progress.finish(mode);
     let run = LastRun {
         at: Utc::now(),
@@ -230,6 +232,7 @@ async fn sync(
     http: &reqwest::Client,
     settings: &Settings,
     clones: Vec<PathBuf>,
+    manual: Vec<ManualProject>,
     mode: Mode,
     progress: &Progress,
 ) -> (Snapshot, Vec<WatchTarget>) {
@@ -246,8 +249,19 @@ async fn sync(
         if preview {
             let (locals, _, recents) = &scanned;
             let quiet = Progress::quiet(&progress.app);
-            let mut snapshot =
-                local_snapshot(state, http, locals.clone(), now, false, false, &quiet).await;
+            let mut snapshot = local_snapshot(
+                state,
+                http,
+                OnDisk {
+                    locals: locals.clone(),
+                    manual: manual.clone(),
+                },
+                now,
+                false,
+                false,
+                &quiet,
+            )
+            .await;
             let choices = progress.app.state::<EditorChoices>().all();
             annotate(state, &mut snapshot, recents, &choices);
             let phases = progress.app.state::<PhaseStore>();
@@ -264,7 +278,16 @@ async fn sync(
         let (locals, targets, recents) = scan.await;
         let status = mode == Mode::Status;
         (
-            local_snapshot(state, http, locals, now, status, network, progress).await,
+            local_snapshot(
+                state,
+                http,
+                OnDisk { locals, manual },
+                now,
+                status,
+                network,
+                progress,
+            )
+            .await,
             targets,
             recents,
         )
@@ -272,7 +295,15 @@ async fn sync(
         let (remote, (locals, targets, recents)) =
             tokio::join!(sync_remote(state, http, progress), scan);
         (
-            full_snapshot(state, http, remote, locals, now, progress).await,
+            full_snapshot(
+                state,
+                http,
+                remote,
+                OnDisk { locals, manual },
+                now,
+                progress,
+            )
+            .await,
             targets,
             recents,
         )

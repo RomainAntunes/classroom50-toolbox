@@ -172,6 +172,7 @@ pub async fn add_teammates(
             (meta, target, cap)
         }
         Some(project) => {
+            refuse_manual(&project)?;
             let (Some(owner), Some(repo)) = (project.owner.as_deref(), project.repo.as_deref())
             else {
                 return Err(Error::Unsupported(format!("{id} isn't on GitHub")));
@@ -313,6 +314,17 @@ pub(super) fn submit_target(project: &Project) -> student::SubmitTarget<'_> {
     }
 }
 
+/// A manual project isn't a Classroom 50 assignment: gh-student has nothing to submit it to.
+fn refuse_manual(project: &Project) -> Result<()> {
+    if project.is_manual() {
+        return Err(Error::Unsupported(format!(
+            "{} isn't a Classroom 50 assignment",
+            project.id
+        )));
+    }
+    Ok(())
+}
+
 /// Refuses to submit project `id` while its clone's marker names the slug the assignment
 /// was renamed from (`student::stale_marker`): it needs a pull first.
 fn refuse_stale_marker(state: &ProjectsState, id: &str, path: &Path) -> Result<()> {
@@ -339,6 +351,7 @@ pub async fn submit_check(
     id: String,
 ) -> Result<student::SubmitCheck> {
     let (path, project) = submittable(&state, &id)?;
+    refuse_manual(&project)?;
     refuse_stale_marker(&state, &id, &path)?;
     student::check(&path, submit_target(&project)).await
 }
@@ -353,6 +366,7 @@ pub async fn submit_project(
     id: String,
 ) -> Result<student::Submitted> {
     let (path, project) = submittable(&state, &id)?;
+    refuse_manual(&project)?;
     refuse_stale_marker(&state, &id, &path)?;
     let submitted = student::submit(&path, submit_target(&project)).await?;
     tauri::async_runtime::spawn(async move {

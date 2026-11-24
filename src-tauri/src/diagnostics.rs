@@ -557,6 +557,10 @@ impl Redactor {
             if let Some(folder) = project.path.as_deref().and_then(Path::file_name) {
                 r.add(Kind::Repo, &folder.to_string_lossy());
             }
+            // A name the student typed may be anything, their own name included.
+            if project.is_manual() {
+                r.add(Kind::Name, &project.config.assignment);
+            }
         }
         for (owner, name, config) in &known.repos {
             r.add(Kind::Org, owner);

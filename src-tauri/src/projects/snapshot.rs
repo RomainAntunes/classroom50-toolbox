@@ -12,8 +12,17 @@ use crate::editor_choices;
 use crate::editors;
 use crate::error::{Error, Result};
 use crate::groups;
+use crate::manual::ManualProject;
 use crate::phases::PhaseStore;
 use crate::sync_progress::Phase;
+
+/// What a build finds on this computer: the clones scanned and the projects the student
+/// added by hand.
+#[derive(Clone)]
+pub(super) struct OnDisk {
+    pub(super) locals: Vec<LocalProject>,
+    pub(super) manual: Vec<ManualProject>,
+}
 
 /// Puts the student's phases on every project and sorts the list again, since a project
 /// with no due date sorts by its next phase. Until `alerts::process` moves a renamed
@@ -57,14 +66,19 @@ pub(super) fn annotate(
         );
     }
     for project in &mut snapshot.projects {
-        project.group = project.owner.as_deref().and_then(|owner| {
-            find(
-                owner,
-                &project.config.classroom,
-                &project.config.assignment,
-                project.assignment.as_ref().and_then(|a| a.old_slug()),
-            )
-        });
+        // A manual project's name and class aren't a Classroom 50 group's.
+        project.group = project
+            .owner
+            .as_deref()
+            .filter(|_| !project.is_manual())
+            .and_then(|owner| {
+                find(
+                    owner,
+                    &project.config.classroom,
+                    &project.config.assignment,
+                    project.assignment.as_ref().and_then(|a| a.old_slug()),
+                )
+            });
         project.editor = project
             .path
             .as_deref()
@@ -109,7 +123,7 @@ fn last_discovery(previous: &Snapshot, cache: &RemoteCache) -> Vec<RemoteRepo> {
 pub(super) async fn local_snapshot(
     state: &ProjectsState,
     http: &reqwest::Client,
-    locals: Vec<LocalProject>,
+    disk: OnDisk,
     now: DateTime<Utc>,
     status: bool,
     network: bool,
@@ -133,8 +147,9 @@ pub(super) async fn local_snapshot(
     let sources = Sources {
         remote: remote_repos,
         classrooms,
-        locals,
+        locals: disk.locals,
         discovered,
+        manual: disk.manual,
     };
     let (projects, unaccepted) =
         build(sources, state, http, auth.as_ref(), network, now, progress).await;
@@ -160,7 +175,7 @@ pub(super) async fn full_snapshot(
     state: &ProjectsState,
     http: &reqwest::Client,
     remote: Result<()>,
-    locals: Vec<LocalProject>,
+    disk: OnDisk,
     now: DateTime<Utc>,
     progress: &Progress,
 ) -> Snapshot {
@@ -210,8 +225,9 @@ pub(super) async fn full_snapshot(
     let sources = Sources {
         remote: repos,
         classrooms,
-        locals,
+        locals: disk.locals,
         discovered,
+        manual: disk.manual,
     };
     let (projects, unaccepted) =
         build(sources, state, http, auth.as_ref(), true, now, progress).await;

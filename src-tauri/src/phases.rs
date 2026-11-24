@@ -155,7 +155,8 @@ fn valid_id(id: &str) -> bool {
 /// keeps its phases: the student set them.
 pub fn open_phases(project: &Project) -> impl Iterator<Item = &Phase> {
     let closed = project.assignment.as_ref().is_some_and(|a| a.closed)
-        || project.remote.as_ref().is_some_and(|r| r.archived);
+        || project.remote.as_ref().is_some_and(|r| r.archived)
+        || project.manual.as_ref().is_some_and(|m| m.done);
     project.phases.iter().filter(move |p| !closed && !p.done)
 }
 
