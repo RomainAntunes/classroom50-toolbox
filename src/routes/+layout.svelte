@@ -29,6 +29,7 @@
   import { initTheme } from "#lib/theme/preview.svelte.js";
   import Prompt from "#lib/components/Prompt.svelte";
   import PhasesEditor from "#lib/components/PhasesEditor.svelte";
+  import ManualEditor from "#lib/components/ManualEditor.svelte";
   import { announce, announcer } from "#lib/announce.svelte.js";
   import { modals } from "#lib/modal.svelte.js";
   import { loadSnapshot, session } from "#lib/session.svelte.js";
@@ -251,6 +252,7 @@
   {@render children()}
   <Prompt />
   <PhasesEditor />
+  <ManualEditor />
   <div class="sr-only" role="status">{announcer.text}</div>
 </div>
 

@@ -5,7 +5,14 @@
 // and menus wait for the test to answer or pick, through `window.__E2E__`.
 import { emit } from "@tauri-apps/api/event";
 import { mockIPC, mockWindows } from "@tauri-apps/api/mocks";
-import type { CommandError, GitProtocol, ProjectPhase, Settings } from "../../../src/lib/api";
+import type {
+  CommandError,
+  GitProtocol,
+  ManualDraft,
+  Project,
+  ProjectPhase,
+  Settings,
+} from "../../../src/lib/api";
 import type { Reply, Scenario } from "../fixtures";
 
 export interface Call {
@@ -206,6 +213,42 @@ export function install(scenario: Scenario): E2E {
         state.snapshot = { ...state.snapshot, projects };
         void emit("projects-updated", state.snapshot);
         return phases;
+      }
+      case "save_manual_project": {
+        // Rust stores it and rescans the disk; the row comes back as a manual project.
+        const draft = args.project as ManualDraft;
+        const id = draft.id ?? `manual:${(state.snapshot.projects.length + 1).toString(16)}`;
+        const [owner, repo] = draft.repo ? draft.repo.split("/") : [null, null];
+        const row: Project = {
+          id,
+          owner,
+          repo,
+          config: { classroom: draft.class ?? "", assignment: draft.name, secret: null },
+          path: draft.path,
+          local: null,
+          remote: null,
+          classroom: null,
+          assignment: null,
+          pending: null,
+          needsWork: !draft.done,
+          webUrl: null,
+          lateSeconds: null,
+          editor: null,
+          lastEditor: null,
+          group: null,
+          phases: state.snapshot.projects.find((p) => p.id === id)?.phases ?? [],
+          manual: { due: draft.due, notes: draft.notes, done: draft.done, repo: draft.repo },
+        };
+        const others = state.snapshot.projects.filter((p) => p.id !== id);
+        state.snapshot = { ...state.snapshot, projects: [...others, row] };
+        void emit("projects-updated", state.snapshot);
+        return id;
+      }
+      case "remove_manual_project": {
+        const projects = state.snapshot.projects.filter((p) => p.id !== args.id);
+        state.snapshot = { ...state.snapshot, projects };
+        void emit("projects-updated", state.snapshot);
+        return null;
       }
       case "active_global_shortcut":
         return state.settings.globalShortcut;

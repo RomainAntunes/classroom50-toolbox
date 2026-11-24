@@ -115,7 +115,7 @@ pub fn parse(url: &str) -> Option<Link> {
 }
 
 /// A GitHub repository name: letters, digits, `.`, `-` and `_`, at most 100, not `.` or `..`.
-fn valid_repo_name(name: &str) -> bool {
+pub(crate) fn valid_repo_name(name: &str) -> bool {
     (1..=100).contains(&name.len())
         && name != "."
         && name != ".."
@@ -668,6 +668,7 @@ mod tests {
                 web_url: None,
                 late_seconds: None,
                 phases: Vec::new(),
+                manual: None,
                 editor: None,
                 last_editor: None,
                 group: None,

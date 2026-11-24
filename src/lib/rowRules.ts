@@ -7,6 +7,8 @@ import { t } from "#lib/i18n/index.js";
 
 /** Every push to the default branch is graded (no `submit/*` tags): Commit & push applies. */
 export function gradedOnPush(project: Project): boolean {
+  // A project added by hand has nothing to submit: its pushes are the work.
+  if (project.manual) return true;
   return Boolean(project.assignment) && project.assignment?.submissionMode !== "tag";
 }
 

@@ -46,6 +46,15 @@ ignore = [
     { id = "RUSTSEC-2026-0368", reason = "Windows-only zip 4 in tauri-plugin-updater; signed .exe/.msi payloads, never a zip; fixed upstream, not released" },
     { id = "RUSTSEC-2026-0369", reason = "Windows-only zip 4 in tauri-plugin-updater; signed .exe/.msi payloads, never a zip; fixed upstream, not released" },
     { id = "RUSTSEC-2026-0429", reason = "Windows-only zip 4 in tauri-plugin-updater; signed .exe/.msi payloads, never a zip; fixed upstream, not released" },
+    # Two more zip < 9 reading flaws (AES entries not authenticated when the data ends early,
+    # ZipStreamReader trusting local-header names), same Windows-only zip 4 as above: the
+    # updater never opens a zip, so drop these with the four above.
+    { id = "RUSTSEC-2026-0545", reason = "Windows-only zip 4 in tauri-plugin-updater; signed .exe/.msi payloads, never a zip; fixed upstream, not released" },
+    { id = "RUSTSEC-2026-0548", reason = "Windows-only zip 4 in tauri-plugin-updater; signed .exe/.msi payloads, never a zip; fixed upstream, not released" },
+    # chrono is unmaintained (no vulnerability, no successor named). Tauri itself depends on
+    # it through specta, so dropping it from this app wouldn't remove it. Drop this once
+    # Tauri and specta move off chrono, then replace the app's own uses.
+    { id = "RUSTSEC-2026-0543", reason = "unmaintained, not a vulnerability; Tauri depends on it through specta, no replacement from this app" },
 ]
 
 [licenses]

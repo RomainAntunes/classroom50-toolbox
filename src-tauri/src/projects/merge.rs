@@ -33,6 +33,7 @@ pub(super) fn merge(
                 web_url: None,
                 late_seconds: None,
                 phases: Vec::new(),
+                manual: None,
                 editor: None,
                 last_editor: None,
                 group: None,
@@ -75,6 +76,7 @@ pub(super) fn merge(
                         web_url: None,
                         late_seconds: None,
                         phases: Vec::new(),
+                        manual: None,
                         editor: None,
                         last_editor: None,
                         group: None,
@@ -150,9 +152,9 @@ pub(super) fn sort_key(project: &Project, now: DateTime<Utc>) -> (u8, i64, Strin
         || project.classroom.as_ref().is_some_and(|c| !c.active);
     // With no due date of its own, the next phase the student set stands in, as the row
     // shows it.
-    let due = assignment
-        .and_then(|a| a.due)
-        .map(|d| d.with_timezone(&Utc))
+    let closed = closed || project.manual.as_ref().is_some_and(|m| m.done);
+    let due = project
+        .due()
         .or_else(|| crate::phases::next_open_phase(project).map(|p| p.due));
     match due {
         _ if closed => (2, 0, name),
@@ -227,6 +229,7 @@ mod tests {
             web_url: None,
             late_seconds: None,
             phases: Vec::new(),
+            manual: None,
             editor: None,
             last_editor: None,
             group: None,

@@ -3,7 +3,7 @@
   import logo from "#lib/assets/logo.png";
   import { onMount } from "svelte";
   import { goto } from "$app/navigation";
-  import { Menu, MenuItem } from "@tauri-apps/api/menu";
+  import { Menu, MenuItem, PredefinedMenuItem } from "@tauri-apps/api/menu";
   import {
     api,
     onEvent,
@@ -29,7 +29,8 @@
   import Section from "#lib/components/Section.svelte";
   import ToolRow from "#lib/components/ToolRow.svelte";
   import ProjectRow from "#lib/components/ProjectRow.svelte";
-  import { classKey, showsProject, showsUnaccepted } from "#lib/filter.js";
+  import { classKey, classOwner, showsProject, showsUnaccepted } from "#lib/filter.js";
+  import { editManual } from "#lib/manualEditor.svelte.js";
   import { isClassHidden, isCollapsed, setClassHidden, setCollapsed } from "#lib/hidden.js";
   import { showsGrading } from "#lib/grading.js";
   import UnacceptedRow from "#lib/components/UnacceptedRow.svelte";
@@ -40,7 +41,12 @@
 
   interface ClassGroup {
     key: string;
+    /** The keys of the projects added by hand under this class's name (`classOwner`). */
+    aliases: string[];
     title: string;
+    /** The class's own name, before a clash adds the org to `title`; empty for projects
+     *  added by hand without one. */
+    name: string;
     owner: string;
     projects: Project[];
     unaccepted: Unaccepted[];
@@ -108,13 +114,37 @@
       const key = classKey(owner, slug);
       let found = groups.get(key);
       if (!found) {
-        found = { key, title, owner, projects: [], unaccepted: [] };
+        found = { key, aliases: [], title, name: title, owner, projects: [], unaccepted: [] };
         groups.set(key, found);
       }
       return found;
     };
+    // A project added by hand joins the Classroom 50 class it is named after, if any.
+    const named = new Map<string, { owner: string; slug: string; title: string }>();
+    const classOf = (owner: string, slug: string, title: string) => {
+      if (!named.has(title.toLowerCase())) named.set(title.toLowerCase(), { owner, slug, title });
+    };
+    for (const project of projects) {
+      if (project.manual) continue;
+      const { classroom } = project.config;
+      classOf(project.owner ?? "", classroom, project.classroom?.name ?? classroom);
+    }
+    for (const item of unaccepted) {
+      classOf(item.classroom.org, item.classroom.slug, item.classroom.name ?? item.classroom.slug);
+    }
     for (const project of projects) {
       const { classroom } = project.config;
+      if (project.manual) {
+        const own = classKey(classOwner(project), classroom);
+        const target = classroom ? named.get(classroom.toLowerCase()) : undefined;
+        const found = target
+          ? group(target.owner, target.slug, target.title)
+          : group("", classroom, classroom || t("manual.noClass"));
+        if (!classroom) found.name = "";
+        if (found.key !== own && !found.aliases.includes(own)) found.aliases.push(own);
+        found.projects.push(project);
+        continue;
+      }
       group(project.owner ?? "", classroom, project.classroom?.name ?? classroom).projects.push(
         project,
       );
@@ -226,17 +256,23 @@
     return undefined;
   }
 
-  async function classMenu(key: string, anchor?: HTMLElement) {
+  async function classMenu(group: ClassGroup, anchor?: HTMLElement) {
+    const { key } = group;
     const collapsed = isCollapsed(key);
     const hidden = isClassHidden(key);
     const items = await Promise.all([
+      MenuItem.new({
+        text: t("manual.add"),
+        action: () => void editManual({ class: group.name }),
+      }),
+      PredefinedMenuItem.new({ item: "Separator" }),
       MenuItem.new({
         text: t(collapsed ? "projects.class.expand" : "projects.class.collapse"),
         action: () => setCollapsed(key, !collapsed),
       }),
       MenuItem.new({
         text: t(hidden ? "projects.class.unhide" : "projects.class.hide"),
-        action: () => setClassHidden(key, !hidden),
+        action: () => setClassHidden([key, ...group.aliases], !hidden),
       }),
     ]);
     const menu = await Menu.new({ items });
@@ -443,7 +479,7 @@
           collapsed={folded(group)}
           note={classNote(group)}
           ontoggle={() => setCollapsed(group.key, !isCollapsed(group.key))}
-          onmenu={(anchor) => classMenu(group.key, anchor)}
+          onmenu={(anchor) => classMenu(group, anchor)}
         >
           {#each group.projects as project (project.id)}
             <ProjectRow
@@ -475,6 +511,7 @@
           {:else}
             {t("projects.empty")}
             <button onclick={() => goto("/settings")}>{t("app.settings")}</button>
+            <button onclick={() => void editManual()}>{t("manual.addButton")}</button>
           {/if}
         </p>
       {/each}

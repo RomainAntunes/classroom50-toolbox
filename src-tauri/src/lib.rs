@@ -19,6 +19,7 @@ mod failures;
 pub mod github;
 pub mod groups;
 mod login;
+pub mod manual;
 pub mod markdown;
 pub mod milestones;
 pub mod noise;
@@ -89,6 +90,8 @@ macro_rules! ipc_commands {
             crate::commands::system_hour_cycle,
             crate::commands::set_native_calendar,
             crate::commands::set_phases,
+            crate::commands::save_manual_project,
+            crate::commands::remove_manual_project,
             crate::commands::simulate_network,
             crate::commands::simulated_network,
             crate::commands::take_deep_link,
@@ -215,6 +218,7 @@ pub fn run() {
                 &app.path().app_config_dir()?,
             ));
             app.manage(phases::PhaseStore::load(&app.path().app_config_dir()?));
+            app.manage(manual::ManualStore::load(&app.path().app_config_dir()?));
             app.manage(calendar::CalendarState::load(
                 &app.path().app_config_dir()?,
                 &app.path().app_data_dir()?,

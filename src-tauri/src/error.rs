@@ -99,6 +99,16 @@ pub enum Error {
     #[error("a phase needs a name of 1 to 80 characters, on one line, and a date")]
     InvalidPhase,
 
+    /// A manual project the form sent that `manual::validate` refuses.
+    #[error(
+        "a project needs a name of 1 to 80 characters, an existing folder and a GitHub repository written as owner/repo"
+    )]
+    InvalidManualProject,
+
+    /// A manual project whose folder or repository is already a Classroom 50 project.
+    #[error("this folder or repository is already in the list as a Classroom 50 assignment")]
+    AlreadyListed,
+
     /// Linux: none of the terminal emulators the app knows is installed.
     #[error("no terminal emulator found")]
     NoTerminal,
@@ -261,6 +271,8 @@ error_kinds! {
     InvalidUsername = "invalidUsername",
     InvalidTeamName = "invalidTeamName",
     InvalidPhase = "invalidPhase",
+    InvalidManualProject = "invalidManualProject",
+    AlreadyListed = "alreadyListed",
     NoTerminal = "noTerminal",
     LocalChanges = "localChanges",
     OtherBranch = "otherBranch",
@@ -432,6 +444,8 @@ impl Error {
             Error::InvalidUsername(_) => ErrorKind::InvalidUsername,
             Error::InvalidTeamName => ErrorKind::InvalidTeamName,
             Error::InvalidPhase => ErrorKind::InvalidPhase,
+            Error::InvalidManualProject => ErrorKind::InvalidManualProject,
+            Error::AlreadyListed => ErrorKind::AlreadyListed,
             Error::NoTerminal => ErrorKind::NoTerminal,
             Error::LocalChanges => ErrorKind::LocalChanges,
             Error::OtherBranch(_) => ErrorKind::OtherBranch,
@@ -537,6 +551,8 @@ mod tests {
             Error::GroupFull { max: 3 },
             Error::InvalidTeamName,
             Error::InvalidPhase,
+            Error::InvalidManualProject,
+            Error::AlreadyListed,
             Error::NoTerminal,
             Error::LocalChanges,
             Error::OtherBranch("main".into()),

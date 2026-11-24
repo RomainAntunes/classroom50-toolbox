@@ -131,10 +131,12 @@ fn pushable(state: &ProjectsState, id: &str) -> Result<(PathBuf, String, Option<
 /// yet) nothing says which branch is graded, so push isn't offered.
 pub(super) fn push_target(project: &Project) -> Result<(String, Option<String>)> {
     let id = &project.id;
-    let every_push = project
-        .assignment
-        .as_ref()
-        .is_some_and(|a| a.submission_mode != Some(crate::classroom50::SubmissionMode::Tag));
+    // A manual project has no submission to make: its pushes are the work.
+    let every_push = project.is_manual()
+        || project
+            .assignment
+            .as_ref()
+            .is_some_and(|a| a.submission_mode != Some(crate::classroom50::SubmissionMode::Tag));
     if !every_push {
         return Err(Error::Unsupported(format!(
             "{id} isn't graded on every push; submit it instead"

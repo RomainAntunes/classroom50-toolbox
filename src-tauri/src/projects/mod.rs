@@ -46,7 +46,7 @@ pub use schedule::{refresh_if_stale, start_background_sync};
 pub use sync::{refresh, refresh_after_push, refresh_after_write, refresh_local, republish};
 
 // What the parts share, so each imports it from here.
-use build::{Sources, build};
+use build::{Sources, build, with_manual};
 use git::{check_clones, commit_emails, local_states};
 use identify::{Found, identify, identify_by, without_doubtful_templates};
 use merge::{late_seconds, merge, pending, sort_key};
@@ -55,7 +55,7 @@ use remote::{Extra, REPO_FRAGMENT, RepoNode, fetch_nodes_with, sync_remote};
 use renames::renamed_clone;
 use scan::{scan_local, watch_targets};
 use schedule::may_call_github;
-use snapshot::{annotate, full_snapshot, local_snapshot, with_phases};
+use snapshot::{OnDisk, annotate, full_snapshot, local_snapshot, with_phases};
 use statuses::{StatusAuth, keep_status, refresh_statuses, status_auth};
 use sync::{Mode, refresh_in_background};
 
@@ -230,6 +230,50 @@ pub struct Project {
     /// The phases the student set on it (`phases::PhaseStore`), by date.
     #[serde(default)]
     pub phases: Vec<crate::phases::Phase>,
+    /// Set on a project the student added by hand (`manual`), never on a Classroom 50 one.
+    #[serde(default)]
+    pub manual: Option<crate::manual::ManualInfo>,
+}
+
+impl Project {
+    /// The deadline the work still answers to: the assignment's due date while it isn't
+    /// closed or archived, or a manual project's while it isn't done.
+    pub fn open_due(&self) -> Option<DateTime<Utc>> {
+        if let Some(manual) = &self.manual {
+            return manual.due.filter(|_| !manual.done);
+        }
+        let assignment = self.assignment.as_ref()?;
+        let archived = self.remote.as_ref().is_some_and(|r| r.archived);
+        if assignment.closed || archived {
+            return None;
+        }
+        assignment.due.map(|due| due.with_timezone(&Utc))
+    }
+
+    /// The due date as set, open or not: the assignment's, else the manual project's.
+    pub fn due(&self) -> Option<DateTime<Utc>> {
+        match &self.manual {
+            Some(manual) => manual.due,
+            None => self
+                .assignment
+                .as_ref()
+                .and_then(|a| a.due)
+                .map(|due| due.with_timezone(&Utc)),
+        }
+    }
+
+    pub fn is_manual(&self) -> bool {
+        self.manual.is_some()
+    }
+
+    /// The owner half of the class a row is filed under (`owner/classroom`, as the UI's
+    /// `classKey`): none for a manual project, whose class is its label alone.
+    pub fn class_owner(&self) -> &str {
+        match &self.manual {
+            Some(_) => "",
+            None => self.owner.as_deref().unwrap_or(""),
+        }
+    }
 }
 
 /// Why the last sync was partial, as `{ kind, message, params }` like command errors.
