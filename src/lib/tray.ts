@@ -18,7 +18,7 @@ import {
 import { focus } from "#lib/deeplink.js";
 import { openPhases } from "#lib/phases.js";
 import { editorFor, openInEditor } from "#lib/editor.svelte.js";
-import { classKey } from "#lib/filter.js";
+import { classKey, classOwner, dueOf, isClosed } from "#lib/filter.js";
 import { relativeAt, t } from "#lib/i18n/index.js";
 import { session } from "#lib/session.svelte.js";
 import { installUpdate } from "#lib/update.js";
@@ -97,9 +97,8 @@ interface Deadline {
 
 /** The project's deadline while it is open, as Rust's `alerts::open_due` reads it. */
 function openDue(project: Project): string | null {
-  const assignment = project.assignment;
-  if (!assignment || assignment.closed || project.remote?.archived) return null;
-  return assignment.due;
+  if (!project.assignment && !project.manual) return null;
+  return isClosed(project) ? null : dueOf(project);
 }
 
 /** Every deadline of open work that isn't hidden, past ones included, in no order: what the
@@ -109,13 +108,14 @@ function candidates({ snapshot, hidden }: TrayInput): Deadline[] {
     !hidden.ids.includes(id) && !hidden.classes.includes(classKey(owner, classroom));
   const out: Deadline[] = [];
   for (const project of snapshot?.projects ?? []) {
+    const owner = classOwner(project);
     const due = openDue(project);
-    if (due && project.needsWork && shown(project.id, project.owner, project.config.classroom)) {
+    if (due && project.needsWork && shown(project.id, owner, project.config.classroom)) {
       const name = project.assignment?.name ?? project.config.assignment;
       out.push({ id: project.id, name, due: Date.parse(due) });
     }
     // The Done box says a phase is handed in, so `needsWork` doesn't count.
-    if (shown(project.id, project.owner, project.config.classroom)) {
+    if (shown(project.id, owner, project.config.classroom)) {
       const name = project.assignment?.name ?? project.config.assignment;
       for (const phase of openPhases(project)) {
         const id = `${project.id}#${phase.id}`;
@@ -165,7 +165,7 @@ function recent({ snapshot, hidden, editor }: TrayInput): TrayItem[] {
       (project) =>
         project.path &&
         !hidden.ids.includes(project.id) &&
-        !hidden.classes.includes(classKey(project.owner, project.config.classroom)),
+        !hidden.classes.includes(classKey(classOwner(project), project.config.classroom)),
     )
     .map((project) => ({ project, at: activeAt(project) }))
     .sort((a, b) => b.at - a.at)

@@ -6,6 +6,8 @@
   import { editorFor, editors, openInEditor } from "#lib/editor.svelte.js";
   // The flows load on the first click (`import()`), out of the startup bundle.
   import { gradedOnPush, joinsGroup } from "#lib/rowRules.js";
+  import { dueOf, isClosed } from "#lib/filter.js";
+  import { editManual, manualInitFrom } from "#lib/manualEditor.svelte.js";
   import { isHidden, setHidden } from "#lib/hidden.js";
   import { nextPhase } from "#lib/phases.js";
   import { editPhases } from "#lib/phasesEditor.svelte.js";
@@ -45,8 +47,11 @@
   const DAY = 24 * 60 * 60 * 1000;
 
   const name = $derived(project.assignment?.name ?? project.config.assignment);
-  const closed = $derived(Boolean(project.assignment?.closed || project.remote?.archived));
-  const due = $derived(project.assignment?.due ? new Date(project.assignment.due) : null);
+  // Added by hand: none of Classroom 50's own actions (submit, classmates, grades) apply.
+  const manual = $derived(project.manual);
+  const closed = $derived(isClosed(project));
+  const dueAt = $derived(dueOf(project));
+  const due = $derived(dueAt ? new Date(dueAt) : null);
   const dueSoon = $derived(
     due !== null && !closed && due > now && due.getTime() - now.getTime() < DAY,
   );
@@ -94,6 +99,7 @@
   // "Not graded" on the row, unless the student hid how assignments are graded.
   const notGraded = $derived(ungraded && gradingInfo);
   const status = $derived.by(() => {
+    if (manual?.done) return { label: t("manual.doneStatus"), warn: false, hint: undefined };
     if (closed) return { label: t("projects.closed"), warn: false, hint: undefined };
     // The last push isn't graded and won't be until it's pushed again or the teacher regrades.
     if (grading?.state === "failed") {
@@ -184,6 +190,7 @@
         })
       : `${g.score}/${g.maxScore}`;
   const path = $derived(project.path);
+  const folderName = (folder: string) => folder.split(/[\\/]/).filter(Boolean).pop() ?? folder;
   const githubUrl = $derived(
     project.remote?.url ??
       (project.owner && project.repo
@@ -195,9 +202,11 @@
   const link = $derived(openLink(project));
   // The editor that last opened the clone, else the default one.
   const editor = $derived(path ? editorFor(project) : null);
-  const cloneable = $derived(!path && Boolean(project.owner && project.repo));
+  const cloneable = $derived(!manual && !path && Boolean(project.owner && project.repo));
 
   const submittable = $derived(Boolean(path) && !closed);
+  // Pushing is all a manual project hands in, done or not.
+  const writable = $derived(Boolean(path) && (manual ? true : !closed));
   // Committed work that isn't graded yet; other rows submit from the menu only, which
   // explains why a clone with uncommitted changes can't submit.
   const ready = $derived(
@@ -213,7 +222,7 @@
   const offersPush = $derived(everyPush && commitActions === "push");
   // No row button: the row shows where the work stands and the student picks Commit or
   // Commit & push from the menu, which explains a refusal.
-  const pushable = $derived(submittable && offersPush);
+  const pushable = $derived(writable && offersPush);
 
   // GitHub has commits the clone lacks. The button only shows when a fast-forward can work
   // (untracked files don't stop one); the menu always offers it and explains a refusal.
@@ -369,7 +378,8 @@
     if (!link || !githubUrl || !owner || !repo) return [];
     const urls = cloneUrls(owner, repo, await gitProtocol());
     return Promise.all([
-      MenuItem.new({ text: t("copy.appLink"), action: () => copyLink(link) }),
+      // The app's link opens Classroom 50 projects only.
+      ...(manual ? [] : [MenuItem.new({ text: t("copy.appLink"), action: () => copyLink(link) })]),
       MenuItem.new({ text: t("copy.github"), action: () => copyLink(githubUrl) }),
       ...urls.map((url) =>
         MenuItem.new({ text: t(`copy.${url.kind}`), action: () => copyLink(url.text) }),
@@ -381,44 +391,50 @@
   async function showMenu(anchor?: HTMLElement) {
     const os = document.documentElement.dataset.os ?? "linux";
     const separator = () => PredefinedMenuItem.new({ item: "Separator" });
+    // Classroom 50's own pages and actions, which a project added by hand has none of.
+    const classroom50 = <T,>(items: T[]): T[] => (manual ? [] : items);
     const items = await Promise.all([
-      MenuItem.new({
-        text: t("projects.openClassroom50"),
-        enabled: Boolean(project.webUrl),
-        action: () => project.webUrl && openUrl(project.webUrl),
-      }),
+      ...classroom50([
+        MenuItem.new({
+          text: t("projects.openClassroom50"),
+          enabled: Boolean(project.webUrl),
+          action: () => project.webUrl && openUrl(project.webUrl),
+        }),
+      ]),
       MenuItem.new({
         text: t("projects.openGitHub"),
         enabled: Boolean(githubUrl),
         action: () => githubUrl && openUrl(githubUrl),
       }),
-      MenuItem.new({
-        text: t("projects.openFeedback"),
-        enabled: Boolean(feedback),
-        action: () => feedback && openUrl(feedback.url),
-      }),
-      MenuItem.new({
-        text: t("projects.openGroup"),
-        enabled: Boolean(project.group),
-        action: () => project.group && openUrl(project.group.url),
-      }),
-      MenuItem.new({
-        text: t("projects.openGrade"),
-        enabled: Boolean(grade),
-        action: () => grade && openUrl(grade.url),
-      }),
-      Submenu.new({
-        text: t("projects.earlierGrades"),
-        enabled: earlier.length > 0,
-        items: await Promise.all(
-          earlier.map((g) => MenuItem.new({ text: gradeLine(g), action: () => openUrl(g.url) })),
-        ),
-      }),
-      MenuItem.new({
-        text: t("projects.openGradingRun"),
-        enabled: Boolean(grading?.url),
-        action: () => grading?.url && openUrl(grading.url),
-      }),
+      ...classroom50([
+        MenuItem.new({
+          text: t("projects.openFeedback"),
+          enabled: Boolean(feedback),
+          action: () => feedback && openUrl(feedback.url),
+        }),
+        MenuItem.new({
+          text: t("projects.openGroup"),
+          enabled: Boolean(project.group),
+          action: () => project.group && openUrl(project.group.url),
+        }),
+        MenuItem.new({
+          text: t("projects.openGrade"),
+          enabled: Boolean(grade),
+          action: () => grade && openUrl(grade.url),
+        }),
+        Submenu.new({
+          text: t("projects.earlierGrades"),
+          enabled: earlier.length > 0,
+          items: await Promise.all(
+            earlier.map((g) => MenuItem.new({ text: gradeLine(g), action: () => openUrl(g.url) })),
+          ),
+        }),
+        MenuItem.new({
+          text: t("projects.openGradingRun"),
+          enabled: Boolean(grading?.url),
+          action: () => grading?.url && openUrl(grading.url),
+        }),
+      ]),
       separator(),
       MenuItem.new({
         text: t("projects.pullAction"),
@@ -443,38 +459,40 @@
             }),
           ]
         : []),
-      MenuItem.new({
-        text: t("projects.submit"),
-        enabled: submittable && !submitting,
-        action: () => submit(),
-      }),
-      MenuItem.new({
-        text: t(joinsGroup(project) ? "teammate.teamMenu" : "teammate.inviteMenu"),
-        enabled: Boolean(project.owner && project.repo) && !closed,
-        action: () => void import("#lib/teammate.js").then((m) => m.addTeammate(project, name)),
-      }),
-      MenuItem.new({
-        text: t("projects.clone"),
-        enabled: cloneable && !cloning,
-        action: () => clone(),
-      }),
-      MenuItem.new({
-        text: t("projects.cloneTo"),
-        enabled: cloneable && !cloning,
-        action: () => clone("choose"),
-      }),
-      Submenu.new({
-        text: t("clone.with"),
-        enabled: cloneable && !cloning,
-        items: await Promise.all(
-          GIT_PROTOCOLS.map((protocol) =>
-            MenuItem.new({
-              text: t(`login.protocol.${protocol}`),
-              action: () => clone("ask", protocol),
-            }),
+      ...classroom50([
+        MenuItem.new({
+          text: t("projects.submit"),
+          enabled: submittable && !submitting,
+          action: () => submit(),
+        }),
+        MenuItem.new({
+          text: t(joinsGroup(project) ? "teammate.teamMenu" : "teammate.inviteMenu"),
+          enabled: Boolean(project.owner && project.repo) && !closed,
+          action: () => void import("#lib/teammate.js").then((m) => m.addTeammate(project, name)),
+        }),
+        MenuItem.new({
+          text: t("projects.clone"),
+          enabled: cloneable && !cloning,
+          action: () => clone(),
+        }),
+        MenuItem.new({
+          text: t("projects.cloneTo"),
+          enabled: cloneable && !cloning,
+          action: () => clone("choose"),
+        }),
+        Submenu.new({
+          text: t("clone.with"),
+          enabled: cloneable && !cloning,
+          items: await Promise.all(
+            GIT_PROTOCOLS.map((protocol) =>
+              MenuItem.new({
+                text: t(`login.protocol.${protocol}`),
+                action: () => clone("ask", protocol),
+              }),
+            ),
           ),
-        ),
-      }),
+        }),
+      ]),
       ...(origin
         ? [
             MenuItem.new({
@@ -515,6 +533,20 @@
         action: () => path && api.openTerminal(path),
       }),
       MenuItem.new({ id: "phases", text: t("phases.menu"), action: () => editPhases(project) }),
+      ...(manual
+        ? [
+            MenuItem.new({
+              id: "manual-edit",
+              text: t("manual.edit"),
+              action: () => void editManual(manualInitFrom(project)),
+            }),
+            MenuItem.new({
+              id: "manual-remove",
+              text: t("manual.remove"),
+              action: () => void import("#lib/manualForm.js").then((m) => m.removeManual(project)),
+            }),
+          ]
+        : []),
       separator(),
       Submenu.new({
         text: t("copy.menu"),
@@ -584,9 +616,11 @@
                 >{t("projects.late", { duration: durationLabel(project.lateSeconds) })}</span
               > ·
             {/if}
-            {#if path}<bdi>{project.repo ?? project.config.assignment}</bdi>{:else}{t(
-                cloning ? "projects.cloning" : "projects.notCloned",
-              )}{/if}
+            {#if manual}{#if project.repo}<bdi>{project.repo}</bdi>{:else if path}<bdi
+                  >{folderName(path)}</bdi
+                >{:else}{t("manual.tag")}{/if}{:else if path}<bdi
+                >{project.repo ?? project.config.assignment}</bdi
+              >{:else}{t(cloning ? "projects.cloning" : "projects.notCloned")}{/if}
           </span>
         </span>
         {#if grading?.state === "running"}
@@ -652,8 +686,8 @@
   {#if open}
     {#await detailsPanel() then { default: Details }}
       <Details
-        description={project.assignment?.description ?? null}
-        doc={project.assignment?.descriptionDoc ?? null}
+        description={manual ? manual.notes : (project.assignment?.description ?? null)}
+        doc={manual ? null : (project.assignment?.descriptionDoc ?? null)}
         items={details}
         {milestones}
         failed={failedTests}

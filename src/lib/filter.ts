@@ -36,6 +36,23 @@ export function classKey(owner: string | null | undefined, classroom: string): s
   return `${owner ?? ""}/${classroom}`.toLowerCase();
 }
 
+/** The owner half of the class a row is filed under: none for a project the student added
+ *  by hand, whose class is its label alone (as Rust's `Project::class_owner`). */
+export function classOwner(project: Project): string {
+  return project.manual ? "" : (project.owner ?? "");
+}
+
+/** The due date as set: the assignment's, else a manual project's (`Project::due`). */
+export function dueOf(project: Project): string | null {
+  return project.manual ? project.manual.due : (project.assignment?.due ?? null);
+}
+
+/** Nothing more to hand in: submissions closed, the repo archived, or a manual project
+ *  ticked done. */
+export function isClosed(project: Project): boolean {
+  return Boolean(project.assignment?.closed || project.remote?.archived || project.manual?.done);
+}
+
 export interface ListQuery {
   filter: ListFilter;
   query: string;
@@ -57,14 +74,13 @@ export function showsProject(
     project.repo,
     ...groupFields(project.group),
   ];
-  const closed = Boolean(project.assignment?.closed || project.remote?.archived);
   const shown =
     !hidden.includes(project.id) &&
-    !hiddenClasses.includes(classKey(project.owner, project.config.classroom));
+    !hiddenClasses.includes(classKey(classOwner(project), project.config.classroom));
   return (
     (shown || query !== "") &&
     matches(fields, query) &&
-    inRange(filter, project.assignment?.due ?? null, closed, now)
+    inRange(filter, dueOf(project), isClosed(project), now)
   );
 }
 

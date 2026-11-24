@@ -16,9 +16,12 @@ export function isClassHidden(key: string): boolean {
   return settings.current?.hiddenClasses.includes(key) ?? false;
 }
 
-export async function setClassHidden(key: string, hide: boolean): Promise<void> {
-  const rest = settings.current?.hiddenClasses.filter((other) => other !== key) ?? [];
-  await saveSettings({ hiddenClasses: hide ? [...rest, key] : rest });
+/** Hides or shows the classes `keys` names: one section can hold a Classroom 50 class and
+ *  the projects added by hand under its name, each with its own key. */
+export async function setClassHidden(keys: string | string[], hide: boolean): Promise<void> {
+  const list = typeof keys === "string" ? [keys] : keys;
+  const rest = settings.current?.hiddenClasses.filter((other) => !list.includes(other)) ?? [];
+  await saveSettings({ hiddenClasses: hide ? [...rest, ...list] : rest });
 }
 
 // Folded classes show their header only.

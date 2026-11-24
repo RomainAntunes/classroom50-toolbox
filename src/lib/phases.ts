@@ -28,9 +28,11 @@ export const MAX_PHASES = 30;
 export const DEFAULT_TIME = "23:59";
 
 /** The phases that may still remind: not done, on an assignment that isn't closed or
- *  archived (as Rust's `phases::open_phases`). */
+ *  archived nor a manual project ticked done (as Rust's `phases::open_phases`). */
 export function openPhases(project: Project): ProjectPhase[] {
-  const closed = Boolean(project.assignment?.closed || project.remote?.archived);
+  const closed = Boolean(
+    project.assignment?.closed || project.remote?.archived || project.manual?.done,
+  );
   return closed ? [] : (project.phases ?? []).filter((p) => !p.done);
 }
 
