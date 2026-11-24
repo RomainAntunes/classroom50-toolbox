@@ -88,3 +88,26 @@ describe("search and hidden assignments", () => {
     expect(showsUnaccepted(item, list({ hiddenClasses: ["o/poo"] }))).toBe(false);
   });
 });
+
+describe("projects added by hand", () => {
+  const manual = (due: string | null, done = false): Project =>
+    ({
+      ...project("manual:1", null),
+      owner: "alice",
+      config: { classroom: "Writing", assignment: "Essay" },
+      assignment: null,
+      manual: { due, notes: null, done, repo: null },
+    }) as unknown as Project;
+
+  it("go by their own due date and Done box", () => {
+    expect(showsProject(manual(at(3)), list({ filter: "week" }))).toBe(true);
+    expect(showsProject(manual(at(3), true), list({ filter: "week" }))).toBe(false);
+    expect(showsProject(manual(at(3), true), list({ filter: "past" }))).toBe(true);
+    expect(showsProject(manual(null), list({ filter: "open" }))).toBe(true);
+  });
+
+  it("are filed under their class alone, whoever owns the repo", () => {
+    expect(showsProject(manual(null), list({ hiddenClasses: ["/writing"] }))).toBe(false);
+    expect(showsProject(manual(null), list({ hiddenClasses: ["alice/writing"] }))).toBe(true);
+  });
+});

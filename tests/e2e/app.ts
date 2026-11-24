@@ -19,6 +19,8 @@ export const WRITES = [
   "pull_project",
   "add_teammates",
   "set_phases",
+  "save_manual_project",
+  "remove_manual_project",
   "set_git_identity",
   "set_up_git_credentials",
   "set_git_protocol",

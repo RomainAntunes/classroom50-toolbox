@@ -293,6 +293,96 @@ export function project(options: ProjectOptions): Project {
     lastEditor: options.lastEditor ?? null,
     group: options.group ?? null,
     phases: options.phases ?? [],
+    manual: null,
+  };
+}
+
+export interface ManualOptions {
+  name: string;
+  /** The class label; empty files it under "My projects". */
+  class?: string;
+  due?: string | null;
+  notes?: string | null;
+  done?: boolean;
+  /** A folder on disk: cloned from `repo` when one is given. */
+  folder?: string | null;
+  /** `owner/repo`, from the folder's origin or as typed. */
+  repo?: string | null;
+  local?: Partial<LocalState>;
+  remote?: Partial<RemoteRepo> | null;
+  pending?: Project["pending"];
+  phases?: Project["phases"];
+}
+
+/** A project the student added by hand (`manual.rs`): no classroom, no assignment. */
+export function manualProject(id: string, options: ManualOptions): Project {
+  const [owner, repo] = options.repo ? options.repo.split("/") : [null, null];
+  const path = options.folder ? `${HOME}/${options.folder}` : null;
+  const local: LocalState | null = path
+    ? {
+        branch: "main",
+        head: "f00dcafe1234",
+        ahead: 0,
+        behind: 0,
+        changedFiles: 0,
+        changedPaths: [],
+        trackedChanges: 0,
+        unmerged: [],
+        remoteAhead: false,
+        activeAt: null,
+        notGradedFiles: 0,
+        notGradedPaths: [],
+        origin: owner ? "https" : null,
+        ...options.local,
+      }
+    : null;
+  const remote: RemoteRepo | null =
+    owner && repo && options.remote !== null && options.remote !== undefined
+      ? {
+          owner,
+          name: repo,
+          url: `https://github.com/${owner}/${repo}`,
+          archived: false,
+          canPush: true,
+          defaultBranch: "main",
+          head: { oid: "f00dcafe1234", at: hoursFromNow(-5), author: LOGIN },
+          lastSubmission: null,
+          config: null,
+          template: null,
+          unmerged: [],
+          grade: null,
+          history: [],
+          grading: null,
+          feedback: null,
+          milestones: [],
+          ...options.remote,
+        }
+      : null;
+  const done = options.done ?? false;
+  return {
+    id: `manual:${id}`,
+    owner,
+    repo,
+    config: { classroom: options.class ?? "", assignment: options.name, secret: null },
+    path,
+    local,
+    remote,
+    classroom: null,
+    assignment: null,
+    pending: options.pending ?? null,
+    needsWork: !done,
+    webUrl: null,
+    lateSeconds: null,
+    editor: null,
+    lastEditor: null,
+    group: null,
+    phases: options.phases ?? [],
+    manual: {
+      due: options.due ?? null,
+      notes: options.notes ?? null,
+      done,
+      repo: options.repo ?? null,
+    },
   };
 }
 
